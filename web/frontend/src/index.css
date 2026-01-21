@@ -1,0 +1,68 @@
+/* 1. Import Cairo FIRST (only Cairo to save performance) */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&display=swap');
+@import "tailwindcss";
+
+@theme {
+    /* 2. Define Cairo */
+    --font-cairo: "Cairo", sans-serif;
+    
+    /* 3. Make Cairo the default sans font for the whole project */
+    --font-sans: "Cairo", sans-serif;
+
+    --color-brand-primary: #1a365d;
+    --color-brand-secondary: #2d3748;
+    --color-brand-accent: #3182ce;
+    --color-surface: #ffffff;
+    --color-background: #f7fafc;
+
+    --radius-xl: 1rem;
+    --radius-2xl: 1.5rem;
+}
+
+@layer base {
+    :root {
+        --brand-primary: #1a365d;
+        --brand-secondary: #2d3748;
+        --brand-accent: #3182ce;
+    }
+
+    * {
+        @apply border-gray-200;
+    }
+
+    body {
+        @apply bg-[#f8fafc] text-slate-900;
+        /* 4. Apply Cairo and RTL direction explicitly */
+        font-family: var(--font-cairo);
+        direction: rtl;
+    }
+
+    /* Since we set --font-sans to Cairo in the theme, 
+       we don't strictly need this, but it adds safety */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-cairo);
+    }
+}
+
+@layer utilities {
+    .glass {
+        @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+    }
+
+    .glass-dark {
+        @apply bg-slate-900/80 backdrop-blur-md border border-slate-700/30 shadow-2xl;
+    }
+
+    .text-gradient {
+        @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-brand-accent;
+    }
+
+    .btn-primary {
+        /* Removed 'font-readex' and replaced with Cairo (inherited or explicit) */
+        @apply bg-brand-primary text-white px-6 py-2.5 rounded-lg hover:bg-brand-accent transition-all duration-300 font-cairo active:scale-95 shadow-lg shadow-brand-primary/20;
+    }
+
+    .input-field {
+        @apply w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-brand-accent focus:border-transparent outline-none transition-all duration-200 text-right;
+    }
+}

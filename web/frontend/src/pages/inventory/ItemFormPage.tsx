@@ -1,0 +1,1118 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+    ChevronRight, Save, Package, Info, Scale, Barcode, DollarSign,
+    Settings, Image as ImageIcon, RefreshCw, AlertCircle, CheckCircle2,
+    X, Tag, Box, Percent, ShoppingCart, ShoppingBag, FileText,
+    Layers, TrendingUp, Calculator, Microscope, Trash2, Plus
+} from 'lucide-react';
+import { itemService, type ItemDto } from '../../services/itemService';
+import { itemCategoryService, type ItemCategoryDto } from '../../services/itemCategoryService';
+import { unitService, type UnitDto } from '../../services/unitService';
+import { qualityService, type QualityParameterDto, type ItemQualitySpecDto } from '../../services/qualityService';
+import { toast } from 'react-hot-toast';
+
+// Animated Input Component
+const FormInput: React.FC<{
+    label: string;
+    value: string | number;
+    onChange: (value: string) => void;
+    icon?: React.ElementType;
+    placeholder?: string;
+    required?: boolean;
+    type?: string;
+    dir?: string;
+    disabled?: boolean;
+    hint?: string;
+    colorClass?: string;
+}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', dir, disabled, hint, colorClass }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const hasValue = value !== undefined && value !== null && value !== '' && value !== 0;
+
+    return (
+        <div className="space-y-2">
+            <label className={`block text-sm font-semibold transition-colors duration-200
+                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
+                {label}
+                {required && <span className="text-rose-500 mr-1">*</span>}
+            </label>
+            <div className="relative">
+                {Icon && (
+                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200
+                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                )}
+                <input
+                    type={type}
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    placeholder={placeholder}
+                    required={required}
+                    disabled={disabled}
+                    dir={dir}
+                    step={type === 'number' ? '0.01' : undefined}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none
+                        disabled:bg-slate-100 disabled:cursor-not-allowed
+                        ${Icon ? 'pr-12' : ''}
+                        ${colorClass || ''}
+                        ${isFocused
+                            ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                            : hasValue
+                                ? 'border-brand-primary/30 bg-brand-primary/5'
+                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+                />
+                {hasValue && !isFocused && type !== 'number' && (
+                    <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-primary" />
+                )}
+            </div>
+            {hint && (
+                <p className="text-xs text-slate-500 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    {hint}
+                </p>
+            )}
+        </div>
+    );
+};
+
+// Form Select Component
+const FormSelect: React.FC<{
+    label: string;
+    value: number | string;
+    onChange: (value: string) => void;
+    options: { value: number | string; label: string }[];
+    icon?: React.ElementType;
+    required?: boolean;
+    placeholder?: string;
+}> = ({ label, value, onChange, options, icon: Icon, required, placeholder }) => {
+    const [isFocused, setIsFocused] = useState(false);
+
+    return (
+        <div className="space-y-2">
+            <label className={`block text-sm font-semibold transition-colors duration-200
+                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
+                {label}
+                {required && <span className="text-rose-500 mr-1">*</span>}
+            </label>
+            <div className="relative">
+                {Icon && (
+                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200
+                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                )}
+                <select
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    required={required}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none 
+                        appearance-none bg-white cursor-pointer
+                        ${Icon ? 'pr-12' : ''}
+                        ${isFocused
+                            ? 'border-brand-primary shadow-lg shadow-brand-primary/10'
+                            : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                    {placeholder && <option value="">{placeholder}</option>}
+                    {options.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+                <ChevronRight className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400
+                    transition-transform duration-200 rotate-90 ${isFocused ? 'rotate-[270deg]' : ''}`} />
+            </div>
+        </div>
+    );
+};
+
+// Form Textarea Component
+const FormTextarea: React.FC<{
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    icon?: React.ElementType;
+    placeholder?: string;
+    rows?: number;
+}> = ({ label, value, onChange, icon: Icon, placeholder, rows = 3 }) => {
+    const [isFocused, setIsFocused] = useState(false);
+
+    return (
+        <div className="space-y-2">
+            <label className={`block text-sm font-semibold transition-colors duration-200
+                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
+                {label}
+            </label>
+            <div className="relative">
+                {Icon && (
+                    <Icon className={`absolute right-4 top-4 w-5 h-5 transition-all duration-200
+                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                )}
+                <textarea
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    placeholder={placeholder}
+                    rows={rows}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none resize-none
+                        ${Icon ? 'pr-12' : ''}
+                        ${isFocused
+                            ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+                />
+            </div>
+        </div>
+    );
+};
+
+// Toggle Switch Component
+const ToggleSwitch: React.FC<{
+    label: string;
+    description?: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    icon?: React.ElementType;
+    activeColor?: string;
+}> = ({ label, description, checked, onChange, icon: Icon, activeColor = 'bg-brand-primary' }) => (
+    <div
+        onClick={() => onChange(!checked)}
+        className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer
+            transition-all duration-200 group
+            ${checked
+                ? 'border-brand-primary/30 bg-brand-primary/5'
+                : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+    >
+        <div className="flex items-center gap-3">
+            {Icon && (
+                <div className={`p-2 rounded-lg transition-colors duration-200
+                    ${checked ? 'bg-brand-primary/20 text-brand-primary' : 'bg-slate-200 text-slate-500'}`}>
+                    <Icon className="w-5 h-5" />
+                </div>
+            )}
+            <div>
+                <span className={`font-semibold transition-colors duration-200
+                    ${checked ? 'text-brand-primary' : 'text-slate-700'}`}>
+                    {label}
+                </span>
+                {description && (
+                    <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+                )}
+            </div>
+        </div>
+        <div className={`relative w-14 h-7 rounded-full transition-colors duration-200
+            ${checked ? activeColor : 'bg-slate-300'}`}>
+            <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200
+                ${checked ? 'right-1' : 'left-1'}`} />
+        </div>
+    </div>
+);
+
+// Form Section Component
+const FormSection: React.FC<{
+    title: string;
+    icon: React.ElementType;
+    children: React.ReactNode;
+    description?: string;
+    badge?: string;
+}> = ({ title, icon: Icon, children, description, badge }) => (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm 
+        transition-all duration-300 hover:shadow-lg hover:border-slate-300">
+        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-l from-slate-50 to-white">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                        flex items-center justify-center text-brand-primary shadow-sm">
+                        <Icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-slate-800">{title}</h3>
+                        {description && (
+                            <p className="text-xs text-slate-500">{description}</p>
+                        )}
+                    </div>
+                </div>
+                {badge && (
+                    <span className="px-3 py-1 bg-brand-primary/10 text-brand-primary text-xs font-semibold rounded-full">
+                        {badge}
+                    </span>
+                )}
+            </div>
+        </div>
+        <div className="p-6">
+            {children}
+        </div>
+    </div>
+);
+
+// Stock Level Indicator Component
+const StockLevelIndicator: React.FC<{
+    min: number;
+    reorder: number;
+    max: number;
+}> = ({ min, reorder, max }) => (
+    <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+        <p className="text-sm font-semibold text-slate-700 mb-3">مؤشر مستويات المخزون</p>
+        <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden">
+            {/* Min zone */}
+            <div
+                className="absolute h-full bg-rose-400"
+                style={{ width: `${(min / (max || 100)) * 100}%` }}
+            />
+            {/* Reorder zone */}
+            <div
+                className="absolute h-full bg-amber-400"
+                style={{ left: `${(min / (max || 100)) * 100}%`, width: `${((reorder - min) / (max || 100)) * 100}%` }}
+            />
+            {/* Normal zone */}
+            <div
+                className="absolute h-full bg-emerald-400"
+                style={{ left: `${(reorder / (max || 100)) * 100}%`, right: 0 }}
+            />
+        </div>
+        <div className="flex justify-between mt-2 text-xs">
+            <span className="flex items-center gap-1 text-rose-600">
+                <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                حرج (0-{min})
+            </span>
+            <span className="flex items-center gap-1 text-amber-600">
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                منخفض ({min}-{reorder})
+            </span>
+            <span className="flex items-center gap-1 text-emerald-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                متوفر ({reorder}-{max})
+            </span>
+        </div>
+    </div>
+);
+
+// Price Calculator Component
+const PriceCalculator: React.FC<{
+    cost: number;
+    salePrice: number;
+    vatRate: number;
+}> = ({ cost, salePrice, vatRate }) => {
+    const profit = salePrice - cost;
+    const margin = cost > 0 ? ((profit / cost) * 100).toFixed(1) : '0';
+    const priceWithVat = salePrice * (1 + vatRate / 100);
+
+    return (
+        <div className="mt-4 p-4 bg-gradient-to-br from-brand-primary/5 to-white rounded-xl border border-brand-primary/20">
+            <p className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-brand-primary" />
+                حاسبة الأسعار التلقائية
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-white rounded-lg border border-slate-100">
+                    <p className="text-xs text-slate-500 mb-1">هامش الربح</p>
+                    <p className={`text-lg font-bold ${parseFloat(margin) > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {margin}%
+                    </p>
+                </div>
+                <div className="text-center p-3 bg-white rounded-lg border border-slate-100">
+                    <p className="text-xs text-slate-500 mb-1">الربح للوحدة</p>
+                    <p className={`text-lg font-bold ${profit > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {profit.toFixed(2)}
+                    </p>
+                </div>
+                <div className="text-center p-3 bg-white rounded-lg border border-slate-100">
+                    <p className="text-xs text-slate-500 mb-1">السعر بالضريبة</p>
+                    <p className="text-lg font-bold text-brand-primary">
+                        {priceWithVat.toFixed(2)}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ItemFormPage: React.FC = () => {
+    const navigate = useNavigate();
+    const { id } = useParams<{ id: string }>();
+    const isEdit = Boolean(id && id !== 'new');
+
+    const [loading, setLoading] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [categories, setCategories] = useState<ItemCategoryDto[]>([]);
+    const [units, setUnits] = useState<UnitDto[]>([]);
+    const [activeTab, setActiveTab] = useState<'basic' | 'pricing' | 'stock' | 'quality' | 'settings'>('basic');
+    const [hasChanges, setHasChanges] = useState(false);
+
+    // Quality Specs State
+    const [specs, setSpecs] = useState<ItemQualitySpecDto[]>([]);
+    const [availableParams, setAvailableParams] = useState<QualityParameterDto[]>([]);
+    const [isAddingSpec, setIsAddingSpec] = useState(false);
+    const [newSpec, setNewSpec] = useState<ItemQualitySpecDto>({
+        itemId: 0,
+        parameterId: 0,
+        targetValue: 0,
+        minValue: 0,
+        maxValue: 0,
+        isRequired: false
+    });
+
+    const [formData, setFormData] = useState<ItemDto>({
+        itemCode: '',
+        itemNameAr: '',
+        itemNameEn: '',
+        gradeName: '',
+        categoryId: 0,
+        unitId: 0,
+        barcode: '',
+        description: '',
+        technicalSpecs: '',
+        minStockLevel: 0,
+        maxStockLevel: 0,
+        reorderLevel: 0,
+        avgMonthlyConsumption: 0,
+        standardCost: 0,
+        lastPurchasePrice: 0,
+        replacementPrice: 0,
+        lastSalePrice: 0,
+        defaultVatRate: 14,
+        isActive: true,
+        isSellable: true,
+        isPurchasable: true
+    });
+
+    const [originalData, setOriginalData] = useState<ItemDto | null>(null);
+
+    useEffect(() => {
+        fetchInitialData();
+        if (isEdit) {
+            fetchItem();
+        } else {
+            setInitialLoading(false);
+        }
+    }, [id]);
+
+    useEffect(() => {
+        if (originalData) {
+            setHasChanges(JSON.stringify(formData) !== JSON.stringify(originalData));
+        }
+    }, [formData, originalData]);
+
+    const fetchInitialData = async () => {
+        try {
+            const [catsRes, unitsRes] = await Promise.all([
+                itemCategoryService.getActiveCategories(),
+                unitService.getAllUnits()
+            ]);
+            setCategories(catsRes.data || []);
+            setUnits(unitsRes.data || []);
+
+            const paramsRes = await qualityService.getActiveParameters();
+            setAvailableParams(paramsRes.data || []);
+        } catch (error) {
+            console.error('Error fetching initial data:', error);
+            toast.error('فشل في تحميل بيانات التصنيفات والوحدات');
+        }
+    };
+
+    const fetchItem = async () => {
+        if (!id) return;
+        try {
+            setInitialLoading(true);
+            const response = await itemService.getItemById(parseInt(id));
+            if (response.data) {
+                setFormData(response.data);
+                setOriginalData(response.data);
+
+                // Fetch existing specs
+                const specsRes = await qualityService.getSpecsByItem(parseInt(id));
+                setSpecs(specsRes.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching item:', error);
+            toast.error('فشل في تحميل بيانات الصنف');
+        } finally {
+            setInitialLoading(false);
+        }
+    };
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        try {
+            setLoading(true);
+            if (isEdit && id) {
+                await itemService.updateItem(parseInt(id), formData);
+                toast.success('تم تحديث الصنف بنجاح', { icon: '🎉' });
+            } else {
+                await itemService.createItem(formData);
+                toast.success('تم إضافة الصنف بنجاح', { icon: '🎉' });
+            }
+            navigate('/dashboard/inventory/items');
+        } catch (error: any) {
+            console.error('Error saving item:', error);
+            toast.error(error.response?.data?.message || 'فشل في حفظ الصنف');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const updateForm = (field: keyof ItemDto, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const tabs = [
+        { id: 'basic', label: 'المعلومات الأساسية', icon: Info },
+        { id: 'pricing', label: 'الأسعار والضرائب', icon: DollarSign },
+        { id: 'stock', label: 'المخزون', icon: Scale },
+        { id: 'quality', label: 'المواصفات الفنية', icon: Microscope },
+        { id: 'settings', label: 'الإعدادات', icon: Settings },
+    ];
+
+    // Loading Skeleton
+    if (initialLoading) {
+        return (
+            <div className="max-w-5xl mx-auto space-y-6 animate-pulse">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-200" />
+                        <div>
+                            <div className="h-6 w-48 bg-slate-200 rounded mb-2" />
+                            <div className="h-4 w-64 bg-slate-100 rounded" />
+                        </div>
+                    </div>
+                    <div className="flex gap-3">
+                        <div className="h-10 w-24 bg-slate-200 rounded-xl" />
+                        <div className="h-10 w-32 bg-slate-200 rounded-xl" />
+                    </div>
+                </div>
+                <div className="h-14 bg-white rounded-xl border border-slate-200" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="h-64 bg-white rounded-2xl border border-slate-200" />
+                    <div className="h-64 bg-white rounded-2xl border border-slate-200" />
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-5xl mx-auto space-y-6 pb-24">
+            {/* Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-6 text-white">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-48 h-48 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-64 h-64 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => navigate('/dashboard/inventory/items')}
+                            className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                        >
+                            <ChevronRight className="w-6 h-6" />
+                        </button>
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl">
+                                <Package className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold">
+                                    {isEdit ? 'تعديل بيانات الصنف' : 'إضافة صنف جديد'}
+                                </h1>
+                                <p className="text-white/70">
+                                    {isEdit ? `تعديل: ${formData.itemCode}` : 'أدخل التفاصيل الفنية والمالية للصنف'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => navigate('/dashboard/inventory/items')}
+                            className="px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl 
+                                transition-colors font-medium flex items-center gap-2"
+                        >
+                            <X className="w-5 h-5" />
+                            إلغاء
+                        </button>
+                        <button
+                            onClick={() => handleSubmit()}
+                            disabled={loading || (!hasChanges && isEdit)}
+                            className="px-6 py-2.5 bg-white text-brand-primary rounded-xl 
+                                flex items-center gap-2 font-bold hover:bg-white/90 
+                                transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <RefreshCw className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Save className="w-5 h-5" />
+                            )}
+                            {isEdit ? 'حفظ التغييرات' : 'إضافة الصنف'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex flex-wrap gap-2 p-2 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all duration-200
+                            ${activeTab === tab.id
+                                ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30'
+                                : 'text-slate-600 hover:bg-slate-100'
+                            }`}
+                    >
+                        <tab.icon className="w-5 h-5" />
+                        <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* Form Content */}
+            <form onSubmit={handleSubmit}>
+                {/* Basic Info Tab */}
+                {activeTab === 'basic' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <FormSection
+                            title="المعلومات الأساسية"
+                            icon={Info}
+                            description="البيانات الرئيسية للصنف"
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FormInput
+                                    label="كود الصنف"
+                                    value={formData.itemCode}
+                                    onChange={(v) => updateForm('itemCode', v)}
+                                    icon={Tag}
+                                    placeholder="POLY-HD-001"
+                                    required
+                                    hint="كود فريد لتعريف الصنف"
+                                />
+                                <div className="md:col-span-2">
+                                    <FormInput
+                                        label="الاسم العربي"
+                                        value={formData.itemNameAr}
+                                        onChange={(v) => updateForm('itemNameAr', v)}
+                                        icon={Package}
+                                        placeholder="اسم الصنف باللغة العربية"
+                                        required
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <FormInput
+                                        label="الاسم الإنجليزي"
+                                        value={formData.itemNameEn || ''}
+                                        onChange={(v) => updateForm('itemNameEn', v)}
+                                        icon={Package}
+                                        placeholder="Item name in English"
+                                        dir="ltr"
+                                    />
+                                </div>
+                                <FormInput
+                                    label="العلامة التجارية / Grade"
+                                    value={formData.gradeName || ''}
+                                    onChange={(v) => updateForm('gradeName', v)}
+                                    icon={Layers}
+                                    placeholder="Sabic 5000S"
+                                />
+                            </div>
+                        </FormSection>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormSection
+                                title="التصنيف والوحدات"
+                                icon={Tag}
+                                description="تصنيف الصنف ووحدة القياس"
+                            >
+                                <div className="space-y-4">
+                                    <FormSelect
+                                        label="التصنيف"
+                                        value={formData.categoryId || ''}
+                                        onChange={(v) => updateForm('categoryId', parseInt(v))}
+                                        icon={Layers}
+                                        required
+                                        placeholder="اختر التصنيف"
+                                        options={categories.map(cat => ({
+                                            value: cat.id!,
+                                            label: cat.categoryNameAr
+                                        }))}
+                                    />
+                                    <FormSelect
+                                        label="وحدة القياس الأساسية"
+                                        value={formData.unitId || ''}
+                                        onChange={(v) => updateForm('unitId', parseInt(v))}
+                                        icon={Box}
+                                        required
+                                        placeholder="اختر الوحدة"
+                                        options={units.map(unit => ({
+                                            value: unit.id!,
+                                            label: unit.unitNameAr
+                                        }))}
+                                    />
+                                    <FormInput
+                                        label="الباركود"
+                                        value={formData.barcode || ''}
+                                        onChange={(v) => updateForm('barcode', v)}
+                                        icon={Barcode}
+                                        placeholder="1234567890123"
+                                        hint="رقم الباركود للمسح الضوئي"
+                                    />
+                                </div>
+                            </FormSection>
+
+                            <FormSection
+                                title="تفاصيل إضافية"
+                                icon={FileText}
+                                description="وصف الصنف والمواصفات"
+                            >
+                                <div className="space-y-4">
+                                    <FormTextarea
+                                        label="وصف الصنف"
+                                        value={formData.description || ''}
+                                        onChange={(v) => updateForm('description', v)}
+                                        icon={FileText}
+                                        placeholder="وصف عام لمجال استخدام الصنف..."
+                                        rows={3}
+                                    />
+                                    <FormTextarea
+                                        label="المواصفات الفنية"
+                                        value={formData.technicalSpecs || ''}
+                                        onChange={(v) => updateForm('technicalSpecs', v)}
+                                        icon={Settings}
+                                        placeholder="الكثافة، درجة الانصهار، الشركة المصنعة..."
+                                        rows={3}
+                                    />
+                                </div>
+                            </FormSection>
+                        </div>
+
+                        <FormSection
+                            title="صورة الصنف"
+                            icon={ImageIcon}
+                            description="رابط صورة الصنف (اختياري)"
+                        >
+                            <FormInput
+                                label="رابط الصورة"
+                                value={formData.imagePath || ''}
+                                onChange={(v) => updateForm('imagePath', v)}
+                                icon={ImageIcon}
+                                placeholder="https://example.com/image.jpg"
+                                dir="ltr"
+                            />
+                            {formData.imagePath && (
+                                <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                    <p className="text-sm text-slate-600 mb-2">معاينة الصورة:</p>
+                                    <img
+                                        src={formData.imagePath}
+                                        alt="معاينة"
+                                        className="max-h-32 rounded-lg border border-slate-200"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </FormSection>
+                    </div>
+                )}
+
+                {/* Pricing Tab */}
+                {activeTab === 'pricing' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <FormSection
+                            title="الأسعار والتكاليف"
+                            icon={DollarSign}
+                            description="أسعار الشراء والبيع والتكلفة"
+                            badge="ج.م"
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormInput
+                                    label="التكلفة المعيارية"
+                                    value={formData.standardCost || 0}
+                                    onChange={(v) => updateForm('standardCost', parseFloat(v) || 0)}
+                                    icon={DollarSign}
+                                    type="number"
+                                    placeholder="0.00"
+                                />
+                                <FormInput
+                                    label="آخر سعر شراء"
+                                    value={formData.lastPurchasePrice || 0}
+                                    onChange={(v) => updateForm('lastPurchasePrice', parseFloat(v) || 0)}
+                                    icon={ShoppingCart}
+                                    type="number"
+                                    placeholder="0.00"
+                                />
+                                <FormInput
+                                    label="آخر سعر بيع"
+                                    value={formData.lastSalePrice || 0}
+                                    onChange={(v) => updateForm('lastSalePrice', parseFloat(v) || 0)}
+                                    icon={ShoppingBag}
+                                    type="number"
+                                    placeholder="0.00"
+                                />
+                                <FormInput
+                                    label="السعر الاستبدالي"
+                                    value={formData.replacementPrice || 0}
+                                    onChange={(v) => updateForm('replacementPrice', parseFloat(v) || 0)}
+                                    icon={TrendingUp}
+                                    type="number"
+                                    placeholder="0.00"
+                                />
+                            </div>
+
+                            <PriceCalculator
+                                cost={formData.standardCost || formData.lastPurchasePrice || 0}
+                                salePrice={formData.lastSalePrice || 0}
+                                vatRate={formData.defaultVatRate || 0}
+                            />
+                        </FormSection>
+
+                        <FormSection
+                            title="الضرائب"
+                            icon={Percent}
+                            description="إعدادات الضريبة الافتراضية"
+                        >
+                            <div className="max-w-xs">
+                                <FormInput
+                                    label="نسبة ضريبة القيمة المضافة"
+                                    value={formData.defaultVatRate || 14}
+                                    onChange={(v) => updateForm('defaultVatRate', parseFloat(v) || 0)}
+                                    icon={Percent}
+                                    type="number"
+                                    placeholder="14"
+                                    hint="النسبة الافتراضية للضريبة على هذا الصنف"
+                                />
+                            </div>
+                        </FormSection>
+                    </div>
+                )}
+
+                {/* Stock Tab */}
+                {activeTab === 'stock' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <FormSection
+                            title="مستويات المخزون"
+                            icon={Scale}
+                            description="حدود المخزون للتنبيهات"
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormInput
+                                    label="الحد الأدنى"
+                                    value={formData.minStockLevel || 0}
+                                    onChange={(v) => updateForm('minStockLevel', parseFloat(v) || 0)}
+                                    icon={AlertCircle}
+                                    type="number"
+                                    placeholder="0"
+                                    hint="تنبيه عند الوصول لهذا المستوى"
+                                    colorClass="text-rose-600 font-bold"
+                                />
+                                <FormInput
+                                    label="حد إعادة الطلب"
+                                    value={formData.reorderLevel || 0}
+                                    onChange={(v) => updateForm('reorderLevel', parseFloat(v) || 0)}
+                                    icon={RefreshCw}
+                                    type="number"
+                                    placeholder="0"
+                                    hint="مستوى طلب إعادة التوريد"
+                                    colorClass="text-amber-600 font-bold"
+                                />
+                                <FormInput
+                                    label="الحد الأقصى"
+                                    value={formData.maxStockLevel || 0}
+                                    onChange={(v) => updateForm('maxStockLevel', parseFloat(v) || 0)}
+                                    icon={TrendingUp}
+                                    type="number"
+                                    placeholder="0"
+                                    hint="الحد الأقصى للمخزون"
+                                    colorClass="text-emerald-600 font-bold"
+                                />
+                                <FormInput
+                                    label="متوسط الاستهلاك الشهري"
+                                    value={formData.avgMonthlyConsumption || 0}
+                                    onChange={(v) => updateForm('avgMonthlyConsumption', parseFloat(v) || 0)}
+                                    icon={TrendingUp}
+                                    type="number"
+                                    placeholder="0"
+                                    hint="لحساب توقعات الطلب"
+                                />
+                            </div>
+
+                            <StockLevelIndicator
+                                min={formData.minStockLevel || 0}
+                                reorder={formData.reorderLevel || 0}
+                                max={formData.maxStockLevel || 100}
+                            />
+                        </FormSection>
+                    </div>
+                )}
+
+                {/* Quality Specs Tab */}
+                {activeTab === 'quality' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300 font-readex">
+                        <FormSection
+                            title="مواصفات الجودة"
+                            icon={Microscope}
+                            description="تحديد المعايير الفنية المطلوب توفرها في المنتج"
+                        >
+                            <div className="space-y-4">
+                                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                    <table className="w-full text-right">
+                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500">مواصفة الجودة</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500">القيمة المستهدفة</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500">المدى (Min-Max)</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500 text-center">إلزامي</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500 text-center">إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {specs.map((spec) => (
+                                                <tr key={spec.id} className="hover:bg-slate-50/50">
+                                                    <td className="px-4 py-3 text-sm">
+                                                        <p className="font-bold text-slate-900">{spec.parameterNameAr}</p>
+                                                        <p className="text-xs text-slate-400">{spec.unit}</p>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">{spec.targetValue || '---'}</td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        {spec.dataType === 'NUMERIC' ? (
+                                                            <span className="font-readex text-slate-600">
+                                                                {spec.minValue} - {spec.maxValue}
+                                                            </span>
+                                                        ) : '---'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        {spec.isRequired ? (
+                                                            <span className="px-2 py-0.5 bg-rose-50 text-rose-600 text-[10px] font-bold rounded-full">نعم</span>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-[10px] font-bold rounded-full">لا</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                if (spec.id) {
+                                                                    try {
+                                                                        await qualityService.deleteSpec(spec.id);
+                                                                        setSpecs(specs.filter(s => s.id !== spec.id));
+                                                                        toast.success('تم حذف المواصفة');
+                                                                    } catch (err) {
+                                                                        toast.error('فشل الحذف');
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {specs.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-sm font-readex">
+                                                        لم يتم إضافة مواصفات جودة لهذا الصنف حتى الآن
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {!isAddingSpec ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAddingSpec(true)}
+                                        className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl 
+                                            text-slate-500 hover:border-brand-primary hover:text-brand-primary 
+                                            hover:bg-brand-primary/5 transition-all flex items-center justify-center gap-2 font-medium font-readex"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        إضافة مواصفة جديدة
+                                    </button>
+                                ) : (
+                                    <div className="p-6 bg-slate-50 rounded-2xl border-2 border-brand-primary/20 space-y-4 animate-in zoom-in-95 duration-200">
+                                        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                            <h4 className="font-bold text-slate-800 font-readex">إضافة مواصفة فنية</h4>
+                                            <button onClick={() => setIsAddingSpec(false)} className="text-slate-400 hover:text-slate-600">
+                                                <X className="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-semibold text-slate-700 font-readex">اختر المعامل *</label>
+                                                <select
+                                                    value={newSpec.parameterId}
+                                                    onChange={(e) => setNewSpec({ ...newSpec, parameterId: parseInt(e.target.value) })}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-brand-primary/20 font-readex text-right"
+                                                    dir="rtl"
+                                                >
+                                                    <option value="0">اختر...</option>
+                                                    {availableParams.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.parameterNameAr} ({p.unit})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-semibold text-slate-700 font-readex">القيمة المستهدفة</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.000001"
+                                                    value={newSpec.targetValue}
+                                                    onChange={(e) => setNewSpec({ ...newSpec, targetValue: parseFloat(e.target.value) || 0 })}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary/20 font-readex"
+                                                    placeholder="مثال: 0.95"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-semibold text-slate-700 font-readex">الحد الأدنى (Min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={newSpec.minValue}
+                                                    onChange={(e) => setNewSpec({ ...newSpec, minValue: parseFloat(e.target.value) || 0 })}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary/20 font-readex"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-semibold text-slate-700 font-readex">الحد الأقصى (Max)</label>
+                                                <input
+                                                    type="number"
+                                                    value={newSpec.maxValue}
+                                                    onChange={(e) => setNewSpec({ ...newSpec, maxValue: parseFloat(e.target.value) || 0 })}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary/20 font-readex"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
+                                            <input
+                                                type="checkbox"
+                                                checked={newSpec.isRequired}
+                                                onChange={(e) => setNewSpec({ ...newSpec, isRequired: e.target.checked })}
+                                                id="required-check-spec"
+                                                className="w-4 h-4 text-brand-primary rounded"
+                                            />
+                                            <label htmlFor="required-check-spec" className="text-sm font-medium text-slate-700 font-readex">هذه المواصفة إلزامية لفحص الجودة</label>
+                                        </div>
+
+                                        <div className="flex gap-3 pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    if (!newSpec.parameterId) {
+                                                        toast.error('يرجى اختيار المعامل أولاً');
+                                                        return;
+                                                    }
+                                                    if (!id || id === 'new') {
+                                                        toast.error('يرجى حفظ الصنف أولاً قبل إضافة المواصفات');
+                                                        return;
+                                                    }
+                                                    try {
+                                                        const res = await qualityService.createSpec({ ...newSpec, itemId: parseInt(id) });
+                                                        setSpecs([...specs, res.data]);
+                                                        setIsAddingSpec(false);
+                                                        setNewSpec({ itemId: 0, parameterId: 0, targetValue: 0, minValue: 0, maxValue: 0, isRequired: false });
+                                                        toast.success('تمت إضافة المواصفة بنجاح');
+                                                    } catch (err) {
+                                                        toast.error('فشل إضافة المواصفة');
+                                                    }
+                                                }}
+                                                className="flex-1 py-2 bg-brand-primary text-white rounded-lg font-bold shadow-lg shadow-brand-primary/20 font-readex"
+                                            >
+                                                حفظ المواصفة
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAddingSpec(false)}
+                                                className="flex-1 py-2 bg-slate-200 text-slate-600 rounded-lg font-bold font-readex"
+                                            >
+                                                إلغاء
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </FormSection>
+                    </div>
+                )}
+
+                {/* Settings Tab */}
+                {activeTab === 'settings' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <FormSection
+                            title="حالة الصنف"
+                            icon={Settings}
+                            description="إعدادات التفعيل والخصائص"
+                        >
+                            <div className="space-y-4">
+                                <ToggleSwitch
+                                    label="صنف نشط"
+                                    description="يظهر الصنف في العمليات والتقارير"
+                                    checked={formData.isActive}
+                                    onChange={(v) => updateForm('isActive', v)}
+                                    icon={CheckCircle2}
+                                    activeColor="bg-emerald-500"
+                                />
+                                <ToggleSwitch
+                                    label="قابل للبيع"
+                                    description="يمكن إضافة الصنف في فواتير البيع"
+                                    checked={formData.isSellable}
+                                    onChange={(v) => updateForm('isSellable', v)}
+                                    icon={ShoppingBag}
+                                />
+                                <ToggleSwitch
+                                    label="قابل للشراء"
+                                    description="يمكن إضافة الصنف في أوامر الشراء"
+                                    checked={formData.isPurchasable}
+                                    onChange={(v) => updateForm('isPurchasable', v)}
+                                    icon={ShoppingCart}
+                                />
+                            </div>
+                        </FormSection>
+                    </div>
+                )}
+            </form>
+
+            {/* Floating Save Button for Mobile */}
+            <div className="fixed bottom-6 left-6 right-6 md:hidden z-50">
+                <button
+                    onClick={() => handleSubmit()}
+                    disabled={loading || (!hasChanges && isEdit)}
+                    className="w-full py-4 bg-brand-primary text-white rounded-2xl font-bold
+                        shadow-xl shadow-brand-primary/30 disabled:opacity-50 
+                        flex items-center justify-center gap-2"
+                >
+                    {loading ? (
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                        <Save className="w-5 h-5" />
+                    )}
+                    {isEdit ? 'حفظ التغييرات' : 'إضافة الصنف'}
+                </button>
+            </div>
+
+            {/* Unsaved Changes Warning */}
+            {hasChanges && (
+                <div className="fixed bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-96 
+                    bg-brand-primary text-white p-4 rounded-xl shadow-xl shadow-brand-primary/30 
+                    flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-300 z-40
+                    md:bottom-6">
+                    <AlertCircle className="w-6 h-6 shrink-0" />
+                    <div className="flex-1">
+                        <p className="font-medium">تغييرات غير محفوظة</p>
+                        <p className="text-sm text-white/80">لا تنسَ حفظ التغييرات</p>
+                    </div>
+                    <button
+                        onClick={() => handleSubmit()}
+                        disabled={loading}
+                        className="px-4 py-2 bg-white text-brand-primary rounded-lg font-medium 
+                            hover:bg-white/90 transition-colors"
+                    >
+                        حفظ
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default ItemFormPage;

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة شركة رصراص بلاستيك</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-section">
+                <div class="logo-container">
+                    <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="10" y="15" width="80" height="90" rx="15" fill="none" stroke="#1B8C4E" stroke-width="3"/>
+                        <rect x="18" y="35" width="64" height="50" rx="10" fill="none" stroke="#1B8C4E" stroke-width="2"/>
+                        <circle cx="50" cy="60" r="8" fill="#1B8C4E"/>
+                        <circle cx="30" cy="45" r="6" fill="#1A1A1A"/>
+                        <circle cx="70" cy="45" r="5" fill="#1A1A1A"/>
+                        <circle cx="70" cy="75" r="6" fill="#1A1A1A"/>
+                        <circle cx="30" cy="75" r="4" fill="#1B8C4E"/>
+                        <line x1="50" y1="60" x2="30" y2="45" stroke="#1A1A1A" stroke-width="2"/>
+                        <line x1="50" y1="60" x2="70" y2="45" stroke="#1A1A1A" stroke-width="2"/>
+                        <line x1="50" y1="60" x2="70" y2="75" stroke="#1A1A1A" stroke-width="2"/>
+                        <line x1="50" y1="60" x2="30" y2="75" stroke="#1A1A1A" stroke-width="2"/>
+                        <text x="50" y="28" text-anchor="middle" fill="#1B8C4E" font-family="Arial" font-weight="bold" font-size="11">RASRAS</text>
+                        <text x="50" y="100" text-anchor="middle" fill="#1B8C4E" font-family="Arial" font-weight="bold" font-size="10">PLASTIC</text>
+                        <text x="18" y="62" fill="#1A1A1A" font-size="6">EST</text>
+                        <text x="78" y="62" fill="#1A1A1A" font-size="6">2016</text>
+                    </svg>
+                </div>
+                <div class="company-name">شركة رصراص بلاستيك</div>
+                <div class="company-subtitle">للتوكيلات التجارية وتصنيع البلاستيك</div>
+            </div>
+
+            <div class="dollar-widget">
+                <div class="dollar-icon">$</div>
+                <div class="dollar-info">
+                    <div class="dollar-label">سعر الدولار اليوم</div>
+                    <div class="dollar-rate">51.20 ج.م</div>
+                    <div class="dollar-change">↑ +0.15</div>
+                </div>
+            </div>
+
+            <nav class="nav-section">
+                <div class="nav-title">الرئيسية</div>
+                <a class="nav-item active" data-page="dashboard"><i class="fas fa-home"></i><span>لوحة التحكم</span></a>
+
+                <div class="nav-title">المبيعات</div>
+                <a class="nav-item" data-page="customers"><i class="fas fa-users"></i><span>العملاء</span></a>
+                <a class="nav-item" data-page="quotations"><i class="fas fa-file-alt"></i><span>عروض الأسعار</span></a>
+                <a class="nav-item" data-page="sales-orders"><i class="fas fa-shopping-cart"></i><span>أوامر البيع</span><span class="nav-badge">5</span></a>
+                <a class="nav-item" data-page="invoices"><i class="fas fa-file-invoice"></i><span>فواتير البيع</span></a>
+
+                <div class="nav-title">المشتريات</div>
+                <a class="nav-item" data-page="suppliers"><i class="fas fa-truck"></i><span>الموردين</span></a>
+                <a class="nav-item" data-page="purchase-orders"><i class="fas fa-clipboard-list"></i><span>أوامر الشراء</span></a>
+
+                <div class="nav-title">المخزون</div>
+                <a class="nav-item" data-page="products"><i class="fas fa-cubes"></i><span>الأصناف</span></a>
+                <a class="nav-item" data-page="warehouses"><i class="fas fa-warehouse"></i><span>المخازن</span></a>
+                <a class="nav-item" data-page="inventory"><i class="fas fa-boxes"></i><span>الجرد</span><span class="nav-badge">3</span></a>
+
+                <div class="nav-title">الحسابات</div>
+                <a class="nav-item" data-page="treasury"><i class="fas fa-cash-register"></i><span>الخزينة</span></a>
+                <a class="nav-item" data-page="banks"><i class="fas fa-university"></i><span>البنوك</span></a>
+                <a class="nav-item" data-page="checks"><i class="fas fa-money-check"></i><span>الشيكات</span></a>
+
+                <div class="nav-title">التقارير</div>
+                <a class="nav-item" data-page="reports"><i class="fas fa-chart-bar"></i><span>التقارير</span></a>
+                <a class="nav-item" data-page="prices"><i class="fas fa-tags"></i><span>متابعة الأسعار</span></a>
+
+                <div class="nav-title">النظام</div>
+                <a class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span>الإعدادات</span></a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-right">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="بحث سريع... (عميل، صنف، فاتورة)">
+                    </div>
+                </div>
+                <div class="header-left">
+                    <button class="header-btn"><i class="fas fa-bell"></i><span class="badge">7</span></button>
+                    <button class="header-btn"><i class="fas fa-envelope"></i><span class="badge">3</span></button>
+                    <div class="user-menu">
+                        <div class="user-info">
+                            <div class="user-name">حسام رصراص</div>
+                            <div class="user-role">مدير النظام</div>
+                        </div>
+                        <div class="user-avatar">ح</div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Page -->
+            <div class="page active" id="dashboard">
+                <div class="page-content fade-in">
+                    <div class="page-header">
+                        <div>
+                            <h1 class="page-title">لوحة التحكم</h1>
+                            <p class="page-subtitle">مرحباً حسام، إليك ملخص النشاط اليوم</p>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn btn-secondary"><i class="fas fa-download"></i> تصدير</button>
+                            <button class="btn btn-primary" onclick="openModal('new-invoice')"><i class="fas fa-plus"></i> فاتورة جديدة</button>
+                        </div>
+                    </div>
+
+                    <!-- Alerts -->
+                    <div class="alerts-row">
+                        <div class="alert-card warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <div class="alert-content">
+                                <h4>5 أصناف تحت الحد الأدنى</h4>
+                                <p>PP H030, HDPE 5502, LDPE 2420...</p>
+                            </div>
+                        </div>
+                        <div class="alert-card danger">
+                            <i class="fas fa-clock"></i>
+                            <div class="alert-content">
+                                <h4>3 شيكات تستحق اليوم</h4>
+                                <p>إجمالي: 185,000 ج.م</p>
+                            </div>
+                        </div>
+                        <div class="alert-card info">
+                            <i class="fas fa-truck"></i>
+                            <div class="alert-content">
+                                <h4>شحنة في الطريق</h4>
+                                <p>20 طن PP من سابك - تصل غداً</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon green"><i class="fas fa-chart-line"></i></div>
+                            <div class="stat-value">1,250,000 <span class="stat-currency">ج.م</span></div>
+                            <div class="stat-label">مبيعات اليوم</div>
+                            <div class="stat-change up"><i class="fas fa-arrow-up"></i> 12.5%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon blue"><i class="fas fa-boxes"></i></div>
+                            <div class="stat-value">156 <span class="stat-currency">طن</span></div>
+                            <div class="stat-label">المخزون الحالي</div>
+                            <div class="stat-change down"><i class="fas fa-arrow-down"></i> 8.3%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange"><i class="fas fa-hand-holding-usd"></i></div>
+                            <div class="stat-value">2,840,000 <span class="stat-currency">ج.م</span></div>
+                            <div class="stat-label">مستحقات العملاء</div>
+                            <div class="stat-change up"><i class="fas fa-arrow-up"></i> 5.2%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon red"><i class="fas fa-credit-card"></i></div>
+                            <div class="stat-value">890,000 <span class="stat-currency">ج.م</span></div>
+                            <div class="stat-label">مستحقات للموردين</div>
+                            <div class="stat-change down"><i class="fas fa-arrow-down"></i> 15.8%</div>
+                        </div>
+                    </div>
+
+                    <!-- Content Grid -->
+                    <div class="content-grid">
+                        <!-- Recent Invoices -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="fas fa-file-invoice"></i> آخر الفواتير</h3>
+                                <button class="card-btn">عرض الكل</button>
+                            </div>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr><th>رقم الفاتورة</th><th>العميل</th><th>المبلغ</th><th>الحالة</th><th>إجراءات</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>#INV-2024-0158</strong></td>
+                                            <td>مصنع النور للبلاستيك</td>
+                                            <td>285,000 ج.م</td>
+                                            <td><span class="status-badge success">مدفوعة</span></td>
+                                            <td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-print"></i></button></div></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>#INV-2024-0157</strong></td>
+                                            <td>شركة الأمل الصناعية</td>
+                                            <td>420,000 ج.م</td>
+                                            <td><span class="status-badge warning">معلقة</span></td>
+                                            <td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-hand-holding-usd"></i></button></div></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>#INV-2024-0156</strong></td>
+                                            <td>مصنع الفجر</td>
+                                            <td>180,500 ج.م</td>
+                                            <td><span class="status-badge danger">متأخرة</span></td>
+                                            <td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-bell"></i></button></div></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>#INV-2024-0155</strong></td>
+                                            <td>مصنع البركة للتعبئة</td>
+                                            <td>95,000 ج.م</td>
+                                            <td><span class="status-badge info">جزئية</span></td>
+                                            <td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-hand-holding-usd"></i></button></div></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Right Column -->
+                        <div class="right-column">
+                            <!-- Quick Actions -->
+                            <div class="card">
+                                <div class="card-header"><h3 class="card-title"><i class="fas fa-bolt"></i> إجراءات سريعة</h3></div>
+                                <div class="card-body">
+                                    <div class="quick-actions">
+                                        <a class="quick-action" onclick="openModal('new-invoice')"><i class="fas fa-file-invoice"></i><span>فاتورة جديدة</span></a>
+                                        <a class="quick-action" onclick="openModal('new-customer')"><i class="fas fa-user-plus"></i><span>عميل جديد</span></a>
+                                        <a class="quick-action" onclick="openModal('new-receipt')"><i class="fas fa-hand-holding-usd"></i><span>سند قبض</span></a>
+                                        <a class="quick-action" onclick="openModal('new-quotation')"><i class="fas fa-file-alt"></i><span>عرض سعر</span></a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Activity Feed -->
+                            <div class="card">
+                                <div class="card-header"><h3 class="card-title"><i class="fas fa-history"></i> آخر النشاطات</h3></div>
+                                <div class="card-body activity-feed">
+                                    <div class="activity-item">
+                                        <div class="activity-icon sale"><i class="fas fa-shopping-cart"></i></div>
+                                        <div class="activity-content">
+                                            <div class="activity-title">فاتورة بيع جديدة</div>
+                                            <div class="activity-desc">مصنع النور - 10 طن PP H030</div>
+                                            <div class="activity-time">منذ 15 دقيقة</div>
+                                        </div>
+                                    </div>
+                                    <div class="activity-item">
+                                        <div class="activity-icon payment"><i class="fas fa-money-bill-wave"></i></div>
+                                        <div class="activity-content">
+                                            <div class="activity-title">تحصيل شيك</div>
+                                            <div class="activity-desc">شركة الأمل - 150,000 ج.م</div>
+                                            <div class="activity-time">منذ 45 دقيقة</div>
+                                        </div>
+                                    </div>
+                                    <div class="activity-item">
+                                        <div class="activity-icon purchase"><i class="fas fa-truck"></i></div>
+                                        <div class="activity-content">
+                                            <div class="activity-title">استلام شحنة</div>
+                                            <div class="activity-desc">سابك - 25 طن HDPE 5502</div>
+                                            <div class="activity-time">منذ ساعتين</div>
+                                        </div>
+                                    </div>
+                                    <div class="activity-item">
+                                        <div class="activity-icon stock"><i class="fas fa-exclamation-circle"></i></div>
+                                        <div class="activity-content">
+                                            <div class="activity-title">تنبيه مخزون</div>
+                                            <div class="activity-desc">LDPE 2420 وصل للحد الأدنى</div>
+                                            <div class="activity-time">منذ 3 ساعات</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customers Page -->
+            <div class="page" id="customers">
+                <div class="page-content fade-in">
+                    <div class="page-header">
+                        <div><h1 class="page-title">إدارة العملاء</h1><p class="page-subtitle">قائمة العملاء وبياناتهم</p></div>
+                        <button class="btn btn-primary" onclick="openModal('new-customer')"><i class="fas fa-plus"></i> عميل جديد</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-users"></i> قائمة العملاء (47 عميل)</h3>
+                            <div class="card-actions"><button class="card-btn"><i class="fas fa-filter"></i> تصفية</button><button class="card-btn"><i class="fas fa-download"></i> تصدير</button></div>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>كود العميل</th><th>اسم العميل</th><th>النوع</th><th>الهاتف</th><th>الرصيد</th><th>حد الائتمان</th><th>التصنيف</th><th>إجراءات</th></tr></thead>
+                                <tbody>
+                                    <tr><td><strong>C-001</strong></td><td>مصنع النور للبلاستيك</td><td>مصنع</td><td>01012345678</td><td class="text-danger">285,000 ج.م</td><td>500,000 ج.م</td><td><span class="status-badge success">VIP</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-edit"></i></button><button class="action-btn"><i class="fas fa-file-alt"></i></button></div></td></tr>
+                                    <tr><td><strong>C-002</strong></td><td>شركة الأمل الصناعية</td><td>مصنع</td><td>01098765432</td><td class="text-danger">420,000 ج.م</td><td>600,000 ج.م</td><td><span class="status-badge success">VIP</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-edit"></i></button><button class="action-btn"><i class="fas fa-file-alt"></i></button></div></td></tr>
+                                    <tr><td><strong>C-003</strong></td><td>مصنع الفجر</td><td>مصنع</td><td>01155544433</td><td class="text-danger">180,500 ج.م</td><td>200,000 ج.م</td><td><span class="status-badge warning">عادي</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-edit"></i></button><button class="action-btn"><i class="fas fa-file-alt"></i></button></div></td></tr>
+                                    <tr><td><strong>C-004</strong></td><td>تاجر البركة</td><td>تاجر</td><td>01222333444</td><td class="text-success">0 ج.م</td><td>100,000 ج.م</td><td><span class="status-badge info">جديد</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-edit"></i></button><button class="action-btn"><i class="fas fa-file-alt"></i></button></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Page -->
+            <div class="page" id="products">
+                <div class="page-content fade-in">
+                    <div class="page-header">
+                        <div><h1 class="page-title">إدارة الأصناف</h1><p class="page-subtitle">خامات البلاستيك والمواد البتروكيماوية</p></div>
+                        <button class="btn btn-primary" onclick="openModal('new-product')"><i class="fas fa-plus"></i> صنف جديد</button>
+                    </div>
+                    <div class="stats-grid stats-3">
+                        <div class="stat-card"><div class="stat-icon green"><i class="fas fa-cubes"></i></div><div class="stat-value">24</div><div class="stat-label">إجمالي الأصناف</div></div>
+                        <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-value">5</div><div class="stat-label">أصناف تحت الحد الأدنى</div></div>
+                        <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-boxes"></i></div><div class="stat-value">156 <span class="stat-currency">طن</span></div><div class="stat-label">إجمالي المخزون</div></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-cubes"></i> قائمة الأصناف</h3>
+                            <div class="card-actions"><button class="card-btn"><i class="fas fa-filter"></i> تصفية</button><button class="card-btn"><i class="fas fa-sync"></i> تحديث الأسعار</button></div>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>الكود</th><th>اسم الصنف</th><th>الفئة</th><th>المخزون</th><th>سعر التكلفة</th><th>سعر الإحلال</th><th>سعر البيع</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                                <tbody>
+                                    <tr><td><strong>PP-001</strong></td><td>PP H030SG</td><td>بولي بروبيلين</td><td>25 طن</td><td>45,000</td><td class="text-primary"><strong>52,000</strong></td><td>55,000</td><td><span class="status-badge success">متوفر</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-edit"></i></button></div></td></tr>
+                                    <tr><td><strong>HDPE-001</strong></td><td>HDPE 5502</td><td>بولي إيثيلين</td><td>18 طن</td><td>42,000</td><td class="text-primary"><strong>47,500</strong></td><td>50,000</td><td><span class="status-badge success">متوفر</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-edit"></i></button></div></td></tr>
+                                    <tr class="row-warning"><td><strong>LDPE-001</strong></td><td>LDPE 2420H</td><td>بولي إيثيلين</td><td class="text-danger"><strong>3 طن</strong></td><td>48,000</td><td class="text-primary"><strong>54,000</strong></td><td>57,000</td><td><span class="status-badge danger">تحت الحد</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-cart-plus"></i></button></div></td></tr>
+                                    <tr><td><strong>PVC-001</strong></td><td>PVC K67</td><td>بولي فينيل كلوريد</td><td>12 طن</td><td>38,000</td><td class="text-primary"><strong>41,000</strong></td><td>44,000</td><td><span class="status-badge success">متوفر</span></td><td><div class="action-btns"><button class="action-btn"><i class="fas fa-eye"></i></button><button class="action-btn"><i class="fas fa-edit"></i></button></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Treasury Page -->
+            <div class="page" id="treasury">
+                <div class="page-content fade-in">
+                    <div class="page-header">
+                        <div><h1 class="page-title">إدارة الخزينة</h1><p class="page-subtitle">متابعة النقدية والحركات المالية</p></div>
+                        <div class="header-actions">
+                            <button class="btn btn-secondary"><i class="fas fa-minus-circle"></i> سند صرف</button>
+                            <button class="btn btn-primary" onclick="openModal('new-receipt')"><i class="fas fa-plus-circle"></i> سند قبض</button>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon green"><i class="fas fa-cash-register"></i></div><div class="stat-value">485,000 <span class="stat-currency">ج.م</span></div><div class="stat-label">رصيد الخزينة الرئيسية</div></div>
+                        <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-arrow-down"></i></div><div class="stat-value">125,000 <span class="stat-currency">ج.م</span></div><div class="stat-label">إيرادات اليوم</div></div>
+                        <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-arrow-up"></i></div><div class="stat-value">45,000 <span class="stat-currency">ج.م</span></div><div class="stat-label">مصروفات اليوم</div></div>
+                        <div class="stat-card"><div class="stat-icon green"><i class="fas fa-dollar-sign"></i></div><div class="stat-value">15,000 <span class="stat-currency">$</span></div><div class="stat-label">رصيد بالدولار</div></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-exchange-alt"></i> حركات اليوم</h3>
+                            <input type="date" class="form-control date-input" value="2024-01-05">
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>رقم السند</th><th>النوع</th><th>البيان</th><th>الحساب</th><th>المبلغ</th><th>الوقت</th><th>المستخدم</th></tr></thead>
+                                <tbody>
+                                    <tr><td><strong>#RV-2024-089</strong></td><td><span class="status-badge success">قبض</span></td><td>تحصيل فاتورة #INV-2024-0155</td><td>مصنع النور</td><td class="text-success">+85,000</td><td>10:30 ص</td><td>أحمد محمد</td></tr>
+                                    <tr><td><strong>#PV-2024-045</strong></td><td><span class="status-badge danger">صرف</span></td><td>مصاريف نقل</td><td>شركة النقل السريع</td><td class="text-danger">-12,500</td><td>11:15 ص</td><td>أحمد محمد</td></tr>
+                                    <tr><td><strong>#RV-2024-090</strong></td><td><span class="status-badge success">قبض</span></td><td>دفعة من العميل</td><td>شركة الأمل</td><td class="text-success">+40,000</td><td>02:45 م</td><td>حسام رصراص</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other Pages -->
+            <div class="page" id="invoices"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">فواتير البيع</h1></div><button class="btn btn-primary" onclick="openModal('new-invoice')"><i class="fas fa-plus"></i> فاتورة جديدة</button></div><div class="tabs"><div class="tab active">الكل (158)</div><div class="tab">مدفوعة (89)</div><div class="tab">معلقة (42)</div><div class="tab">متأخرة (18)</div></div><div class="card"><div class="card-body"><p class="placeholder-text">قائمة الفواتير ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="suppliers"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">إدارة الموردين</h1></div><button class="btn btn-primary"><i class="fas fa-plus"></i> مورد جديد</button></div><div class="card"><div class="card-body"><p class="placeholder-text">قائمة الموردين ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="banks"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">إدارة البنوك</h1></div></div><div class="card"><div class="card-body"><p class="placeholder-text">الحسابات البنكية ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="checks"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">إدارة الشيكات</h1></div></div><div class="card"><div class="card-body"><p class="placeholder-text">قائمة الشيكات ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="reports"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">التقارير</h1></div></div><div class="reports-grid"><div class="report-card card"><i class="fas fa-chart-line" style="color:#1B8C4E"></i><h4>تقرير المبيعات</h4><p>تحليل المبيعات حسب الفترة</p></div><div class="report-card card"><i class="fas fa-boxes" style="color:#3B82F6"></i><h4>تقرير المخزون</h4><p>جرد وتقييم المخزون</p></div><div class="report-card card"><i class="fas fa-calculator" style="color:#EF4444"></i><h4>الربحية الحقيقية</h4><p>تحليل الربح بسعر الإحلال</p></div><div class="report-card card"><i class="fas fa-file-invoice-dollar" style="color:#F59E0B"></i><h4>كشف حساب</h4><p>حركات وأرصدة العملاء</p></div></div></div></div>
+            <div class="page" id="settings"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">الإعدادات</h1></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-building"></i> بيانات الشركة</h3></div><div class="card-body"><div class="form-grid form-2"><div class="form-group"><label class="form-label">اسم الشركة</label><input type="text" class="form-control" value="شركة رصراص للتوكيلات التجارية وتصنيع البلاستيك"></div><div class="form-group"><label class="form-label">السجل التجاري</label><input type="text" class="form-control" value="5902"></div><div class="form-group"><label class="form-label">البطاقة الضريبية</label><input type="text" class="form-control" value="178-470-494"></div><div class="form-group"><label class="form-label">الهاتف</label><input type="text" class="form-control" value="00201003576079"></div><div class="form-group full-width"><label class="form-label">العنوان</label><input type="text" class="form-control" value="العاشر من رمضان، الروبيكي، المنطقة الصناعية الثالثة"></div><div class="form-group full-width"><label class="form-label">البريد الإلكتروني</label><input type="email" class="form-control" value="info@rasrasplastic.com"></div></div><button class="btn btn-primary" style="margin-top:20px"><i class="fas fa-save"></i> حفظ التغييرات</button></div></div></div></div>
+            <div class="page" id="quotations"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">عروض الأسعار</h1></div><button class="btn btn-primary" onclick="openModal('new-quotation')"><i class="fas fa-plus"></i> عرض سعر جديد</button></div><div class="card"><div class="card-body"><p class="placeholder-text">عروض الأسعار ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="sales-orders"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">أوامر البيع</h1></div></div><div class="card"><div class="card-body"><p class="placeholder-text">أوامر البيع ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="purchase-orders"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">أوامر الشراء</h1></div></div><div class="card"><div class="card-body"><p class="placeholder-text">أوامر الشراء ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="warehouses"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">المخازن</h1></div></div><div class="card"><div class="card-body"><p class="placeholder-text">قائمة المخازن ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="inventory"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">الجرد</h1></div></div><div class="card"><div class="card-body"><p class="placeholder-text">شاشة الجرد ستظهر هنا</p></div></div></div></div>
+            <div class="page" id="prices"><div class="page-content fade-in"><div class="page-header"><div><h1 class="page-title">متابعة الأسعار</h1></div></div><div class="card"><div class="card-body"><p class="placeholder-text">متابعة الأسعار ستظهر هنا</p></div></div></div></div>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <p>© 2024 شركة رصراص للتوكيلات التجارية وتصنيع البلاستيك. جميع الحقوق محفوظة.</p>
+                <p>العاشر من رمضان، المنطقة الصناعية الثالثة | هاتف: 00201003576079 | <a href="mailto:info@rasrasplastic.com">info@rasrasplastic.com</a></p>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modal-new-invoice">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-file-invoice" style="color:#1B8C4E;margin-left:10px"></i> فاتورة بيع جديدة</h3>
+                <button class="modal-close" onclick="closeModal('new-invoice')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group"><label class="form-label">رقم الفاتورة</label><input type="text" class="form-control" value="#INV-2024-0159" readonly></div>
+                    <div class="form-group"><label class="form-label">التاريخ</label><input type="date" class="form-control" value="2024-01-05"></div>
+                    <div class="form-group"><label class="form-label">العميل <span class="required">*</span></label><select class="form-control"><option value="">اختر العميل...</option><option>مصنع النور للبلاستيك</option><option>شركة الأمل الصناعية</option><option>مصنع الفجر</option></select></div>
+                    <div class="form-group"><label class="form-label">نوع الدفع</label><select class="form-control"><option>نقدي</option><option>آجل</option><option>شيك</option><option>تحويل بنكي</option></select></div>
+                    <div class="form-group"><label class="form-label">المخزن</label><select class="form-control"><option>المخزن الرئيسي</option><option>مخزن العبور</option></select></div>
+                    <div class="form-group"><label class="form-label">مندوب المبيعات</label><select class="form-control"><option>أحمد محمد</option><option>محمد علي</option><option>حسام رصراص</option></select></div>
+                </div>
+                <h4 style="margin:20px 0 12px;font-size:0.95rem">بنود الفاتورة</h4>
+                <table class="items-table"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th><th></th></tr></thead><tbody><tr><td><select class="form-control"><option>PP H030SG</option><option>HDPE 5502</option><option>LDPE 2420H</option></select></td><td><input type="number" class="form-control" value="10" style="width:70px"></td><td><input type="number" class="form-control" value="55000" style="width:90px"></td><td><strong>550,000</strong></td><td><button class="action-btn danger"><i class="fas fa-trash"></i></button></td></tr></tbody></table>
+                <button class="btn btn-secondary btn-sm" style="margin-top:10px"><i class="fas fa-plus"></i> إضافة صنف</button>
+                <div class="invoice-totals">
+                    <div class="total-row"><span>الإجمالي:</span><span>550,000 ج.م</span></div>
+                    <div class="total-row"><span>ضريبة القيمة المضافة (14%):</span><span>77,000 ج.م</span></div>
+                    <div class="total-row final"><span>الصافي:</span><span>627,000 ج.م</span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"><i class="fas fa-save"></i> حفظ الفاتورة</button>
+                <button class="btn btn-secondary"><i class="fas fa-print"></i> حفظ وطباعة</button>
+                <button class="btn btn-secondary" onclick="closeModal('new-invoice')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-new-customer">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-user-plus" style="color:#1B8C4E;margin-left:10px"></i> عميل جديد</h3>
+                <button class="modal-close" onclick="closeModal('new-customer')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid form-2">
+                    <div class="form-group"><label class="form-label">كود العميل</label><input type="text" class="form-control" value="C-048" readonly></div>
+                    <div class="form-group"><label class="form-label">اسم العميل <span class="required">*</span></label><input type="text" class="form-control" placeholder="أدخل اسم العميل"></div>
+                    <div class="form-group"><label class="form-label">نوع العميل</label><select class="form-control"><option>مصنع</option><option>تاجر</option><option>مُصدّر</option></select></div>
+                    <div class="form-group"><label class="form-label">التصنيف</label><select class="form-control"><option>جديد</option><option>عادي</option><option>VIP</option></select></div>
+                    <div class="form-group"><label class="form-label">رقم الهاتف <span class="required">*</span></label><input type="tel" class="form-control" placeholder="01xxxxxxxxx"></div>
+                    <div class="form-group"><label class="form-label">حد الائتمان</label><input type="number" class="form-control" value="100000"></div>
+                    <div class="form-group full-width"><label class="form-label">العنوان</label><textarea class="form-control" rows="2" placeholder="عنوان العميل"></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"><i class="fas fa-save"></i> حفظ العميل</button>
+                <button class="btn btn-secondary" onclick="closeModal('new-customer')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-new-receipt">
+        <div class="modal" style="max-width:500px">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-hand-holding-usd" style="color:#10B981;margin-left:10px"></i> سند قبض جديد</h3>
+                <button class="modal-close" onclick="closeModal('new-receipt')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid form-2">
+                    <div class="form-group"><label class="form-label">رقم السند</label><input type="text" class="form-control" value="#RV-2024-091" readonly></div>
+                    <div class="form-group"><label class="form-label">التاريخ</label><input type="date" class="form-control" value="2024-01-05"></div>
+                    <div class="form-group full-width"><label class="form-label">العميل <span class="required">*</span></label><select class="form-control"><option value="">اختر العميل...</option><option>مصنع النور للبلاستيك</option><option>شركة الأمل الصناعية</option></select></div>
+                    <div class="form-group"><label class="form-label">المبلغ <span class="required">*</span></label><input type="number" class="form-control" placeholder="0"></div>
+                    <div class="form-group"><label class="form-label">طريقة الدفع</label><select class="form-control"><option>نقدي</option><option>شيك</option><option>تحويل بنكي</option></select></div>
+                    <div class="form-group full-width"><label class="form-label">البيان</label><textarea class="form-control" rows="2" placeholder="سبب القبض أو رقم الفاتورة"></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"><i class="fas fa-save"></i> حفظ السند</button>
+                <button class="btn btn-secondary" onclick="closeModal('new-receipt')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-new-quotation">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-file-alt" style="color:#1B8C4E;margin-left:10px"></i> عرض سعر جديد</h3>
+                <button class="modal-close" onclick="closeModal('new-quotation')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group"><label class="form-label">رقم العرض</label><input type="text" class="form-control" value="#QT-2024-089" readonly></div>
+                    <div class="form-group"><label class="form-label">التاريخ</label><input type="date" class="form-control" value="2024-01-05"></div>
+                    <div class="form-group"><label class="form-label">صالح حتى</label><input type="date" class="form-control" value="2024-01-12"></div>
+                    <div class="form-group"><label class="form-label">العميل <span class="required">*</span></label><select class="form-control"><option value="">اختر العميل...</option><option>مصنع النور</option><option>شركة الأمل</option></select></div>
+                    <div class="form-group"><label class="form-label">سعر الدولار المرجعي</label><input type="number" class="form-control" value="51.20"></div>
+                    <div class="form-group"><label class="form-label">شروط الدفع</label><select class="form-control"><option>نقدي</option><option>آجل 30 يوم</option><option>آجل 45 يوم</option></select></div>
+                </div>
+                <div class="form-group full-width" style="margin-top:16px"><label class="form-label">ملاحظات العرض</label><textarea class="form-control" rows="2">- الأسعار شاملة التوصيل للعاشر من رمضان
+- الأسعار مرتبطة بسعر الدولار المذكور</textarea></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"><i class="fas fa-save"></i> حفظ العرض</button>
+                <button class="btn btn-secondary"><i class="fas fa-paper-plane"></i> حفظ وإرسال</button>
+                <button class="btn btn-secondary" onclick="closeModal('new-quotation')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-new-product">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-cube" style="color:#1B8C4E;margin-left:10px"></i> صنف جديد</h3>
+                <button class="modal-close" onclick="closeModal('new-product')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid form-2">
+                    <div class="form-group"><label class="form-label">كود الصنف <span class="required">*</span></label><input type="text" class="form-control" placeholder="مثال: PP-002"></div>
+                    <div class="form-group"><label class="form-label">اسم الصنف <span class="required">*</span></label><input type="text" class="form-control" placeholder="مثال: PP H030SG"></div>
+                    <div class="form-group"><label class="form-label">الفئة</label><select class="form-control"><option>بولي بروبيلين (PP)</option><option>بولي إيثيلين (HDPE)</option><option>بولي إيثيلين (LDPE)</option><option>بولي فينيل كلوريد (PVC)</option></select></div>
+                    <div class="form-group"><label class="form-label">الوحدة</label><select class="form-control"><option>طن</option><option>كجم</option></select></div>
+                    <div class="form-group"><label class="form-label">الحد الأدنى للمخزون</label><input type="number" class="form-control" value="5"></div>
+                    <div class="form-group"><label class="form-label">سعر البيع الافتراضي</label><input type="number" class="form-control" placeholder="بالجنيه"></div>
+                    <div class="form-group full-width"><label class="form-label">المواصفات</label><textarea class="form-control" rows="2" placeholder="المواصفات الفنية"></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary"><i class="fas fa-save"></i> حفظ الصنف</button>
+                <button class="btn btn-secondary" onclick="closeModal('new-product')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
