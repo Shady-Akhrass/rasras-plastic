@@ -160,16 +160,5 @@ git reset --hard <commit-hash>
 ```
 git reflog
 git checkout -b restore-branch <commit-hash-from-reflog>
-```
 
-**13) Tips for beginners**
-- Commit small, focused changes with clear messages.
-- Pull often to avoid large conflicts.
-- Use branches for each task or feature.
-- Ask for reviews and link tasks/issues in PR descriptions.
-
-If you'd like, I can also:
-- add a short `CONTRIBUTING.md` with testing steps,
-- set up branch protection rules on GitHub (requires repo admin access), or
-- walk your friend through cloning and making their first PR over a call/screen share.
 # rasras-plastic
