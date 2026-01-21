@@ -64,3 +64,6 @@ Thumbs.db
 
 # Personal local folder (do not commit)
 personal/
+
+# Scripts helpers (local automation)
+scripts/
