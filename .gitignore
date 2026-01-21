@@ -61,3 +61,6 @@ Thumbs.db
 
 # Git LFS placeholder tracking
 .gitattributes
+
+# Personal local folder (do not commit)
+personal/
