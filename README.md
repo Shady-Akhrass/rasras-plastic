@@ -9,6 +9,7 @@ This README is written for collaborators who are new to Git and GitHub. Follow t
 
 **1) Configure Git (one-time on your machine)**
 - Open PowerShell and run:
+-add it just for test
 ```
 git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
@@ -83,7 +84,6 @@ If the remote branch exists and you've rewritten history with rebase, you may ne
 ```
 git push --force-with-lease
 ```
-sf 
 
 Option B — Merge (safer for beginners):
 ```
