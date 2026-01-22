@@ -117,11 +117,8 @@ git push origin --delete feature/your-branch
 **10) Resolving conflicts (step-by-step)**
 - If a merge or rebase reports conflicts, Git will pause and mark conflicted files with markers:
 ```
-<<<<<<< HEAD
 your local code
-=======
 incoming remote code
->>>>>>> branch or commit
 ```
 - Open each conflicted file in an editor and decide which code to keep. Remove the conflict markers and save.
 - Stage the resolved files:
@@ -164,3 +161,5 @@ git checkout -b restore-branch <commit-hash-from-reflog>
 # rasras-plastic
 
 that make sense 
+sdf s
+sdf
