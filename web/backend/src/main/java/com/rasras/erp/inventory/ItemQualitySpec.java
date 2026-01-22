@@ -25,10 +25,10 @@ public class ItemQualitySpec {
     @Column(name = "TargetValue")
     private BigDecimal targetValue;
 
-    @Column(name = "MinValue")
+    @Column(name = "`MinValue`")
     private BigDecimal minValue;
 
-    @Column(name = "MaxValue")
+    @Column(name = "`MaxValue`")
     private BigDecimal maxValue;
 
     @Builder.Default
