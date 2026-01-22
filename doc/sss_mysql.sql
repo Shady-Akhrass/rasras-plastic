@@ -987,7 +987,19 @@ CREATE TABLE IF NOT EXISTS `itemqualityspecs` (
   CONSTRAINT `fk_itemqualityspecs_parameter` FOREIGN KEY (`ParameterID`) REFERENCES `qualityparameters` (`ParameterID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
+--
+-- Dumping data for table `qualityparameters`
+--
+
+INSERT INTO `qualityparameters` (`ParameterCode`, `ParameterNameAr`, `ParameterNameEn`, `UnitOfMeasure`, `DataType`, `Description`, `IsActive`) VALUES
+('DEN', 'الكثافة', 'Density', 'g/cm³', 'NUMERIC', 'كثافة المادة', 1),
+('MFI', 'معامل الانصهار', 'Melt Flow Index', 'g/10min', 'NUMERIC', 'معدل سريان المصهور', 1),
+('TENS', 'قوة الشد', 'Tensile Strength', 'MPa', 'NUMERIC', 'مقاومة الشد', 1),
+('ELONG', 'الاستطالة', 'Elongation at Break', '%', 'NUMERIC', 'نسبة الاستطالة عند الكسر', 1),
+('FLEX', 'معامل الانحناء', 'Flexural Modulus', 'MPa', 'NUMERIC', 'مقاومة الانحناء', 1),
+('IMPACT', 'مقاومة الصدم', 'Impact Strength', 'kJ/m²', 'NUMERIC', 'مقاومة الصدمات', 1),
+('COLOR', 'اللون', 'Color', NULL, 'TEXT', 'لون المادة', 1),
+('ODOR', 'الرائحة', 'Odor', NULL, 'BOOLEAN', 'وجود رائحة غير مقبولة', 1);
 
 -- --------------------------------------------------------
 

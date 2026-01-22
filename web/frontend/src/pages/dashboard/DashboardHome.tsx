@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
 import apiClient from '../../services/apiClient';
+import ExchangeRateWidget from '../../components/ExchangeRate/ExchangeRateWidget';
+import ExchangeRateCompact from '../../components/ExchangeRate/ExchangeRateCompact';
 
 // Animation variants
 const containerVariants: Variants = {
@@ -31,7 +33,6 @@ const itemVariants: Variants = {
         transition: { duration: 0.5, ease: 'easeOut' }
     }
 };
-
 
 // Stat Card Component
 const StatCard = ({
@@ -93,7 +94,6 @@ const StatCard = ({
             className="relative bg-white p-6 rounded-2xl shadow-sm border border-slate-100 overflow-hidden
                 hover:shadow-xl hover:shadow-slate-100 hover:border-slate-200 transition-all duration-300 group"
         >
-            {/* Background Decoration */}
             <div className={`absolute -top-10 -left-10 w-32 h-32 rounded-full bg-gradient-to-br ${colors.gradient} 
                 opacity-50 group-hover:opacity-100 transition-opacity duration-300`} />
 
@@ -138,12 +138,10 @@ const QuickAction = ({
     icon: Icon,
     label,
     onClick,
-    color = 'slate'
 }: {
     icon: React.ElementType;
     label: string;
     onClick?: () => void;
-    color?: string;
 }) => (
     <motion.button
         whileHover={{ scale: 1.02 }}
@@ -378,7 +376,6 @@ const DashboardHome: React.FC = () => {
         });
     };
 
-    // Sample activities data
     const activities = [
         { title: 'أمر بيع #SO-1025', subtitle: 'محمد أحمد', time: 'منذ 5 دقائق', status: 'success' as const, icon: ShoppingCart },
         { title: 'فاتورة #INV-2048', subtitle: 'شركة النور', time: 'منذ 15 دقيقة', status: 'pending' as const, icon: FileText },
@@ -416,7 +413,7 @@ const DashboardHome: React.FC = () => {
 
                 <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div>
-                        <div className="flex items-center gap-3 mb-4">
+                        <div className="flex flex-wrap items-center gap-3 mb-4">
                             <span className="px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full text-sm flex items-center gap-2">
                                 <Calendar className="w-4 h-4" />
                                 {formatDate()}
@@ -425,6 +422,8 @@ const DashboardHome: React.FC = () => {
                                 <Clock className="w-4 h-4" />
                                 {currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                            {/* Exchange Rate Compact Widget */}
+                            <ExchangeRateCompact />
                         </div>
 
                         <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
@@ -553,10 +552,9 @@ const DashboardHome: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Chart Placeholder with better design */}
+                    {/* Chart Placeholder */}
                     <div className="relative h-[300px] bg-gradient-to-br from-slate-50 to-white rounded-xl 
                         border border-slate-100 flex items-center justify-center overflow-hidden">
-                        {/* Decorative Grid */}
                         <div className="absolute inset-0 opacity-30">
                             {[...Array(6)].map((_, i) => (
                                 <div
@@ -567,7 +565,6 @@ const DashboardHome: React.FC = () => {
                             ))}
                         </div>
 
-                        {/* Fake Chart Bars */}
                         <div className="absolute bottom-0 left-0 right-0 flex items-end justify-around px-8 pb-4">
                             {[65, 45, 80, 55, 90, 70, 85, 60, 75, 50, 95, 80].map((height, i) => (
                                 <motion.div
@@ -581,7 +578,6 @@ const DashboardHome: React.FC = () => {
                             ))}
                         </div>
 
-                        {/* Coming Soon Overlay */}
                         <div className="relative z-10 text-center">
                             <div className="w-16 h-16 mx-auto mb-4 bg-brand-primary/10 rounded-2xl 
                                 flex items-center justify-center">
@@ -592,7 +588,6 @@ const DashboardHome: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Chart Legend */}
                     <div className="flex items-center justify-center gap-8 mt-6 pt-6 border-t border-slate-100">
                         <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-brand-primary" />
@@ -676,6 +671,11 @@ const DashboardHome: React.FC = () => {
                     </div>
                 </motion.div>
 
+                {/* Exchange Rate Widget */}
+                <motion.div variants={itemVariants}>
+                    <ExchangeRateWidget />
+                </motion.div>
+
                 {/* Performance Metrics */}
                 <motion.div
                     variants={itemVariants}
@@ -699,50 +699,50 @@ const DashboardHome: React.FC = () => {
                         <ProgressBar label="معدل التحصيل" value={88} max={100} color="success" />
                     </div>
                 </motion.div>
-
-                {/* Top Performers / Departments */}
-                <motion.div
-                    variants={itemVariants}
-                    className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl text-white"
-                >
-                    <div className="flex items-center gap-2 mb-6">
-                        <div className="p-2 bg-white/10 rounded-lg">
-                            <Award className="w-5 h-5" />
-                        </div>
-                        <h3 className="text-lg font-bold">الأقسام الأكثر نشاطاً</h3>
-                    </div>
-
-                    <div className="space-y-4">
-                        {[
-                            { name: 'قسم المبيعات', value: 45, change: '+12%' },
-                            { name: 'قسم المشتريات', value: 38, change: '+8%' },
-                            { name: 'قسم المخازن', value: 32, change: '+5%' },
-                            { name: 'قسم المحاسبة', value: 28, change: '+3%' },
-                        ].map((dept, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl
-                                hover:bg-white/10 transition-colors cursor-pointer">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center 
-                                        text-sm font-bold">
-                                        {i + 1}
-                                    </div>
-                                    <span className="font-medium">{dept.name}</span>
-                                </div>
-                                <div className="text-left">
-                                    <p className="font-bold">{dept.value} عملية</p>
-                                    <p className="text-xs text-emerald-400">{dept.change}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <button className="w-full mt-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl 
-                        font-medium transition-colors flex items-center justify-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        عرض التقرير الكامل
-                    </button>
-                </motion.div>
             </div>
+
+            {/* Top Performers / Departments */}
+            <motion.div
+                variants={itemVariants}
+                className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl text-white"
+            >
+                <div className="flex items-center gap-2 mb-6">
+                    <div className="p-2 bg-white/10 rounded-lg">
+                        <Award className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-lg font-bold">الأقسام الأكثر نشاطاً</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                        { name: 'قسم المبيعات', value: 45, change: '+12%' },
+                        { name: 'قسم المشتريات', value: 38, change: '+8%' },
+                        { name: 'قسم المخازن', value: 32, change: '+5%' },
+                        { name: 'قسم المحاسبة', value: 28, change: '+3%' },
+                    ].map((dept, i) => (
+                        <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-xl
+                            hover:bg-white/10 transition-colors cursor-pointer">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center 
+                                    text-lg font-bold">
+                                    {i + 1}
+                                </div>
+                                <span className="font-medium">{dept.name}</span>
+                            </div>
+                            <div className="text-left">
+                                <p className="font-bold">{dept.value} عملية</p>
+                                <p className="text-xs text-emerald-400">{dept.change}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <button className="w-full mt-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl 
+                    font-medium transition-colors flex items-center justify-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    عرض التقرير الكامل
+                </button>
+            </motion.div>
         </motion.div>
     );
 };

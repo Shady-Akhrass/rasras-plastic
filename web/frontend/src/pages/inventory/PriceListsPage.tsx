@@ -376,7 +376,7 @@ const ItemLineRow: React.FC<{
                         bg-white text-sm focus:border-brand-primary transition-colors appearance-none"
                 >
                     <option value="0">اختر الصنف...</option>
-                    {items.map(i => (
+                    {items.filter(i => i.isSellable).map(i => (
                         <option key={i.id} value={i.id}>{i.itemNameAr} ({i.itemCode})</option>
                     ))}
                 </select>

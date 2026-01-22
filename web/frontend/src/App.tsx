@@ -17,6 +17,10 @@ import SystemSettingsPage from './pages/settings/SystemSettingsPage';
 import PublicCompanyPage from './pages/public/PublicCompanyPage';
 import RolesPage from './pages/settings/RolesPage';
 import PermissionsPage from './pages/settings/PermissionsPage';
+import CustomersPage from './pages/crm/CustomersPage';
+import CustomerFormPage from './pages/crm/CustomerFormPage';
+import PurchaseRequisitionsPage from './pages/procurement/PurchaseRequisitionsPage';
+import PurchaseRequisitionFormPage from './pages/procurement/PurchaseRequisitionFormPage';
 import { Toaster } from 'react-hot-toast';
 
 // Simple Auth Guard Placeholder
@@ -65,6 +69,22 @@ function App() {
             <Route path="items">
               <Route index element={<ItemsMasterPage />} />
               <Route path=":id" element={<ItemFormPage />} />
+            </Route>
+          </Route>
+
+          <Route path="crm">
+            <Route index element={<Navigate to="customers" replace />} />
+            <Route path="customers">
+              <Route index element={<CustomersPage />} />
+              <Route path=":id" element={<CustomerFormPage />} />
+            </Route>
+          </Route>
+          <Route path="procurement">
+            <Route index element={<Navigate to="pr" replace />} />
+            <Route path="pr">
+              <Route index element={<PurchaseRequisitionsPage />} />
+              <Route path="new" element={<PurchaseRequisitionFormPage />} />
+              <Route path=":id" element={<PurchaseRequisitionFormPage />} />
             </Route>
           </Route>
         </Route>
