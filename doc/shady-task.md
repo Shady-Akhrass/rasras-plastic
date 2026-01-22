@@ -3,17 +3,11 @@
 Shady is responsible for the **Outbound**, **Financial**, and **Logistics** operations, including customer relationships, revenue cycle, accounting, and delivery.
 
 ## Database Tables
-The following tables are primarily within Shady's scope:
-- `customers`, `customercontacts`
-- `salesquotations`, `salesquotationitems`
-- `salesorders`, `salesorderitems`
-- `stockissuenotes`, `stockissuenoteitems`
-- `salesinvoices`, `salesinvoiceitems`
-- `salesreturns`, `salesreturnitems`, `creditnotes`
-- `chartofaccounts`, `fiscalyears`, `fiscalperiods`, `journalentries`, `journalentrylines`
-- `cashregisters`, `bankaccounts`, `receiptvouchers`, `paymentvouchers`, `receiptallocations`, `paymentallocations`
-- `chequesreceived`, `chequesissued`, `banks`, `banktransactions`
-- `deliveryzones`, `vehicles`, `transportcontractors`, `deliveryorders`
+The following tables are within Shady's scope:
+- **CRM & Sales**: `customers`, `customercontacts`, `salesquotations`, `salesquotationitems`, `salesorders`, `salesorderitems`, `pricelists`, `pricelistitems`
+- **Outbound & Invoicing**: `stockissuenotes`, `stockissuenoteitems`, `salesinvoices`, `salesinvoiceitems`, `salesreturns`, `salesreturnitems`
+- **Finance & Accounting**: `chartofaccounts`, `fiscalyears`, `fiscalperiods`, `journalentries`, `journalentrylines`, `cashregisters`, `bankaccounts`, `banks`, `banktransactions`, `receiptvouchers`, `receiptvoucherallocations`, `paymentvouchers`, `paymentvoucherallocations`, `chequesreceived`, `chequesissued`, `costcenters`, `creditnotes`, `debitnotes`, `exchangerates`
+- **Logistics**: `deliveryzones`, `vehicles`, `transportcontractors`, `deliveryorders`
 
 ---
 

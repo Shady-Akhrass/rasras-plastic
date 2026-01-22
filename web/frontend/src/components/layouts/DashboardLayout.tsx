@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
-    Settings, User, X, ChevronLeft, ChevronRight, Moon, Sun,
-    HelpCircle, MessageSquare, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign
+    Settings, User, X, ChevronLeft, ChevronRight,
+    HelpCircle, Shield, Sparkles, Building2,
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 
@@ -168,6 +168,8 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations' },
         { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations' },
         { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations' },
+        { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
+        { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
         { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات', section: 'system' },
     ];
 
@@ -259,6 +261,40 @@ const DashboardLayout: React.FC = () => {
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
                                 // badge={item.badge}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {/* CRM Section */}
+                    {filteredNavItems.some(i => i.section === 'crm') && (
+                        <>
+                            <SidebarSection title="إدارة العملاء" collapsed={sidebarCollapsed} />
+                            {filteredNavItems.filter(i => i.section === 'crm').map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {/* Procurement Section */}
+                    {filteredNavItems.some(i => i.section === 'procurement') && (
+                        <>
+                            <SidebarSection title="المشتريات" collapsed={sidebarCollapsed} />
+                            {filteredNavItems.filter(i => i.section === 'procurement').map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
                                 />
                             ))}
                         </>

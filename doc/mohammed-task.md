@@ -3,16 +3,11 @@
 Mohammed is responsible for the **Inbound** and **Storage** operations, including procurement, warehouse management, and quality control.
 
 ## Database Tables
-The following tables are primarily within Mohammed's scope:
-- `suppliers`, `suppliercontacts`, `supplieritems`
-- `purchaserequisitions`, `purchaserequisitionitems`
-- `rfqs`, `rfqitems`, `supplierquotations`
-- `purchaseorders`, `purchaseorderitems`
-- `goodsreceiptnotes`, `goodsreceiptnoteitems`
-- `supplierinvoices`, `supplierinvoiceitems`
-- `purchasereturns`, `purchasereturnitems`, `debitnotes`
-- `stockbalances`, `stockmovements`, `stocktransfers`, `stockadjustments`, `physicalinventory`, `batches`
-- `qualityinspections`, `inspectionresults`
+The following tables are within Mohammed's scope:
+- **Procurement**: `suppliers`, `supplieritems`, `purchaserequisitions`, `purchaserequisitionitems`, `requestforquotations`, `rfqitems`, `supplierquotations`, `supplierquotationitems`, `quotationcomparisons`, `quotationcomparisondetails`, `purchaseorders`, `purchaseorderitems`, `purchasereturns`, `purchasereturnitems`, `supplierinvoices`, `supplierinvoiceitems`
+- **Inventory**: `items`, `itemcategories`, `inventorybatches`, `stockbalances`, `stockmovements`, `stockadjustments`, `stockadjustmentitems`, `stocktransfers`, `stocktransferitems`, `stockreservations`, `unitsofmeasure`, `warehouses`, `warehouselocations`
+- **Quality Control**: `qualityparameters`, `itemqualityspecs`, `qualityinspections`, `qualityinspectionresults`
+- **Market Data**: `dailymarketprices`, `suggestedsellingprices`
 
 ---
 
