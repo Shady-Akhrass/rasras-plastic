@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 
+// Interfaces
 export interface PurchaseRequisitionItem {
     id?: number;
     prId?: number;
@@ -40,24 +41,182 @@ export interface PurchaseRequisition {
     createdBy?: number;
 }
 
+export interface RFQItem {
+    id?: number;
+    rfqId?: number;
+    itemId: number;
+    itemNameAr?: string;
+    itemCode?: string;
+    requestedQty: number;
+    unitId: number;
+    unitName?: string;
+    specifications?: string;
+}
+
+export interface RFQ {
+    id?: number;
+    rfqNumber?: string;
+    rfqDate?: string;
+    prId?: number;
+    prNumber?: string;
+    supplierId: number;
+    supplierNameAr?: string;
+    responseDueDate?: string;
+    status?: string;
+    notes?: string;
+    items: RFQItem[];
+}
+
+export interface SupplierQuotationItem {
+    id?: number;
+    quotationId?: number;
+    itemId: number;
+    itemNameAr?: string;
+    itemCode?: string;
+    offeredQty: number;
+    unitId: number;
+    unitName?: string;
+    unitPrice: number;
+    discountPercentage?: number;
+    discountAmount?: number;
+    taxPercentage?: number;
+    taxAmount?: number;
+    totalPrice: number;
+    deliveryDays?: number;
+    notes?: string;
+}
+
+export interface SupplierQuotation {
+    id?: number;
+    quotationNumber?: string;
+    rfqId?: number;
+    rfqNumber?: string;
+    supplierId: number;
+    supplierNameAr?: string;
+    quotationDate: string;
+    validUntilDate?: string;
+    currency?: string;
+    exchangeRate?: number;
+    paymentTerms?: string;
+    deliveryTerms?: string;
+    deliveryDays?: number;
+    totalAmount: number;
+    status?: string;
+    notes?: string;
+    items: SupplierQuotationItem[];
+}
+
+export interface QuotationComparisonDetail {
+    id?: number;
+    comparisonId?: number;
+    quotationId: number;
+    quotationNumber?: string;
+    supplierId: number;
+    supplierNameAr?: string;
+    unitPrice?: number;
+    totalPrice?: number;
+    paymentTerms?: string;
+    deliveryDays?: number;
+    qualityRating?: number;
+    priceRating?: number;
+    overallScore?: number;
+    comments?: string;
+}
+
+export interface QuotationComparison {
+    id?: number;
+    comparisonNumber?: string;
+    comparisonDate?: string;
+    prId?: number;
+    prNumber?: string;
+    itemId: number;
+    itemNameAr?: string;
+    selectedQuotationId?: number;
+    selectedQuotationNumber?: string;
+    selectedSupplierId?: number;
+    selectedSupplierNameAr?: string;
+    selectionReason?: string;
+    status?: string;
+    details: QuotationComparisonDetail[];
+}
+
+export interface Supplier {
+    id: number;
+    supplierCode: string;
+    supplierNameAr: string;
+    supplierNameEn?: string;
+    phone?: string;
+    email?: string;
+}
+
 const purchaseService = {
+    // PRs
     getAllPRs: async () => {
         const response = await apiClient.get<{ data: PurchaseRequisition[] }>('/procurement/pr');
         return response.data.data;
     },
-
     getPRById: async (id: number) => {
         const response = await apiClient.get<{ data: PurchaseRequisition }>(`/procurement/pr/${id}`);
         return response.data.data;
     },
-
     createPR: async (pr: PurchaseRequisition) => {
         const response = await apiClient.post<{ data: PurchaseRequisition }>('/procurement/pr', pr);
         return response.data.data;
     },
-
     updatePR: async (id: number, pr: PurchaseRequisition) => {
         const response = await apiClient.put<{ data: PurchaseRequisition }>(`/procurement/pr/${id}`, pr);
+        return response.data.data;
+    },
+
+    // RFQs
+    getAllRFQs: async () => {
+        const response = await apiClient.get<{ data: RFQ[] }>('/procurement/rfq');
+        return response.data.data;
+    },
+    getRFQById: async (id: number) => {
+        const response = await apiClient.get<{ data: RFQ }>(`/procurement/rfq/${id}`);
+        return response.data.data;
+    },
+    createRFQ: async (rfq: RFQ) => {
+        const response = await apiClient.post<{ data: RFQ }>('/procurement/rfq', rfq);
+        return response.data.data;
+    },
+
+    // Quotations
+    getAllQuotations: async () => {
+        const response = await apiClient.get<{ data: SupplierQuotation[] }>('/procurement/quotation');
+        return response.data.data;
+    },
+    getQuotationById: async (id: number) => {
+        const response = await apiClient.get<{ data: SupplierQuotation }>(`/procurement/quotation/${id}`);
+        return response.data.data;
+    },
+    createQuotation: async (quotation: SupplierQuotation) => {
+        const response = await apiClient.post<{ data: SupplierQuotation }>('/procurement/quotation', quotation);
+        return response.data.data;
+    },
+
+    // Comparisons
+    getAllComparisons: async () => {
+        const response = await apiClient.get<{ data: QuotationComparison[] }>('/procurement/comparison');
+        return response.data.data;
+    },
+    getComparisonById: async (id: number) => {
+        const response = await apiClient.get<{ data: QuotationComparison }>(`/procurement/comparison/${id}`);
+        return response.data.data;
+    },
+    createComparison: async (comparison: QuotationComparison) => {
+        const response = await apiClient.post<{ data: QuotationComparison }>('/procurement/comparison', comparison);
+        return response.data.data;
+    },
+    updateComparison: async (id: number, comparison: QuotationComparison) => {
+        const response = await apiClient.put<{ data: QuotationComparison }>(`/procurement/comparison/${id}`, comparison);
+        return response.data.data;
+    },
+
+    // Suppliers
+    getAllSuppliers: async () => {
+        const response = await apiClient.get<{ data: Supplier[] }>('/suppliers');
         return response.data.data;
     }
 };

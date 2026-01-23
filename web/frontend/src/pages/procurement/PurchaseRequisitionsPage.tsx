@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Plus,
     Search,
@@ -8,26 +8,253 @@ import {
     Calendar,
     User,
     Building2,
-    MoreVertical,
+    Edit3,
     CheckCircle2,
     XCircle,
     Clock,
-    AlertCircle
+    AlertCircle,
+    RefreshCw,
+    ShoppingCart,
+    Package
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import purchaseService, { type PurchaseRequisition } from '../../services/purchaseService';
-import toast from 'react-hot-toast';
 
-const PurchaseRequisitionsPage = () => {
+// Stat Card Component
+const StatCard: React.FC<{
+    icon: React.ElementType;
+    value: number;
+    label: string;
+    color: 'primary' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
+}> = ({ icon: Icon, value, label, color }) => {
+    const colorClasses = {
+        primary: 'bg-brand-primary/10 text-brand-primary',
+        success: 'bg-emerald-100 text-emerald-600',
+        warning: 'bg-amber-100 text-amber-600',
+        purple: 'bg-purple-100 text-purple-600',
+        blue: 'bg-blue-100 text-blue-600',
+        rose: 'bg-rose-100 text-rose-600'
+    };
+
+    return (
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
+            hover:border-brand-primary/20 transition-all duration-300 group">
+            <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${colorClasses[color]} 
+                    group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                    <div className="text-2xl font-bold text-slate-800">{value}</div>
+                    <div className="text-sm text-slate-500">{label}</div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
+        'Approved': {
+            icon: CheckCircle2,
+            className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            label: 'معتمد'
+        },
+        'Rejected': {
+            icon: XCircle,
+            className: 'bg-rose-50 text-rose-700 border-rose-200',
+            label: 'مرفوض'
+        },
+        'Pending': {
+            icon: Clock,
+            className: 'bg-amber-50 text-amber-700 border-amber-200',
+            label: 'قيد الانتظار'
+        },
+        'Draft': {
+            icon: FileText,
+            className: 'bg-slate-50 text-slate-700 border-slate-200',
+            label: 'مسودة'
+        }
+    };
+
+    const { icon: Icon, className, label } = config[status] || config['Draft'];
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+        </span>
+    );
+};
+
+// Priority Badge Component
+const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
+    const config: Record<string, { className: string; label: string }> = {
+        'High': {
+            className: 'bg-rose-100 text-rose-800 border-rose-200',
+            label: 'عالية'
+        },
+        'Normal': {
+            className: 'bg-slate-100 text-slate-700 border-slate-200',
+            label: 'عادية'
+        },
+        'Low': {
+            className: 'bg-blue-100 text-blue-700 border-blue-200',
+            label: 'منخفضة'
+        }
+    };
+
+    const { className, label } = config[priority] || config['Normal'];
+
+    return (
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${className}`}>
+            {label}
+        </span>
+    );
+};
+
+// Table Row Component
+const PRTableRow: React.FC<{
+    pr: PurchaseRequisition;
+    index: number;
+    onView: (id: number) => void;
+}> = ({ pr, index, onView }) => (
+    <tr
+        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
+        style={{
+            animationDelay: `${index * 30}ms`,
+            animation: 'fadeInUp 0.3s ease-out forwards'
+        }}
+    >
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText className="w-5 h-5 text-brand-primary" />
+                </div>
+                <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                    #{pr.prNumber}
+                </span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-sm text-slate-600">
+            <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span>{new Date(pr.prDate || '').toLocaleDateString('ar-EG')}</span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-sm text-slate-600">
+            <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-slate-400" />
+                <span>{pr.requestedByUserName}</span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-sm text-slate-600">
+            <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                <span>{pr.requestedByDeptName}</span>
+            </div>
+        </td>
+        <td className="px-6 py-4">
+            <PriorityBadge priority={pr.priority || 'Normal'} />
+        </td>
+        <td className="px-6 py-4">
+            <StatusBadge status={pr.status || 'Draft'} />
+        </td>
+        <td className="px-6 py-4">
+            <button
+                onClick={() => onView(pr.id!)}
+                className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
+                    rounded-lg transition-all duration-200 group-hover:scale-110"
+                title="تعديل"
+            >
+                <Edit3 className="w-5 h-5" />
+            </button>
+        </td>
+    </tr>
+);
+
+// Loading Skeleton
+const TableSkeleton: React.FC = () => (
+    <>
+        {[1, 2, 3, 4, 5].map(i => (
+            <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-lg" />
+                        <div className="h-4 w-20 bg-slate-100 rounded" />
+                    </div>
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-4 w-24 bg-slate-100 rounded" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-4 w-32 bg-slate-100 rounded" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-4 w-28 bg-slate-100 rounded" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-6 w-16 bg-slate-100 rounded-full" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-6 w-20 bg-slate-100 rounded-full" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="w-9 h-9 bg-slate-100 rounded-lg" />
+                </td>
+            </tr>
+        ))}
+    </>
+);
+
+// Empty State
+const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
+    <tr>
+        <td colSpan={7} className="px-6 py-16">
+            <div className="text-center">
+                <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
+                    {searchTerm || statusFilter !== 'All' ? (
+                        <Search className="w-12 h-12 text-slate-400" />
+                    ) : (
+                        <ShoppingCart className="w-12 h-12 text-slate-400" />
+                    )}
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                    {searchTerm || statusFilter !== 'All' ? 'لا توجد نتائج' : 'لا توجد طلبات شراء'}
+                </h3>
+                <p className="text-slate-500 max-w-md mx-auto">
+                    {searchTerm || statusFilter !== 'All'
+                        ? 'لم يتم العثور على طلبات تطابق معايير البحث'
+                        : 'لم يتم إنشاء أي طلبات شراء بعد'}
+                </p>
+            </div>
+        </td>
+    </tr>
+);
+
+const PurchaseRequisitionsPage: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [prs, setPrs] = useState<PurchaseRequisition[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         fetchPRs();
-    }, []);
+        
+        // Check if coming back from edit with success state
+        if (location.state?.success) {
+            setSuccessMessage(location.state.message || 'تم تحديث طلب الشراء بنجاح');
+            setTimeout(() => setSuccessMessage(''), 4000);
+            
+            // Clear the state so message doesn't show on subsequent visits
+            window.history.replaceState({}, document.title);
+        }
+    }, [location]);
 
     const fetchPRs = async () => {
         try {
@@ -36,167 +263,247 @@ const PurchaseRequisitionsPage = () => {
             setPrs(data);
         } catch (error) {
             console.error('Failed to fetch PRs:', error);
-            toast.error('فشل تحميل طلبات الشراء');
         } finally {
             setLoading(false);
         }
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'Approved': return 'bg-green-100 text-green-700';
-            case 'Rejected': return 'bg-red-100 text-red-700';
-            case 'Pending': return 'bg-yellow-100 text-yellow-700';
-            default: return 'bg-slate-100 text-slate-700';
-        }
-    };
+    const filteredPRs = useMemo(() => {
+        return prs.filter(pr => {
+            const matchesSearch =
+                pr.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                pr.requestedByUserName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                pr.requestedByDeptName?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = statusFilter === 'All' || pr.status === statusFilter;
+            return matchesSearch && matchesStatus;
+        });
+    }, [prs, searchTerm, statusFilter]);
 
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'Approved': return <CheckCircle2 className="w-4 h-4" />;
-            case 'Rejected': return <XCircle className="w-4 h-4" />;
-            case 'Pending': return <Clock className="w-4 h-4" />;
-            default: return <FileText className="w-4 h-4" />;
-        }
-    };
+    const stats = useMemo(() => ({
+        total: prs.length,
+        draft: prs.filter(p => p.status === 'Draft').length,
+        pending: prs.filter(p => p.status === 'Pending').length,
+        approved: prs.filter(p => p.status === 'Approved').length,
+        rejected: prs.filter(p => p.status === 'Rejected').length,
+        highPriority: prs.filter(p => p.priority === 'High').length,
+    }), [prs]);
 
-    const filteredPRs = prs.filter(pr => {
-        const matchesSearch =
-            pr.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            pr.requestedByUserName?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'All' || pr.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const handleViewPR = (id: number) => {
+        navigate(`/dashboard/procurement/pr/${id}`);
+    };
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">طلبات الشراء</h1>
-                    <p className="text-slate-500 mt-1">إدارة ومتابعة طلبات الشراء الداخلية</p>
+            {/* Custom Styles */}
+            <style>{`
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}</style>
+
+            {/* Header Section */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/3 left-1/4 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+                            <ShoppingCart className="w-10 h-10" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold mb-2">طلبات الشراء</h1>
+                            <p className="text-white/70 text-lg">إدارة ومتابعة طلبات الشراء الداخلية</p>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => navigate('/dashboard/procurement/pr/new')}
+                        className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
+                            hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
+                            hover:shadow-xl hover:scale-105"
+                    >
+                        <Plus className="w-5 h-5" />
+                        <span>طلب شراء جديد</span>
+                    </button>
                 </div>
-                <button
-                    onClick={() => navigate('/dashboard/procurement/pr/new')}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors"
-                >
-                    <Plus className="w-5 h-5" />
-                    <span>طلب جديد</span>
-                </button>
+            </div>
+
+            {/* Success Message */}
+            {successMessage && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 
+                    px-6 py-4 rounded-2xl flex justify-between items-center 
+                    animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                            <span className="font-bold block">{successMessage}</span>
+                            <span className="text-sm text-emerald-600">تم التحديث بنجاح</span>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setSuccessMessage('')} 
+                        className="p-2 hover:bg-emerald-100 rounded-lg transition-colors"
+                    >
+                        <XCircle className="w-5 h-5" />
+                    </button>
+                </div>
+            )}
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <StatCard
+                    icon={Package}
+                    value={stats.total}
+                    label="إجمالي الطلبات"
+                    color="primary"
+                />
+                <StatCard
+                    icon={FileText}
+                    value={stats.draft}
+                    label="مسودة"
+                    color="blue"
+                />
+                <StatCard
+                    icon={Clock}
+                    value={stats.pending}
+                    label="قيد الانتظار"
+                    color="warning"
+                />
+                <StatCard
+                    icon={CheckCircle2}
+                    value={stats.approved}
+                    label="معتمد"
+                    color="success"
+                />
+                <StatCard
+                    icon={XCircle}
+                    value={stats.rejected}
+                    label="مرفوض"
+                    color="rose"
+                />
+                <StatCard
+                    icon={AlertCircle}
+                    value={stats.highPriority}
+                    label="أولوية عالية"
+                    color="purple"
+                />
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
-                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <div className="relative flex-1">
+                        <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
+                            transition-colors duration-200
+                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                         <input
                             type="text"
-                            placeholder="بحث برقم الطلب أو اسم الطالب..."
+                            placeholder="بحث برقم الطلب، اسم الطالب، أو القسم..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pr-10 pl-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary outline-none"
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setIsSearchFocused(false)}
+                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
+                                outline-none bg-slate-50
+                                ${isSearchFocused
+                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                    : 'border-transparent hover:border-slate-200'}`}
                         />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 
+                                    rounded-full transition-colors"
+                            >
+                                <XCircle className="w-4 h-4 text-slate-400" />
+                            </button>
+                        )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Filter className="text-slate-400 w-5 h-5" />
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary outline-none"
+
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent
+                            hover:border-slate-200 transition-all duration-200">
+                            <Filter className="text-slate-400 w-5 h-5" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                            >
+                                <option value="All">جميع الحالات</option>
+                                <option value="Draft">مسودة</option>
+                                <option value="Pending">قيد الانتظار</option>
+                                <option value="Approved">معتمد</option>
+                                <option value="Rejected">مرفوض</option>
+                            </select>
+                        </div>
+
+                        <button
+                            onClick={fetchPRs}
+                            disabled={loading}
+                            className="p-3 rounded-xl border border-slate-200 text-slate-600 
+                                hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
+                                disabled:opacity-50"
+                            title="تحديث البيانات"
                         >
-                            <option value="All">جميع الحالات</option>
-                            <option value="Draft">مسودة</option>
-                            <option value="Pending">قيد الانتظار</option>
-                            <option value="Approved">معتمد</option>
-                            <option value="Rejected">مرفوض</option>
-                        </select>
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
                     </div>
                 </div>
             </div>
 
-            {/* List */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Results Count */}
+            {!loading && (
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-brand-primary rounded-full" />
+                    <span className="text-slate-600">
+                        عرض <span className="font-bold text-slate-800">{filteredPRs.length}</span> من{' '}
+                        <span className="font-bold text-slate-800">{prs.length}</span> طلب شراء
+                    </span>
+                </div>
+            )}
+
+            {/* Table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-slate-50 border-b border-slate-200">
+                        <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                             <tr>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-600">رقم الطلب</th>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-600">تاريخ الطلب</th>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-600">الطالب</th>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-600">القسم</th>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-600">الأولوية</th>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-600">الحالة</th>
-                                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-600">إجراءات</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم الطلب</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">تاريخ الطلب</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الطالب</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">القسم</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الأولوية</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200">
+                        <tbody>
                             {loading ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                                        جاري التحميل...
-                                    </td>
-                                </tr>
+                                <TableSkeleton />
                             ) : filteredPRs.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                                        لا توجد طلبات شراء
-                                    </td>
-                                </tr>
+                                <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
                             ) : (
-                                filteredPRs.map((pr) => (
-                                    <motion.tr
+                                filteredPRs.map((pr, index) => (
+                                    <PRTableRow
                                         key={pr.id}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="hover:bg-slate-50 transition-colors"
-                                    >
-                                        <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                                            #{pr.prNumber}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            <div className="flex items-center gap-2">
-                                                <Calendar className="w-4 h-4 text-slate-400" />
-                                                {new Date(pr.prDate || '').toLocaleDateString('ar-EG')}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            <div className="flex items-center gap-2">
-                                                <User className="w-4 h-4 text-slate-400" />
-                                                {pr.requestedByUserName}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            <div className="flex items-center gap-2">
-                                                <Building2 className="w-4 h-4 text-slate-400" />
-                                                {pr.requestedByDeptName}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${pr.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                    pr.priority === 'Low' ? 'bg-blue-100 text-blue-800' :
-                                                        'bg-gray-100 text-gray-800'}`}>
-                                                {pr.priority === 'High' ? 'عالية' : pr.priority === 'Low' ? 'منخفضة' : 'عادية'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(pr.status || 'Draft')}`}>
-                                                {getStatusIcon(pr.status || 'Draft')}
-                                                {pr.status === 'Draft' ? 'مسودة' :
-                                                    pr.status === 'Pending' ? 'قيد الانتظار' :
-                                                        pr.status === 'Approved' ? 'معتمد' : 'مرفوض'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            <button
-                                                onClick={() => navigate(`/dashboard/procurement/pr/${pr.id}`)}
-                                                className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/5 rounded-lg transition-colors"
-                                            >
-                                                <MoreVertical className="w-5 h-5" />
-                                            </button>
-                                        </td>
-                                    </motion.tr>
+                                        pr={pr}
+                                        index={index}
+                                        onView={handleViewPR}
+                                    />
                                 ))
                             )}
                         </tbody>
