@@ -21,6 +21,17 @@ import CustomersPage from './pages/crm/CustomersPage';
 import CustomerFormPage from './pages/crm/CustomerFormPage';
 import PurchaseRequisitionsPage from './pages/procurement/PurchaseRequisitionsPage';
 import PurchaseRequisitionFormPage from './pages/procurement/PurchaseRequisitionFormPage';
+import RFQsPage from './pages/procurement/RFQsPage';
+import RFQFormPage from './pages/procurement/RFQFormPage';
+import SupplierQuotationsPage from './pages/procurement/SupplierQuotationsPage';
+import SupplierQuotationFormPage from './pages/procurement/SupplierQuotationFormPage';
+import QuotationComparisonPage from './pages/procurement/QuotationComparisonPage';
+import QuotationComparisonFormPage from './pages/procurement/QuotationComparisonFormPage';
+import SuppliersPage from './pages/procurement/SuppliersPage';
+import SupplierFormPage from './pages/procurement/SupplierFormPage';
+import SupplierOutstandingPage from './pages/procurement/SupplierOutstandingPage';
+import SupplierItemsPage from './pages/procurement/SupplierItemsPage';
+import SupplierItemFormPage from './pages/procurement/SupplierItemFormPage';
 import { Toaster } from 'react-hot-toast';
 
 // Simple Auth Guard Placeholder
@@ -85,6 +96,31 @@ function App() {
               <Route index element={<PurchaseRequisitionsPage />} />
               <Route path="new" element={<PurchaseRequisitionFormPage />} />
               <Route path=":id" element={<PurchaseRequisitionFormPage />} />
+            </Route>
+            <Route path="rfq">
+              <Route index element={<RFQsPage />} />
+              <Route path="new" element={<RFQFormPage />} />
+              <Route path=":id" element={<RFQFormPage />} />
+            </Route>
+            <Route path="quotation">
+              <Route index element={<SupplierQuotationsPage />} />
+              <Route path="new" element={<SupplierQuotationFormPage />} />
+              <Route path=":id" element={<SupplierQuotationFormPage />} />
+            </Route>
+            <Route path="comparison">
+              <Route index element={<QuotationComparisonPage />} />
+              <Route path="new" element={<QuotationComparisonFormPage />} />
+              <Route path=":id" element={<QuotationComparisonFormPage />} />
+            </Route>
+            <Route path="suppliers">
+              <Route index element={<SuppliersPage />} />
+              <Route path="new" element={<SupplierFormPage />} />
+              <Route path="outstanding" element={<SupplierOutstandingPage />} />
+              <Route path="items">
+                <Route index element={<SupplierItemsPage />} />
+                <Route path="new" element={<SupplierItemFormPage />} />
+              </Route>
+              <Route path=":id" element={<SupplierFormPage />} />
             </Route>
           </Route>
         </Route>

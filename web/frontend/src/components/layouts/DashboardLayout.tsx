@@ -3,7 +3,7 @@ import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
     Settings, User, X, ChevronLeft, ChevronRight,
     HelpCircle, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 
@@ -170,6 +170,12 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations' },
         { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
         { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
+        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'عروض الأسعار (RFQ)', section: 'procurement' },
+        { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement' },
+        { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement' },
+        { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement' },
+        { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement' },
+        { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement' },
         { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات', section: 'system' },
     ];
 
