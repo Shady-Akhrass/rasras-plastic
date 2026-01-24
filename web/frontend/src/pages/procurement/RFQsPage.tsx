@@ -6,14 +6,14 @@ import {
     Filter,
     FileText,
     Calendar,
-    Building2,
     Edit3,
     CheckCircle2,
     XCircle,
     Clock,
     RefreshCw,
     Truck,
-    Package
+    Package,
+    Tag
 } from 'lucide-react';
 import purchaseService, { type RFQ } from '../../services/purchaseService';
 
@@ -90,7 +90,8 @@ const RFQTableRow: React.FC<{
     rfq: RFQ;
     index: number;
     onView: (id: number) => void;
-}> = ({ rfq, index, onView }) => (
+    onCreateQuotation: (id: number) => void;
+}> = ({ rfq, index, onView, onCreateQuotation }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -135,15 +136,27 @@ const RFQTableRow: React.FC<{
         <td className="px-6 py-4">
             <StatusBadge status={rfq.status || 'Sent'} />
         </td>
-        <td className="px-6 py-4">
-            <button
-                onClick={() => onView(rfq.id!)}
-                className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
-                    rounded-lg transition-all duration-200 group-hover:scale-110"
-                title="تعديل"
-            >
-                <Edit3 className="w-5 h-5" />
-            </button>
+        <td className="px-6 py-4 text-left">
+            <div className="flex items-center justify-end gap-2">
+                {rfq.status === 'Sent' && (
+                    <button
+                        onClick={() => onCreateQuotation(rfq.id!)}
+                        className="p-2 text-indigo-500 hover:bg-indigo-50 
+                            rounded-lg transition-all duration-200"
+                        title="تسجيل عرض سعر"
+                    >
+                        <Tag className="w-5 h-5" />
+                    </button>
+                )}
+                <button
+                    onClick={() => onView(rfq.id!)}
+                    className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
+                        rounded-lg transition-all duration-200"
+                    title="تعديل"
+                >
+                    <Edit3 className="w-5 h-5" />
+                </button>
+            </div>
         </td>
     </tr>
 );
@@ -189,6 +202,10 @@ const RFQsPage: React.FC = () => {
         pending: rfqs.filter(r => r.status === 'Pending').length,
         completed: rfqs.filter(r => r.status === 'Completed').length,
     }), [rfqs]);
+
+    const handleCreateQuotation = (id: number) => {
+        navigate(`/dashboard/procurement/quotation/new?rfqId=${id}`);
+    };
 
     return (
         <div className="space-y-6">
@@ -286,7 +303,13 @@ const RFQsPage: React.FC = () => {
                                 <tr><td colSpan={7} className="text-center py-10 text-slate-500">لا توجد نتائج</td></tr>
                             ) : (
                                 filteredRFQs.map((rfq, index) => (
-                                    <RFQTableRow key={rfq.id} rfq={rfq} index={index} onView={(id) => navigate(`/dashboard/procurement/rfq/${id}`)} />
+                                    <RFQTableRow
+                                        key={rfq.id}
+                                        rfq={rfq}
+                                        index={index}
+                                        onView={(id) => navigate(`/dashboard/procurement/rfq/${id}`)}
+                                        onCreateQuotation={handleCreateQuotation}
+                                    />
                                 ))
                             )}
                         </tbody>

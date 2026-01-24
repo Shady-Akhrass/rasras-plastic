@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { 
+import {
     Plus, Search, Edit2, Trash2, Package, Filter, Download, Upload,
     RefreshCw, CheckCircle2, XCircle, Eye, ChevronLeft, ChevronRight,
     ChevronsLeft, ChevronsRight, DollarSign, Layers,
-    Tag, Box, TrendingUp, TrendingDown, AlertTriangle, 
+    Tag, Box, TrendingUp, TrendingDown, AlertTriangle,
     Barcode, ShoppingCart, ShoppingBag, Percent, Scale,
     BarChart3, Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { itemService, type ItemDto } from '../../services/itemService';
+import { stockBalanceService } from '../../services/stockBalanceService';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { toast } from 'react-hot-toast';
 
@@ -84,9 +85,9 @@ const ItemTypeBadge: React.FC<{ type?: string }> = ({ type }) => {
 };
 
 // Stock Status Badge
-const StockStatusBadge: React.FC<{ 
-    currentStock?: number; 
-    minLevel?: number; 
+const StockStatusBadge: React.FC<{
+    currentStock?: number;
+    minLevel?: number;
     maxLevel?: number;
     reorderLevel?: number;
 }> = ({ currentStock = 0, minLevel = 0, maxLevel = 0, reorderLevel = 0 }) => {
@@ -123,14 +124,14 @@ const ItemRow: React.FC<{
     index: number;
 }> = ({ item, onEdit, onDelete, onView, index }) => {
     // Calculate profit margin
-    const profitMargin = item.lastSalePrice && item.lastPurchasePrice 
+    const profitMargin = item.lastSalePrice && item.lastPurchasePrice
         ? ((item.lastSalePrice - item.lastPurchasePrice) / item.lastPurchasePrice * 100).toFixed(1)
         : null;
 
     return (
-        <tr 
+        <tr
             className="group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0"
-            style={{ 
+            style={{
                 animationDelay: `${index * 30}ms`,
                 animation: 'fadeInUp 0.3s ease-out forwards'
             }}
@@ -202,7 +203,7 @@ const ItemRow: React.FC<{
                         <span className="text-lg font-bold text-slate-800">
                             {(item.currentStock || 0).toLocaleString()}
                         </span>
-                        <StockStatusBadge 
+                        <StockStatusBadge
                             currentStock={item.currentStock}
                             minLevel={item.minStockLevel}
                             maxLevel={item.maxStockLevel}
@@ -290,8 +291,8 @@ const ItemRow: React.FC<{
             {/* Status */}
             <td className="px-4 py-4">
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border
-                    ${item.isActive 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    ${item.isActive
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                     {item.isActive ? (
                         <>
@@ -404,7 +405,7 @@ const EmptyState: React.FC<{ searchTerm: string; onAdd: () => void }> = ({ searc
                     {searchTerm ? 'لا توجد نتائج' : 'لا توجد أصناف'}
                 </h3>
                 <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                    {searchTerm 
+                    {searchTerm
                         ? `لم يتم العثور على أصناف تطابق "${searchTerm}"`
                         : 'ابدأ بإضافة أصناف جديدة لإدارة المخزون والمنتجات'}
                 </p>
@@ -430,7 +431,7 @@ const ItemsMasterPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
-    
+
     // Filters
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
     const [filterType, setFilterType] = useState<string>('all');
@@ -453,13 +454,22 @@ const ItemsMasterPage: React.FC = () => {
     const fetchItems = async () => {
         try {
             setLoading(true);
-            const response = await itemService.getAllItems();
-            if (response.data) {
-                setItems(response.data);
+            const [itemResponse, stockResponse] = await Promise.all([
+                itemService.getAllItems(),
+                stockBalanceService.getAllBalances()
+            ]);
+
+            if (itemResponse.data) {
+                const combinedItems = itemResponse.data.map(item => {
+                    const itemStocks = stockResponse.data?.filter(s => s.itemId === item.id) || [];
+                    const totalStock = itemStocks.reduce((sum, s) => sum + (s.quantityOnHand || 0), 0);
+                    return { ...item, currentStock: totalStock };
+                });
+                setItems(combinedItems);
             }
         } catch (error) {
             console.error('Error fetching items:', error);
-            toast.error('فشل في تحميل قائمة الأصناف');
+            toast.error('فشل في تحميل قائمة الأصناف والارصدة');
         } finally {
             setLoading(false);
         }
@@ -498,21 +508,21 @@ const ItemsMasterPage: React.FC = () => {
     const filteredItems = useMemo(() => {
         return items.filter(item => {
             // Search filter
-            const matchesSearch = 
+            const matchesSearch =
                 item.itemNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (item.itemNameEn && item.itemNameEn.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.barcode && item.barcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.gradeName && item.gradeName.toLowerCase().includes(searchTerm.toLowerCase()));
-            
+
             // Status filter
-            const matchesStatus = filterStatus === 'all' || 
+            const matchesStatus = filterStatus === 'all' ||
                 (filterStatus === 'active' && item.isActive) ||
                 (filterStatus === 'inactive' && !item.isActive);
 
             // Type filter
             const matchesType = filterType === 'all' || item.itemType === filterType;
-            
+
             // Category filter
             const matchesCategory = filterCategory === 'all' || item.categoryName === filterCategory;
 
@@ -638,38 +648,38 @@ const ItemsMasterPage: React.FC = () => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                <StatCard 
+                <StatCard
                     icon={Package}
                     value={stats.total}
                     label="إجمالي الأصناف"
                     color="primary"
                 />
-                <StatCard 
+                <StatCard
                     icon={CheckCircle2}
                     value={stats.active}
                     label="صنف نشط"
                     trend={{ value: `${Math.round((stats.active / stats.total) * 100) || 0}%`, isUp: true }}
                     color="success"
                 />
-                <StatCard 
+                <StatCard
                     icon={AlertTriangle}
                     value={stats.lowStock}
                     label="مخزون منخفض"
                     color="warning"
                 />
-                <StatCard 
+                <StatCard
                     icon={XCircle}
                     value={stats.outOfStock}
                     label="نفذ من المخزون"
                     color="danger"
                 />
-                <StatCard 
+                <StatCard
                     icon={DollarSign}
                     value={`${(stats.totalValue / 1000).toFixed(0)}K`}
                     label="قيمة المخزون"
                     color="purple"
                 />
-                <StatCard 
+                <StatCard
                     icon={Percent}
                     value={`${stats.avgMargin}%`}
                     label="متوسط هامش الربح"
@@ -695,8 +705,8 @@ const ItemsMasterPage: React.FC = () => {
                             onBlur={() => setIsSearchFocused(false)}
                             className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
                                 outline-none bg-slate-50
-                                ${isSearchFocused 
-                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10' 
+                                ${isSearchFocused
+                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
                                     : 'border-transparent hover:border-slate-200'}`}
                         />
                         {searchTerm && (
@@ -792,31 +802,31 @@ const ItemsMasterPage: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
                         <span className="text-sm text-slate-500">الفلاتر النشطة:</span>
                         {searchTerm && (
-                            <FilterBadge 
+                            <FilterBadge
                                 label={`بحث: ${searchTerm}`}
                                 onRemove={() => setSearchTerm('')}
                             />
                         )}
                         {filterStatus !== 'all' && (
-                            <FilterBadge 
+                            <FilterBadge
                                 label={`الحالة: ${filterStatus === 'active' ? 'نشط' : 'غير نشط'}`}
                                 onRemove={() => setFilterStatus('all')}
                             />
                         )}
                         {filterStock !== 'all' && (
-                            <FilterBadge 
+                            <FilterBadge
                                 label={`المخزون: ${filterStock === 'available' ? 'متوفر' : filterStock === 'low' ? 'منخفض' : 'نفذ'}`}
                                 onRemove={() => setFilterStock('all')}
                             />
                         )}
                         {filterType !== 'all' && (
-                            <FilterBadge 
+                            <FilterBadge
                                 label={`النوع: ${filterType}`}
                                 onRemove={() => setFilterType('all')}
                             />
                         )}
                         {filterCategory !== 'all' && (
-                            <FilterBadge 
+                            <FilterBadge
                                 label={`التصنيف: ${filterCategory}`}
                                 onRemove={() => setFilterCategory('all')}
                             />
@@ -935,7 +945,7 @@ const ItemsMasterPage: React.FC = () => {
                             <span className="font-bold text-slate-700">{totalPages}</span>
                             {' '}(<span className="font-medium">{paginatedItems.length}</span> من {filteredItems.length} صنف)
                         </div>
-                        
+
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => setCurrentPage(1)}
@@ -945,7 +955,7 @@ const ItemsMasterPage: React.FC = () => {
                             >
                                 <ChevronsRight className="w-5 h-5" />
                             </button>
-                            
+
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
@@ -967,7 +977,7 @@ const ItemsMasterPage: React.FC = () => {
                                     } else {
                                         page = currentPage - 2 + i;
                                     }
-                                    
+
                                     return (
                                         <button
                                             key={page}

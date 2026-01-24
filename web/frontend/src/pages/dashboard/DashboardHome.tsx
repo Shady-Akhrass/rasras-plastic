@@ -656,7 +656,7 @@ const DashboardHome: React.FC = () => {
                         <QuickAction
                             icon={FileText}
                             label="إنشاء فاتورة"
-                            onClick={() => alert('ميزة إنشاء الفواتير ستتوفر قريباً')}
+                            onClick={() => navigate('/dashboard/procurement/invoices/new')}
                         />
                         <QuickAction
                             icon={ShoppingCart}

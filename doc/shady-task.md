@@ -34,25 +34,24 @@ Shady is responsible for **Procurement**, **Financial Operations**, and **Suppli
     - [x] Supplier Quotations UI (Web)
     - [x] Quotation Comparison API (BE)
     - [x] Quotation Comparison UI (Web)
-- [ ] Sprint 10: Purchase Orders & GRN
-    - [ ] Purchase Orders API (BE)
-    - [ ] Purchase Orders UI (Web, Mobile)
-    - [ ] Purchase Order Items API (BE)
-    - [ ] Purchase Order Items UI (Web, Mobile)
-    - [ ] PO Approval Workflow API (BE)
-    - [ ] PO Approval Workflow UI (Web)
-    - [ ] GRN API (BE)
-    - [ ] GRN UI (Web, Mobile)
-    - [ ] GRN Items API (BE)
-    - [ ] GRN Items UI (Web, Mobile)
-    - [ ] Stock Update on GRN Logic (BE)
-- [ ] Sprint 11: Supplier Invoices & Returns
-    - [ ] Supplier Invoices API (BE)
-    - [ ] Supplier Invoices UI (Web, Mobile)
-    - [ ] Supplier Invoice Items API (BE)
-    - [ ] Supplier Invoice Items UI (Web, Mobile)
-    - [ ] Purchase Returns API (BE)
-    - [ ] Purchase Returns UI (Web)
+- [x] Sprint 10: Purchase Orders & GRN
+    - [x] Purchase Orders API (BE)
+    - [x] Purchase Orders UI (Web, Mobile)
+    - [x] Purchase Order Items API (BE)
+    - [x] Purchase Order Items UI (Web, Mobile)
+    - [x] PO Approval Workflow API (BE)
+    - [x] PO Approval Workflow UI (Web)
+    - [x] GRN API (BE)
+    - [x] GRN UI (Web, Mobile)
+    - [x] GRN Items API (BE)
+    - [x] GRN Items UI (Web, Mobile)
+    - [x] Stock Update on GRN Logic (BE)
+- [x] Sprint 11: Supplier Invoices & Returns
+    - [x] Supplier Invoice API & Logic (BE) <!-- id: 170 -->
+    - [x] Supplier Invoice Management UI (Web) <!-- id: 171 -->
+    - [x] Purchase Return API & Logic (BE) <!-- id: 172 -->
+    - [x] Purchase Return & Stock Adjustment (BE) <!-- id: 173 -->
+    - [/] Returns Management UI (Web/Mobile) <!-- id: 174 -->
     - [ ] Purchase Return Items API (BE)
     - [ ] Purchase Return Items UI (Web)
     - [ ] Debit Notes API (BE)

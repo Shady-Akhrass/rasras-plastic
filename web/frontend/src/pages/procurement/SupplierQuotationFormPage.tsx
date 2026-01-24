@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
     Trash2,
@@ -8,12 +8,17 @@ import {
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
 import { itemService, type ItemDto } from '../../services/itemService';
-import { unitService } from '../../services/unitService';
+import toast from 'react-hot-toast';
 
 const SupplierQuotationFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const isEdit = !!id;
+
+    // Get rfqId from URL
+    const queryParams = new URLSearchParams(location.search);
+    const rfqIdFromUrl = queryParams.get('rfqId');
 
     // State
     const [loading, setLoading] = useState(false);
@@ -42,8 +47,10 @@ const SupplierQuotationFormPage: React.FC = () => {
         loadDependencies();
         if (isEdit) {
             loadQuotation(parseInt(id));
+        } else if (rfqIdFromUrl) {
+            handleRFQLink(parseInt(rfqIdFromUrl));
         }
-    }, [id]);
+    }, [id, rfqIdFromUrl]);
 
     const loadDependencies = async () => {
         try {
@@ -57,6 +64,7 @@ const SupplierQuotationFormPage: React.FC = () => {
             setItems(itemsData.data || []);
         } catch (error) {
             console.error('Failed to load dependencies:', error);
+            toast.error('فشل تحميل البيانات الأساسية');
         }
     };
 

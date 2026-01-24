@@ -24,7 +24,7 @@ export const unitService = {
     },
 
     createUnit: async (unit: UnitDto) => {
-        const response = await apiClient.post<{ data: UnitDto }>('/units', unit);
+        const response = await apiClient.post<{ data: UnitDto }>('/api/units', unit);
         return response.data;
     },
 

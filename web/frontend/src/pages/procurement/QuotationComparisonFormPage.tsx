@@ -5,14 +5,12 @@ import {
     ArrowRight,
     FileText,
     CheckCircle2,
-    Package,
     AlertCircle,
     Info,
     Trophy
 } from 'lucide-react';
 import purchaseService, {
     type QuotationComparison,
-    type PurchaseRequisition,
     type SupplierQuotation,
     type RFQ
 } from '../../services/purchaseService';
@@ -111,7 +109,11 @@ const QuotationComparisonFormPage: React.FC = () => {
                         unitPrice: item.unitPrice,
                         totalPrice: item.totalPrice,
                         deliveryDays: q.deliveryDays,
-                        paymentTerms: q.paymentTerms
+                        paymentTerms: q.paymentTerms,
+                        qualityRating: 0,
+                        priceRating: 0,
+                        overallScore: 0,
+                        comments: ''
                     };
                 });
                 setFormData(prev => ({ ...prev, details: initialDetails }));
@@ -121,6 +123,25 @@ const QuotationComparisonFormPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const updateDetail = (quotationId: number, field: string, value: any) => {
+        setFormData(prev => ({
+            ...prev,
+            details: prev.details?.map(d => {
+                if (d.quotationId === quotationId) {
+                    const updated = { ...d, [field]: value };
+                    // Recalculate score if ratings change
+                    if (field === 'qualityRating' || field === 'priceRating') {
+                        const q = field === 'qualityRating' ? value : (d.qualityRating || 0);
+                        const p = field === 'priceRating' ? value : (d.priceRating || 0);
+                        updated.overallScore = (parseInt(q) + parseInt(p)) / 2;
+                    }
+                    return updated;
+                }
+                return d;
+            })
+        }));
     };
 
     const handleSave = async () => {
@@ -252,7 +273,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 <option value="">حدد العرض الفائز...</option>
                                 {formData.details?.map(d => (
                                     <option key={d.quotationId} value={d.quotationId}>
-                                        {d.supplierNameAr} - ({d.totalPrice} {formData.currency || 'EGP'})
+                                        {d.supplierNameAr} - ({d.totalPrice} EGP)
                                     </option>
                                 ))}
                             </select>
@@ -288,9 +309,10 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 <tr className="bg-slate-50/50">
                                     <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">المورد</th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">سعر الوحدة</th>
-                                    <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">الإجمالي</th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">تقييم السعر (1-10)</th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">تقييم الجودة (1-10)</th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100 text-center">الدرجة</th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">مدة التوريد</th>
-                                    <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">شروط الدفع</th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-600 border-b border-slate-100">القرار</th>
                                 </tr>
                             </thead>
@@ -305,9 +327,35 @@ const QuotationComparisonFormPage: React.FC = () => {
                                             <div className="text-xs text-slate-400">#{detail.quotationNumber}</div>
                                         </td>
                                         <td className="px-6 py-4 font-medium text-slate-700">{detail.unitPrice?.toLocaleString()}</td>
-                                        <td className="px-6 py-4 font-bold text-brand-primary">{detail.totalPrice?.toLocaleString()}</td>
+                                        <td className="px-6 py-4">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="10"
+                                                value={detail.priceRating || 0}
+                                                onChange={(e) => updateDetail(detail.quotationId, 'priceRating', e.target.value)}
+                                                className="w-16 px-2 py-1 border rounded-lg text-center focus:border-brand-primary outline-none"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="10"
+                                                value={detail.qualityRating || 0}
+                                                onChange={(e) => updateDetail(detail.quotationId, 'qualityRating', e.target.value)}
+                                                className="w-16 px-2 py-1 border rounded-lg text-center focus:border-brand-primary outline-none"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className={`px-3 py-1 rounded-full font-bold ${(detail.overallScore || 0) >= 7 ? 'bg-emerald-50 text-emerald-600' :
+                                                (detail.overallScore || 0) >= 5 ? 'bg-amber-50 text-amber-600' :
+                                                    'bg-rose-50 text-rose-600'
+                                                }`}>
+                                                {detail.overallScore?.toFixed(1) || '0.0'}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4 text-slate-600">{detail.deliveryDays} يوم</td>
-                                        <td className="px-6 py-4 text-slate-600 text-sm">{detail.paymentTerms || '-'}</td>
                                         <td className="px-6 py-4">
                                             {formData.selectedQuotationId === detail.quotationId ? (
                                                 <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-sm">
