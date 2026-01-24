@@ -3,7 +3,8 @@ import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
     Settings, User, X, ChevronLeft, ChevronRight,
     HelpCircle, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, ShoppingCart,
+    Layers, Box, UserSquare2, Undo2
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 
@@ -159,15 +160,16 @@ const DashboardLayout: React.FC = () => {
     };
 
     const navItems = [
-        { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
-        { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'operations' },
-        { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'operations' },
+        { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة التحكم', section: 'main' },
+        { to: '/dashboard/users', icon: UserSquare2, label: 'إدارة المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
+        { to: '/dashboard/employees', icon: Users, label: 'إدارة الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
+        { to: '/dashboard/inventory/categories', icon: Layers, label: 'تصنيفات الأصناف', section: 'operations' },
+        { to: '/dashboard/inventory/items', icon: Package, label: 'دليل الأصناف', section: 'operations' },
         { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'operations' },
+        { to: '/dashboard/inventory/stocks', icon: LayoutDashboard, label: 'أرصدة المخازن', section: 'operations' },
         { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations' },
         { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations' },
-        { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations' },
+        { to: '/dashboard/inventory/units', icon: Box, label: 'وحدات القياس', section: 'operations' },
         { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
         { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
         { to: '/dashboard/procurement/rfq', icon: FileText, label: 'عروض الأسعار (RFQ)', section: 'procurement' },
@@ -176,7 +178,14 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement' },
-        { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات', section: 'system' },
+        { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement' },
+        { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement' },
+        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement' },
+        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement' },
+        { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main' },
+        // { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system' },
+        // { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system' },
+        { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات العامة', section: 'system' },
     ];
 
     const filteredNavItems = navItems.filter(item =>

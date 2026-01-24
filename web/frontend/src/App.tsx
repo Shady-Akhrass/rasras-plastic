@@ -32,7 +32,17 @@ import SupplierFormPage from './pages/procurement/SupplierFormPage';
 import SupplierOutstandingPage from './pages/procurement/SupplierOutstandingPage';
 import SupplierItemsPage from './pages/procurement/SupplierItemsPage';
 import SupplierItemFormPage from './pages/procurement/SupplierItemFormPage';
+import SupplierInvoicesPage from './pages/procurement/SupplierInvoicesPage';
+import SupplierInvoiceFormPage from './pages/procurement/SupplierInvoiceFormPage';
+import PurchaseOrdersPage from './pages/procurement/PurchaseOrdersPage';
+import PurchaseOrderFormPage from './pages/procurement/PurchaseOrderFormPage';
+import GRNsPage from './pages/procurement/GRNsPage';
+import GRNFormPage from './pages/procurement/GRNFormPage';
+import PurchaseReturnsPage from './pages/procurement/PurchaseReturnsPage';
+import PurchaseReturnFormPage from './pages/procurement/PurchaseReturnFormPage';
+import ApprovalsInbox from './pages/procurement/ApprovalsInbox';
 import { Toaster } from 'react-hot-toast';
+import StockLevelsPage from './pages/inventory/StockLevelsPage';
 
 // Simple Auth Guard Placeholder
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -61,6 +71,7 @@ function App() {
           <Route index element={<DashboardHome />} />
           <Route path="employees" element={<EmployeeList />} />
           <Route path="users" element={<UserList />} />
+          <Route path="approvals" element={<ApprovalsInbox />} />
           <Route path="settings">
             <Route index element={<SettingsPage />} />
             <Route path="company" element={<CompanyInfoPage />} />
@@ -79,8 +90,10 @@ function App() {
             <Route path="price-lists" element={<PriceListsPage />} />
             <Route path="items">
               <Route index element={<ItemsMasterPage />} />
+              <Route index element={<ItemsMasterPage />} />
               <Route path=":id" element={<ItemFormPage />} />
             </Route>
+            <Route path="stocks" element={<StockLevelsPage />} />
           </Route>
 
           <Route path="crm">
@@ -121,6 +134,30 @@ function App() {
                 <Route path="new" element={<SupplierItemFormPage />} />
               </Route>
               <Route path=":id" element={<SupplierFormPage />} />
+            </Route>
+
+            <Route path="po">
+              <Route index element={<PurchaseOrdersPage />} />
+              <Route path="new" element={<PurchaseOrderFormPage />} />
+              <Route path=":id" element={<PurchaseOrderFormPage />} />
+            </Route>
+
+            <Route path="grn">
+              <Route index element={<GRNsPage />} />
+              <Route path="new" element={<GRNFormPage />} />
+              <Route path=":id" element={<GRNFormPage />} />
+            </Route>
+
+            <Route path="invoices">
+              <Route index element={<SupplierInvoicesPage />} />
+              <Route path="new" element={<SupplierInvoiceFormPage />} />
+              <Route path=":id" element={<SupplierInvoiceFormPage />} />
+            </Route>
+
+            <Route path="returns">
+              <Route index element={<PurchaseReturnsPage />} />
+              <Route path="new" element={<PurchaseReturnFormPage />} />
+              <Route path=":id" element={<PurchaseReturnFormPage />} />
             </Route>
           </Route>
         </Route>

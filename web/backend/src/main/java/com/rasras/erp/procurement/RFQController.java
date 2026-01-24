@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/procurement/rfq")
+@RequestMapping("/api/procurement/rfq")
 @RequiredArgsConstructor
 public class RFQController {
 

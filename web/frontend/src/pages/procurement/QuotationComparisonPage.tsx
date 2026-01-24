@@ -99,11 +99,19 @@ const QuotationComparisonPage: React.FC = () => {
                                 <span className="font-bold text-slate-700">{comp.details.length} موردين</span>
                             </div>
                             {comp.selectedSupplierNameAr && (
-                                <div className="flex justify-between text-sm p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                                    <span className="text-emerald-600 font-bold flex items-center gap-1.5">
-                                        <Trophy className="w-4 h-4" /> الفائز:
-                                    </span>
-                                    <span className="text-emerald-700 font-bold">{comp.selectedSupplierNameAr}</span>
+                                <div className="flex flex-col gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-emerald-600 font-bold flex items-center gap-1.5">
+                                            <Trophy className="w-4 h-4" /> الفائز:
+                                        </span>
+                                        <span className="text-emerald-700 font-bold">{comp.selectedSupplierNameAr}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs pt-2 border-t border-emerald-100">
+                                        <span className="text-emerald-600/70 font-medium">الدرجة الكلية:</span>
+                                        <span className="px-2 py-0.5 bg-emerald-500 text-white rounded-md font-black">
+                                            {(comp.details.find(d => d.quotationId === comp.selectedQuotationId)?.overallScore || 0).toFixed(1)}
+                                        </span>
+                                    </div>
                                 </div>
                             )}
                         </div>

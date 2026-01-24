@@ -26,6 +26,8 @@ export interface ItemDto {
     isActive: boolean;
     isSellable: boolean;
     isPurchasable: boolean;
+    currentStock?: number;
+    itemType?: string;
     createdAt?: string;
 }
 
