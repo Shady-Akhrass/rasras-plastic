@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/procurement/pr")
+@RequestMapping("/procurement/pr")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class PurchaseRequisitionController {

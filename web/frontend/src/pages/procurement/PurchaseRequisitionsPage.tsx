@@ -118,7 +118,8 @@ const PRTableRow: React.FC<{
     pr: PurchaseRequisition;
     index: number;
     onView: (id: number) => void;
-}> = ({ pr, index, onView }) => (
+    onCreateRFQ: (id: number) => void;
+}> = ({ pr, index, onView, onCreateRFQ }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -161,15 +162,27 @@ const PRTableRow: React.FC<{
         <td className="px-6 py-4">
             <StatusBadge status={pr.status || 'Draft'} />
         </td>
-        <td className="px-6 py-4">
-            <button
-                onClick={() => onView(pr.id!)}
-                className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
-                    rounded-lg transition-all duration-200 group-hover:scale-110"
-                title="تعديل"
-            >
-                <Edit3 className="w-5 h-5" />
-            </button>
+        <td className="px-6 py-4 text-left">
+            <div className="flex items-center justify-end gap-2">
+                {pr.status === 'Approved' && (
+                    <button
+                        onClick={() => onCreateRFQ(pr.id!)}
+                        className="p-2 text-emerald-500 hover:bg-emerald-50 
+                            rounded-lg transition-all duration-200"
+                        title="إنشاء طلب عرض سعر"
+                    >
+                        <ShoppingCart className="w-5 h-5" />
+                    </button>
+                )}
+                <button
+                    onClick={() => onView(pr.id!)}
+                    className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
+                        rounded-lg transition-all duration-200"
+                    title="تعديل"
+                >
+                    <Edit3 className="w-5 h-5" />
+                </button>
+            </div>
         </td>
     </tr>
 );
@@ -245,12 +258,12 @@ const PurchaseRequisitionsPage: React.FC = () => {
 
     useEffect(() => {
         fetchPRs();
-        
+
         // Check if coming back from edit with success state
         if (location.state?.success) {
             setSuccessMessage(location.state.message || 'تم تحديث طلب الشراء بنجاح');
             setTimeout(() => setSuccessMessage(''), 4000);
-            
+
             // Clear the state so message doesn't show on subsequent visits
             window.history.replaceState({}, document.title);
         }
@@ -290,6 +303,10 @@ const PurchaseRequisitionsPage: React.FC = () => {
 
     const handleViewPR = (id: number) => {
         navigate(`/dashboard/procurement/pr/${id}`);
+    };
+
+    const handleCreateRFQ = (id: number) => {
+        navigate(`/dashboard/procurement/rfq/new?prId=${id}`);
     };
 
     return (
@@ -354,8 +371,8 @@ const PurchaseRequisitionsPage: React.FC = () => {
                             <span className="text-sm text-emerald-600">تم التحديث بنجاح</span>
                         </div>
                     </div>
-                    <button 
-                        onClick={() => setSuccessMessage('')} 
+                    <button
+                        onClick={() => setSuccessMessage('')}
                         className="p-2 hover:bg-emerald-100 rounded-lg transition-colors"
                     >
                         <XCircle className="w-5 h-5" />
@@ -503,6 +520,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                         pr={pr}
                                         index={index}
                                         onView={handleViewPR}
+                                        onCreateRFQ={handleCreateRFQ}
                                     />
                                 ))
                             )}

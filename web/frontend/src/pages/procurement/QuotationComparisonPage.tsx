@@ -6,7 +6,8 @@ import {
     Scale,
     Trophy,
     Award,
-    Zap
+    Zap,
+    ShoppingCart
 } from 'lucide-react';
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
 
@@ -116,13 +117,24 @@ const QuotationComparisonPage: React.FC = () => {
                             )}
                         </div>
 
-                        <button
-                            onClick={() => navigate(`/dashboard/procurement/comparison/${comp.id}`)}
-                            className="w-full py-3 bg-slate-50 text-slate-600 font-bold rounded-xl hover:bg-orange-600 hover:text-white transition-all flex items-center justify-center gap-2"
-                        >
-                            <FileText className="w-4 h-4" />
-                            عرض التحليل الكامل
-                        </button>
+                        <div className="grid grid-cols-2 gap-3 mt-auto">
+                            <button
+                                onClick={() => navigate(`/dashboard/procurement/comparison/${comp.id}`)}
+                                className="py-3 bg-slate-50 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                            >
+                                <FileText className="w-4 h-4" />
+                                التفاصيل
+                            </button>
+                            {comp.status === 'Approved' && comp.selectedQuotationId && (
+                                <button
+                                    onClick={() => navigate(`/dashboard/procurement/po/new?comparisonId=${comp.id}&quotationId=${comp.selectedQuotationId}`)}
+                                    className="py-3 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <ShoppingCart className="w-4 h-4" />
+                                    أمر شراء
+                                </button>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>

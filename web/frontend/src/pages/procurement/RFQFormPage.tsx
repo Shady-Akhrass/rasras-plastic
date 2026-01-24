@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Plus,
     Save,
@@ -13,11 +13,17 @@ import {
 import purchaseService, { type RFQ, type RFQItem, type Supplier } from '../../services/purchaseService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
+import toast from 'react-hot-toast';
 
 const RFQFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const isEdit = !!id;
+
+    // Get prId from URL
+    const queryParams = new URLSearchParams(location.search);
+    const prIdFromUrl = queryParams.get('prId');
 
     // State
     const [loading, setLoading] = useState(false);
@@ -39,8 +45,10 @@ const RFQFormPage: React.FC = () => {
         loadDependencies();
         if (isEdit) {
             loadRFQ(parseInt(id));
+        } else if (prIdFromUrl) {
+            loadPRData(parseInt(prIdFromUrl));
         }
-    }, [id]);
+    }, [id, prIdFromUrl]);
 
     const loadDependencies = async () => {
         try {
@@ -54,6 +62,34 @@ const RFQFormPage: React.FC = () => {
             setUnits(unitsData.data || []);
         } catch (error) {
             console.error('Failed to load dependencies:', error);
+            toast.error('فشل تحميل البيانات الأساسية');
+        }
+    };
+
+    const loadPRData = async (prId: number) => {
+        try {
+            setLoading(true);
+            const pr = await purchaseService.getPRById(prId);
+            if (pr) {
+                setFormData(prev => ({
+                    ...prev,
+                    prId: pr.id,
+                    prNumber: pr.prNumber,
+                    notes: `تم الإنشاء بناءً على طلب شراء: ${pr.prNumber}`,
+                    items: pr.items.map(pi => ({
+                        itemId: pi.itemId,
+                        requestedQty: pi.requestedQty,
+                        unitId: pi.unitId,
+                        specifications: pi.specifications || ''
+                    }))
+                }));
+                toast.success('تم تحميل بيانات طلب الشراء');
+            }
+        } catch (error) {
+            console.error('Failed to load PR data:', error);
+            toast.error('فشل تحميل بيانات طلب الشراء');
+        } finally {
+            setLoading(false);
         }
     };
 

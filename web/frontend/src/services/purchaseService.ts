@@ -152,71 +152,71 @@ export interface Supplier {
 const purchaseService = {
     // PRs
     getAllPRs: async () => {
-        const response = await apiClient.get<{ data: PurchaseRequisition[] }>('/api/procurement/pr');
+        const response = await apiClient.get<{ data: PurchaseRequisition[] }>('/procurement/pr');
         return response.data.data;
     },
     getPRById: async (id: number) => {
-        const response = await apiClient.get<{ data: PurchaseRequisition }>(`/api/procurement/pr/${id}`);
+        const response = await apiClient.get<{ data: PurchaseRequisition }>(`/procurement/pr/${id}`);
         return response.data.data;
     },
     createPR: async (pr: PurchaseRequisition) => {
-        const response = await apiClient.post<{ data: PurchaseRequisition }>('/api/procurement/pr', pr);
+        const response = await apiClient.post<{ data: PurchaseRequisition }>('/procurement/pr', pr);
         return response.data.data;
     },
     updatePR: async (id: number, pr: PurchaseRequisition) => {
-        const response = await apiClient.put<{ data: PurchaseRequisition }>(`/api/procurement/pr/${id}`, pr);
+        const response = await apiClient.put<{ data: PurchaseRequisition }>(`/procurement/pr/${id}`, pr);
         return response.data.data;
     },
 
     // RFQs
     getAllRFQs: async () => {
-        const response = await apiClient.get<{ data: RFQ[] }>('/api/procurement/rfq');
+        const response = await apiClient.get<{ data: RFQ[] }>('/procurement/rfq');
         return response.data.data;
     },
     getRFQById: async (id: number) => {
-        const response = await apiClient.get<{ data: RFQ }>(`/api/procurement/rfq/${id}`);
+        const response = await apiClient.get<{ data: RFQ }>(`/procurement/rfq/${id}`);
         return response.data.data;
     },
     createRFQ: async (rfq: RFQ) => {
-        const response = await apiClient.post<{ data: RFQ }>('/api/procurement/rfq', rfq);
+        const response = await apiClient.post<{ data: RFQ }>('/procurement/rfq', rfq);
         return response.data.data;
     },
 
     // Quotations
     getAllQuotations: async () => {
-        const response = await apiClient.get<{ data: SupplierQuotation[] }>('/api/procurement/quotation');
+        const response = await apiClient.get<{ data: SupplierQuotation[] }>('/procurement/quotation');
         return response.data.data;
     },
     getQuotationById: async (id: number) => {
-        const response = await apiClient.get<{ data: SupplierQuotation }>(`/api/procurement/quotation/${id}`);
+        const response = await apiClient.get<{ data: SupplierQuotation }>(`/procurement/quotation/${id}`);
         return response.data.data;
     },
     createQuotation: async (quotation: SupplierQuotation) => {
-        const response = await apiClient.post<{ data: SupplierQuotation }>('/api/procurement/quotation', quotation);
+        const response = await apiClient.post<{ data: SupplierQuotation }>('/procurement/quotation', quotation);
         return response.data.data;
     },
 
     // Comparisons
     getAllComparisons: async () => {
-        const response = await apiClient.get<{ data: QuotationComparison[] }>('/api/procurement/comparison');
+        const response = await apiClient.get<{ data: QuotationComparison[] }>('/procurement/comparison');
         return response.data.data;
     },
     getComparisonById: async (id: number) => {
-        const response = await apiClient.get<{ data: QuotationComparison }>(`/api/procurement/comparison/${id}`);
+        const response = await apiClient.get<{ data: QuotationComparison }>(`/procurement/comparison/${id}`);
         return response.data.data;
     },
     createComparison: async (comparison: QuotationComparison) => {
-        const response = await apiClient.post<{ data: QuotationComparison }>('/api/procurement/comparison', comparison);
+        const response = await apiClient.post<{ data: QuotationComparison }>('/procurement/comparison', comparison);
         return response.data.data;
     },
     updateComparison: async (id: number, comparison: QuotationComparison) => {
-        const response = await apiClient.put<{ data: QuotationComparison }>(`/api/procurement/comparison/${id}`, comparison);
+        const response = await apiClient.put<{ data: QuotationComparison }>(`/procurement/comparison/${id}`, comparison);
         return response.data.data;
     },
 
     // Suppliers
     getAllSuppliers: async () => {
-        const response = await apiClient.get<{ data: Supplier[] }>('/api/suppliers');
+        const response = await apiClient.get<{ data: Supplier[] }>('/suppliers');
         return response.data.data;
     }
 };

@@ -26,5 +26,6 @@ public class PurchaseReturnDto {
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
     private String status;
+    private Integer preparedByUserId;
     private List<PurchaseReturnItemDto> items;
 }

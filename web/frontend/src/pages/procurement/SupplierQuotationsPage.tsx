@@ -89,7 +89,8 @@ const QuotationTableRow: React.FC<{
     quotation: SupplierQuotation;
     index: number;
     onView: (id: number) => void;
-}> = ({ quotation, index, onView }) => (
+    navigate: ReturnType<typeof useNavigate>;
+}> = ({ quotation, index, onView, navigate }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
         onClick={() => onView(quotation.id!)}
@@ -152,7 +153,7 @@ const QuotationTableRow: React.FC<{
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                window.location.href = `/dashboard/procurement/po/new?quotationId=${quotation.id}`;
+                                navigate(`/dashboard/procurement/po/new?quotationId=${quotation.id}`);
                             }}
                             className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                             title="إصدار أمر شراء"
@@ -162,7 +163,7 @@ const QuotationTableRow: React.FC<{
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                window.location.href = `/dashboard/procurement/invoices/new?quotationId=${quotation.id}`;
+                                navigate(`/dashboard/procurement/invoices/new?quotationId=${quotation.id}`);
                             }}
                             className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
                             title="إصدار فاتورة"
@@ -324,6 +325,7 @@ const SupplierQuotationsPage: React.FC = () => {
                                         quotation={q}
                                         index={index}
                                         onView={(id) => navigate(`/dashboard/procurement/quotation/${id}`)}
+                                        navigate={navigate}
                                     />
                                 ))
                             )}

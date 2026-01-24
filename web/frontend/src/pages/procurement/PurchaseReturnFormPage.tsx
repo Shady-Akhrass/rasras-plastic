@@ -15,6 +15,7 @@ import { purchaseReturnService, type PurchaseReturnDto, type PurchaseReturnItemD
 import { grnService } from '../../services/grnService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
+import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
 import toast from 'react-hot-toast';
 
 const PurchaseReturnFormPage: React.FC = () => {
@@ -28,6 +29,7 @@ const PurchaseReturnFormPage: React.FC = () => {
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [grns, setGrns] = useState<any[]>([]); // simplified
+    const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [saving, setSaving] = useState(false);
 
     // Form State
@@ -35,7 +37,7 @@ const PurchaseReturnFormPage: React.FC = () => {
         returnNumber: `RET-${Date.now().toString().slice(-6)}`,
         returnDate: new Date().toISOString(),
         supplierId: 0,
-        warehouseId: 1, // Default
+        warehouseId: 0,
         returnReason: '',
         subTotal: 0,
         taxAmount: 0,
@@ -45,13 +47,29 @@ const PurchaseReturnFormPage: React.FC = () => {
     });
 
     useEffect(() => {
-        loadSuppliers(); loadItems(); loadGrns();
+        loadSuppliers();
+        loadItems();
+        loadGrns();
+        loadWarehouses();
         if (grnId) { loadGRNData(parseInt(grnId)); }
     }, [id, grnId]);
 
     const loadSuppliers = async () => { const d = await supplierService.getAllSuppliers(); setSuppliers(d.data || []); };
     const loadItems = async () => { const d = await itemService.getActiveItems(); setItems(d.data || []); };
     const loadGrns = async () => { const d = await grnService.getAllGRNs(); setGrns(d || []); };
+    const loadWarehouses = async () => {
+        try {
+            const d = await warehouseService.getActive();
+            const activeWarehouses = d.data || [];
+            setWarehouses(activeWarehouses);
+            if (activeWarehouses.length > 0 && !formData.warehouseId) {
+                setFormData(prev => ({ ...prev, warehouseId: activeWarehouses[0].id! }));
+            }
+        } catch (e) {
+            console.error('Failed to load warehouses:', e);
+            toast.error('فشل تحميل قائمة المستودعات');
+        }
+    };
 
     const loadGRNData = async (gId: number) => {
         try {
@@ -279,8 +297,10 @@ const PurchaseReturnFormPage: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400">سحب من مستودع</label>
                                 <select value={formData.warehouseId} onChange={(e) => setFormData({ ...formData, warehouseId: parseInt(e.target.value) })} className="w-full px-4 py-2 bg-slate-50 rounded-xl border-none font-bold text-slate-700 outline-none">
-                                    <option value="1">المخزن الرئيسي</option>
-                                    <option value="2">مخزن المواد الخام</option>
+                                    <option value="0" disabled>اختر المستودع...</option>
+                                    {warehouses.map(w => (
+                                        <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
+                                    ))}
                                 </select>
                             </div>
                         </div>
