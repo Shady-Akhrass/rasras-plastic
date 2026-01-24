@@ -61,41 +61,7 @@ public class PurchaseReturnService {
                     .collect(Collectors.toList()));
         }
 
-<<<<<<< HEAD
-        entity.setStatus("Approved");
-        entity.setApprovedDate(java.time.LocalDateTime.now());
-        Integer userId = dto.getPreparedByUserId() != null ? dto.getPreparedByUserId() : 1;
-        entity.setApprovedByUserId(userId);
-        entity.setPreparedByUserId(userId);
-
-        PurchaseReturn saved = returnRepo.save(entity);
-
-        // Update Stock (Decrement)
-        updateInventory(saved);
-
-        return mapToDto(saved);
-    }
-
-    private void updateInventory(PurchaseReturn entity) {
-        if (entity.getItems() == null)
-            return;
-
-        for (PurchaseReturnItem item : entity.getItems()) {
-            inventoryService.updateStock(
-                    item.getItem().getId(),
-                    entity.getWarehouse().getId(),
-                    item.getReturnedQty(),
-                    "OUT",
-                    "RETURN",
-                    "PurchaseReturn",
-                    entity.getId(),
-                    entity.getReturnNumber(),
-                    item.getUnitPrice(),
-                    entity.getPreparedByUserId());
-        }
-=======
         return mapToDto(returnRepo.save(entity));
->>>>>>> c47efc5 (final)
     }
 
     @Transactional
