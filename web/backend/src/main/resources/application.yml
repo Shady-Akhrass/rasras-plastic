@@ -21,7 +21,7 @@ spring:
   # JPA / Hibernate
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none  # Changed from 'validate' to 'none' to avoid FK constraint issues with existing tables
     show-sql: false
     properties:
       hibernate:

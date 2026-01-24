@@ -13,6 +13,11 @@ import ItemFormPage from './pages/inventory/ItemFormPage';
 import WarehousesPage from './pages/inventory/WarehousesPage';
 import QualityParametersPage from './pages/inventory/QualityParametersPage';
 import PriceListsPage from './pages/inventory/PriceListsPage';
+import InventorySectionsPage from './pages/inventory/InventorySectionsPage';
+import ItemsBelowMinReportPage from './pages/inventory/reports/ItemsBelowMinReportPage';
+import StagnantItemsReportPage from './pages/inventory/reports/StagnantItemsReportPage';
+import ItemMovementReportPage from './pages/inventory/reports/ItemMovementReportPage';
+import InventoryCountPage from './pages/inventory/InventoryCountPage';
 import SystemSettingsPage from './pages/settings/SystemSettingsPage';
 import PublicCompanyPage from './pages/public/PublicCompanyPage';
 import RolesPage from './pages/settings/RolesPage';
@@ -71,7 +76,8 @@ function App() {
             <Route path="permissions" element={<PermissionsPage />} />
           </Route>
           <Route path="inventory">
-            <Route index element={<Navigate to="categories" replace />} />
+            <Route index element={<Navigate to="sections" replace />} />
+            <Route path="sections" element={<InventorySectionsPage />} />
             <Route path="categories" element={<ItemCategoriesPage />} />
             <Route path="units" element={<UnitsPage />} />
             <Route path="warehouses" element={<WarehousesPage />} />
@@ -81,6 +87,12 @@ function App() {
               <Route index element={<ItemsMasterPage />} />
               <Route path=":id" element={<ItemFormPage />} />
             </Route>
+            <Route path="reports">
+              <Route path="below-min" element={<ItemsBelowMinReportPage />} />
+              <Route path="stagnant" element={<StagnantItemsReportPage />} />
+              <Route path="movement" element={<ItemMovementReportPage />} />
+            </Route>
+            <Route path="count" element={<InventoryCountPage />} />
           </Route>
 
           <Route path="crm">

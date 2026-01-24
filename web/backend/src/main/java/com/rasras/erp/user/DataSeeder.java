@@ -23,6 +23,9 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
         log.info("Starting data seeding for Employees and Users...");
 
+        // 0. Ensure Roles exist first
+        seedRoles();
+
         // 1. Ensure Department 1 exists (needed for employee)
         Integer deptCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM departments WHERE DepartmentID = 1", Integer.class);
@@ -67,5 +70,47 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         log.info("Data seeding completed.");
+    }
+
+    private void seedRoles() {
+        log.info("Seeding roles...");
+        
+        // Check and create ADMIN role
+        if (!roleRepository.findByRoleCode("ADMIN").isPresent()) {
+            log.info("Creating ADMIN role...");
+            Role adminRole = Role.builder()
+                    .roleCode("ADMIN")
+                    .roleNameAr("مدير النظام")
+                    .roleNameEn("System Administrator")
+                    .description("صلاحيات كاملة على النظام")
+                    .isActive(true)
+                    .build();
+            roleRepository.save(adminRole);
+            log.info("ADMIN role created successfully");
+        }
+
+        // Check and create other common roles
+        String[][] roles = {
+            {"GM", "المدير العام", "General Manager", "الإدارة العليا واعتماد القرارات"},
+            {"FM", "المدير المالي", "Finance Manager", "إدارة الشؤون المالية"},
+            {"ACC", "محاسب", "Accountant", "العمليات المحاسبية اليومية"},
+            {"PM", "مدير المشتريات", "Procurement Manager", "إدارة عمليات الشراء"},
+            {"BUYER", "مشتري", "Buyer", "تنفيذ عمليات الشراء"},
+            {"SM", "مدير المبيعات", "Sales Manager", "إدارة عمليات البيع"}
+        };
+
+        for (String[] roleData : roles) {
+            if (!roleRepository.findByRoleCode(roleData[0]).isPresent()) {
+                Role role = Role.builder()
+                        .roleCode(roleData[0])
+                        .roleNameAr(roleData[1])
+                        .roleNameEn(roleData[2])
+                        .description(roleData[3])
+                        .isActive(true)
+                        .build();
+                roleRepository.save(role);
+                log.info("Created role: {}", roleData[0]);
+            }
+        }
     }
 }

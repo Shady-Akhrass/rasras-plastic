@@ -40,6 +40,11 @@ public class SupplierController {
         return ResponseEntity.ok(ApiResponse.success(supplierService.getAllSupplierItems()));
     }
 
+    @GetMapping("/items-by-item/{itemId}")
+    public ResponseEntity<ApiResponse<List<SupplierItemDto>>> getSupplierItemsByItemId(@PathVariable Integer itemId) {
+        return ResponseEntity.ok(ApiResponse.success(supplierService.getSupplierItemsByItemId(itemId)));
+    }
+
     @GetMapping("/{id}/items")
     public ResponseEntity<ApiResponse<List<SupplierItemDto>>> getSupplierItems(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(supplierService.getSupplierItems(id)));
