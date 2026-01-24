@@ -4,12 +4,14 @@ import {
     ChevronRight, Save, Package, Info, Scale, Barcode, DollarSign,
     Settings, Image as ImageIcon, RefreshCw, AlertCircle, CheckCircle2,
     X, Tag, Box, Percent, ShoppingCart, ShoppingBag, FileText,
-    Layers, TrendingUp, Calculator, Microscope, Trash2, Plus
+    Layers, TrendingUp, Calculator, Microscope, Trash2, Plus, Truck
 } from 'lucide-react';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { itemCategoryService, type ItemCategoryDto } from '../../services/itemCategoryService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import { qualityService, type QualityParameterDto, type ItemQualitySpecDto } from '../../services/qualityService';
+import { supplierService, type SupplierItemDto } from '../../services/supplierService';
+import type { SupplierDto } from '../../services/supplierService';
 import { toast } from 'react-hot-toast';
 
 // Animated Input Component
@@ -335,8 +337,15 @@ const ItemFormPage: React.FC = () => {
     const [initialLoading, setInitialLoading] = useState(true);
     const [categories, setCategories] = useState<ItemCategoryDto[]>([]);
     const [units, setUnits] = useState<UnitDto[]>([]);
-    const [activeTab, setActiveTab] = useState<'basic' | 'pricing' | 'stock' | 'quality' | 'settings'>('basic');
+    const [activeTab, setActiveTab] = useState<'basic' | 'pricing' | 'stock' | 'quality' | 'suppliers' | 'settings'>('basic');
     const [hasChanges, setHasChanges] = useState(false);
+
+    // Suppliers (الموردون المعتمدون) - مندوب المبيعات لا يرى هذا التبويب (يُخفى حسب الصلاحية لاحقاً)
+    const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
+    const [allSuppliers, setAllSuppliers] = useState<SupplierDto[]>([]);
+    const [isAddingSupplier, setIsAddingSupplier] = useState(false);
+    const [linkSupplier, setLinkSupplier] = useState<{ supplierId: number; supplierItemCode: string }>({ supplierId: 0, supplierItemCode: '' });
+    const [loadingSuppliers, setLoadingSuppliers] = useState(false);
 
     // Quality Specs State
     const [specs, setSpecs] = useState<ItemQualitySpecDto[]>([]);
@@ -421,6 +430,16 @@ const ItemFormPage: React.FC = () => {
                 // Fetch existing specs
                 const specsRes = await qualityService.getSpecsByItem(parseInt(id));
                 setSpecs(specsRes.data || []);
+
+                // الموردون المعتمدون لهذا الصنف
+                try {
+                    const siRes = await supplierService.getSupplierItemsByItem(parseInt(id));
+                    setSupplierItems((siRes as any)?.data ?? []);
+                } catch { setSupplierItems([]); }
+                try {
+                    const supRes = await supplierService.getAllSuppliers();
+                    setAllSuppliers((supRes as any)?.data ?? []);
+                } catch { setAllSuppliers([]); }
             }
         } catch (error) {
             console.error('Error fetching item:', error);
@@ -459,6 +478,7 @@ const ItemFormPage: React.FC = () => {
         { id: 'pricing', label: 'الأسعار والضرائب', icon: DollarSign },
         { id: 'stock', label: 'المخزون', icon: Scale },
         { id: 'quality', label: 'المواصفات الفنية', icon: Microscope },
+        ...(isEdit ? [{ id: 'suppliers' as const, label: 'الموردون المعتمدون', icon: Truck }] : []),
         { id: 'settings', label: 'الإعدادات', icon: Settings },
     ];
 
@@ -762,6 +782,28 @@ const ItemFormPage: React.FC = () => {
                                 salePrice={formData.lastSalePrice || 0}
                                 vatRate={formData.defaultVatRate || 0}
                             />
+
+                            {/* تنبيه التقييم المزدوج: فرق كبير بين التكلفة التاريخية وسعر الإحلال */}
+                            {(() => {
+                                const hist = Number(formData.standardCost) || Number(formData.lastPurchasePrice) || 0;
+                                const repl = Number(formData.replacementPrice) || 0;
+                                const diffPct = hist > 0 ? Math.abs(repl - hist) / hist : 0;
+                                if (diffPct >= 0.15 && (hist > 0 || repl > 0)) {
+                                    return (
+                                        <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-200 rounded-xl flex items-start gap-3">
+                                            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                            <div>
+                                                <p className="font-semibold text-amber-800">تنبيه: فرق كبير في التقييم المزدوج</p>
+                                                <p className="text-sm text-amber-700 mt-1">
+                                                    التكلفة التاريخية (محاسبة): {hist.toLocaleString('ar-EG')} — سعر الإحلال (قرارات): {repl.toLocaleString('ar-EG')}.
+                                                    الفرق ≈ {(diffPct * 100).toFixed(0)}%. راجع القيم عند الحاجة.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </FormSection>
 
                         <FormSection
@@ -1027,6 +1069,138 @@ const ItemFormPage: React.FC = () => {
                                             >
                                                 إلغاء
                                             </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </FormSection>
+                    </div>
+                )}
+
+                {/* الموردون المعتمدون (لا يرى مندوب المبيعات هذا التبويب) */}
+                {activeTab === 'suppliers' && isEdit && id && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <FormSection
+                            title="الموردون المعتمدون لهذا الصنف"
+                            icon={Truck}
+                            description="إدارة الموردين الذين يوردون هذا الصنف؛ مندوب المبيعات لا يرى الموردين"
+                        >
+                            <div className="space-y-4">
+                                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                    <table className="w-full text-right">
+                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500">المورد</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500">كود الصنف لدى المورد</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500">آخر سعر</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500 text-center">مفضل</th>
+                                                <th className="px-4 py-3 text-xs font-bold text-slate-500 text-center">إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {supplierItems.map((si) => (
+                                                <tr key={si.id} className="hover:bg-slate-50/50">
+                                                    <td className="px-4 py-3 font-medium text-slate-800">{si.supplierNameAr || `#${si.supplierId}`}</td>
+                                                    <td className="px-4 py-3 text-slate-600">{si.supplierItemCode || '—'}</td>
+                                                    <td className="px-4 py-3">{si.lastPrice != null ? Number(si.lastPrice).toLocaleString('ar-EG') : '—'}</td>
+                                                    <td className="px-4 py-3 text-center">{si.isPreferred ? <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-xs">نعم</span> : '—'}</td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                if (!si.id) return;
+                                                                if (!window.confirm('إلغاء ربط هذا المورد بالصنف؟')) return;
+                                                                try {
+                                                                    await supplierService.unlinkItem(si.id);
+                                                                    setSupplierItems(supplierItems.filter(s => s.id !== si.id));
+                                                                    toast.success('تم إلغاء الربط');
+                                                                } catch {
+                                                                    toast.error('فشل إلغاء الربط');
+                                                                }
+                                                            }}
+                                                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {supplierItems.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-sm">
+                                                        لا يوجد موردون معتمدون لهذا الصنف حتى الآن
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {!isAddingSupplier ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAddingSupplier(true)}
+                                        className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 hover:border-brand-primary hover:text-brand-primary hover:bg-brand-primary/5 flex items-center justify-center gap-2 font-medium"
+                                    >
+                                        <Plus className="w-5 h-5" /> إضافة مورد معتمد
+                                    </button>
+                                ) : (
+                                    <div className="p-4 bg-slate-50 rounded-xl border-2 border-brand-primary/20 space-y-4">
+                                        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                            <h4 className="font-bold text-slate-800">ربط مورد بالصنف</h4>
+                                            <button type="button" onClick={() => { setIsAddingSupplier(false); setLinkSupplier({ supplierId: 0, supplierItemCode: '' }); }} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-2">المورد *</label>
+                                                <select
+                                                    value={linkSupplier.supplierId || ''}
+                                                    onChange={(e) => setLinkSupplier({ ...linkSupplier, supplierId: parseInt(e.target.value) || 0 })}
+                                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none"
+                                                >
+                                                    <option value="">اختر المورد...</option>
+                                                    {allSuppliers.filter(s => !supplierItems.some(si => si.supplierId === s.id)).map(s => (
+                                                        <option key={s.id} value={s.id}>{s.supplierNameAr} {s.supplierCode ? `(${s.supplierCode})` : ''}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-2">كود الصنف لدى المورد</label>
+                                                <input
+                                                    type="text"
+                                                    value={linkSupplier.supplierItemCode}
+                                                    onChange={(e) => setLinkSupplier({ ...linkSupplier, supplierItemCode: e.target.value })}
+                                                    placeholder="اختياري"
+                                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    if (!linkSupplier.supplierId) { toast.error('اختر المورد'); return; }
+                                                    if (!id) return;
+                                                    setLoadingSuppliers(true);
+                                                    try {
+                                                        const res = await supplierService.linkItem({ supplierId: linkSupplier.supplierId, itemId: parseInt(id), supplierItemCode: linkSupplier.supplierItemCode || undefined } as any);
+                                                        const added = (res as any)?.data ?? res;
+                                                        setSupplierItems(prev => [...prev, { ...added, supplierNameAr: allSuppliers.find(s => s.id === linkSupplier.supplierId)?.supplierNameAr }]);
+                                                        setIsAddingSupplier(false);
+                                                        setLinkSupplier({ supplierId: 0, supplierItemCode: '' });
+                                                        toast.success('تم ربط المورد');
+                                                    } catch {
+                                                        toast.error('فشل ربط المورد');
+                                                    } finally {
+                                                        setLoadingSuppliers(false);
+                                                    }
+                                                }}
+                                                disabled={loadingSuppliers}
+                                                className="flex-1 py-2 bg-brand-primary text-white rounded-lg font-bold disabled:opacity-50"
+                                            >
+                                                {loadingSuppliers ? 'جاري...' : 'ربط المورد'}
+                                            </button>
+                                            <button type="button" onClick={() => { setIsAddingSupplier(false); setLinkSupplier({ supplierId: 0, supplierItemCode: '' }); }} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg font-bold">إلغاء</button>
                                         </div>
                                     </div>
                                 )}

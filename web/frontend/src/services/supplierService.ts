@@ -39,6 +39,7 @@ export interface SupplierDto {
 export interface SupplierItemDto {
     id?: number;
     supplierId: number;
+    supplierNameAr?: string;
     itemId: number;
     itemNameAr?: string;
     itemCode?: string;
@@ -102,6 +103,11 @@ export const supplierService = {
 
     getSupplierItems: async (supplierId: number) => {
         const response = await apiClient.get<{ data: SupplierItemDto[] }>(`/suppliers/${supplierId}/items`);
+        return response.data;
+    },
+
+    getSupplierItemsByItem: async (itemId: number) => {
+        const response = await apiClient.get<{ data: SupplierItemDto[] }>(`/suppliers/items-by-item/${itemId}`);
         return response.data;
     },
 

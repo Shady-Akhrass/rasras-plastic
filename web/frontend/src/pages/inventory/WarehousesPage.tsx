@@ -347,6 +347,10 @@ const WarehousesPage: React.FC = () => {
                                                     bg-slate-100 text-slate-600 text-sm font-mono rounded-full">
                                                     {selectedWarehouse.warehouseCode}
                                                 </span>
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 
+                                                    bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-full border border-emerald-200">
+                                                    نظام FIFO تلقائي
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

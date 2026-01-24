@@ -94,6 +94,13 @@ public class SupplierService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<SupplierItemDto> getSupplierItemsByItemId(Integer itemId) {
+        return supplierItemRepository.findByItemId(itemId).stream()
+                .map(this::mapToSupplierItemDto)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public SupplierItemDto linkItemToSupplier(SupplierItemDto dto) {
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
@@ -188,6 +195,7 @@ public class SupplierService {
         return SupplierItemDto.builder()
                 .id(item.getId())
                 .supplierId(item.getSupplier().getId())
+                .supplierNameAr(item.getSupplier().getSupplierNameAr())
                 .itemId(item.getItem().getId())
                 .itemNameAr(item.getItem().getItemNameAr())
                 .itemCode(item.getItem().getItemCode())

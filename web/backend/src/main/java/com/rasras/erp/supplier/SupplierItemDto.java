@@ -15,6 +15,7 @@ import java.time.LocalDate;
 public class SupplierItemDto {
     private Integer id;
     private Integer supplierId;
+    private String supplierNameAr;
     private Integer itemId;
     private String itemNameAr;
     private String itemCode;

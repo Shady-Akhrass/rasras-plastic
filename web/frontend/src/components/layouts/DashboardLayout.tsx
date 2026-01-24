@@ -3,7 +3,7 @@ import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
     Settings, User, X, ChevronLeft, ChevronRight,
     HelpCircle, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 
@@ -162,6 +162,7 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
         { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
         { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
+        { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'operations' },
         { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'operations' },
         { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'operations' },
         { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'operations' },

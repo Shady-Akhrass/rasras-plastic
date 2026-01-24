@@ -38,11 +38,30 @@ const UserForm: React.FC<UserFormProps> = ({ user, onClose, onSuccess }) => {
 
     const loadData = async () => {
         try {
-            const [empData, roleData] = await Promise.all([
-                employeeService.getAll(0, 100),
+            // جلب جميع الموظفين وجميع المستخدمين
+            const [empData, usersData, roleData] = await Promise.all([
+                employeeService.getAll(0, 200), // جلب عدد كبير من الموظفين
+                userService.getAll(0, 200), // جلب جميع المستخدمين
                 userService.getRoles()
             ]);
-            setEmployees(empData.content);
+
+            let employeesData = empData.content;
+
+            // عند إنشاء مستخدم جديد، نستبعد الموظفين الذين لديهم حسابات مسبقة
+            if (!user) {
+                // إنشاء Set من employeeIds المرتبطة بحسابات مستخدمين
+                const employeesWithUsers = new Set(
+                    usersData.content.map((u: User) => u.employeeId)
+                );
+                
+                // تصفية الموظفين: نعرض فقط الذين ليس لديهم حسابات
+                employeesData = employeesData.filter(
+                    (emp: Employee) => !employeesWithUsers.has(emp.employeeId)
+                );
+            }
+            // عند التعديل، نعرض جميع الموظفين (لا تصفية)
+            
+            setEmployees(employeesData);
             setRoles(roleData);
         } catch (err) {
             console.error('Error loading data:', err);
