@@ -99,6 +99,12 @@ function App() {
               <Route index element={<ItemsMasterPage />} />
               <Route path=":id" element={<ItemFormPage />} />
             </Route>
+            <Route path="reports">
+              <Route path="below-min" element={<ItemsBelowMinReportPage />} />
+              <Route path="stagnant" element={<StagnantItemsReportPage />} />
+              <Route path="movement" element={<ItemMovementReportPage />} />
+            </Route>
+            <Route path="count" element={<InventoryCountPage />} />
             <Route path="stocks" element={<StockLevelsPage />} />
           </Route>
 

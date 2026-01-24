@@ -3,7 +3,8 @@ import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
     Settings, User, X, ChevronLeft, ChevronRight,
     HelpCircle, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, ShoppingCart,
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse
+   , ShoppingCart,
     Layers, Box, UserSquare2, Undo2
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
@@ -160,11 +161,17 @@ const DashboardLayout: React.FC = () => {
     };
 
     const navItems = [
-        { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة التحكم', section: 'main' },
-        { to: '/dashboard/users', icon: UserSquare2, label: 'إدارة المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/employees', icon: Users, label: 'إدارة الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/inventory/categories', icon: Layers, label: 'تصنيفات الأصناف', section: 'operations' },
-        { to: '/dashboard/inventory/items', icon: Package, label: 'دليل الأصناف', section: 'operations' },
+        { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
+        { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
+        { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
+        { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'operations' },
+        { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'operations' },
+        { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'operations' },
+        // { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة التحكم', section: 'main' },
+        // { to: '/dashboard/users', icon: UserSquare2, label: 'إدارة المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
+        // { to: '/dashboard/employees', icon: Users, label: 'إدارة الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
+        // { to: '/dashboard/inventory/categories', icon: Layers, label: 'تصنيفات الأصناف', section: 'operations' },
+        // { to: '/dashboard/inventory/items', icon: Package, label: 'دليل الأصناف', section: 'operations' },
         { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'operations' },
         { to: '/dashboard/inventory/stocks', icon: LayoutDashboard, label: 'أرصدة المخازن', section: 'operations' },
         { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations' },

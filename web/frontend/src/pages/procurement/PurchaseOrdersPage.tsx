@@ -4,6 +4,7 @@ import {
     Plus,
     Search,
     FileText,
+    Calendar,
     CheckCircle2,
     Clock,
     RefreshCw,
@@ -81,18 +82,16 @@ const PurchaseOrdersPage: React.FC = () => {
         return orders.filter(o => {
             const matchesSearch = o.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 o.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = statusFilter === 'All'
-                ? o.status !== 'Closed' // Hide closed in main list
-                : o.status === statusFilter;
+            const matchesStatus = statusFilter === 'All' || o.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
     }, [orders, searchTerm, statusFilter]);
 
     const stats = useMemo(() => ({
-        total: orders.filter(o => o.status !== 'Closed').length,
+        total: orders.length,
         pending: orders.filter(o => o.status === 'Draft' || o.status === 'Pending').length,
         active: orders.filter(o => o.status === 'PartiallyReceived').length,
-        totalValue: orders.filter(o => o.status !== 'Closed').reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString()
+        totalValue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString()
     }), [orders]);
 
     return (
@@ -126,8 +125,8 @@ const PurchaseOrdersPage: React.FC = () => {
                     <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input type="text" placeholder="بحث برقم الأمر أو المورد..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pr-12 pl-4 py-3 rounded-xl border-2 border-transparent bg-slate-50 focus:border-brand-primary focus:bg-white outline-none transition-all" />
                 </div>
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-3 bg-slate-50 rounded-xl border-none font-medium outline-none text-right">
-                    <option value="All">الأوامر النشطة</option>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-3 bg-slate-50 rounded-xl border-none font-medium outline-none">
+                    <option value="All">جميع الحالات</option>
                     <option value="Draft">مسودة</option>
                     <option value="Pending">قيد الاعتماد</option>
                     <option value="PartiallyReceived">استلام جزئي</option>

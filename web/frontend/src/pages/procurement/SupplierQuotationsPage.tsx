@@ -153,7 +153,11 @@ const QuotationTableRow: React.FC<{
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
+<<<<<<< HEAD
                                 navigate(`/dashboard/procurement/po/new?quotationId=${quotation.id}`);
+=======
+                                window.location.href = `/dashboard/procurement/po/new?quotationId=${quotation.id}`;
+>>>>>>> c47efc5 (final)
                             }}
                             className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                             title="إصدار أمر شراء"
@@ -163,7 +167,11 @@ const QuotationTableRow: React.FC<{
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
+<<<<<<< HEAD
                                 navigate(`/dashboard/procurement/invoices/new?quotationId=${quotation.id}`);
+=======
+                                window.location.href = `/dashboard/procurement/invoices/new?quotationId=${quotation.id}`;
+>>>>>>> c47efc5 (final)
                             }}
                             className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
                             title="إصدار فاتورة"

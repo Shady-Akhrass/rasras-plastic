@@ -13,7 +13,6 @@ import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../ser
 import { purchaseOrderService } from '../../services/purchaseOrderService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
-import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
 import toast from 'react-hot-toast';
 
 const GRNFormPage: React.FC = () => {
@@ -27,41 +26,25 @@ const GRNFormPage: React.FC = () => {
     // Data State
     const [items, setItems] = useState<ItemDto[]>([]);
     const [units, setUnits] = useState<UnitDto[]>([]);
-    const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [saving, setSaving] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<GoodsReceiptNoteDto>({
         poId: 0,
         supplierId: 0,
-        warehouseId: 0,
+        warehouseId: 1, // Default
         receivedByUserId: 1, // Mock current user
         status: 'Draft',
         items: []
     });
 
     useEffect(() => {
-        loadItems();
-        loadUnits();
-        loadWarehouses();
+        loadItems(); loadUnits();
         if (poId) { loadPOData(parseInt(poId)); }
     }, [id, poId]);
 
     const loadItems = async () => { const d = await itemService.getActiveItems(); setItems(d.data || []); };
     const loadUnits = async () => { const d = await unitService.getAllUnits(); setUnits(d.data || []); };
-    const loadWarehouses = async () => {
-        try {
-            const d = await warehouseService.getActive();
-            const activeWarehouses = d.data || [];
-            setWarehouses(activeWarehouses);
-            if (activeWarehouses.length > 0 && !formData.warehouseId) {
-                setFormData(prev => ({ ...prev, warehouseId: activeWarehouses[0].id! }));
-            }
-        } catch (e) {
-            console.error('Failed to load warehouses:', e);
-            toast.error('فشل تحميل قائمة المستودعات');
-        }
-    };
 
     const loadPOData = async (pId: number) => {
         try {
@@ -205,10 +188,8 @@ const GRNFormPage: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400">المستودع</label>
                                 <select value={formData.warehouseId} onChange={(e) => setFormData({ ...formData, warehouseId: parseInt(e.target.value) })} className="w-full px-4 py-2 bg-slate-50 rounded-xl border-none font-bold text-slate-700 outline-none">
-                                    <option value="0" disabled>اختر المستودع...</option>
-                                    {warehouses.map(w => (
-                                        <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
-                                    ))}
+                                    <option value="1">المخزن الرئيسي</option>
+                                    <option value="2">مخزن المواد الخام</option>
                                 </select>
                             </div>
                         </div>

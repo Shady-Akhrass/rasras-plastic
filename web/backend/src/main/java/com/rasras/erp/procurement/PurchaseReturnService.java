@@ -61,6 +61,7 @@ public class PurchaseReturnService {
                     .collect(Collectors.toList()));
         }
 
+<<<<<<< HEAD
         entity.setStatus("Approved");
         entity.setApprovedDate(java.time.LocalDateTime.now());
         Integer userId = dto.getPreparedByUserId() != null ? dto.getPreparedByUserId() : 1;
@@ -92,6 +93,9 @@ public class PurchaseReturnService {
                     item.getUnitPrice(),
                     entity.getPreparedByUserId());
         }
+=======
+        return mapToDto(returnRepo.save(entity));
+>>>>>>> c47efc5 (final)
     }
 
     @Transactional
