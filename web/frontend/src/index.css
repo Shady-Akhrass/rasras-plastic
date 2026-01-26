@@ -5,25 +5,24 @@
 @theme {
     /* 2. Define Cairo */
     --font-cairo: "Cairo", sans-serif;
-    
+
     /* 3. Make Cairo the default sans font for the whole project */
     --font-sans: "Cairo", sans-serif;
 
-    --color-brand-primary: #1a365d;
-    --color-brand-secondary: #2d3748;
-    --color-brand-accent: #3182ce;
+    --color-brand-primary: #2d7a4f;
+    --color-brand-secondary: #1a5a38;
+    --color-brand-accent: #45a371;
     --color-surface: #ffffff;
-    --color-background: #f7fafc;
-
+    --color-background: #f8fdf9;
     --radius-xl: 1rem;
     --radius-2xl: 1.5rem;
 }
 
 @layer base {
     :root {
-        --brand-primary: #1a365d;
-        --brand-secondary: #2d3748;
-        --brand-accent: #3182ce;
+        --brand-primary: #2d7a4f;
+        --brand-secondary: #1a5a38;
+        --brand-accent: #45a371;
     }
 
     * {
@@ -39,7 +38,12 @@
 
     /* Since we set --font-sans to Cairo in the theme, 
        we don't strictly need this, but it adds safety */
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
         font-family: var(--font-cairo);
     }
 }

@@ -29,4 +29,16 @@ public class GRNController {
     public ResponseEntity<Map<String, GoodsReceiptNoteDto>> createGRN(@RequestBody GoodsReceiptNoteDto dto) {
         return ResponseEntity.ok(Map.of("data", grnService.createGRN(dto)));
     }
+
+    @PostMapping("/{id}/finalize")
+    public ResponseEntity<Map<String, GoodsReceiptNoteDto>> finalizeStoreIn(@PathVariable Integer id,
+            @RequestParam Integer userId) {
+        return ResponseEntity.ok(Map.of("data", grnService.finalizeStoreIn(id, userId)));
+    }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<Map<String, GoodsReceiptNoteDto>> submitGRN(@PathVariable Integer id,
+            @RequestParam Integer userId) {
+        return ResponseEntity.ok(Map.of("data", grnService.submitGRN(id, userId)));
+    }
 }

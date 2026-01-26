@@ -1,5 +1,7 @@
 package com.rasras.erp.supplier;
 
+import com.rasras.erp.supplier.SupplierStatus;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ public class SupplierService {
     private final SupplierItemRepository supplierItemRepository;
     private final SupplierBankRepository supplierBankRepository;
     private final com.rasras.erp.inventory.ItemRepository itemRepository;
+    private final com.rasras.erp.approval.ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<SupplierDto> getAllSuppliers() {
@@ -45,6 +48,8 @@ public class SupplierService {
     public SupplierDto createSupplier(SupplierDto dto) {
         Supplier supplier = mapToEntity(dto);
         supplier.setSupplierCode(generateSupplierCode());
+        supplier.setStatus(SupplierStatus.DRAFT);
+        supplier.setApprovalStatus("Pending");
         return mapToDto(supplierRepository.save(supplier));
     }
 
@@ -52,8 +57,17 @@ public class SupplierService {
     public SupplierDto submitForApproval(Integer id) {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("المورد غير موجود"));
+
         supplier.setStatus(SupplierStatus.PENDING);
-        return mapToDto(supplierRepository.save(supplier));
+        supplier.setApprovalStatus("Submitted");
+
+        Supplier saved = supplierRepository.save(supplier);
+
+        // Initiate approval workflow
+        approvalService.initiateApproval("SUPPLIER_APPROVAL", "Supplier", saved.getId(),
+                saved.getSupplierCode(), 1, BigDecimal.ZERO); // Assuming admin user for now
+
+        return mapToDto(saved);
     }
 
     @Transactional
@@ -108,17 +122,32 @@ public class SupplierService {
         com.rasras.erp.inventory.Item item = itemRepository.findById(dto.getItemId())
                 .orElseThrow(() -> new RuntimeException("المنتج غير موجود"));
 
-        SupplierItem supplierItem = SupplierItem.builder()
-                .supplier(supplier)
-                .item(item)
-                .supplierItemCode(dto.getSupplierItemCode())
-                .lastPrice(dto.getLastPrice())
-                .lastPriceDate(dto.getLastPriceDate())
-                .leadTimeDays(dto.getLeadTimeDays())
-                .minOrderQty(dto.getMinOrderQty())
-                .isPreferred(dto.getIsPreferred() != null ? dto.getIsPreferred() : false)
-                .isActive(dto.getIsActive() != null ? dto.getIsActive() : true)
-                .build();
+        SupplierItem supplierItem = supplierItemRepository.findBySupplierIdAndItemId(supplier.getId(), item.getId())
+                .orElse(null);
+
+        if (supplierItem == null) {
+            supplierItem = SupplierItem.builder()
+                    .supplier(supplier)
+                    .item(item)
+                    .isPreferred(false)
+                    .isActive(true)
+                    .build();
+        }
+
+        if (dto.getSupplierItemCode() != null)
+            supplierItem.setSupplierItemCode(dto.getSupplierItemCode());
+        if (dto.getLastPrice() != null)
+            supplierItem.setLastPrice(dto.getLastPrice());
+        if (dto.getLastPriceDate() != null)
+            supplierItem.setLastPriceDate(dto.getLastPriceDate());
+        if (dto.getLeadTimeDays() != null)
+            supplierItem.setLeadTimeDays(dto.getLeadTimeDays());
+        if (dto.getMinOrderQty() != null)
+            supplierItem.setMinOrderQty(dto.getMinOrderQty());
+        if (dto.getIsPreferred() != null)
+            supplierItem.setIsPreferred(dto.getIsPreferred());
+        if (dto.getIsActive() != null)
+            supplierItem.setIsActive(dto.getIsActive());
 
         return mapToSupplierItemDto(supplierItemRepository.save(supplierItem));
     }
@@ -168,6 +197,7 @@ public class SupplierService {
                 .creditLimit(supplier.getCreditLimit())
                 .totalInvoiced(supplier.getTotalInvoiced())
                 .totalPaid(supplier.getTotalPaid())
+                .totalReturned(supplier.getTotalReturned())
                 .currentBalance(supplier.getCurrentBalance())
                 .currency(supplier.getCurrency())
                 .build();
@@ -240,6 +270,7 @@ public class SupplierService {
                 .rating(supplier.getRating())
                 .totalInvoiced(supplier.getTotalInvoiced())
                 .totalPaid(supplier.getTotalPaid())
+                .totalReturned(supplier.getTotalReturned())
                 .currentBalance(supplier.getCurrentBalance())
                 .isApproved(supplier.getIsApproved())
                 .isActive(supplier.getIsActive())
@@ -284,6 +315,7 @@ public class SupplierService {
         supplier.setRating(dto.getRating());
         supplier.setTotalInvoiced(dto.getTotalInvoiced() != null ? dto.getTotalInvoiced() : BigDecimal.ZERO);
         supplier.setTotalPaid(dto.getTotalPaid() != null ? dto.getTotalPaid() : BigDecimal.ZERO);
+        supplier.setTotalReturned(dto.getTotalReturned() != null ? dto.getTotalReturned() : BigDecimal.ZERO);
         supplier.setCurrentBalance(dto.getCurrentBalance() != null ? dto.getCurrentBalance() : BigDecimal.ZERO);
         supplier.setIsApproved(dto.getIsApproved() != null ? dto.getIsApproved() : false);
         supplier.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : true);

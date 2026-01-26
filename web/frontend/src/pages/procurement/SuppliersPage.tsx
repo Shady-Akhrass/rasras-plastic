@@ -12,7 +12,8 @@ import {
     MapPin,
     CheckCircle2,
     RefreshCw,
-    Edit3
+    Edit3,
+    ExternalLink
 } from 'lucide-react';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 
@@ -49,19 +50,20 @@ const StatCard: React.FC<{
 
 // Status Badge Component
 const StatusBadge: React.FC<{ active: boolean; status: SupplierDto['status'] }> = ({ active, status }) => {
-    const statusConfig = {
+    const statusConfig: Record<string, { label: string; class: string }> = {
         DRAFT: { label: 'مسودة', class: 'bg-slate-100 text-slate-600 border-slate-200' },
         PENDING: { label: 'قيد المراجعة', class: 'bg-amber-50 text-amber-700 border-amber-200' },
         APPROVED: { label: 'معتمد', class: 'bg-blue-50 text-blue-700 border-blue-200' },
         REJECTED: { label: 'مرفوض', class: 'bg-rose-50 text-rose-700 border-rose-200' }
     };
 
-    const config = statusConfig[status] || statusConfig.DRAFT;
+    const normalizedStatus = status?.toUpperCase() || 'DRAFT';
+    const config = statusConfig[normalizedStatus] || statusConfig.DRAFT;
 
     return (
         <div className="flex flex-col gap-1 items-end">
             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${config.class}`}>
-                {status === 'APPROVED' && <CheckCircle2 className="w-2.5 h-2.5" />}
+                {normalizedStatus === 'APPROVED' && <CheckCircle2 className="w-2.5 h-2.5" />}
                 {config.label}
             </span>
             {!active && (
@@ -78,7 +80,9 @@ const SupplierCard: React.FC<{
     supplier: SupplierDto;
     index: number;
     onEdit: (id: number) => void;
-}> = ({ supplier, index, onEdit }) => (
+    onApprove: (id: number) => void;
+    onReview: () => void;
+}> = ({ supplier, index, onEdit, onApprove, onReview }) => (
     <div
         className="bg-white rounded-3xl border border-slate-100 p-6 hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
         style={{
@@ -137,12 +141,32 @@ const SupplierCard: React.FC<{
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-primary/5 text-brand-primary rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all duration-200"
                 >
                     <Edit3 className="w-4 h-4" />
-                    <span>تعديل التفاصيل</span>
+                    <span>تعديل</span>
                 </button>
+                {['PENDING', 'Pending'].includes(supplier.status || '') && (
+                    <button
+                        onClick={onReview}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all duration-200 shadow-lg shadow-amber-500/20"
+                    >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>مراجعة الطلب</span>
+                    </button>
+                )}
+                {['DRAFT', 'Draft'].includes(supplier.status || '') && (
+                    <button
+                        onClick={() => onApprove(supplier.id!)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all duration-200 shadow-lg shadow-emerald-500/20"
+                    >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>اعتماد</span>
+                    </button>
+                )}
             </div>
         </div>
     </div>
 );
+
+import toast from 'react-hot-toast';
 
 const SuppliersPage: React.FC = () => {
     const navigate = useNavigate();
@@ -168,6 +192,16 @@ const SuppliersPage: React.FC = () => {
         }
     };
 
+    const handleApprove = async (id: number) => {
+        try {
+            await supplierService.submitForApproval(id);
+            toast.success('تم إرسال المورد للاعتماد');
+            fetchSuppliers();
+        } catch (error) {
+            toast.error('فشل إرسال المورد');
+        }
+    };
+
     const filteredSuppliers = useMemo(() => {
         return suppliers.filter(s => {
             const matchesSearch =
@@ -187,7 +221,7 @@ const SuppliersPage: React.FC = () => {
     }), [suppliers]);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" dir="rtl">
             <style>{`
                 @keyframes fadeInUp {
                     from { opacity: 0; transform: translateY(20px); }
@@ -277,7 +311,14 @@ const SuppliersPage: React.FC = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
                     {filteredSuppliers.map((s, idx) => (
-                        <SupplierCard key={s.id} supplier={s} index={idx} onEdit={(id) => navigate(`/dashboard/procurement/suppliers/${id}`)} />
+                        <SupplierCard
+                            key={s.id}
+                            supplier={s}
+                            index={idx}
+                            onEdit={(id) => navigate(`/dashboard/procurement/suppliers/${id}`)}
+                            onApprove={handleApprove}
+                            onReview={() => navigate('/dashboard/procurement/approvals?type=Supplier')}
+                        />
                     ))}
                 </div>
             )}

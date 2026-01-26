@@ -6,7 +6,6 @@ import {
     TrendingDown,
     TrendingUp,
     DollarSign,
-    ArrowLeft,
     Download,
     Eye,
     RefreshCw,
@@ -16,38 +15,199 @@ import {
     CheckCircle2,
     Package,
     Building2,
-    FileText
+    FileText,
+    X,
+    AlertCircle,
+    Undo2
 } from 'lucide-react';
 import { supplierService, type SupplierOutstandingDto } from '../../services/supplierService';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
 
+// Stat Card Component
 const StatCard: React.FC<{
     icon: React.ElementType;
-    value: string;
+    value: string | number;
     label: string;
-    color: 'emerald' | 'rose' | 'amber' | 'blue';
+    color: 'primary' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
 }> = ({ icon: Icon, value, label, color }) => {
-    const colors = {
-        emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-        rose: 'bg-rose-50 text-rose-600 border-rose-100',
-        amber: 'bg-amber-50 text-amber-600 border-amber-100',
-        blue: 'bg-blue-50 text-blue-600 border-blue-100'
+    const colorClasses = {
+        primary: 'bg-brand-primary/10 text-brand-primary',
+        success: 'bg-emerald-100 text-emerald-600',
+        warning: 'bg-amber-100 text-amber-600',
+        purple: 'bg-purple-100 text-purple-600',
+        blue: 'bg-blue-100 text-blue-600',
+        rose: 'bg-rose-100 text-rose-600'
     };
 
     return (
-        <div className={`p-6 bg-white rounded-3xl border ${colors[color]} shadow-sm hover:shadow-md transition-all`}>
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
+            hover:border-brand-primary/20 transition-all duration-300 group">
             <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-2xl ${colors[color]} border-none group-hover:scale-110 transition-transform`}>
-                    <Icon className="w-6 h-6" />
+                <div className={`p-3 rounded-xl ${colorClasses[color]} 
+                    group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className="w-5 h-5" />
                 </div>
                 <div>
                     <div className="text-2xl font-bold text-slate-800">{value}</div>
-                    <div className="text-sm font-medium text-slate-500">{label}</div>
+                    <div className="text-sm text-slate-500">{label}</div>
                 </div>
             </div>
         </div>
     );
 };
+
+// Balance Table Row Component
+const BalanceTableRow: React.FC<{
+    summary: SupplierOutstandingDto;
+    index: number;
+    onView: (id: number) => void;
+}> = ({ summary, index, onView }) => (
+    <tr
+        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
+        style={{
+            animationDelay: `${index * 30}ms`,
+            animation: 'fadeInUp 0.3s ease-out forwards'
+        }}
+    >
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Building2 className="w-5 h-5 text-brand-primary" />
+                </div>
+                <div>
+                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                        {summary.supplierNameAr}
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">#{summary.supplierCode}</div>
+                </div>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="font-medium text-slate-600">
+                {(summary.totalInvoiced || 0).toLocaleString()} {summary.currency || 'EGP'}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="font-medium text-amber-600">
+                {(summary.totalReturned || 0).toLocaleString()} {summary.currency || 'EGP'}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="font-medium text-emerald-600">
+                {(summary.totalPaid || 0).toLocaleString()} {summary.currency || 'EGP'}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className={`font-bold ${(summary.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {Math.abs(summary.currentBalance || 0).toLocaleString()} {summary.currency || 'EGP'}
+                {(summary.currentBalance || 0) > 0 ? ' (لم يسدد)' : (summary.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
+                <CreditCard className="w-3 h-3" />
+                {(summary.creditLimit || 0).toLocaleString()}
+            </div>
+        </td>
+        <td className="px-6 py-4">
+            <button
+                onClick={() => onView(summary.id)}
+                className="p-2 text-brand-primary bg-brand-primary/5 rounded-lg hover:bg-brand-primary 
+                    hover:text-white transition-all"
+                title="عرض التفاصيل"
+            >
+                <Eye className="w-4 h-4" />
+            </button>
+        </td>
+    </tr>
+);
+
+// Order Table Row Component
+const OrderTableRow: React.FC<{
+    order: PurchaseOrderDto;
+    index: number;
+    onView: (id: number) => void;
+}> = ({ order, index, onView }) => (
+    <tr
+        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
+        style={{
+            animationDelay: `${index * 30}ms`,
+            animation: 'fadeInUp 0.3s ease-out forwards'
+        }}
+    >
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 
+                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ShoppingCart className="w-5 h-5 text-emerald-600" />
+                </div>
+                <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                    #{order.poNumber}
+                </span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-sm text-slate-600">
+            {new Date(order.poDate!).toLocaleDateString('ar-EG')}
+        </td>
+        <td className="px-6 py-4 text-sm font-medium text-slate-700">
+            {order.supplierNameAr}
+        </td>
+        <td className="px-6 py-4 text-right">
+            <span className="font-bold text-emerald-600">
+                {order.totalAmount.toLocaleString()} {order.currency}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold 
+                border bg-emerald-50 text-emerald-700 border-emerald-200">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                مغلق
+            </span>
+        </td>
+        <td className="px-6 py-4 text-right">
+            <button
+                onClick={() => onView(order.id!)}
+                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                title="عرض التفاصيل"
+            >
+                <FileText className="w-4 h-4" />
+            </button>
+        </td>
+    </tr>
+);
+
+// Loading Skeleton
+const TableSkeleton: React.FC<{ columns: number }> = ({ columns }) => (
+    <>
+        {[1, 2, 3, 4, 5].map(i => (
+            <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td colSpan={columns} className="px-6 py-6">
+                    <div className="h-4 bg-slate-100 rounded w-full" />
+                </td>
+            </tr>
+        ))}
+    </>
+);
+
+// Empty State
+const EmptyState: React.FC<{
+    icon: React.ElementType;
+    message: string;
+    columns: number;
+}> = ({ icon: Icon, message, columns }) => (
+    <tr>
+        <td colSpan={columns} className="px-6 py-16">
+            <div className="text-center">
+                <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
+                    <Icon className="w-12 h-12 text-slate-400" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">لا توجد بيانات</h3>
+                <p className="text-slate-500 max-w-md mx-auto">{message}</p>
+            </div>
+        </td>
+    </tr>
+);
 
 const SupplierOutstandingPage: React.FC = () => {
     const navigate = useNavigate();
@@ -57,6 +217,7 @@ const SupplierOutstandingPage: React.FC = () => {
     const [orders, setOrders] = useState<PurchaseOrderDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'All' | 'Debit' | 'Credit'>('All');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -78,8 +239,6 @@ const SupplierOutstandingPage: React.FC = () => {
         }
     };
 
-    const fetchSummaries = fetchData; // maintain ref if used elsewhere
-
     const filteredSummaries = useMemo(() => {
         return summaries.filter(s => {
             const matchesSearch =
@@ -88,8 +247,8 @@ const SupplierOutstandingPage: React.FC = () => {
 
             const matchesFilter =
                 filter === 'All' ||
-                (filter === 'Debit' && s.currentBalance > 0) ||
-                (filter === 'Credit' && s.currentBalance < 0);
+                (filter === 'Debit' && (s.currentBalance || 0) > 0) ||
+                (filter === 'Credit' && (s.currentBalance || 0) < 0);
 
             return matchesSearch && matchesFilter;
         });
@@ -109,64 +268,131 @@ const SupplierOutstandingPage: React.FC = () => {
         const totalOutstanding = summaries.reduce((acc, curr) => acc + (curr.currentBalance || 0), 0);
         const totalPaid = summaries.reduce((acc, curr) => acc + (curr.totalPaid || 0), 0);
         const totalInvoiced = summaries.reduce((acc, curr) => acc + (curr.totalInvoiced || 0), 0);
+        const totalReturned = summaries.reduce((acc, curr) => acc + (curr.totalReturned || 0), 0);
         const providersWithBalance = summaries.filter(s => (s.currentBalance || 0) > 0).length;
 
         return {
             totalOutstanding: totalOutstanding.toLocaleString(),
             totalPaid: totalPaid.toLocaleString(),
             totalInvoiced: totalInvoiced.toLocaleString(),
+            totalReturned: totalReturned.toLocaleString(),
             providersWithBalance
         };
     }, [summaries]);
 
+    const handleViewSupplier = (id: number) => {
+        navigate(`/dashboard/procurement/suppliers/${id}`);
+    };
+
+    const handleViewOrder = (id: number) => {
+        navigate(`/dashboard/procurement/po/${id}`);
+    };
+
     return (
         <div className="space-y-6">
+            {/* Custom Styles */}
             <style>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in {
-                    animation: fadeIn 0.4s ease-out forwards;
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
                 }
             `}</style>
 
-            {/* Header */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-brand-primary/10 hover:text-brand-primary transition-all">
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">الأرصدة المستحقة للموردين</h1>
-                        <p className="text-slate-500 text-sm">متابعة المديونيات، الفواتير، والمدفوعات لكل مورد</p>
+            {/* Header Section */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/3 left-1/4 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+                            <Wallet className="w-10 h-10" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold mb-2">الأرصدة المستحقة للموردين</h1>
+                            <p className="text-white/70 text-lg">متابعة المديونيات، الفواتير، والمدفوعات لكل مورد</p>
+                        </div>
                     </div>
-                </div>
-                <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 text-slate-600 rounded-xl font-bold hover:bg-slate-100 transition-all border border-slate-200">
-                        <Download className="w-4 h-4" />
-                        <span>تصدير تقرير</span>
-                    </button>
-                    <button onClick={fetchSummaries} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-brand-primary/10 hover:text-brand-primary transition-all border border-slate-200">
-                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+
+                    <div className="flex gap-3">
+                        <button
+                            className="flex items-center gap-2 px-4 py-3 bg-white/10 backdrop-blur-sm text-white 
+                                rounded-xl font-bold hover:bg-white/20 transition-all duration-200"
+                        >
+                            <Download className="w-4 h-4" />
+                            <span className="hidden sm:inline">تصدير</span>
+                        </button>
+                        <button
+                            onClick={fetchData}
+                            disabled={loading}
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-xl hover:bg-white/20 
+                                transition-all duration-200 disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard icon={Wallet} value={stats.totalOutstanding} label="إجمالي المستحقات" color="rose" />
-                <StatCard icon={TrendingUp} value={stats.totalInvoiced} label="إجمالي المشتريات" color="blue" />
-                <StatCard icon={TrendingDown} value={stats.totalPaid} label="إجمالي المدفوعات" color="emerald" />
-                <StatCard icon={Building2} value={stats.providersWithBalance.toString()} label="موردين لهم مديونية" color="amber" />
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <StatCard
+                    icon={Wallet}
+                    value={stats.totalOutstanding}
+                    label="إجمالي المستحقات"
+                    color="rose"
+                />
+                <StatCard
+                    icon={TrendingUp}
+                    value={stats.totalInvoiced}
+                    label="إجمالي الفواتير"
+                    color="blue"
+                />
+                <StatCard
+                    icon={Undo2}
+                    value={stats.totalReturned}
+                    label="إجمالي المرتجعات"
+                    color="purple"
+                />
+                <StatCard
+                    icon={TrendingDown}
+                    value={stats.totalPaid}
+                    label="إجمالي المدفوعات"
+                    color="success"
+                />
+                <StatCard
+                    icon={AlertCircle}
+                    value={stats.providersWithBalance}
+                    label="موردين لهم مديونية"
+                    color="warning"
+                />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-center gap-3 text-blue-700 text-sm">
+                <AlertCircle className="w-5 h-5" />
+                <p className="font-medium">
+                    المعادلة الحسابية: الرصيد الحالي = إجمالي الفواتير - إجمالي المرتجعات - إجمالي المدفوعات
+                </p>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 p-1 bg-slate-100/50 w-fit rounded-2xl border border-slate-200">
+            <div className="flex gap-2 p-1 bg-white w-fit rounded-2xl border border-slate-100 shadow-sm">
                 <button
                     onClick={() => setActiveTab('balances')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'balances' ? 'bg-white text-brand-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        ${activeTab === 'balances'
+                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                            : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <Wallet className="w-4 h-4" />
                     <span>أرصدة الموردين</span>
@@ -174,12 +400,14 @@ const SupplierOutstandingPage: React.FC = () => {
                 <button
                     onClick={() => setActiveTab('orders')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'orders' ? 'bg-white text-brand-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        ${activeTab === 'orders'
+                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                            : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <ShoppingCart className="w-4 h-4" />
-                    <span>أوامر شراء معلقة (مغلقة)</span>
+                    <span>أوامر مغلقة</span>
                     {filteredOrders.length > 0 && (
-                        <span className="bg-brand-primary/10 text-brand-primary text-[10px] px-2 py-0.5 rounded-full">
+                        <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
                             {filteredOrders.length}
                         </span>
                     )}
@@ -187,151 +415,137 @@ const SupplierOutstandingPage: React.FC = () => {
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder={activeTab === 'balances' ? "بحث باسم المورد أو كود المورد..." : "بحث برقم الأمر أو المورد..."}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pr-12 pl-4 py-3 rounded-xl border-2 border-transparent bg-slate-50 focus:border-brand-primary outline-none transition-all"
-                    />
-                </div>
-                {activeTab === 'balances' && (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl">
-                        <Filter className="w-4 h-4 text-slate-400" />
-                        <select
-                            value={filter}
-                            onChange={(e) => setFilter(e.target.value as any)}
-                            className="bg-transparent text-sm font-bold text-slate-700 outline-none"
-                        >
-                            <option value="All">جميع الأرصدة</option>
-                            <option value="Debit">مدين (لهم مستحقات)</option>
-                            <option value="Credit">دائن (رصيد مقدم)</option>
-                        </select>
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
+                            transition-colors duration-200
+                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
+                        <input
+                            type="text"
+                            placeholder={activeTab === 'balances'
+                                ? "بحث باسم المورد أو كود المورد..."
+                                : "بحث برقم الأمر أو المورد..."}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setIsSearchFocused(false)}
+                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
+                                outline-none bg-slate-50
+                                ${isSearchFocused
+                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                    : 'border-transparent hover:border-slate-200'}`}
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 
+                                    rounded-full transition-colors"
+                            >
+                                <X className="w-4 h-4 text-slate-400" />
+                            </button>
+                        )}
                     </div>
-                )}
+
+                    {activeTab === 'balances' && (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent
+                            hover:border-slate-200 transition-all duration-200">
+                            <Filter className="text-slate-400 w-5 h-5" />
+                            <select
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value as any)}
+                                className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                            >
+                                <option value="All">جميع الأرصدة</option>
+                                <option value="Debit">مدين (لهم مستحقات)</option>
+                                <option value="Credit">دائن (رصيد مقدم)</option>
+                            </select>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Content Tabl */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
+            {/* Results Count */}
+            {!loading && (
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-brand-primary rounded-full" />
+                    <span className="text-slate-600">
+                        عرض <span className="font-bold text-slate-800">
+                            {activeTab === 'balances' ? filteredSummaries.length : filteredOrders.length}
+                        </span> من{' '}
+                        <span className="font-bold text-slate-800">
+                            {activeTab === 'balances' ? summaries.length : orders.filter(o => o.status === 'Closed').length}
+                        </span> {activeTab === 'balances' ? 'مورد' : 'أمر'}
+                    </span>
+                </div>
+            )}
+
+            {/* Table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     {activeTab === 'balances' ? (
-                        <table className="w-full text-right border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
-                                    <th className="px-6 py-4 text-sm">المورد</th>
-                                    <th className="px-6 py-4 text-sm text-center">إجمالي الفواتير</th>
-                                    <th className="px-6 py-4 text-sm text-center">إجمالي المدفوعات</th>
-                                    <th className="px-6 py-4 text-sm text-center">الرصيد الحالي</th>
-                                    <th className="px-6 py-4 text-sm text-center">حد الائتمان</th>
-                                    <th className="px-6 py-4 text-sm">الإجراءات</th>
+                        <table className="w-full">
+                            <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
+                                <tr>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">إجمالي الفواتير</th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">إجمالي المرتجعات</th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">إجمالي المدفوعات</th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">الرصيد الحالي</th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">حد الائتمان</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <tr key={i} className="animate-pulse">
-                                            <td colSpan={6} className="px-6 py-6"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
-                                        </tr>
-                                    ))
+                                    <TableSkeleton columns={6} />
                                 ) : filteredSummaries.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-20 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
-                                                    <DollarSign className="w-8 h-8" />
-                                                </div>
-                                                <p className="text-slate-500 font-bold">لم يتم العثور على موردين مطابقين للبحث</p>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <EmptyState
+                                        icon={DollarSign}
+                                        message="لم يتم العثور على موردين مطابقين للبحث"
+                                        columns={6}
+                                    />
                                 ) : (
-                                    filteredSummaries.map((s, idx) => (
-                                        <tr key={s.id} className="hover:bg-slate-50/50 transition-colors animate-fade-in" style={{ animationDelay: `${idx * 40}ms` }}>
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-slate-800">{s.supplierNameAr}</div>
-                                                <div className="text-xs text-slate-400 font-mono">#{s.supplierCode}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-medium text-slate-600">
-                                                {(s.totalInvoiced || 0).toLocaleString()} {s.currency || 'EGP'}
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-medium text-emerald-600">
-                                                {(s.totalPaid || 0).toLocaleString()} {s.currency || 'EGP'}
-                                            </td>
-                                            <td className={`px-6 py-4 text-center font-black ${(s.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                {Math.abs(s.currentBalance || 0).toLocaleString()} {s.currency || 'EGP'}
-                                                {(s.currentBalance || 0) > 0 ? ' (لم يسدد)' : (s.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 px-3 py-1 bg-slate-100 rounded-full">
-                                                    <CreditCard className="w-3 h-3" />
-                                                    {s.creditLimit ? s.creditLimit.toLocaleString() : '0.00'}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => navigate(`/dashboard/procurement/suppliers/${s.id}`)}
-                                                        className="p-2 text-brand-primary bg-brand-primary/5 rounded-xl hover:bg-brand-primary hover:text-white transition-all shadow-sm"
-                                                        title="عرض التفاصيل"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                    filteredSummaries.map((summary, index) => (
+                                        <BalanceTableRow
+                                            key={summary.id}
+                                            summary={summary}
+                                            index={index}
+                                            onView={handleViewSupplier}
+                                        />
                                     ))
                                 )}
                             </tbody>
                         </table>
                     ) : (
-                        <table className="w-full text-right border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
-                                    <th className="px-6 py-4 text-sm">رقم الأمر</th>
-                                    <th className="px-6 py-4 text-sm">التاريخ</th>
-                                    <th className="px-6 py-4 text-sm">المورد</th>
-                                    <th className="px-6 py-4 text-sm text-left">الإجمالي</th>
-                                    <th className="px-6 py-4 text-sm text-center">الحالة</th>
-                                    <th className="px-6 py-4 text-sm text-left">إجراءات</th>
+                        <table className="w-full">
+                            <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
+                                <tr>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم الأمر</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الإجمالي</th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">الحالة</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <tr key={i} className="animate-pulse">
-                                            <td colSpan={6} className="px-6 py-6"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
-                                        </tr>
-                                    ))
+                                    <TableSkeleton columns={6} />
                                 ) : filteredOrders.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-20 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
-                                                    <Package className="w-8 h-8" />
-                                                </div>
-                                                <p className="text-slate-500 font-bold">لا توجد أوامر شراء مغلقة حالياً</p>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <EmptyState
+                                        icon={Package}
+                                        message="لا توجد أوامر شراء مغلقة حالياً"
+                                        columns={6}
+                                    />
                                 ) : (
-                                    filteredOrders.map((o, idx) => (
-                                        <tr key={o.id} className="hover:bg-slate-50/50 transition-colors animate-fade-in" style={{ animationDelay: `${idx * 40}ms` }}>
-                                            <td className="px-6 py-4 font-bold text-slate-800">#{o.poNumber}</td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">{new Date(o.poDate!).toLocaleDateString('ar-EG')}</td>
-                                            <td className="px-6 py-4 font-medium">{o.supplierNameAr}</td>
-                                            <td className="px-6 py-4 text-left font-bold text-emerald-600">{o.totalAmount.toLocaleString()} {o.currency}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border bg-emerald-100 text-emerald-700 border-emerald-300">
-                                                    <CheckCircle2 className="w-3 h-3" /> مغلق
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-left">
-                                                <button onClick={() => navigate(`/dashboard/procurement/po/${o.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all" title="التفاصيل"><FileText className="w-4 h-4" /></button>
-                                            </td>
-                                        </tr>
+                                    filteredOrders.map((order, index) => (
+                                        <OrderTableRow
+                                            key={order.id}
+                                            order={order}
+                                            index={index}
+                                            onView={handleViewOrder}
+                                        />
                                     ))
                                 )}
                             </tbody>

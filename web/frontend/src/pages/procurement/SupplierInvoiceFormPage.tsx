@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supplierInvoiceService, type SupplierInvoiceDto, type SupplierInvoiceItemDto } from '../../services/supplierInvoiceService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
+import { grnService } from '../../services/grnService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import purchaseService from '../../services/purchaseService';
@@ -28,6 +29,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const isEdit = !!id;
     const queryParams = new URLSearchParams(location.search);
     const quotationId = queryParams.get('quotationId');
+    const grnId = queryParams.get('grnId');
 
     // Data State
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
@@ -48,7 +50,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
         discountAmount: 0,
         taxAmount: 0,
         totalAmount: 0,
-        status: 'Pending',
+        status: 'Unpaid',
         items: []
     });
 
@@ -58,10 +60,46 @@ const SupplierInvoiceFormPage: React.FC = () => {
         loadUnits();
         if (isEdit) {
             loadInvoice();
+        } else if (grnId) {
+            loadGRNData(parseInt(grnId));
         } else if (quotationId) {
             loadQuotationData(parseInt(quotationId));
         }
-    }, [id, quotationId]);
+    }, [id, quotationId, grnId]);
+
+    const loadGRNData = async (gId: number) => {
+        try {
+            const grn = await grnService.getGRNById(gId);
+            if (grn) {
+                setFormData(prev => ({
+                    ...prev,
+                    grnId: gId,
+                    supplierId: grn.supplierId,
+                    notes: `تم الإنشاء من إذن استلام بضائع رقم: ${grn.grnNumber}`,
+                    items: grn.items.map(gItem => {
+                        const price = gItem.unitCost || 0;
+                        const qty = gItem.acceptedQty || gItem.receivedQty;
+                        return {
+                            itemId: gItem.itemId,
+                            unitId: gItem.unitId,
+                            quantity: qty,
+                            unitPrice: price,
+                            discountPercentage: 0,
+                            discountAmount: 0,
+                            taxPercentage: 14, // Default VAT
+                            taxAmount: (qty * price) * 0.14,
+                            totalPrice: (qty * price) * 1.14,
+                            grnItemId: gItem.id
+                        };
+                    })
+                }));
+                toast.success('تم تحميل بيانات الاستلام بنجاح');
+            }
+        } catch (error) {
+            console.error('Failed to load GRN data:', error);
+            toast.error('فشل تحميل بيانات الاستلام');
+        }
+    };
 
     const loadQuotationData = async (qId: number) => {
         try {
@@ -174,6 +212,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
             toast.error('يرجى اختيار المورد وإضافة صنف واحد على الأقل');
             return;
         }
+        if (!formData.supplierInvoiceNo) {
+            toast.error('يرجى إدخال رقم فاتورة المورد (الورقي)');
+            return;
+        }
 
         try {
             setSaving(true);
@@ -226,9 +268,9 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     type="text"
                                     value={formData.invoiceNumber}
                                     onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all"
-                                    placeholder="مثلاً: INV-2024-001"
-                                    required
+                                    className="w-full px-4 py-2.5 bg-slate-100 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all text-slate-500"
+                                    placeholder="سيتم إنشاؤه تلقائياً"
+                                    disabled
                                 />
                             </div>
                             <div className="space-y-2">

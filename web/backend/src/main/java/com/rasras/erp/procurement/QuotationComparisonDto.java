@@ -20,16 +20,18 @@ public class QuotationComparisonDto {
     private String prNumber; // UI helper
     private Integer itemId;
     private String itemNameAr; // UI helper
+    private String itemNameEn; // Added based on snippet
     private Integer selectedQuotationId;
     private String selectedQuotationNumber; // UI helper
     private Integer selectedSupplierId;
     private String selectedSupplierNameAr; // UI helper
     private String selectionReason;
     private String status;
-    private Integer reviewedByUserId;
-    private LocalDateTime reviewedDate;
-    private Integer approvedByUserId;
-    private LocalDateTime approvedDate;
+    private String approvalStatus;
+    private Integer financeReviewedBy;
+    private LocalDateTime financeReviewedDate;
+    private Integer managementApprovedBy;
+    private LocalDateTime managementApprovedDate;
     private String notes;
     private LocalDateTime createdAt;
     private Integer createdBy;

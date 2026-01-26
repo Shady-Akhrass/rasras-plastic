@@ -51,21 +51,25 @@ public class QuotationComparison {
     @Column(name = "SelectionReason", length = 500)
     private String selectionReason;
 
-    @Column(name = "Status", length = 20)
+    @Column(name = "Status", length = 30)
     @Builder.Default
-    private String status = "Draft";
+    private String status = "Draft"; // Draft, Pending Finance, Pending Management, Approved, Rejected
 
-    @Column(name = "ReviewedByUserID")
-    private Integer reviewedByUserId;
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
 
-    @Column(name = "ReviewedDate")
-    private LocalDateTime reviewedDate;
+    @Column(name = "FinanceReviewedBy")
+    private Integer financeReviewedBy;
 
-    @Column(name = "ApprovedByUserID")
-    private Integer approvedByUserId;
+    @Column(name = "FinanceReviewedDate")
+    private LocalDateTime financeReviewedDate;
 
-    @Column(name = "ApprovedDate")
-    private LocalDateTime approvedDate;
+    @Column(name = "ManagementApprovedBy")
+    private Integer managementApprovedBy;
+
+    @Column(name = "ManagementApprovedDate")
+    private LocalDateTime managementApprovedDate;
 
     @Column(name = "Notes", length = 1000)
     private String notes;

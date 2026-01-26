@@ -9,4 +9,6 @@ public interface SupplierInvoiceRepository extends JpaRepository<SupplierInvoice
     List<SupplierInvoice> findBySupplierId(Integer supplierId);
 
     List<SupplierInvoice> findByStatus(String status);
+
+    boolean existsByGrnId(Integer grnId);
 }

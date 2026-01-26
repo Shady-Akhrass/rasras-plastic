@@ -119,7 +119,8 @@ const PRTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onCreateRFQ: (id: number) => void;
-}> = ({ pr, index, onView, onCreateRFQ }) => (
+    onSubmit: (id: number) => void;
+}> = ({ pr, index, onView, onCreateRFQ, onSubmit }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -164,10 +165,20 @@ const PRTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-left">
             <div className="flex items-center justify-end gap-2">
+                {pr.status === 'Draft' && (
+                    <button
+                        onClick={() => onSubmit(pr.id!)}
+                        className="p-2 text-emerald-500 hover:bg-emerald-50 
+                            rounded-lg transition-all duration-200"
+                        title="إرسال للاعتماد"
+                    >
+                        <CheckCircle2 className="w-5 h-5" />
+                    </button>
+                )}
                 {pr.status === 'Approved' && (
                     <button
                         onClick={() => onCreateRFQ(pr.id!)}
-                        className="p-2 text-emerald-500 hover:bg-emerald-50 
+                        className="p-2 text-indigo-500 hover:bg-indigo-50 
                             rounded-lg transition-all duration-200"
                         title="إنشاء طلب عرض سعر"
                     >
@@ -246,6 +257,8 @@ const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ se
     </tr>
 );
 
+import toast from 'react-hot-toast';
+
 const PurchaseRequisitionsPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -278,6 +291,16 @@ const PurchaseRequisitionsPage: React.FC = () => {
             console.error('Failed to fetch PRs:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSubmit = async (id: number) => {
+        try {
+            await purchaseService.submitPR(id);
+            toast.success('تم إرسال الطلب للاعتماد');
+            fetchPRs();
+        } catch (error) {
+            toast.error('فشل إرسال الطلب');
         }
     };
 
@@ -521,6 +544,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                         index={index}
                                         onView={handleViewPR}
                                         onCreateRFQ={handleCreateRFQ}
+                                        onSubmit={handleSubmit}
                                     />
                                 ))
                             )}

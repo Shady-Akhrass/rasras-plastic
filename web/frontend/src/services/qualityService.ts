@@ -44,4 +44,7 @@ export const qualityService = {
     createSpec: (data: ItemQualitySpecDto) => apiClient.post<ItemQualitySpecDto>(`${API_URL}/item-quality-specs`, data),
     updateSpec: (id: number, data: ItemQualitySpecDto) => apiClient.put<ItemQualitySpecDto>(`${API_URL}/item-quality-specs/${id}`, data),
     deleteSpec: (id: number) => apiClient.delete(`${API_URL}/item-quality-specs/${id}`),
+
+    // Inspections
+    recordInspection: (grnId: number, data: any) => apiClient.post(`${API_URL}/quality-inspection/${grnId}`, data),
 };

@@ -4,9 +4,11 @@ import {
     Save,
     Trash2,
     ShoppingCart,
-    ArrowRight
+    ArrowRight,
+    Sparkles
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
+import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import toast from 'react-hot-toast';
 
@@ -26,6 +28,8 @@ const SupplierQuotationFormPage: React.FC = () => {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [rfqs, setRfqs] = useState<RFQ[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
+    const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
+    const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
 
     const [formData, setFormData] = useState<SupplierQuotation>({
         quotationNumber: '',
@@ -81,6 +85,51 @@ const SupplierQuotationFormPage: React.FC = () => {
         }
     };
 
+    // Handle supplier change - auto-load supplier items
+    const handleSupplierChange = async (supplierId: number) => {
+        setFormData(prev => ({ ...prev, supplierId }));
+
+        if (supplierId === 0) {
+            setSupplierItems([]);
+            return;
+        }
+
+        try {
+            setLoadingSupplierItems(true);
+            const result = await supplierService.getSupplierItems(supplierId);
+            const fetchedItems = result.data || [];
+            setSupplierItems(fetchedItems);
+
+            // Auto-populate form items with supplier's registered products (only if empty)
+            if (fetchedItems.length > 0 && formData.items.length === 0) {
+                const autoItems: SupplierQuotationItem[] = fetchedItems.map(si => {
+                    const itemData = items.find(i => i.id === si.itemId);
+                    return {
+                        itemId: si.itemId,
+                        offeredQty: si.minOrderQty || 1,
+                        unitId: itemData?.unitId || 0,
+                        unitPrice: si.lastPrice || 0,
+                        discountPercentage: 0,
+                        taxPercentage: 14,
+                        totalPrice: ((si.lastPrice || 0) * (si.minOrderQty || 1)) * 1.14
+                    };
+                });
+                const total = autoItems.reduce((sum, item) => sum + item.totalPrice, 0);
+                setFormData(prev => ({ ...prev, items: autoItems, totalAmount: total }));
+                toast.success(`تم تحميل ${fetchedItems.length} صنف من كتالوج المورد`, { icon: '📦' });
+            }
+        } catch (error) {
+            console.error('Failed to load supplier items:', error);
+        } finally {
+            setLoadingSupplierItems(false);
+        }
+    };
+
+    // Get supplier price for an item
+    const getSupplierPrice = (itemId: number): number | undefined => {
+        return supplierItems.find(si => si.itemId === itemId)?.lastPrice;
+    };
+
     // Calculate item total
     const calculateItemTotal = (item: SupplierQuotationItem) => {
         const gross = item.offeredQty * item.unitPrice;
@@ -121,10 +170,14 @@ const SupplierQuotationFormPage: React.FC = () => {
         const newItems = [...formData.items];
         const updatedItem = { ...newItems[index], [field]: value };
 
-        // Auto-select unit
+        // Auto-select unit and price from catalog
         if (field === 'itemId') {
             const selectedItem = items.find(i => i.id === value);
             if (selectedItem) updatedItem.unitId = selectedItem.unitId;
+
+            // Auto-fill price from supplier catalog
+            const catalogPrice = getSupplierPrice(value);
+            if (catalogPrice) updatedItem.unitPrice = catalogPrice;
         }
 
         updatedItem.totalPrice = calculateItemTotal(updatedItem);
@@ -142,46 +195,95 @@ const SupplierQuotationFormPage: React.FC = () => {
         if (rfqId === 0) return;
         try {
             const rfq = await purchaseService.getRFQById(rfqId);
-            const rfqItems = rfq.items.map(ri => ({
-                itemId: ri.itemId,
-                offeredQty: ri.requestedQty,
-                unitId: ri.unitId,
-                unitPrice: 0,
-                discountPercentage: 0,
-                taxPercentage: 14,
-                totalPrice: 0
-            }));
+
+            // Load supplier items to get catalog prices
+            const result = await supplierService.getSupplierItems(rfq.supplierId);
+            const fetchedItems = result.data || [];
+            setSupplierItems(fetchedItems);
+
+            const rfqItems = rfq.items.map(ri => {
+                // Check if this item has a catalog price
+                const catalogPrice = fetchedItems.find(si => si.itemId === ri.itemId)?.lastPrice || 0;
+                const qty = ri.requestedQty;
+                const gross = qty * catalogPrice;
+                const taxAmount = gross * 0.14;
+                return {
+                    itemId: ri.itemId,
+                    offeredQty: qty,
+                    unitId: ri.unitId,
+                    unitPrice: catalogPrice,
+                    discountPercentage: 0,
+                    taxPercentage: 14,
+                    totalPrice: gross + taxAmount
+                };
+            });
+            const total = rfqItems.reduce((sum, item) => sum + item.totalPrice, 0);
             setFormData(prev => ({
                 ...prev,
                 rfqId: rfqId,
                 supplierId: rfq.supplierId,
-                items: rfqItems
+                items: rfqItems,
+                totalAmount: total
             }));
         } catch (error) {
             console.error('Failed to link RFQ:', error);
         }
     };
 
+    // Save quotation and update supplier item prices
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (formData.supplierId === 0) {
-            alert('يرجى اختيار المورد');
+            toast.error('يرجى اختيار المورد');
             return;
         }
 
         if (formData.items.length === 0) {
-            alert('يرجى إضافة بند واحد على الأقل');
+            toast.error('يرجى إضافة بند واحد على الأقل');
             return;
         }
 
         try {
             setSaving(true);
+
+            // 1. Save the quotation
             await purchaseService.createQuotation(formData);
+
+            // 2. Update supplier item prices in the catalog
+            for (const item of formData.items) {
+                if (item.itemId && item.unitPrice > 0) {
+                    try {
+                        // Check if this item exists in supplier catalog
+                        const existingItem = supplierItems.find(si => si.itemId === item.itemId);
+                        if (existingItem) {
+                            // Update existing item with new price
+                            await supplierService.linkItem({
+                                ...existingItem,
+                                lastPrice: item.unitPrice,
+                                lastPriceDate: new Date().toISOString().split('T')[0]
+                            });
+                        } else {
+                            // Add new item to supplier catalog
+                            await supplierService.linkItem({
+                                supplierId: formData.supplierId,
+                                itemId: item.itemId,
+                                lastPrice: item.unitPrice,
+                                lastPriceDate: new Date().toISOString().split('T')[0],
+                                isActive: true
+                            });
+                        }
+                    } catch (priceError) {
+                        console.error('Failed to update item price:', priceError);
+                    }
+                }
+            }
+
+            toast.success('تم حفظ عرض السعر وتحديث أسعار المورد');
             navigate('/dashboard/procurement/quotation');
         } catch (error) {
             console.error('Failed to save quotation:', error);
-            alert('حدث خطأ أثناء حفظ العرض');
+            toast.error('حدث خطأ أثناء حفظ العرض');
         } finally {
             setSaving(false);
         }
@@ -238,16 +340,29 @@ const SupplierQuotationFormPage: React.FC = () => {
 
                     <div className="space-y-2">
                         <label className="text-sm font-bold text-slate-700 block">المورد</label>
-                        <select
-                            value={formData.supplierId}
-                            onChange={(e) => setFormData(prev => ({ ...prev, supplierId: parseInt(e.target.value) }))}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
-                        >
-                            <option value={0}>اختر المورد...</option>
-                            {suppliers.map(s => (
-                                <option key={s.id} value={s.id}>{s.supplierNameAr} ({s.supplierCode})</option>
-                            ))}
-                        </select>
+                        <div className="relative">
+                            <select
+                                value={formData.supplierId}
+                                onChange={(e) => handleSupplierChange(parseInt(e.target.value))}
+                                className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
+                            >
+                                <option value={0}>اختر المورد...</option>
+                                {suppliers.map(s => (
+                                    <option key={s.id} value={s.id}>{s.supplierNameAr} ({s.supplierCode})</option>
+                                ))}
+                            </select>
+                            {loadingSupplierItems && (
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                                    <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
+                        </div>
+                        {supplierItems.length > 0 && (
+                            <p className="text-xs text-emerald-600 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                تم تحميل {supplierItems.length} صنف من كتالوج المورد - الأسعار ستُحفظ تلقائياً
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">

@@ -23,6 +23,7 @@ public class PurchaseRequisitionService {
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
     private final UnitRepository unitRepository;
+    private final com.rasras.erp.approval.ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<PurchaseRequisitionDto> getAllPurchaseRequisitions() {
@@ -95,6 +96,26 @@ public class PurchaseRequisitionService {
         }
 
         return mapToDto(prRepository.save(pr));
+    }
+
+    @Transactional
+    public PurchaseRequisitionDto submitForApproval(Integer id) {
+        PurchaseRequisition pr = prRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("PR not found"));
+
+        if (!"Draft".equals(pr.getStatus())) {
+            throw new RuntimeException("PR must be in Draft status to submit");
+        }
+
+        pr.setStatus("Pending");
+        PurchaseRequisition saved = prRepository.save(pr);
+
+        // Initiate approval workflow
+        approvalService.initiateApproval("PR_APPROVAL", "PurchaseRequisition", saved.getId(),
+                saved.getPrNumber(), saved.getRequestedByUser().getUserId(),
+                saved.getTotalEstimatedAmount());
+
+        return mapToDto(saved);
     }
 
     private void updatePrFromDto(PurchaseRequisition pr, PurchaseRequisitionDto dto) {

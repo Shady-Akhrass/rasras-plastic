@@ -4,10 +4,11 @@ import {
     Settings, User, X, ChevronLeft, ChevronRight,
     HelpCircle, Shield, Sparkles, Building2,
     Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse
-   , ShoppingCart,
+    , ShoppingCart,
     Layers, Box, UserSquare2, Undo2
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
+import { approvalService } from '../../services/approvalService';
 
 // Sidebar Link Component
 const SidebarLink = ({
@@ -125,6 +126,7 @@ const DashboardLayout: React.FC = () => {
     const [searchFocused, setSearchFocused] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
@@ -139,6 +141,21 @@ const DashboardLayout: React.FC = () => {
     useEffect(() => {
         setMobileMenuOpen(false);
     }, [location.pathname]);
+
+    // Fetch pending approvals count
+    useEffect(() => {
+        const fetchPendingCount = async () => {
+            const userString = localStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            if (user?.userId) {
+                const count = await approvalService.getPendingCount(user.userId);
+                setPendingApprovalsCount(count);
+            }
+        };
+        fetchPendingCount();
+        const interval = setInterval(fetchPendingCount, 60000); // Refresh every minute
+        return () => clearInterval(interval);
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('accessToken');
@@ -161,6 +178,7 @@ const DashboardLayout: React.FC = () => {
     };
 
     const navItems = [
+        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations' },
         { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
         { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
         { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
@@ -179,17 +197,18 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard/inventory/units', icon: Box, label: 'وحدات القياس', section: 'operations' },
         { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
         { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
-        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'عروض الأسعار (RFQ)', section: 'procurement' },
+        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement' },
         { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement' },
+        { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement' },
+        { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement' },
+        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement' },
+        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement' },
+        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement' },
-        { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement' },
-        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement' },
-        { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main' },
+        { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
         // { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system' },
         // { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system' },
         { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات العامة', section: 'system' },

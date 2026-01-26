@@ -27,6 +27,7 @@ public class GoodsReceiptNoteDto {
     private Integer receivedByUserId;
     private Integer inspectedByUserId;
     private String status;
+    private String approvalStatus;
     private String qualityStatus;
     private BigDecimal totalReceivedQty;
     private BigDecimal totalAcceptedQty;

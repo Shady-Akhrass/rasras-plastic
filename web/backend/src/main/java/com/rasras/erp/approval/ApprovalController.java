@@ -16,7 +16,7 @@ public class ApprovalController {
     private final ApprovalService approvalService;
 
     @GetMapping("/pending")
-    public ResponseEntity<ApiResponse<List<ApprovalRequest>>> getPendingRequests(@RequestParam Integer userId) {
+    public ResponseEntity<ApiResponse<List<ApprovalRequestDto>>> getPendingRequests(@RequestParam Integer userId) {
         return ResponseEntity.ok(ApiResponse.success(approvalService.getPendingRequestsForUser(userId)));
     }
 

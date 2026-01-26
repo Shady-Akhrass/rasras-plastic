@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/procurement/pr")
+@RequestMapping("/procurement/pr")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class PurchaseRequisitionController {
@@ -35,5 +35,10 @@ public class PurchaseRequisitionController {
     public ResponseEntity<ApiResponse<PurchaseRequisitionDto>> updatePurchaseRequisition(@PathVariable Integer id,
             @RequestBody PurchaseRequisitionDto dto) {
         return ResponseEntity.ok(ApiResponse.success(prService.updatePurchaseRequisition(id, dto)));
+    }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ApiResponse<PurchaseRequisitionDto>> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(prService.submitForApproval(id)));
     }
 }

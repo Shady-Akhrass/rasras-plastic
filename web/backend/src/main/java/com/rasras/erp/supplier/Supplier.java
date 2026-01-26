@@ -13,10 +13,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-enum SupplierStatus {
-    DRAFT, PENDING, APPROVED, REJECTED
-}
-
 @Entity
 @Table(name = "suppliers")
 @Data
@@ -106,6 +102,10 @@ public class Supplier {
     @Builder.Default
     private BigDecimal totalPaid = BigDecimal.ZERO;
 
+    @Column(name = "TotalReturned", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal totalReturned = BigDecimal.ZERO;
+
     @Column(name = "CurrentBalance", precision = 18, scale = 2)
     @Builder.Default
     private BigDecimal currentBalance = BigDecimal.ZERO;
@@ -139,6 +139,10 @@ public class Supplier {
     @Column(name = "Status", length = 20)
     @Builder.Default
     private SupplierStatus status = SupplierStatus.DRAFT;
+
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
 
     @Column(name = "ApprovalNotes")
     private String approvalNotes;

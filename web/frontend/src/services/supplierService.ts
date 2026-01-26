@@ -70,6 +70,7 @@ export interface SupplierOutstandingDto {
     creditLimit: number;
     totalInvoiced: number;
     totalPaid: number;
+    totalReturned: number;
     currentBalance: number;
     currency: string;
     lastPaymentDate?: string;

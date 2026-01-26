@@ -71,7 +71,11 @@ public class SupplierInvoice extends AuditableEntity {
 
     @Column(name = "Status", length = 20)
     @Builder.Default
-    private String status = "Pending";
+    private String status = "Unpaid"; // Unpaid, Partial, Paid
+
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending"; // Pending, Approved, Rejected
 
     @Column(name = "PaymentTerms", length = 200)
     private String paymentTerms;

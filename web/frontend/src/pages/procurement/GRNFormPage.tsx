@@ -13,6 +13,7 @@ import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../ser
 import { purchaseOrderService } from '../../services/purchaseOrderService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
+import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
 import toast from 'react-hot-toast';
 
 const GRNFormPage: React.FC = () => {
@@ -26,6 +27,7 @@ const GRNFormPage: React.FC = () => {
     // Data State
     const [items, setItems] = useState<ItemDto[]>([]);
     const [units, setUnits] = useState<UnitDto[]>([]);
+    const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [saving, setSaving] = useState(false);
 
     // Form State
@@ -39,12 +41,13 @@ const GRNFormPage: React.FC = () => {
     });
 
     useEffect(() => {
-        loadItems(); loadUnits();
+        loadItems(); loadUnits(); loadWarehouses();
         if (poId) { loadPOData(parseInt(poId)); }
     }, [id, poId]);
 
     const loadItems = async () => { const d = await itemService.getActiveItems(); setItems(d.data || []); };
     const loadUnits = async () => { const d = await unitService.getAllUnits(); setUnits(d.data || []); };
+    const loadWarehouses = async () => { const d = await warehouseService.getActive(); setWarehouses(d.data || []); };
 
     const loadPOData = async (pId: number) => {
         try {
@@ -188,8 +191,10 @@ const GRNFormPage: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400">المستودع</label>
                                 <select value={formData.warehouseId} onChange={(e) => setFormData({ ...formData, warehouseId: parseInt(e.target.value) })} className="w-full px-4 py-2 bg-slate-50 rounded-xl border-none font-bold text-slate-700 outline-none">
-                                    <option value="1">المخزن الرئيسي</option>
-                                    <option value="2">مخزن المواد الخام</option>
+                                    <option value="">اختر المستودع...</option>
+                                    {warehouses.map(w => (
+                                        <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
+                                    ))}
                                 </select>
                             </div>
                         </div>

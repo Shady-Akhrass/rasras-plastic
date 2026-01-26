@@ -24,6 +24,7 @@ public class GRNService {
     private final ItemRepository itemRepo;
     private final UnitRepository unitRepo;
     private final InventoryService inventoryService;
+    private final com.rasras.erp.approval.ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<GoodsReceiptNoteDto> getAllGRNs() {
@@ -57,9 +58,10 @@ public class GRNService {
                 .supplierInvoiceNo(dto.getSupplierInvoiceNo())
                 .receivedByUserId(dto.getReceivedByUserId())
                 .inspectedByUserId(dto.getInspectedByUserId())
-                .status("Completed") // Auto-completing for now
+                .status("Pending Inspection") // Step 7: Initial Receipt
+                .qualityStatus("Pending")
                 .notes(dto.getNotes())
-                .createdBy(dto.getReceivedByUserId()) // Temporary
+                .createdBy(dto.getReceivedByUserId())
                 .build();
 
         if (dto.getItems() != null) {
@@ -70,8 +72,8 @@ public class GRNService {
             // Update PO and calculating totals
             updatePOQuantities(po, grn.getItems());
 
-            // Update Stock
-            updateInventory(grn);
+            // DO NOT update inventory yet (Step 7 only)
+            // updateInventory(grn);
 
             grn.setTotalReceivedQty(grn.getItems().stream()
                     .map(GRNItem::getReceivedQty)
@@ -79,6 +81,50 @@ public class GRNService {
         }
 
         return mapToDto(grnRepo.save(grn));
+    }
+
+    @Transactional
+    public GoodsReceiptNoteDto finalizeStoreIn(Integer grnId, Integer userId) {
+        GoodsReceiptNote grn = grnRepo.findById(grnId)
+                .orElseThrow(() -> new RuntimeException("GRN not found"));
+
+        if (!"Inspected".equals(grn.getStatus()) && !"Approved".equals(grn.getStatus())) {
+            throw new RuntimeException("GRN must be inspected and approved before store-in");
+        }
+
+        if (!"Approved".equals(grn.getApprovalStatus())) {
+            throw new RuntimeException("GRN must be approved before store-in");
+        }
+
+        // Step 9: Addition Note -> Update Inventory
+        updateInventory(grn);
+
+        grn.setStatus("Completed"); // Final state
+        grn.setUpdatedBy(userId);
+        grn.setUpdatedAt(LocalDateTime.now());
+
+        return mapToDto(grnRepo.save(grn));
+    }
+
+    @Transactional
+    public GoodsReceiptNoteDto submitGRN(Integer id, Integer userId) {
+        GoodsReceiptNote grn = grnRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("GRN not found"));
+
+        if (!"Draft".equals(grn.getStatus()) && !"Pending Inspection".equals(grn.getStatus())
+                && !"Inspected".equals(grn.getStatus())) {
+            throw new RuntimeException("GRN must be in Draft, Pending Inspection, or Inspected status to submit");
+        }
+
+        grn.setStatus("Pending Approval");
+        grn.setApprovalStatus("Pending");
+        GoodsReceiptNote saved = grnRepo.save(grn);
+
+        // Initiate approval workflow
+        approvalService.initiateApproval("GRN_APPROVAL", "GoodsReceiptNote", saved.getId(),
+                saved.getGrnNumber(), userId, saved.getTotalReceivedQty());
+
+        return mapToDto(saved);
     }
 
     private void updatePOQuantities(PurchaseOrder po, List<GRNItem> grnItems) {
@@ -163,6 +209,7 @@ public class GRNService {
                 .supplierInvoiceNo(entity.getSupplierInvoiceNo())
                 .receivedByUserId(entity.getReceivedByUserId())
                 .status(entity.getStatus())
+                .approvalStatus(entity.getApprovalStatus())
                 .notes(entity.getNotes())
                 .items(entity.getItems() != null ? entity.getItems().stream()
                         .map(this::mapToItemDto)

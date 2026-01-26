@@ -28,6 +28,7 @@ public class SupplierInvoiceDto {
     private BigDecimal paidAmount;
     private BigDecimal remainingAmount;
     private String status;
+    private String approvalStatus;
     private String paymentTerms;
     private String notes;
     private List<SupplierInvoiceItemDto> items;

@@ -29,4 +29,10 @@ public class PurchaseOrderController {
     public ResponseEntity<Map<String, PurchaseOrderDto>> createPO(@RequestBody PurchaseOrderDto dto) {
         return ResponseEntity.ok(Map.of("data", poService.createPO(dto)));
     }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<Map<String, PurchaseOrderDto>> submitForApproval(@PathVariable Integer id) {
+        // Keeping Map<String, Dto> format as per other methods in this controller
+        return ResponseEntity.ok(Map.of("data", poService.submitPO(id)));
+    }
 }

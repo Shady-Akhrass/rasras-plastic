@@ -8,9 +8,11 @@ import {
     Truck,
     Calendar,
     FileText,
-    ArrowRight
+    ArrowRight,
+    Sparkles
 } from 'lucide-react';
 import purchaseService, { type RFQ, type RFQItem, type Supplier } from '../../services/purchaseService';
+import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import toast from 'react-hot-toast';
@@ -31,6 +33,8 @@ const RFQFormPage: React.FC = () => {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [units, setUnits] = useState<UnitDto[]>([]);
+    const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
+    const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
 
     const [formData, setFormData] = useState<RFQ>({
         supplierId: 0,
@@ -106,6 +110,43 @@ const RFQFormPage: React.FC = () => {
         }
     };
 
+    // Handle supplier change - auto-load supplier items
+    const handleSupplierChange = async (supplierId: number) => {
+        setFormData(prev => ({ ...prev, supplierId }));
+
+        if (supplierId === 0) {
+            setSupplierItems([]);
+            return;
+        }
+
+        try {
+            setLoadingSupplierItems(true);
+            const result = await supplierService.getSupplierItems(supplierId);
+            const fetchedItems = result.data || [];
+            setSupplierItems(fetchedItems);
+
+            // Auto-populate form items with supplier's registered products
+            if (fetchedItems.length > 0 && formData.items.length === 0) {
+                const autoItems: RFQItem[] = fetchedItems.map(si => {
+                    const itemData = items.find(i => i.id === si.itemId);
+                    return {
+                        itemId: si.itemId,
+                        requestedQty: si.minOrderQty || 1,
+                        unitId: itemData?.unitId || 0,
+                        specifications: si.supplierItemCode ? `كود المورد: ${si.supplierItemCode}` : '',
+                        estimatedPrice: si.lastPrice
+                    };
+                });
+                setFormData(prev => ({ ...prev, items: autoItems }));
+                toast.success(`تم تحميل ${fetchedItems.length} صنف من كتالوج المورد`, { icon: '📦' });
+            }
+        } catch (error) {
+            console.error('Failed to load supplier items:', error);
+        } finally {
+            setLoadingSupplierItems(false);
+        }
+    };
+
     // Item Management
     const addItem = () => {
         const newItem: RFQItem = {
@@ -128,15 +169,25 @@ const RFQFormPage: React.FC = () => {
         const newItems = [...formData.items];
         newItems[index] = { ...newItems[index], [field]: value };
 
-        // Auto-select unit if item changes
+        // Auto-select unit and price if item changes
         if (field === 'itemId') {
             const selectedItem = items.find(i => i.id === value);
             if (selectedItem) {
                 newItems[index].unitId = selectedItem.unitId;
             }
+            // Check if this item has a supplier price
+            const supplierItem = supplierItems.find(si => si.itemId === value);
+            if (supplierItem?.lastPrice) {
+                newItems[index].estimatedPrice = supplierItem.lastPrice;
+            }
         }
 
         setFormData(prev => ({ ...prev, items: newItems }));
+    };
+
+    // Get supplier price for an item
+    const getSupplierPrice = (itemId: number): number | undefined => {
+        return supplierItems.find(si => si.itemId === itemId)?.lastPrice;
     };
 
     // Form Submission
@@ -216,7 +267,7 @@ const RFQFormPage: React.FC = () => {
                             <Truck className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                             <select
                                 value={formData.supplierId}
-                                onChange={(e) => setFormData(prev => ({ ...prev, supplierId: parseInt(e.target.value) }))}
+                                onChange={(e) => handleSupplierChange(parseInt(e.target.value))}
                                 className="w-full pr-12 pl-4 py-3 rounded-xl border-2 border-slate-100 focus:border-brand-primary outline-none transition-all appearance-none"
                             >
                                 <option value={0}>اختر المورد...</option>
@@ -224,7 +275,18 @@ const RFQFormPage: React.FC = () => {
                                     <option key={s.id} value={s.id}>{s.supplierNameAr} ({s.supplierCode})</option>
                                 ))}
                             </select>
+                            {loadingSupplierItems && (
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                                    <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
                         </div>
+                        {supplierItems.length > 0 && (
+                            <p className="text-xs text-emerald-600 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                هذا المورد لديه {supplierItems.length} صنف مسجل في الكتالوج
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -298,7 +360,7 @@ const RFQFormPage: React.FC = () => {
                                 </button>
 
                                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                                    <div className="md:col-span-5 space-y-2">
+                                    <div className="md:col-span-4 space-y-2">
                                         <label className="text-xs font-bold text-slate-500 block">الصنف</label>
                                         <select
                                             value={item.itemId}
@@ -336,8 +398,27 @@ const RFQFormPage: React.FC = () => {
                                         </select>
                                     </div>
 
-                                    <div className="md:col-span-3 space-y-2">
-                                        <label className="text-xs font-bold text-slate-500 block">مواصفات خاصة</label>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <label className="text-xs font-bold text-slate-500 block flex items-center gap-1">
+                                            السعر المتوقع
+                                            {getSupplierPrice(item.itemId) && (
+                                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">كتالوج</span>
+                                            )}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={item.estimatedPrice || ''}
+                                            onChange={(e) => updateItem(index, 'estimatedPrice', parseFloat(e.target.value) || 0)}
+                                            placeholder="0.00"
+                                            className={`w-full px-4 py-2.5 rounded-xl border-2 outline-none font-medium transition-all ${getSupplierPrice(item.itemId)
+                                                ? 'border-emerald-200 bg-emerald-50/50'
+                                                : 'border-slate-100 bg-white'
+                                                } focus:border-brand-primary`}
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2 space-y-2">
+                                        <label className="text-xs font-bold text-slate-500 block">مواصفات</label>
                                         <input
                                             type="text"
                                             value={item.specifications || ''}

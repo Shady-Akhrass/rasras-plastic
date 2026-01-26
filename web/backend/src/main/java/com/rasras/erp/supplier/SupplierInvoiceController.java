@@ -30,4 +30,12 @@ public class SupplierInvoiceController {
     public ResponseEntity<ApiResponse<SupplierInvoiceDto>> createInvoice(@RequestBody SupplierInvoiceDto dto) {
         return ResponseEntity.ok(ApiResponse.success(invoiceService.createInvoice(dto)));
     }
+
+    @PostMapping("/{id}/approve-payment")
+    public ResponseEntity<ApiResponse<SupplierInvoiceDto>> approvePayment(
+            @PathVariable Integer id,
+            @RequestParam Integer userId,
+            @RequestParam boolean approved) {
+        return ResponseEntity.ok(ApiResponse.success(invoiceService.approvePayment(id, userId, approved)));
+    }
 }

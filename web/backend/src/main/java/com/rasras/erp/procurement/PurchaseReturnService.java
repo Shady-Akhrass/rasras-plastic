@@ -3,6 +3,8 @@ package com.rasras.erp.procurement;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.inventory.WarehouseRepository;
+import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
+import com.rasras.erp.inventory.GoodsReceiptNote;
 import com.rasras.erp.procurement.dto.PurchaseReturnDto;
 import com.rasras.erp.procurement.dto.PurchaseReturnItemDto;
 import com.rasras.erp.supplier.SupplierRepository;
@@ -22,6 +24,7 @@ public class PurchaseReturnService {
     private final WarehouseRepository warehouseRepo;
     private final ItemRepository itemRepo;
     private final UnitRepository unitRepo;
+    private final GoodsReceiptNoteRepository grnRepo;
     private final com.rasras.erp.inventory.InventoryService inventoryService;
 
     @Transactional(readOnly = true)
@@ -51,7 +54,7 @@ public class PurchaseReturnService {
                 .subTotal(dto.getSubTotal())
                 .taxAmount(dto.getTaxAmount())
                 .totalAmount(dto.getTotalAmount())
-                .status("Draft")
+                .status(dto.getStatus() != null ? dto.getStatus() : "Draft")
                 .preparedByUserId(1) // Placeholder
                 .build();
 
@@ -61,7 +64,16 @@ public class PurchaseReturnService {
                     .collect(Collectors.toList()));
         }
 
-        return mapToDto(returnRepo.save(entity));
+        PurchaseReturn saved = returnRepo.save(entity);
+
+        if ("Approved".equalsIgnoreCase(saved.getStatus())) {
+            saved.setApprovedByUserId(1); // Placeholder
+            saved.setApprovedDate(java.time.LocalDateTime.now());
+            processApprovalEffects(saved, 1);
+            saved = returnRepo.save(saved);
+        }
+
+        return mapToDto(saved);
     }
 
     @Transactional
@@ -77,7 +89,13 @@ public class PurchaseReturnService {
         entity.setApprovedByUserId(userId);
         entity.setApprovedDate(java.time.LocalDateTime.now());
 
-        // Update Stock (Decrement)
+        processApprovalEffects(entity, userId);
+
+        return mapToDto(returnRepo.save(entity));
+    }
+
+    private void processApprovalEffects(PurchaseReturn entity, Integer userId) {
+        // 1. Update Stock (Decrement)
         for (PurchaseReturnItem item : entity.getItems()) {
             inventoryService.updateStock(
                     item.getItem().getId(),
@@ -92,7 +110,24 @@ public class PurchaseReturnService {
                     userId);
         }
 
-        return mapToDto(returnRepo.save(entity));
+        // 2. Update Supplier Balance (Decrease) & Total Returned (Increase)
+        com.rasras.erp.supplier.Supplier supplier = entity.getSupplier();
+        java.math.BigDecimal currentBalance = supplier.getCurrentBalance() != null ? supplier.getCurrentBalance()
+                : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal currentReturned = supplier.getTotalReturned() != null ? supplier.getTotalReturned()
+                : java.math.BigDecimal.ZERO;
+
+        supplier.setCurrentBalance(currentBalance.subtract(entity.getTotalAmount()));
+        supplier.setTotalReturned(currentReturned.add(entity.getTotalAmount()));
+        supplierRepo.save(supplier);
+
+        // 3. Update GRN status if reference exists
+        if (entity.getGrnId() != null) {
+            grnRepo.findById(entity.getGrnId()).ifPresent(grn -> {
+                grn.setStatus("Returned");
+                grnRepo.save(grn);
+            });
+        }
     }
 
     private PurchaseReturnItem mapToItemEntity(PurchaseReturn parent, PurchaseReturnItemDto dto) {

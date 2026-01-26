@@ -18,6 +18,7 @@ public class SupplierOutstandingDto {
     private BigDecimal creditLimit;
     private BigDecimal totalInvoiced;
     private BigDecimal totalPaid;
+    private BigDecimal totalReturned;
     private BigDecimal currentBalance;
     private String currency;
     private String lastPaymentDate; // Placeholder for now

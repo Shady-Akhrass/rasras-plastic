@@ -22,6 +22,17 @@ export const approvalService = {
         return response.data;
     },
 
+    getPendingCount: async (userId: number): Promise<number> => {
+        try {
+            const response = await apiClient.get<{ data: ApprovalRequestDto[] }>('/approvals/pending', {
+                params: { userId }
+            });
+            return response.data?.data?.length || 0;
+        } catch {
+            return 0;
+        }
+    },
+
     takeAction: async (requestId: number, userId: number, action: 'Approved' | 'Rejected', comments?: string) => {
         const response = await apiClient.post('/approvals/' + requestId + '/action', null, {
             params: { userId, action, comments }

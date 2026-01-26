@@ -176,6 +176,25 @@ const QuotationComparisonFormPage: React.FC = () => {
         }
     };
 
+    const handleApprove = async () => {
+        if (!formData.selectedQuotationId) {
+            toast.error('لا يمكن الاعتماد بدون اختيار عرض فائز');
+            return;
+        }
+        try {
+            setSaving(true);
+            // Approve directly (Management Approval) and set approved by user 1 (Admin)
+            await purchaseService.managementApproveComparison(parseInt(id!), 1, true, 'تم الاعتماد يدوياً');
+            toast.success('تم اعتماد المرشح الفائز');
+            navigate('/dashboard/procurement/comparison');
+        } catch (error) {
+            console.error('Failed to approve:', error);
+            toast.error('فشل الاعتماد');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center text-slate-500">جاري تحميل البيانات...</div>;
 
     return (
@@ -194,6 +213,16 @@ const QuotationComparisonFormPage: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex gap-3">
+                    {isEdit && formData.status !== 'Approved' && (
+                        <button
+                            onClick={handleApprove}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-all"
+                        >
+                            <CheckCircle2 className="w-5 h-5" />
+                            <span>اعتماد الفائز</span>
+                        </button>
+                    )}
                     <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-8 py-2.5 bg-brand-primary text-white rounded-xl font-bold shadow-lg hover:scale-105 transition-all">
                         <Save className="w-5 h-5" />
                         <span>{saving ? 'جاري الحفظ...' : 'حفظ المقارنة'}</span>

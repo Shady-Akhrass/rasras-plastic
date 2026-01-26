@@ -58,6 +58,10 @@ public class GoodsReceiptNote {
     @Builder.Default
     private String status = "Draft";
 
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
+
     @Column(name = "QualityStatus", length = 20)
     private String qualityStatus;
 

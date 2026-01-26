@@ -38,6 +38,7 @@ public class SupplierDto {
     private String rating;
     private BigDecimal totalInvoiced;
     private BigDecimal totalPaid;
+    private BigDecimal totalReturned;
     private BigDecimal currentBalance;
     private Boolean isApproved;
     private Boolean isActive;

@@ -19,6 +19,7 @@ export interface SupplierInvoiceDto {
     paidAmount?: number;
     remainingAmount?: number;
     status: string;
+    approvalStatus?: string;
     paymentTerms?: string;
     notes?: string;
     items?: SupplierInvoiceItemDto[];
@@ -54,6 +55,13 @@ export const supplierInvoiceService = {
 
     createInvoice: async (invoice: SupplierInvoiceDto) => {
         const response = await apiClient.post<{ data: SupplierInvoiceDto }>('/suppliers/invoices', invoice);
+        return response.data;
+    },
+
+    approvePayment: async (id: number, userId: number, approved: boolean) => {
+        const response = await apiClient.post<{ data: SupplierInvoiceDto }>(`/suppliers/invoices/${id}/approve-payment`, null, {
+            params: { userId, approved }
+        });
         return response.data;
     }
 };

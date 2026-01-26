@@ -48,6 +48,7 @@ import PurchaseReturnFormPage from './pages/procurement/PurchaseReturnFormPage';
 import ApprovalsInbox from './pages/procurement/ApprovalsInbox';
 import { Toaster } from 'react-hot-toast';
 import StockLevelsPage from './pages/inventory/StockLevelsPage';
+import QualityInspectionPage from './pages/inventory/QualityInspectionPage';
 
 // Simple Auth Guard Placeholder
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -106,6 +107,7 @@ function App() {
             </Route>
             <Route path="count" element={<InventoryCountPage />} />
             <Route path="stocks" element={<StockLevelsPage />} />
+            <Route path="quality-inspection" element={<QualityInspectionPage />} />
           </Route>
 
           <Route path="crm">

@@ -165,13 +165,19 @@ const RFQsPage: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [rfqs, setRfqs] = useState<RFQ[]>([]);
+    const [pendingPRs, setPendingPRs] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<'rfqs' | 'pending'>('rfqs');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     useEffect(() => {
-        fetchRFQs();
-    }, []);
+        if (activeTab === 'rfqs') {
+            fetchRFQs();
+        } else {
+            fetchPendingPRs();
+        }
+    }, [activeTab]);
 
     const fetchRFQs = async () => {
         try {
@@ -180,6 +186,19 @@ const RFQsPage: React.FC = () => {
             setRfqs(data);
         } catch (error) {
             console.error('Failed to fetch RFQs:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchPendingPRs = async () => {
+        try {
+            setLoading(true);
+            const data = await purchaseService.getAllPRs();
+            // Filter only approved PRs that haven't been fully turned into RFQs (simplified logic)
+            setPendingPRs(data.filter((pr: any) => pr.status === 'Approved'));
+        } catch (error) {
+            console.error('Failed to fetch PRs:', error);
         } finally {
             setLoading(false);
         }
@@ -195,6 +214,14 @@ const RFQsPage: React.FC = () => {
             return matchesSearch && matchesStatus;
         });
     }, [rfqs, searchTerm, statusFilter]);
+
+    const filteredPRs = useMemo(() => {
+        return pendingPRs.filter(pr =>
+            pr.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            pr.requestedByDeptName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            pr.requestedByUserName?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [pendingPRs, searchTerm]);
 
     const stats = useMemo(() => ({
         total: rfqs.length,
@@ -229,16 +256,53 @@ const RFQsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => navigate('/dashboard/procurement/rfq/new')}
-                        className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
-                            hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
-                            hover:shadow-xl hover:scale-105"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>طلب عرض سعر جديد</span>
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => navigate('/dashboard/procurement/rfq/new')}
+                            className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
+                                hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
+                                hover:shadow-xl hover:scale-105"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>طلب عرض سعر جديد</span>
+                        </button>
+                        <button
+                            onClick={activeTab === 'rfqs' ? fetchRFQs : fetchPendingPRs}
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-xl hover:bg-white/20 transition-all"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 p-1 bg-white w-fit rounded-2xl border border-slate-100 shadow-sm">
+                <button
+                    onClick={() => setActiveTab('rfqs')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
+                        ${activeTab === 'rfqs'
+                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                            : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    <FileText className="w-4 h-4" />
+                    <span>طلبات عروض الأسعار</span>
+                </button>
+                <button
+                    onClick={() => setActiveTab('pending')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
+                        ${activeTab === 'pending'
+                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                            : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    <Package className="w-4 h-4" />
+                    <span>طلبات شراء معتمدة (PR)</span>
+                    {pendingPRs.length > 0 && (
+                        <span className={`${activeTab === 'pending' ? 'bg-white text-brand-primary' : 'bg-brand-primary text-white'} text-[10px] px-2 py-0.5 rounded-full font-bold ml-1 transition-colors`}>
+                            {pendingPRs.length}
+                        </span>
+                    )}
+                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -254,7 +318,7 @@ const RFQsPage: React.FC = () => {
                         ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                     <input
                         type="text"
-                        placeholder="بحث برقم الطلب، اسم المورد، أو رقم طلب الشراء..."
+                        placeholder={activeTab === 'rfqs' ? "بحث برقم الطلب، اسم المورد، أو رقم طلب الشراء..." : "بحث برقم طلب الشراء، القسم، أو الطالب..."}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onFocus={() => setIsSearchFocused(true)}
@@ -263,23 +327,22 @@ const RFQsPage: React.FC = () => {
                             ${isSearchFocused ? 'border-brand-primary bg-white shadow-lg' : 'border-transparent'}`}
                     />
                 </div>
-                <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent">
-                    <Filter className="text-slate-400 w-5 h-5" />
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
-                    >
-                        <option value="All">جميع الحالات</option>
-                        <option value="Sent">تم الإرسال</option>
-                        <option value="Pending">قيد الانتظار</option>
-                        <option value="Completed">مكتمل</option>
-                        <option value="Cancelled">ملغي</option>
-                    </select>
-                </div>
-                <button onClick={fetchRFQs} className="p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
-                    <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                </button>
+                {activeTab === 'rfqs' && (
+                    <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent">
+                        <Filter className="text-slate-400 w-5 h-5" />
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                        >
+                            <option value="All">جميع الحالات</option>
+                            <option value="Sent">تم الإرسال</option>
+                            <option value="Pending">قيد الانتظار</option>
+                            <option value="Completed">مكتمل</option>
+                            <option value="Cancelled">ملغي</option>
+                        </select>
+                    </div>
+                )}
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -287,21 +350,40 @@ const RFQsPage: React.FC = () => {
                     <table className="w-full text-right">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th className="px-6 py-4 text-sm font-bold text-slate-700">رقم الطلب</th>
-                                <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الطلب</th>
-                                <th className="px-6 py-4 text-sm font-bold text-slate-700">المورد</th>
-                                <th className="px-6 py-4 text-sm font-bold text-slate-700">طلب الشراء</th>
-                                <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الاستحقاق</th>
-                                <th className="px-6 py-4 text-sm font-bold text-slate-700">الحالة</th>
-                                <th className="px-6 py-4 text-sm font-bold text-slate-700">إجراءات</th>
+                                {activeTab === 'rfqs' ? (
+                                    <>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">رقم الطلب</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الطلب</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">المورد</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">طلب الشراء</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الاستحقاق</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">الحالة</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">إجراءات</th>
+                                    </>
+                                ) : (
+                                    <>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">رقم طلب الشراء (PR)</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الطلب</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">القسم الطالب</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">الطالب</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">المبلغ التقديري</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700 text-center">الأصناف</th>
+                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">إجراءات</th>
+                                    </>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan={7} className="text-center py-10">جاري التحميل...</td></tr>
-                            ) : filteredRFQs.length === 0 ? (
-                                <tr><td colSpan={7} className="text-center py-10 text-slate-500">لا توجد نتائج</td></tr>
-                            ) : (
+                            ) : (activeTab === 'rfqs' ? filteredRFQs : filteredPRs).length === 0 ? (
+                                <tr><td colSpan={7} className="text-center py-20">
+                                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                                        <Package className="w-12 h-12 opacity-20" />
+                                        <span>{activeTab === 'rfqs' ? 'لا توجد طلبات عروض أسعار' : 'لا توجد طلبات شراء معتمدة بانتظار عروض الأسعار'}</span>
+                                    </div>
+                                </td></tr>
+                            ) : activeTab === 'rfqs' ? (
                                 filteredRFQs.map((rfq, index) => (
                                     <RFQTableRow
                                         key={rfq.id}
@@ -310,6 +392,30 @@ const RFQsPage: React.FC = () => {
                                         onView={(id) => navigate(`/dashboard/procurement/rfq/${id}`)}
                                         onCreateQuotation={handleCreateQuotation}
                                     />
+                                ))
+                            ) : (
+                                filteredPRs.map((pr, index) => (
+                                    <tr key={pr.id} className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0">
+                                        <td className="px-6 py-4 font-bold text-slate-800">#{pr.prNumber}</td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">{new Date(pr.prDate).toLocaleDateString('ar-EG')}</td>
+                                        <td className="px-6 py-4 text-sm text-slate-600 font-bold">{pr.requestedByDeptName}</td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">{pr.requestedByUserName}</td>
+                                        <td className="px-6 py-4 text-sm font-black text-brand-primary">{pr.totalEstimatedAmount?.toLocaleString()} EGP</td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className="px-2 py-1 bg-slate-100 rounded text-xs font-bold text-slate-600">
+                                                {pr.items?.length || 0} صنف
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-left">
+                                            <button
+                                                onClick={() => navigate(`/dashboard/procurement/rfq/new?prId=${pr.id}`)}
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-all shadow-sm"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                <span>إنشاء RFQ</span>
+                                            </button>
+                                        </td>
+                                    </tr>
                                 ))
                             )}
                         </tbody>
