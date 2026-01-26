@@ -8,12 +8,14 @@ export interface GRNItemDto {
     orderedQty: number;
     receivedQty: number;
     acceptedQty?: number;
-    rejectedQty?: number;
     unitId: number;
     unitNameAr?: string;
     unitCost?: number;
     totalCost?: number;
     lotNumber?: string;
+    manufactureDate?: string;
+    expiryDate?: string;
+    locationId?: number;
     notes?: string;
 }
 
@@ -30,7 +32,6 @@ export interface GoodsReceiptNoteDto {
     supplierInvoiceNo?: string;
     receivedByUserId: number;
     status?: string;
-    approvalStatus?: string;
     totalReceivedQty?: number;
     notes?: string;
     items: GRNItemDto[];
@@ -39,26 +40,14 @@ export interface GoodsReceiptNoteDto {
 export const grnService = {
     getAllGRNs: async () => {
         const response = await apiClient.get<{ data: GoodsReceiptNoteDto[] }>('/inventory/grn');
-        return response.data.data;
+        return (response.data as { data?: GoodsReceiptNoteDto[] })?.data ?? [];
     },
     getGRNById: async (id: number) => {
         const response = await apiClient.get<{ data: GoodsReceiptNoteDto }>(`/inventory/grn/${id}`);
-        return response.data.data;
+        return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
     },
     createGRN: async (grn: GoodsReceiptNoteDto) => {
         const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>('/inventory/grn', grn);
-        return response.data.data;
-    },
-    finalizeStoreIn: async (id: number, userId: number) => {
-        const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>(`/inventory/grn/${id}/finalize`, null, {
-            params: { userId }
-        });
-        return response.data.data;
-    },
-    submitGRN: async (id: number, userId: number) => {
-        const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>(`/inventory/grn/${id}/submit`, null, {
-            params: { userId }
-        });
-        return response.data.data;
+        return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
     }
 };
