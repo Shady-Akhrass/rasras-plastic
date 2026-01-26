@@ -12,6 +12,7 @@ const GRNListPage: React.FC = () => {
     const [list, setList] = useState<GoodsReceiptNoteDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
 
     useEffect(() => {
         fetchList();
@@ -31,11 +32,14 @@ const GRNListPage: React.FC = () => {
     };
 
     const filtered = list.filter(
-        (g) =>
-            !search ||
-            (g.grnNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-            (g.poNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-            (g.supplierNameAr || '').toLowerCase().includes(search.toLowerCase())
+        (g) => {
+            const matchesSearch = !search ||
+                (g.grnNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+                (g.poNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+                (g.supplierNameAr || '').toLowerCase().includes(search.toLowerCase());
+            const matchesStatus = statusFilter === 'all' || g.status === statusFilter;
+            return matchesSearch && matchesStatus;
+        }
     );
 
     return (
@@ -61,8 +65,8 @@ const GRNListPage: React.FC = () => {
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                         <button
-                            onClick={() => navigate('/dashboard/inventory/grn/new')}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold hover:bg-white/90"
+                            onClick={() => navigate('/dashboard/inventory/warehouse/grn/new')}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold hover:bg-white/90 transition-colors"
                         >
                             <Plus className="w-5 h-5" />
                             إذن إضافة جديد
@@ -73,15 +77,27 @@ const GRNListPage: React.FC = () => {
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-slate-100">
-                    <div className="relative max-w-md">
-                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="بحث برقم الإذن، أمر الشراء، المورد..."
-                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 focus:border-brand-primary outline-none"
-                        />
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="بحث برقم الإذن، أمر الشراء، المورد..."
+                                className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                            />
+                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                        >
+                            <option value="all">جميع الحالات</option>
+                            <option value="Completed">مكتمل</option>
+                            <option value="Draft">مسودة</option>
+                            <option value="Pending">قيد الانتظار</option>
+                        </select>
                     </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -114,13 +130,15 @@ const GRNListPage: React.FC = () => {
                                 <tr>
                                     <td colSpan={7} className="px-6 py-16 text-center text-slate-500">
                                         <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                                        <p>لا توجد أذونات إضافة</p>
-                                        <button
-                                            onClick={() => navigate('/dashboard/inventory/grn/new')}
-                                            className="mt-4 text-brand-primary font-medium"
-                                        >
-                                            إنشاء إذن إضافة
-                                        </button>
+                                        <p>{search || statusFilter !== 'all' ? 'لا توجد نتائج للبحث' : 'لا توجد أذونات إضافة'}</p>
+                                        {!search && statusFilter === 'all' && (
+                                            <button
+                                                onClick={() => navigate('/dashboard/inventory/warehouse/grn/new')}
+                                                className="mt-4 text-emerald-600 font-medium hover:underline"
+                                            >
+                                                إنشاء إذن إضافة
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ) : (
@@ -147,8 +165,8 @@ const GRNListPage: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <button
-                                                onClick={() => navigate(`/dashboard/inventory/grn/${g.id}`)}
-                                                className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"
+                                                onClick={() => navigate(`/dashboard/inventory/warehouse/grn/${g.id}`)}
+                                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                             >
                                                 <Eye className="w-5 h-5" />
                                             </button>

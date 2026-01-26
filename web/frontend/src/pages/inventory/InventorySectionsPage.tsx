@@ -164,21 +164,21 @@ const InventorySectionsPage: React.FC = () => {
                         icon={LogIn}
                         title="إذن إضافة (GRN)"
                         description="استلام مواد بعد موافقة الجودة وربطها بأمر الشراء"
-                        to="/dashboard/inventory/grn"
+                        to="/dashboard/inventory/warehouse/grn"
                         color="emerald"
                     />
                     <SectionCard
                         icon={LogOut}
                         title="إذن صرف"
                         description="صرف مواد لأمر بيع، تشغيل، مشروع أو قسم داخلي"
-                        to="/dashboard/inventory/issue"
+                        to="/dashboard/inventory/warehouse/issue"
                         color="amber"
                     />
                     <SectionCard
                         icon={ArrowRightLeft}
                         title="إذن تحويل بين مخازن"
                         description="تحويل صنف من مخزن إلى آخر"
-                        to="/dashboard/inventory/transfer"
+                        to="/dashboard/inventory/warehouse/transfer"
                         color="purple"
                     />
                 </div>
