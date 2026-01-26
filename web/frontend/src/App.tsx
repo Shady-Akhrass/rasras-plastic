@@ -119,6 +119,23 @@ function App() {
               <Route path="variance" element={<VarianceReportPage />} />
               <Route path="dual-valuation" element={<DualInventoryValuationPage />} />
             </Route>
+            <Route path="warehouse">
+              <Route path="grn">
+                <Route index element={<GRNListPage />} />
+                <Route path="new" element={<GRNFormPage />} />
+                <Route path=":id" element={<GRNFormPage />} />
+              </Route>
+              <Route path="issue">
+                <Route index element={<MaterialIssueListPage />} />
+                <Route path="new" element={<MaterialIssueFormPage />} />
+                <Route path=":id" element={<MaterialIssueFormPage />} />
+              </Route>
+              <Route path="transfer">
+                <Route index element={<TransferNoteListPage />} />
+                <Route path="new" element={<TransferNoteFormPage />} />
+                <Route path=":id" element={<TransferNoteFormPage />} />
+              </Route>
+            </Route>
             <Route path="count" element={<InventoryCountPage />} />
             <Route path="stocks" element={<StockLevelsPage />} />
           </Route>
@@ -129,6 +146,36 @@ function App() {
               <Route index element={<CustomersPage />} />
               <Route path=":id" element={<CustomerFormPage />} />
             </Route>
+          </Route>
+          <Route path="sales">
+            <Route index element={<Navigate to="sections" replace />} />
+            <Route path="sections" element={<SalesSectionsPage />} />
+            <Route path="quotations">
+              <Route index element={<QuotationListPage />} />
+              <Route path="new" element={<QuotationFormPage />} />
+              <Route path=":id" element={<QuotationFormPage />} />
+            </Route>
+            <Route path="orders">
+              <Route index element={<SaleOrderListPage />} />
+              <Route path="new" element={<SaleOrderFormPage />} />
+              <Route path=":id" element={<SaleOrderFormPage />} />
+            </Route>
+            <Route path="delivery-orders">
+              <Route index element={<DeliveryOrderListPage />} />
+              <Route path="new" element={<DeliveryOrderFormPage />} />
+              <Route path=":id" element={<DeliveryOrderFormPage />} />
+            </Route>
+            <Route path="invoices">
+              <Route index element={<SalesInvoiceListPage />} />
+              <Route path="new" element={<SalesInvoiceFormPage />} />
+              <Route path=":id" element={<SalesInvoiceFormPage />} />
+            </Route>
+            <Route path="receipts">
+              <Route index element={<ReceiptListPage />} />
+              <Route path="new" element={<ReceiptFormPage />} />
+              <Route path=":id" element={<ReceiptFormPage />} />
+            </Route>
+            <Route path="reports" element={<SalesReportsPage />} />
           </Route>
           <Route path="procurement">
             <Route index element={<Navigate to="pr" replace />} />

@@ -3,7 +3,7 @@ import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
     Settings, User, X, ChevronLeft, ChevronRight,
     HelpCircle, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart, ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 
@@ -175,6 +175,9 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations' },
         { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations' },
         { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations' },
+        { to: '/dashboard/inventory/warehouse/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse' },
+        { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse' },
+        { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse' },
         { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales' },
         { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
         { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
@@ -310,6 +313,23 @@ const DashboardLayout: React.FC = () => {
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
                                     badge={item.badge}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {/* Warehouse Section */}
+                    {filteredNavItems.some(i => i.section === 'warehouse') && (
+                        <>
+                            <SidebarSection title="دورة المخازن" collapsed={sidebarCollapsed} />
+                            {filteredNavItems.filter(i => i.section === 'warehouse').map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
                                 />
                             ))}
                         </>

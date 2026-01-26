@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     ChevronRight, Save, Package, FileText, Building2, Truck, Calendar,
-    X, RefreshCw, Plus
+    X, RefreshCw, Plus, AlertCircle, CheckCircle, Info, DollarSign
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../../services/grnService';
 import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto } from '../../../services/purchaseOrderService';
@@ -167,15 +167,35 @@ const GRNFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Validation
         if (!form.poId || !form.supplierId || !form.warehouseId) {
-            toast.error('أدخل أمر الشراء والمستودع');
+            toast.error('الرجاء اختيار أمر الشراء والمستودع');
             return;
         }
+        
         const items = buildItems();
         if (items.length === 0) {
-            toast.error('أضف صنفاً واحداً على الأقل بكمية مستلمة');
+            toast.error('يجب إضافة صنف واحد على الأقل بكمية مستلمة');
             return;
         }
+
+        // Validate items
+        for (const item of items) {
+            if (item.receivedQty <= 0) {
+                toast.error(`الكمية المستلمة للصنف ${item.itemNameAr} يجب أن تكون أكبر من صفر`);
+                return;
+            }
+            if (item.receivedQty > item.orderedQty) {
+                toast.error(`الكمية المستلمة للصنف ${item.itemNameAr} لا يمكن أن تتجاوز الكمية المطلوبة`);
+                return;
+            }
+            if (item.acceptedQty && item.acceptedQty > item.receivedQty) {
+                toast.error(`الكمية المقبولة للصنف ${item.itemNameAr} لا يمكن أن تتجاوز الكمية المستلمة`);
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             const payload: GoodsReceiptNoteDto = {
@@ -190,7 +210,7 @@ const GRNFormPage: React.FC = () => {
             };
             await grnService.createGRN(payload);
             toast.success('تم إنشاء إذن الإضافة بنجاح');
-            navigate('/dashboard/inventory/grn');
+            navigate('/dashboard/inventory/warehouse/grn');
         } catch (err: any) {
             toast.error(err?.response?.data?.message || 'فشل حفظ إذن الإضافة');
         } finally {
@@ -198,12 +218,20 @@ const GRNFormPage: React.FC = () => {
         }
     };
 
+    // Calculate totals
+    const totals = React.useMemo(() => {
+        const items = buildItems();
+        const totalQty = items.reduce((sum, item) => sum + (item.receivedQty || 0), 0);
+        const totalCost = items.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+        return { totalQty, totalCost, itemCount: items.length };
+    }, [rows, selectedPo]);
+
     if (!isNew && id) {
         const g = form as GoodsReceiptNoteDto;
         return (
             <div className="space-y-6 max-w-4xl mx-auto">
                 <div className="flex items-center justify-between">
-                    <button onClick={() => navigate('/dashboard/inventory/grn')} className="p-2 hover:bg-slate-100 rounded-xl">
+                    <button onClick={() => navigate('/dashboard/inventory/warehouse/grn')} className="p-2 hover:bg-slate-100 rounded-xl">
                         <ChevronRight className="w-6 h-6" />
                     </button>
                     <h1 className="text-xl font-bold text-slate-800">عرض إذن الإضافة {g.grnNumber}</h1>
@@ -241,10 +269,13 @@ const GRNFormPage: React.FC = () => {
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12">
             <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/dashboard/inventory/grn')} className="p-2 hover:bg-slate-100 rounded-xl">
+                <button onClick={() => navigate('/dashboard/inventory/warehouse/grn')} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                     <ChevronRight className="w-6 h-6" />
                 </button>
-                <h1 className="text-xl font-bold text-slate-800">إذن إضافة جديد (GRN)</h1>
+                <div>
+                    <h1 className="text-xl font-bold text-slate-800">إذن إضافة جديد (GRN)</h1>
+                    <p className="text-sm text-slate-500 mt-1">استلام المواد بعد موافقة الجودة وربطها بأمر الشراء</p>
+                </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -310,9 +341,42 @@ const GRNFormPage: React.FC = () => {
                 </div>
 
                 {selectedPo && (
-                    <div className="bg-white rounded-2xl border border-slate-100 p-6 overflow-x-auto">
-                        <h2 className="font-bold text-slate-800 border-b pb-2 mb-4">البنود — الكمية المستلمة، اللوت، التاريخ، الموقع</h2>
-                        <table className="w-full min-w-[800px]">
+                    <>
+                        {/* Supplier Info Card */}
+                        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 p-4">
+                            <div className="flex items-center gap-3 mb-2">
+                                <Truck className="w-5 h-5 text-emerald-600" />
+                                <h3 className="font-bold text-emerald-900">معلومات المورد</h3>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                    <p className="text-xs text-emerald-600 mb-1">اسم المورد</p>
+                                    <p className="font-semibold text-slate-800">{form.supplierNameAr || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-emerald-600 mb-1">رقم أمر الشراء</p>
+                                    <p className="font-semibold text-slate-800">{form.poNumber || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-emerald-600 mb-1">عدد الأصناف</p>
+                                    <p className="font-semibold text-slate-800">{selectedPo.items?.filter(i => maxRem(i) > 0).length || 0}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-emerald-600 mb-1">إجمالي الكمية</p>
+                                    <p className="font-semibold text-slate-800">{totals.totalQty.toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-slate-100 p-6 overflow-x-auto">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="font-bold text-slate-800">البنود — الكمية المستلمة، اللوت، التاريخ، الموقع</h2>
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                    <Info className="w-4 h-4" />
+                                    <span>يتم تطبيق نظام FIFO تلقائياً عند التخزين</span>
+                                </div>
+                            </div>
+                            <table className="w-full min-w-[900px]">
                             <thead>
                                 <tr className="bg-slate-50 border-b">
                                     <th className="px-3 py-2 text-right text-xs font-semibold">الصنف</th>
@@ -337,18 +401,27 @@ const GRNFormPage: React.FC = () => {
                                                     type="number"
                                                     min={0}
                                                     max={maxRem(i)}
+                                                    step="0.001"
                                                     value={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                    onChange={(e) => updateRow(i.id!, { receivedQty: parseFloat(e.target.value) || 0, acceptedQty: parseFloat(e.target.value) || 0 })}
-                                                    className="w-20 px-2 py-1 border rounded"
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        updateRow(i.id!, { 
+                                                            receivedQty: val, 
+                                                            acceptedQty: val 
+                                                        });
+                                                    }}
+                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
                                                 <input
                                                     type="number"
                                                     min={0}
+                                                    max={rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                    step="0.001"
                                                     value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
                                                     onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 })}
-                                                    className="w-20 px-2 py-1 border rounded"
+                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -356,8 +429,8 @@ const GRNFormPage: React.FC = () => {
                                                     type="text"
                                                     value={rows[i.id!]?.lotNumber || ''}
                                                     onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value || undefined })}
-                                                    placeholder="لوت"
-                                                    className="w-24 px-2 py-1 border rounded text-sm"
+                                                    placeholder="رقم اللوت"
+                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -365,7 +438,7 @@ const GRNFormPage: React.FC = () => {
                                                     type="date"
                                                     value={rows[i.id!]?.manufactureDate || ''}
                                                     onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
-                                                    className="w-36 px-2 py-1 border rounded"
+                                                    className="w-36 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -373,18 +446,18 @@ const GRNFormPage: React.FC = () => {
                                                     type="date"
                                                     value={rows[i.id!]?.expiryDate || ''}
                                                     onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined })}
-                                                    className="w-36 px-2 py-1 border rounded"
+                                                    className="w-36 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
                                                 <select
                                                     value={rows[i.id!]?.locationId || ''}
                                                     onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
-                                                    className="w-28 px-2 py-1 border rounded text-sm"
+                                                    className="w-32 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
                                                 >
-                                                    <option value="">—</option>
+                                                    <option value="">اختر الموقع</option>
                                                     {locations.map((l) => (
-                                                        <option key={l.id} value={l.id}>{l.locationCode}</option>
+                                                        <option key={l.id} value={l.id}>{l.locationCode} {l.locationNameAr ? `- ${l.locationNameAr}` : ''}</option>
                                                     ))}
                                                 </select>
                                             </td>
@@ -392,21 +465,59 @@ const GRNFormPage: React.FC = () => {
                                     ))}
                             </tbody>
                         </table>
-                    </div>
+                        </div>
+
+                        {/* Summary Card */}
+                        <div className="mt-4 bg-slate-50 rounded-xl p-4 border border-slate-200">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="text-center">
+                                    <p className="text-xs text-slate-500 mb-1">عدد الأصناف</p>
+                                    <p className="text-lg font-bold text-slate-800">{totals.itemCount}</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-xs text-slate-500 mb-1">إجمالي الكمية</p>
+                                    <p className="text-lg font-bold text-emerald-600">{totals.totalQty.toLocaleString()}</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-xs text-slate-500 mb-1">إجمالي التكلفة</p>
+                                    <p className="text-lg font-bold text-slate-800 flex items-center justify-center gap-1">
+                                        <DollarSign className="w-4 h-4" />
+                                        {totals.totalCost.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-xs text-slate-500 mb-1">متوسط التكلفة</p>
+                                    <p className="text-lg font-bold text-slate-800">
+                                        {totals.totalQty > 0 
+                                            ? (totals.totalCost / totals.totalQty).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                            : '0.00'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </>
                 )}
 
-                <div className="flex items-center gap-3">
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                        {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        حفظ إذن الإضافة
-                    </button>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="submit"
+                            disabled={loading || totals.itemCount === 0}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-emerald-500/25"
+                        >
+                            {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                            حفظ إذن الإضافة
+                        </button>
+                        {totals.itemCount > 0 && (
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                <span>{totals.itemCount} صنف جاهز للحفظ</span>
+                            </div>
+                        )}
+                    </div>
                     <button
                         type="button"
-                        onClick={() => navigate('/dashboard/inventory/grn')}
+                        onClick={() => navigate('/dashboard/inventory/warehouse/grn')}
                         className="px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50"
                     >
                         إلغاء

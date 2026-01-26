@@ -45,7 +45,7 @@ const MaterialIssueListPage: React.FC = () => {
                         <button onClick={fetchList} disabled={loading} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl">
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
-                        <button onClick={() => navigate('/dashboard/inventory/issue/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-white text-amber-700 rounded-xl font-bold hover:bg-white/90">
+                        <button onClick={() => navigate('/dashboard/inventory/warehouse/issue/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-white text-amber-700 rounded-xl font-bold hover:bg-white/90 transition-colors">
                             <Plus className="w-5 h-5" /> إذن صرف جديد
                         </button>
                     </div>
@@ -70,7 +70,7 @@ const MaterialIssueListPage: React.FC = () => {
                                 <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-500">
                                     <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                                     <p>لا توجد أذونات صرف. أو أن واجهة الـ API غير مفعّلة بعد.</p>
-                                    <button onClick={() => navigate('/dashboard/inventory/issue/new')} className="mt-4 text-amber-600 font-medium">إنشاء إذن صرف</button>
+                                    <button onClick={() => navigate('/dashboard/inventory/warehouse/issue/new')} className="mt-4 text-amber-600 font-medium hover:underline">إنشاء إذن صرف</button>
                                 </td></tr>
                             ) : (
                                 list.map((m) => (
@@ -79,7 +79,14 @@ const MaterialIssueListPage: React.FC = () => {
                                         <td className="px-6 py-4">{typeLabel[m.issueType as string] || m.issueType}</td>
                                         <td className="px-6 py-4">{m.referenceNo || '—'}</td>
                                         <td className="px-6 py-4">{m.receiverName || '—'}</td>
-                                        <td className="px-6 py-4"><button onClick={() => navigate(`/dashboard/inventory/issue/${m.id}`)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"><Eye className="w-5 h-5" /></button></td>
+                                        <td className="px-6 py-4">
+                                            <button 
+                                                onClick={() => navigate(`/dashboard/inventory/warehouse/issue/${m.id}`)} 
+                                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                            >
+                                                <Eye className="w-5 h-5" />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))
                             )}

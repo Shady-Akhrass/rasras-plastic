@@ -45,7 +45,7 @@ const TransferNoteListPage: React.FC = () => {
                         <button onClick={fetchList} disabled={loading} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl">
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
-                        <button onClick={() => navigate('/dashboard/inventory/transfer/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-white text-violet-700 rounded-xl font-bold hover:bg-white/90">
+                        <button onClick={() => navigate('/dashboard/inventory/warehouse/transfer/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-white text-violet-700 rounded-xl font-bold hover:bg-white/90 transition-colors">
                             <Plus className="w-5 h-5" /> إذن تحويل جديد
                         </button>
                     </div>
@@ -76,7 +76,7 @@ const TransferNoteListPage: React.FC = () => {
                                 <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-500">
                                     <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                                     <p>لا توجد أذونات تحويل. أو أن واجهة الـ API غير مفعّلة بعد.</p>
-                                    <button onClick={() => navigate('/dashboard/inventory/transfer/new')} className="mt-4 text-violet-600 font-medium">إنشاء إذن تحويل</button>
+                                    <button onClick={() => navigate('/dashboard/inventory/warehouse/transfer/new')} className="mt-4 text-violet-600 font-medium hover:underline">إنشاء إذن تحويل</button>
                                 </td></tr>
                             ) : (
                                 list.map((t) => (
@@ -85,7 +85,14 @@ const TransferNoteListPage: React.FC = () => {
                                         <td className="px-6 py-4">{t.fromWarehouseNameAr || '—'}</td>
                                         <td className="px-6 py-4">{t.toWarehouseNameAr || '—'}</td>
                                         <td className="px-6 py-4">{reasonLabel[t.reason] || t.reason}</td>
-                                        <td className="px-6 py-4"><button onClick={() => navigate(`/dashboard/inventory/transfer/${t.id}`)} className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg"><Eye className="w-5 h-5" /></button></td>
+                                        <td className="px-6 py-4">
+                                            <button 
+                                                onClick={() => navigate(`/dashboard/inventory/warehouse/transfer/${t.id}`)} 
+                                                className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                                            >
+                                                <Eye className="w-5 h-5" />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))
                             )}
