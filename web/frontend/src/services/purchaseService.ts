@@ -118,6 +118,7 @@ export interface QuotationComparisonDetail {
     totalPrice?: number;
     paymentTerms?: string;
     deliveryDays?: number;
+    validUntilDate?: string;
     qualityRating?: number;
     priceRating?: number;
     overallScore?: number;

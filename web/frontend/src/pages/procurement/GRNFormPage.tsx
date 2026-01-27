@@ -7,7 +7,14 @@ import {
     Warehouse,
     Info,
     Hash,
-    Trash2
+    Trash2,
+    FileText,
+    Calendar,
+    Truck,
+    ClipboardCheck,
+    AlertCircle,
+    Building2,
+    CheckCircle2
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../services/grnService';
 import { purchaseOrderService } from '../../services/purchaseOrderService';
@@ -96,107 +103,324 @@ const GRNFormPage: React.FC = () => {
         finally { setSaving(false); }
     };
 
+    // Calculate totals
+    const totalItems = formData.items.length;
+    const totalQuantity = formData.items.reduce((sum, item) => sum + (item.receivedQty || 0), 0);
+    const totalCost = formData.items.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+
     return (
-        <div className="max-w-6xl mx-auto space-y-6 pb-20">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-3 bg-white text-slate-400 rounded-2xl border border-slate-100 shadow-sm hover:text-brand-primary">
-                        <ArrowRight className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">{isEdit ? 'تعديل إذن استلام' : 'تسجيل إذن استلام (GRN)'}</h1>
-                        <p className="text-slate-500 text-sm">إثبات استلام البضائع فعلياً في المستودعات وتحديث الأرصدة</p>
+        <div className="space-y-6 pb-20" dir="rtl">
+            <style>{`
+                @keyframes slideInRight {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                }
+                .animate-slide-in {
+                    animation: slideInRight 0.4s ease-out;
+                }
+            `}</style>
+
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
+                                hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
+                        >
+                            <ArrowRight className="w-5 h-5" />
+                        </button>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                            <ClipboardCheck className="w-10 h-10" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold mb-2">
+                                {isEdit ? 'تعديل إذن استلام' : 'تسجيل إذن استلام (GRN)'}
+                            </h1>
+                            <p className="text-white/80 text-lg">إثبات استلام البضائع فعلياً في المستودعات وتحديث الأرصدة</p>
+                        </div>
                     </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={saving}
+                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                        {saving ? (
+                            <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                        ) : (
+                            <Save className="w-5 h-5" />
+                        )}
+                        <span>{saving ? 'جاري الحفظ...' : 'إتمام الاستلام'}</span>
+                    </button>
                 </div>
-                <button onClick={handleSubmit} disabled={saving} className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
-                    {saving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-5 h-5" />}
-                    <span>إتمام الاستلام</span>
-                </button>
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-                        <div className="flex items-center gap-2 font-bold text-slate-800 border-b border-slate-50 pb-4">
-                            <Warehouse className="w-5 h-5 text-emerald-600" />
-                            <span>بيانات التوريد</span>
+                    {/* Supply Data */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                    <Warehouse className="w-5 h-5 text-brand-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">بيانات التوريد</h3>
+                                    <p className="text-slate-500 text-sm">تفاصيل الشحنة والمستندات المرجعية</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500">مستند التوريد (أمر الشراء)</label>
-                                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-                                    <Hash className="w-4 h-4 text-slate-400" />
-                                    <span className="font-bold text-slate-700">{formData.poId ? `أمر شراء رقم ${formData.poId}` : 'لم يتم اختيار أمر شراء'}</span>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <FileText className="w-4 h-4 text-brand-primary" />
+                                    مستند التوريد (أمر الشراء)
+                                </label>
+                                <div className="flex items-center gap-3 p-4 bg-gradient-to-l from-blue-50 to-cyan-50 
+                                    rounded-xl border-2 border-blue-200">
+                                    <div className="p-2 bg-blue-100 rounded-lg">
+                                        <Hash className="w-5 h-5 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-blue-600 font-semibold">أمر الشراء المرجعي</div>
+                                        <div className="font-bold text-slate-800">
+                                            {formData.poId ? `PO #${formData.poId}` : 'لم يتم اختيار أمر شراء'}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500">رقم بوليصة الشحن / Delivery Note</label>
-                                <input type="text" value={formData.deliveryNoteNo || ''} onChange={(e) => setFormData({ ...formData, deliveryNoteNo: e.target.value })} className="w-full px-4 py-2.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-emerald-600 outline-none transition-all" placeholder="DN-XXX" />
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Truck className="w-4 h-4 text-brand-primary" />
+                                    رقم بوليصة الشحن / Delivery Note
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.deliveryNoteNo || ''}
+                                    onChange={(e) => setFormData({ ...formData, deliveryNoteNo: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    placeholder="DN-XXX"
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-50 pb-4">
-                            <div className="flex items-center gap-2 font-bold text-slate-800">
-                                <Package className="w-5 h-5 text-amber-500" />
-                                <span>الأصناف المستلمة</span>
+                    {/* Items Table */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '100ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-purple-100 rounded-xl">
+                                        <Package className="w-5 h-5 text-purple-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المستلمة</h3>
+                                        <p className="text-slate-500 text-sm">تأكيد الكميات المستلمة فعلياً</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 rounded-xl">
+                                    <Package className="w-4 h-4 text-brand-primary" />
+                                    <span className="text-sm font-bold text-brand-primary">
+                                        {totalItems} صنف
+                                    </span>
+                                </div>
                             </div>
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-right">
+                            <table className="w-full">
                                 <thead>
-                                    <tr className="text-slate-400 text-xs font-bold">
-                                        <th className="pb-4 pr-2">الصنف</th>
-                                        <th className="pb-4 text-center">مطلوب</th>
-                                        <th className="pb-4 text-center">تم استلامه الآن</th>
-                                        <th className="pb-4 text-center">الوحدة</th>
-                                        <th className="pb-4 text-center">التكلفة</th>
-                                        <th className="pb-4"></th>
+                                    <tr className="bg-slate-50 text-slate-600 text-sm font-bold border-b border-slate-200">
+                                        <th className="py-4 pr-6 text-right">الصنف</th>
+                                        <th className="py-4 px-4 text-center">الكمية المطلوبة</th>
+                                        <th className="py-4 px-4 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                                <span>تم استلامه</span>
+                                            </div>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">الوحدة</th>
+                                        <th className="py-4 px-4 text-center">التكلفة الإجمالية</th>
+                                        <th className="py-4 pl-6"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {formData.items.map((item, idx) => (
-                                        <tr key={idx} className="group">
-                                            <td className="py-4 pr-2">
-                                                <div className="font-bold text-slate-800">{items.find(i => i.id === item.itemId)?.itemNameAr || 'صنف غير معرف'}</div>
-                                            </td>
-                                            <td className="py-4 px-2 text-center text-slate-400">{item.orderedQty}</td>
-                                            <td className="py-4 px-2">
-                                                <input type="number" value={item.receivedQty} onChange={(e) => updateItem(idx, { receivedQty: parseFloat(e.target.value) })} className="w-24 bg-slate-50 border-none rounded-lg text-sm p-2 text-center font-bold text-emerald-600" />
-                                            </td>
-                                            <td className="py-4 px-2 text-center">{units.find(u => u.id === item.unitId)?.unitNameAr}</td>
-                                            <td className="py-4 px-2 text-center font-black text-slate-700">{item.totalCost?.toLocaleString()}</td>
-                                            <td className="py-4 text-left">
-                                                <button type="button" onClick={() => setFormData(p => ({ ...p, items: p.items.filter((_, i) => i !== idx) }))} className="p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-4 h-4" /></button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                <tbody className="divide-y divide-slate-100">
+                                    {formData.items.map((item, idx) => {
+                                        const itemData = items.find(i => i.id === item.itemId);
+                                        const unitData = units.find(u => u.id === item.unitId);
+                                        const isComplete = item.receivedQty === item.orderedQty;
+                                        const isPartial = item.receivedQty > 0 && item.receivedQty < item.orderedQty;
+
+                                        return (
+                                            <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                                                <td className="py-4 pr-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-2 h-2 rounded-full ${
+                                                            isComplete ? 'bg-emerald-500' : 
+                                                            isPartial ? 'bg-amber-500' : 'bg-slate-300'
+                                                        }`} />
+                                                        <span className="font-bold text-slate-800">
+                                                            {itemData?.itemNameAr || 'صنف غير معرف'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4 text-center">
+                                                    <span className="px-3 py-1 bg-slate-100 rounded-lg text-slate-600 font-semibold text-sm">
+                                                        {item.orderedQty}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        value={item.receivedQty}
+                                                        onChange={(e) => updateItem(idx, { receivedQty: parseFloat(e.target.value) })}
+                                                        className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                            text-sm text-center font-bold text-emerald-600 outline-none 
+                                                            focus:border-brand-primary transition-all"
+                                                    />
+                                                </td>
+                                                <td className="py-4 px-4 text-center text-slate-600 font-semibold">
+                                                    {unitData?.unitNameAr}
+                                                </td>
+                                                <td className="py-4 px-4 text-center font-bold text-slate-800">
+                                                    {item.totalCost?.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="py-4 pl-6 text-left">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(p => ({ 
+                                                            ...p, 
+                                                            items: p.items.filter((_, i) => i !== idx) 
+                                                        }))}
+                                                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
+                                                            rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
+                            {formData.items.length === 0 && (
+                                <div className="py-20 text-center">
+                                    <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                        <Package className="w-10 h-10 text-slate-400" />
+                                    </div>
+                                    <p className="text-slate-400 font-semibold">لا توجد أصناف للاستلام</p>
+                                    <p className="text-slate-400 text-sm mt-1">الرجاء اختيار أمر شراء أولاً</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
+                {/* Sidebar */}
                 <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                        <div className="flex items-center gap-2 font-bold text-slate-800 text-sm border-b border-slate-50 pb-4">
-                            <Info className="w-4 h-4 text-brand-primary" /> معلومات الاستلام
+                    {/* Summary Card */}
+                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
+                        rounded-3xl p-6 text-white shadow-2xl animate-slide-in"
+                        style={{ animationDelay: '200ms' }}>
+                        <div className="flex items-center gap-3 pb-6 border-b border-white/10">
+                            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
+                                <ClipboardCheck className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <h3 className="font-bold text-xl">ملخص الاستلام</h3>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-5 mt-6">
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">عدد الأصناف</span>
+                                <span className="font-bold text-lg">{totalItems}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">إجمالي الكميات</span>
+                                <span className="font-bold text-lg text-emerald-400">{totalQuantity}</span>
+                            </div>
+                            <div className="pt-6 border-t border-white/10">
+                                <div className="text-xs text-white/40 mb-2">إجمالي التكلفة</div>
+                                <div className="text-4xl font-black text-emerald-400">
+                                    {totalCost.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    <span className="text-sm font-bold mr-2">ج.م</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Receipt Info */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '300ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 rounded-xl">
+                                    <Info className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <h3 className="font-bold text-slate-800">معلومات الاستلام</h3>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-5">
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400">تاريخ الاستلام</label>
-                                <input type="date" value={formData.grnDate?.split('T')[0] || new Date().toISOString().split('T')[0]} onChange={(e) => setFormData({ ...formData, grnDate: e.target.value })} className="w-full px-4 py-2 bg-slate-50 rounded-xl border-none font-bold text-slate-700 outline-none" />
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Calendar className="w-4 h-4 text-brand-primary" />
+                                    تاريخ الاستلام
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formData.grnDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setFormData({ ...formData, grnDate: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400">المستودع</label>
-                                <select value={formData.warehouseId} onChange={(e) => setFormData({ ...formData, warehouseId: parseInt(e.target.value) })} className="w-full px-4 py-2 bg-slate-50 rounded-xl border-none font-bold text-slate-700 outline-none">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Building2 className="w-4 h-4 text-brand-primary" />
+                                    المستودع المستلم
+                                </label>
+                                <select
+                                    value={formData.warehouseId}
+                                    onChange={(e) => setFormData({ ...formData, warehouseId: parseInt(e.target.value) })}
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                >
                                     <option value="">اختر المستودع...</option>
                                     {warehouses.map(w => (
                                         <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
                                     ))}
                                 </select>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Info Alert */}
+                    <div className="p-5 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border-2 border-emerald-200 
+                        flex gap-4 animate-slide-in shadow-lg"
+                        style={{ animationDelay: '400ms' }}>
+                        <div className="p-3 bg-emerald-100 rounded-xl h-fit">
+                            <AlertCircle className="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-emerald-800 mb-2">معلومة هامة</h4>
+                            <p className="text-sm leading-relaxed text-emerald-700">
+                                سيتم <strong>تحديث أرصدة المخزون</strong> فور اعتماد إذن الاستلام. تأكد من صحة الكميات المستلمة.
+                            </p>
                         </div>
                     </div>
                 </div>

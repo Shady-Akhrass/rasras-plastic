@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Bell,
-    CheckCircle2,
-    XCircle,
     Clock,
     FileText,
     User,
     Calendar,
     DollarSign,
-    RefreshCw,
-    MessageSquare,
-    ChevronRight,
-    ArrowLeft,
-    Search,
-    Filter,
     AlertCircle,
     Package,
-    ShoppingCart
+    ShoppingCart,
+    Tag,
+    Scale,
+    Eye,
+    Search,
+    Filter,
+    RefreshCw,
+    XCircle,
+    CheckCircle2
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
@@ -65,16 +65,57 @@ const RequestCard: React.FC<{
 }> = ({ request, index, onApprove, onReject, processing }) => {
     const getDocTypeConfig = (type: string) => {
         const configs: Record<string, { bg: string; text: string; icon: React.ElementType }> = {
-            'PurchaseOrder': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: ShoppingCart },
             'PurchaseRequisition': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
-            'Supplier': { bg: 'bg-amber-50', text: 'text-amber-600', icon: Package },
-            'GoodsReceiptNote': { bg: 'bg-blue-50', text: 'text-blue-600', icon: Package },
+            'PR': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
+            'RFQ': { bg: 'bg-amber-50', text: 'text-amber-600', icon: FileText },
+            'SupplierQuotation': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
+            'SQ': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
+            'QuotationComparison': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
+            'QC': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
+            'PurchaseOrder': { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            'PO': { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            'GoodsReceiptNote': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
+            'GRN': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
+            'SupplierInvoice': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'SINV': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'SalesOrder': { bg: 'bg-sky-50', text: 'text-sky-600', icon: ShoppingCart },
+            'SO': { bg: 'bg-sky-50', text: 'text-sky-600', icon: ShoppingCart },
+            'PaymentVoucher': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'PV': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'ReceiptVoucher': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign },
+            'RV': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign },
         };
         return configs[type] || configs['PurchaseOrder'];
     };
 
     const config = getDocTypeConfig(request.documentType);
     const DocIcon = config.icon;
+    const navigate = useNavigate();
+
+    const handleViewDocument = () => {
+        const typeRoutes: Record<string, string> = {
+            'PR': '/dashboard/procurement/pr',
+            'PurchaseRequisition': '/dashboard/procurement/pr',
+            'RFQ': '/dashboard/procurement/rfq',
+            'SQ': '/dashboard/procurement/quotation',
+            'SupplierQuotation': '/dashboard/procurement/quotation',
+            'QC': '/dashboard/procurement/comparison',
+            'QuotationComparison': '/dashboard/procurement/comparison',
+            'PO': '/dashboard/procurement/po',
+            'PurchaseOrder': '/dashboard/procurement/po',
+            'GRN': '/dashboard/procurement/grn',
+            'GoodsReceiptNote': '/dashboard/procurement/grn',
+            'SINV': '/dashboard/procurement/invoices',
+            'SupplierInvoice': '/dashboard/procurement/invoices'
+        };
+
+        const route = typeRoutes[request.documentType];
+        if (route) {
+            navigate(`${route}/${request.documentId}`);
+        } else {
+            toast.error('لم يتم تحديد مسار لهذا المستند');
+        }
+    };
 
     return (
         <div
@@ -107,9 +148,14 @@ const RequestCard: React.FC<{
                                 </span>
                             )}
                         </div>
-                        <h3 className="font-bold text-slate-800 text-lg group-hover:text-brand-primary transition-colors">
-                            {request.workflowName}
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-bold text-slate-800 text-lg group-hover:text-brand-primary transition-colors">
+                                {request.workflowName}
+                            </h3>
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">
+                                {request.documentNumber}
+                            </span>
+                        </div>
                         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
                             <div className="flex items-center gap-2">
                                 <User className="w-4 h-4 text-slate-400" />
@@ -139,6 +185,15 @@ const RequestCard: React.FC<{
 
                 {/* Right: Actions */}
                 <div className="flex flex-row lg:flex-col justify-center gap-3 min-w-[140px]">
+                    <button
+                        onClick={handleViewDocument}
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 
+                            bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 
+                            transition-all hover:scale-105"
+                    >
+                        <Eye className="w-4 h-4" />
+                        <span>عرض</span>
+                    </button>
                     <button
                         onClick={() => onApprove(request.id)}
                         disabled={processing}
@@ -225,7 +280,6 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
 );
 
 const ApprovalsInbox: React.FC = () => {
-    const navigate = useNavigate();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const initialType = queryParams.get('type') || 'All';
@@ -412,11 +466,16 @@ const ApprovalsInbox: React.FC = () => {
                                 onChange={(e) => setTypeFilter(e.target.value)}
                                 className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
                             >
-                                <option value="All">جميع الأنواع</option>
-                                <option value="PurchaseOrder">أوامر شراء</option>
-                                <option value="PurchaseRequisition">طلبات شراء</option>
-                                <option value="Supplier">موردين</option>
-                                <option value="GoodsReceiptNote">إشعارات استلام</option>
+                                <option value="PR">طلبات شراء</option>
+                                <option value="RFQ">طلبات عروض أسعار</option>
+                                <option value="SQ">عروض موردين</option>
+                                <option value="PO">أوامر شراء</option>
+                                <option value="GRN">إشعارات استلام</option>
+                                <option value="QC">مقارنة عروض</option>
+                                <option value="SINV">فواتير موردين</option>
+                                <option value="SO">أوامر بيع</option>
+                                <option value="PV">سندات صرف</option>
+                                <option value="RV">سندات قبض</option>
                             </select>
                         </div>
                     </div>

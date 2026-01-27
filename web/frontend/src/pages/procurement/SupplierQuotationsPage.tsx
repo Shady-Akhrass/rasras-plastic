@@ -12,7 +12,11 @@ import {
     RefreshCw,
     DollarSign,
     Tag,
-    ShoppingCart
+    ShoppingCart,
+    X,
+    XCircle,
+    Eye,
+    AlertCircle
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation } from '../../services/purchaseService';
 
@@ -137,7 +141,15 @@ const QuotationTableRow: React.FC<{
             {quotation.deliveryDays ? `${quotation.deliveryDays} يوم` : '-'}
         </td>
         <td className="px-6 py-4">
-            <StatusBadge status={quotation.status || 'Received'} />
+            <div className="flex flex-col gap-1">
+                <StatusBadge status={quotation.status || 'Received'} />
+                {quotation.validUntilDate && new Date(quotation.validUntilDate) < new Date() && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-rose-600 text-[10px] font-bold border border-rose-100">
+                        <AlertCircle className="w-3 h-3" />
+                        منتهي
+                    </span>
+                )}
+            </div>
         </td>
         <td className="px-6 py-4">
             <div className="flex justify-end gap-2">
@@ -183,6 +195,7 @@ const SupplierQuotationsPage: React.FC = () => {
     const [quotations, setQuotations] = useState<SupplierQuotation[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
+    const [showExpired, setShowExpired] = useState(false);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     useEffect(() => {
@@ -202,7 +215,13 @@ const SupplierQuotationsPage: React.FC = () => {
     };
 
     const filteredQuotations = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         return quotations.filter(q => {
+            const isExpired = q.validUntilDate && new Date(q.validUntilDate) < today;
+            if (!showExpired && isExpired) return false;
+
             const matchesSearch =
                 q.quotationNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 q.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -210,7 +229,7 @@ const SupplierQuotationsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || q.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-    }, [quotations, searchTerm, statusFilter]);
+    }, [quotations, searchTerm, statusFilter, showExpired]);
 
     const stats = useMemo(() => {
         const total = quotations.length;
@@ -266,20 +285,73 @@ const SupplierQuotationsPage: React.FC = () => {
                 <StatCard icon={DollarSign} value={`${stats.avgAmount} ج.م`} label="متوسط القيمة" color="purple" />
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors 
-                        ${isSearchFocused ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    <input
-                        type="text"
-                        placeholder="بحث برقم العرض، اسم المورد، أو رقم طلب السعر..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onFocus={() => setIsSearchFocused(true)}
-                        onBlur={() => setIsSearchFocused(false)}
-                        className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none bg-slate-50
-                            ${isSearchFocused ? 'border-indigo-600 bg-white shadow-lg' : 'border-transparent'}`}
-                    />
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
+                            transition-colors duration-200
+                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
+                        <input
+                            type="text"
+                            placeholder="بحث برقم العرض، اسم المورد، أو رقم طلب السعر..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setIsSearchFocused(false)}
+                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
+                                outline-none bg-slate-50
+                                ${isSearchFocused
+                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                    : 'border-transparent hover:border-slate-200'}`}
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 
+                                    rounded-full transition-colors"
+                            >
+                                <X className="w-4 h-4 text-slate-400" />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent
+                            hover:border-slate-200 transition-all duration-200">
+                            <Filter className="text-slate-400 w-5 h-5" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                            >
+                                <option value="Rejected">مرفوض</option>
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-slate-200 transition-all duration-200">
+                            <input
+                                type="checkbox"
+                                id="showExpired"
+                                checked={showExpired}
+                                onChange={(e) => setShowExpired(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                            />
+                            <label htmlFor="showExpired" className="text-sm font-bold text-slate-600 cursor-pointer">
+                                إظهار العروض المنتهية
+                            </label>
+                        </div>
+
+                        <button
+                            onClick={fetchQuotations}
+                            disabled={loading}
+                            className="p-3 rounded-xl border border-slate-200 text-slate-600 
+                                hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
+                                disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent">
                     <Filter className="text-slate-400 w-5 h-5" />

@@ -12,7 +12,9 @@ import {
     FileText,
     Hash,
     Info,
-    AlertCircle
+    AlertCircle,
+    Receipt,
+    CheckCircle2
 } from 'lucide-react';
 import { supplierInvoiceService, type SupplierInvoiceDto, type SupplierInvoiceItemDto } from '../../services/supplierInvoiceService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
@@ -36,6 +38,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const [items, setItems] = useState<ItemDto[]>([]);
     const [units, setUnits] = useState<UnitDto[]>([]);
     const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<SupplierInvoiceDto>({
@@ -69,11 +72,13 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
     const loadGRNData = async (gId: number) => {
         try {
+            setLoading(true);
             const grn = await grnService.getGRNById(gId);
             if (grn) {
                 setFormData(prev => ({
                     ...prev,
                     grnId: gId,
+                    grnNumber: grn.grnNumber,
                     supplierId: grn.supplierId,
                     notes: `تم الإنشاء من إذن استلام بضائع رقم: ${grn.grnNumber}`,
                     items: grn.items.map(gItem => {
@@ -86,23 +91,26 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             unitPrice: price,
                             discountPercentage: 0,
                             discountAmount: 0,
-                            taxPercentage: 14, // Default VAT
+                            taxPercentage: 14,
                             taxAmount: (qty * price) * 0.14,
                             totalPrice: (qty * price) * 1.14,
                             grnItemId: gItem.id
                         };
                     })
                 }));
-                toast.success('تم تحميل بيانات الاستلام بنجاح');
+                toast.success(`تم تحميل ${grn.items.length} صنف من إذن الاستلام`);
             }
         } catch (error) {
             console.error('Failed to load GRN data:', error);
             toast.error('فشل تحميل بيانات الاستلام');
+        } finally {
+            setLoading(false);
         }
     };
 
     const loadQuotationData = async (qId: number) => {
         try {
+            setLoading(true);
             const quotation = await purchaseService.getQuotationById(qId);
             if (quotation) {
                 setFormData(prev => ({
@@ -125,11 +133,13 @@ const SupplierInvoiceFormPage: React.FC = () => {
                         totalPrice: qItem.totalPrice
                     }))
                 }));
-                toast.success('تم تحميل بيانات عرض السعر بنجاح');
+                toast.success(`تم تحميل ${quotation.items.length} صنف من عرض السعر`);
             }
         } catch (error) {
             console.error('Failed to load quotation data:', error);
             toast.error('فشل تحميل بيانات عرض السعر');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -176,7 +186,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
             unitPrice: 0,
             discountPercentage: 0,
             discountAmount: 0,
-            taxPercentage: 0,
+            taxPercentage: 14,
             taxAmount: 0,
             totalPrice: 0
         };
@@ -195,6 +205,14 @@ const SupplierInvoiceFormPage: React.FC = () => {
             const newItems = [...(prev.items || [])];
             const item = { ...newItems[index], ...updates };
 
+            // Auto-select unit when item is selected
+            if (updates.itemId) {
+                const selectedItem = items.find(i => i.id === updates.itemId);
+                if (selectedItem) {
+                    item.unitId = selectedItem.unitId;
+                }
+            }
+
             // Recalculate item total
             const base = item.quantity * item.unitPrice;
             item.discountAmount = base * ((item.discountPercentage || 0) / 100);
@@ -208,13 +226,37 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.supplierId || formData.items?.length === 0) {
-            toast.error('يرجى اختيار المورد وإضافة صنف واحد على الأقل');
+        
+        if (!formData.supplierId) {
+            toast.error('يرجى اختيار المورد');
             return;
         }
-        if (!formData.supplierInvoiceNo) {
+        
+        if (!formData.supplierInvoiceNo?.trim()) {
             toast.error('يرجى إدخال رقم فاتورة المورد (الورقي)');
             return;
+        }
+        
+        if (!formData.items || formData.items.length === 0) {
+            toast.error('يرجى إضافة صنف واحد على الأقل');
+            return;
+        }
+
+        // Validate items
+        for (let i = 0; i < formData.items.length; i++) {
+            const item = formData.items[i];
+            if (!item.itemId) {
+                toast.error(`يرجى اختيار الصنف في السطر ${i + 1}`);
+                return;
+            }
+            if (!item.quantity || item.quantity <= 0) {
+                toast.error(`يرجى إدخال كمية صحيحة في السطر ${i + 1}`);
+                return;
+            }
+            if (!item.unitPrice || item.unitPrice <= 0) {
+                toast.error(`يرجى إدخال سعر صحيح في السطر ${i + 1}`);
+                return;
+            }
         }
 
         try {
@@ -229,68 +271,166 @@ const SupplierInvoiceFormPage: React.FC = () => {
         }
     };
 
-    return (
-        <div className="max-w-6xl mx-auto space-y-6 pb-20">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-3 bg-white text-slate-400 rounded-2xl border border-slate-100 shadow-sm hover:text-brand-primary">
-                        <ArrowRight className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">{isEdit ? 'تعديل فاتورة' : 'تسجيل فاتورة مورد'}</h1>
-                        <p className="text-slate-500 text-sm">تسجيل المطالبة المالية بناءً على المستندات الورقية من المورد</p>
-                    </div>
+    const totalItems = formData.items?.length || 0;
+    const totalQuantity = formData.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+
+    if (loading && (grnId || quotationId)) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-slate-500 font-semibold">جاري التحميل...</p>
                 </div>
-                <button
-                    onClick={handleSubmit}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-8 py-3 bg-brand-primary text-white rounded-2xl font-bold shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-                >
-                    {saving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-5 h-5" />}
-                    <span>حفظ واعتماد</span>
-                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 pb-20" dir="rtl">
+            <style>{`
+                @keyframes slideInRight {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                }
+                .animate-slide-in {
+                    animation: slideInRight 0.4s ease-out;
+                }
+            `}</style>
+
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
+                                hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
+                        >
+                            <ArrowRight className="w-5 h-5" />
+                        </button>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                            <Receipt className="w-10 h-10" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold mb-2">
+                                {isEdit ? 'تعديل فاتورة' : 'تسجيل فاتورة مورد'}
+                            </h1>
+                            <p className="text-white/80 text-lg">تسجيل المطالبة المالية بناءً على المستندات الورقية من المورد</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={saving || totalItems === 0}
+                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                        {saving ? (
+                            <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                        ) : (
+                            <Save className="w-5 h-5" />
+                        )}
+                        <span>{saving ? 'جاري الحفظ...' : 'حفظ واعتماد'}</span>
+                    </button>
+                </div>
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Basic Info */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-                        <div className="flex items-center gap-2 font-bold text-slate-800 border-b border-slate-50 pb-4">
-                            <Info className="w-5 h-5 text-brand-primary" />
-                            <span>بيانات الفاتورة الأساسية</span>
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                    <Info className="w-5 h-5 text-brand-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">بيانات الفاتورة الأساسية</h3>
+                                    <p className="text-slate-500 text-sm">معلومات المورد والفاتورة</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {(grnId || quotationId) && (
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                        <Hash className="w-4 h-4 text-blue-600" />
+                                        المستند المرجعي
+                                    </label>
+                                    <div className="flex items-center gap-3 p-4 bg-gradient-to-l from-blue-50 to-cyan-50 
+                                        rounded-xl border-2 border-blue-200">
+                                        <div className="p-2 bg-blue-100 rounded-lg">
+                                            <FileText className="w-5 h-5 text-blue-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="text-xs text-blue-600 font-semibold">
+                                                {grnId ? 'إذن استلام بضائع' : 'عرض سعر'}
+                                            </div>
+                                            <div className="font-bold text-slate-800">
+                                                {grnId ? `GRN #${formData.grnNumber || grnId}` : `Quotation #${quotationId}`}
+                                            </div>
+                                        </div>
+                                        {!loading && formData.items.length > 0 && (
+                                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500">رقم الفاتورة (النظام)</label>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Hash className="w-4 h-4 text-slate-400" />
+                                    رقم الفاتورة (النظام)
+                                </label>
                                 <input
                                     type="text"
                                     value={formData.invoiceNumber}
-                                    onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-slate-100 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all text-slate-500"
-                                    placeholder="سيتم إنشاؤه تلقائياً"
                                     disabled
+                                    className="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-xl 
+                                        text-slate-500 font-semibold outline-none cursor-not-allowed"
+                                    placeholder="سيتم إنشاؤه تلقائياً"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500">رقم فاتورة المورد (الورقية)</label>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <FileText className="w-4 h-4 text-brand-primary" />
+                                    رقم فاتورة المورد (الورقية) <span className="text-rose-500">*</span>
+                                </label>
                                 <input
                                     type="text"
                                     value={formData.supplierInvoiceNo}
                                     onChange={(e) => setFormData({ ...formData, supplierInvoiceNo: e.target.value })}
-                                    className="w-full px-4 py-2.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-mono"
-                                    placeholder="Supplier Inv #"
                                     required
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-mono font-semibold"
+                                    placeholder="Supplier Inv #"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 flex items-center gap-2"><Truck className="w-3 h-3" /> المورد</label>
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Truck className="w-4 h-4 text-brand-primary" />
+                                    المورد <span className="text-rose-500">*</span>
+                                </label>
                                 <select
                                     value={formData.supplierId}
                                     onChange={(e) => setFormData({ ...formData, supplierId: parseInt(e.target.value) })}
-                                    className="w-full px-4 py-2.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all"
                                     required
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
                                 >
                                     <option value="0">اختر المورد...</option>
                                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplierNameAr}</option>)}
@@ -300,80 +440,119 @@ const SupplierInvoiceFormPage: React.FC = () => {
                     </div>
 
                     {/* Items Table */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-50 pb-4">
-                            <div className="flex items-center gap-2 font-bold text-slate-800">
-                                <Package className="w-5 h-5 text-amber-500" />
-                                <span>الأصناف والأسعار</span>
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '100ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-purple-100 rounded-xl">
+                                        <Package className="w-5 h-5 text-purple-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف والأسعار</h3>
+                                        <p className="text-slate-500 text-sm">تفاصيل البنود المشتراة</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 rounded-xl">
+                                        <Package className="w-4 h-4 text-brand-primary" />
+                                        <span className="text-sm font-bold text-brand-primary">
+                                            {totalItems} صنف
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={addItem}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
+                                            font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
+                                            hover:scale-105 active:scale-95"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        إضافة صنف
+                                    </button>
+                                </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={addItem}
-                                className="flex items-center gap-2 text-xs font-bold text-brand-primary hover:bg-brand-primary/5 px-3 py-1.5 rounded-lg transition-all"
-                            >
-                                <Plus className="w-4 h-4" /> إضافة صنف
-                            </button>
                         </div>
 
                         <div className="overflow-x-auto">
-                            <table className="w-full text-right">
+                            <table className="w-full">
                                 <thead>
-                                    <tr className="text-slate-400 text-xs font-bold">
-                                        <th className="pb-4 pr-2">الصنف</th>
-                                        <th className="pb-4 text-center">الكمية</th>
-                                        <th className="pb-4 text-center">الوحدة</th>
-                                        <th className="pb-4 text-center">سعر الوحدة</th>
-                                        <th className="pb-4 text-center">الإجمالي</th>
-                                        <th className="pb-4"></th>
+                                    <tr className="bg-slate-50 text-slate-600 text-sm font-bold border-b border-slate-200">
+                                        <th className="py-4 pr-6 text-right">
+                                            الصنف <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">
+                                            الكمية <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">الوحدة</th>
+                                        <th className="py-4 px-4 text-center">
+                                            سعر الوحدة <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">الإجمالي</th>
+                                        <th className="py-4 pl-6"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
+                                <tbody className="divide-y divide-slate-100">
                                     {(formData.items || []).map((item, idx) => (
-                                        <tr key={idx} className="group">
-                                            <td className="py-4 pr-2 min-w-[200px]">
+                                        <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                                            <td className="py-4 pr-6">
                                                 <select
                                                     value={item.itemId}
                                                     onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) })}
-                                                    className="w-full bg-slate-50 border-none rounded-lg text-sm p-2 outline-none font-bold"
+                                                    required
+                                                    className="w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
+                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all"
                                                 >
                                                     <option value="0">اختر صنف...</option>
                                                     {items.map(i => <option key={i.id} value={i.id}>{i.itemNameAr}</option>)}
                                                 </select>
                                             </td>
-                                            <td className="py-4 px-2">
+                                            <td className="py-4 px-4">
                                                 <input
                                                     type="number"
                                                     value={item.quantity}
-                                                    onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) })}
-                                                    className="w-20 bg-slate-50 border-none rounded-lg text-sm p-2 text-center font-bold"
+                                                    onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                                                    required
+                                                    min="0.001"
+                                                    step="0.001"
+                                                    className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-bold text-brand-primary outline-none 
+                                                        focus:border-brand-primary transition-all"
                                                 />
                                             </td>
-                                            <td className="py-4 px-2">
+                                            <td className="py-4 px-4">
                                                 <select
                                                     value={item.unitId}
                                                     onChange={(e) => updateItem(idx, { unitId: parseInt(e.target.value) })}
-                                                    className="w-24 bg-slate-50 border-none rounded-lg text-sm p-2 outline-none"
+                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm font-semibold outline-none focus:border-brand-primary transition-all"
                                                 >
                                                     <option value="0">الوحدة...</option>
                                                     {units.map(u => <option key={u.id} value={u.id}>{u.unitNameAr}</option>)}
                                                 </select>
                                             </td>
-                                            <td className="py-4 px-2">
+                                            <td className="py-4 px-4">
                                                 <input
                                                     type="number"
                                                     value={item.unitPrice}
-                                                    onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) })}
-                                                    className="w-24 bg-slate-50 border-none rounded-lg text-sm p-2 text-center font-bold text-emerald-600"
+                                                    onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
+                                                    required
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-bold text-emerald-600 outline-none 
+                                                        focus:border-brand-primary transition-all"
                                                 />
                                             </td>
-                                            <td className="py-4 px-2 text-center font-black text-slate-700">
-                                                {(item.totalPrice || 0).toLocaleString()}
+                                            <td className="py-4 px-4 text-center font-bold text-slate-800">
+                                                {(item.totalPrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                                             </td>
-                                            <td className="py-4 text-left">
+                                            <td className="py-4 pl-6 text-left">
                                                 <button
                                                     type="button"
                                                     onClick={() => removeItem(idx)}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
+                                                        rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -383,82 +562,136 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                 </tbody>
                             </table>
                             {(!formData.items || formData.items.length === 0) && (
-                                <div className="py-12 text-center text-slate-400 italic text-sm">
-                                    لم يتم إضافة أي أصناف بعد
+                                <div className="py-20 text-center">
+                                    <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                        <Package className="w-10 h-10 text-slate-400" />
+                                    </div>
+                                    <p className="text-slate-400 font-semibold">لم يتم إضافة أي أصناف بعد</p>
+                                    <p className="text-slate-400 text-sm mt-1">انقر على "إضافة صنف" لبدء الإضافة</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Sidebar Info */}
+                {/* Sidebar */}
                 <div className="space-y-6">
                     {/* Financial Summary */}
-                    <div className="bg-slate-900 p-6 rounded-3xl text-white shadow-xl space-y-6">
-                        <div className="flex items-center gap-2 font-bold text-lg border-b border-white/10 pb-4 text-brand-secondary">
-                            <DollarSign className="w-5 h-5" />
-                            الملخص المالي
+                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
+                        rounded-3xl p-6 text-white shadow-2xl animate-slide-in"
+                        style={{ animationDelay: '200ms' }}>
+                        <div className="flex items-center gap-3 pb-6 border-b border-white/10">
+                            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
+                                <DollarSign className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <h3 className="font-bold text-xl">الملخص المالي</h3>
                         </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between text-sm">
-                                <span className="opacity-60 text-slate-400">الإجمالي الفرعي</span>
-                                <span className="font-bold">{formData.subTotal.toLocaleString()} {formData.currency}</span>
+                        <div className="space-y-5 mt-6">
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">عدد الأصناف</span>
+                                <span className="font-bold text-lg">{totalItems}</span>
                             </div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-xs font-bold text-rose-300">
-                                    <span>الخصم الإجمالي</span>
-                                    <input
-                                        type="number"
-                                        value={formData.discountAmount}
-                                        onChange={(e) => setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || 0 })}
-                                        className="w-20 bg-white/10 border-none rounded-md px-1 text-left text-white outline-none"
-                                    />
-                                </div>
-                                <div className="flex justify-between text-xs font-bold text-emerald-300">
-                                    <span>الضريبة (Value Added)</span>
-                                    <input
-                                        type="number"
-                                        value={formData.taxAmount}
-                                        onChange={(e) => setFormData({ ...formData, taxAmount: parseFloat(e.target.value) || 0 })}
-                                        className="w-20 bg-white/10 border-none rounded-md px-1 text-left text-white outline-none"
-                                    />
-                                </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">إجمالي الكميات</span>
+                                <span className="font-bold text-lg text-emerald-400">
+                                    {totalQuantity.toLocaleString('ar-EG')}
+                                </span>
                             </div>
-                            <div className="pt-4 border-t border-white/10 flex justify-between items-end">
-                                <div className="text-xs opacity-50">إجمالي الفاتورة</div>
-                                <div className="text-3xl font-black text-brand-secondary">
-                                    {formData.totalAmount.toLocaleString()}
-                                    <span className="text-xs font-bold mr-1">{formData.currency}</span>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">الإجمالي الفرعي</span>
+                                <span className="font-bold text-lg">
+                                    {formData.subTotal.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                                <span className="text-rose-400 font-semibold text-sm">الخصم الإجمالي</span>
+                                <input
+                                    type="number"
+                                    value={formData.discountAmount}
+                                    onChange={(e) => setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || 0 })}
+                                    min="0"
+                                    step="0.01"
+                                    className="w-28 px-3 py-2 bg-rose-500/10 border-2 border-rose-500/30 rounded-lg 
+                                        text-rose-400 font-bold text-right outline-none focus:border-rose-500/50 transition-all"
+                                />
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                <span className="text-emerald-400 font-semibold text-sm">الضريبة (VAT)</span>
+                                <input
+                                    type="number"
+                                    value={formData.taxAmount}
+                                    onChange={(e) => setFormData({ ...formData, taxAmount: parseFloat(e.target.value) || 0 })}
+                                    min="0"
+                                    step="0.01"
+                                    className="w-28 px-3 py-2 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-lg 
+                                        text-emerald-400 font-bold text-right outline-none focus:border-emerald-500/50 transition-all"
+                                />
+                            </div>
+                            <div className="pt-6 border-t border-white/10">
+                                <div className="text-xs text-white/40 mb-2">إجمالي الفاتورة</div>
+                                <div className="text-4xl font-black text-emerald-400">
+                                    {formData.totalAmount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    <span className="text-sm font-bold mr-2">{formData.currency}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Logistics */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-                        <div className="flex items-center gap-2 font-bold text-slate-800 border-b border-slate-50 pb-4 text-sm">
-                            <Calendar className="w-4 h-4 text-brand-primary" />
-                            التواريخ والمواعيد
+                    {/* Dates */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '300ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 rounded-xl">
+                                    <Calendar className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <h3 className="font-bold text-slate-800">التواريخ والمواعيد</h3>
+                            </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="p-6 space-y-5">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">تاريخ الفاتورة</label>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Calendar className="w-4 h-4 text-brand-primary" />
+                                    تاريخ الفاتورة <span className="text-rose-500">*</span>
+                                </label>
                                 <input
                                     type="date"
                                     value={formData.invoiceDate}
                                     onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
-                                    className="w-full px-4 py-2 bg-slate-50 rounded-xl border-none font-bold text-slate-700 outline-none focus:ring-2 ring-brand-primary/20"
+                                    required
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">تاريخ الاستحقاق</label>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Calendar className="w-4 h-4 text-rose-500" />
+                                    تاريخ الاستحقاق <span className="text-rose-500">*</span>
+                                </label>
                                 <input
                                     type="date"
                                     value={formData.dueDate}
                                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                                    className="w-full px-4 py-2 bg-slate-50 rounded-xl border-none font-bold text-rose-600 outline-none focus:ring-2 ring-rose-500/20"
+                                    required
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
                                 />
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Info Alert */}
+                    <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border-2 border-amber-200 
+                        flex gap-4 animate-slide-in shadow-lg"
+                        style={{ animationDelay: '400ms' }}>
+                        <div className="p-3 bg-amber-100 rounded-xl h-fit">
+                            <AlertCircle className="w-6 h-6 text-amber-600" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-amber-800 mb-2">تنبيه هام</h4>
+                            <p className="text-sm leading-relaxed text-amber-700">
+                                سيتم تسجيل هذه الفاتورة كـ <strong>مطالبة مستحقة</strong> على الشركة للمورد فور الاعتماد.
+                            </p>
                         </div>
                     </div>
                 </div>
