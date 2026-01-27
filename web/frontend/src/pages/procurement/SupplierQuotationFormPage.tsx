@@ -5,7 +5,16 @@ import {
     Trash2,
     ShoppingCart,
     ArrowRight,
-    Sparkles
+    Sparkles,
+    FileText,
+    Building2,
+    Calendar,
+    DollarSign,
+    Package,
+    Plus,
+    Truck,
+    Clock,
+    AlertCircle
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
@@ -239,9 +248,36 @@ const SupplierQuotationFormPage: React.FC = () => {
             return;
         }
 
-        if (formData.items.length === 0) {
-            toast.error('يرجى إضافة بند واحد على الأقل');
+        if (!formData.quotationNumber?.trim()) {
+            toast.error('يرجى إدخال رقم عرض السعر');
             return;
+        }
+
+        if (!formData.validUntilDate) {
+            toast.error('يرجى تحديد تاريخ انتهاء الصلاحية');
+            return;
+        }
+
+        if (formData.items.length === 0) {
+            toast.error('يرجى إضافة صنف واحد على الأقل');
+            return;
+        }
+
+        // Validate all items
+        for (let i = 0; i < formData.items.length; i++) {
+            const item = formData.items[i];
+            if (item.itemId === 0) {
+                toast.error(`يرجى اختيار الصنف في السطر ${i + 1}`);
+                return;
+            }
+            if (item.offeredQty <= 0) {
+                toast.error(`يرجى إدخال كمية صحيحة في السطر ${i + 1}`);
+                return;
+            }
+            if (item.unitPrice <= 0) {
+                toast.error(`يرجى إدخال سعر صحيح في السطر ${i + 1}`);
+                return;
+            }
         }
 
         try {
@@ -292,230 +328,415 @@ const SupplierQuotationFormPage: React.FC = () => {
     if (loading) return <div className="p-8 text-center">جاري التحميل...</div>;
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6">
-            <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => navigate('/dashboard/procurement/quotation')}
-                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                        <ArrowRight className="w-5 h-5 text-slate-400" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">
-                            {isEdit ? `تعديل عرض سعر #${formData.quotationNumber}` : 'تسجيل عرض سعر جديد'}
-                        </h1>
-                        <p className="text-slate-500">أدخل تفاصيل عرض السعر المستلم من المورد</p>
+        <div className="space-y-6 pb-20" dir="rtl">
+            <style>{`
+                @keyframes slideInRight {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                }
+                .animate-slide-in {
+                    animation: slideInRight 0.4s ease-out;
+                }
+            `}</style>
+
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <button
+                            onClick={() => navigate('/dashboard/procurement/quotation')}
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
+                                hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
+                        >
+                            <ArrowRight className="w-5 h-5" />
+                        </button>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                            <FileText className="w-10 h-10" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold mb-2">
+                                {isEdit ? `تعديل عرض سعر #${formData.quotationNumber}` : 'تسجيل عرض سعر جديد'}
+                            </h1>
+                            <p className="text-white/80 text-lg">أدخل تفاصيل عرض السعر المستلم من المورد</p>
+                        </div>
                     </div>
-                </div>
-                <div className="flex gap-3">
                     <button
                         onClick={handleSubmit}
                         disabled={saving}
-                        className="flex items-center gap-2 px-8 py-2.5 bg-indigo-600 text-white rounded-xl 
-                            font-bold shadow-lg shadow-indigo-600/20 hover:scale-105 transition-all disabled:opacity-50"
+                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                        <Save className="w-5 h-5" />
+                        {saving ? (
+                            <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                        ) : (
+                            <Save className="w-5 h-5" />
+                        )}
                         <span>{saving ? 'جاري الحفظ...' : 'حفظ عرض السعر'}</span>
                     </button>
                 </div>
             </div>
 
-            <form className="space-y-6" onSubmit={handleSubmit}>
-                {/* Header Information */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 block">رابط بطلب سعر (اختياري)</label>
-                        <select
-                            value={formData.rfqId || 0}
-                            onChange={(e) => handleRFQLink(parseInt(e.target.value))}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
-                        >
-                            <option value={0}>لا يوجد...</option>
-                            {rfqs.map(r => (
-                                <option key={r.id} value={r.id}>{r.rfqNumber} - {r.supplierNameAr}</option>
-                            ))}
-                        </select>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Basic Information */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                    <Building2 className="w-5 h-5 text-brand-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">معلومات المورد والعرض</h3>
+                                    <p className="text-slate-500 text-sm">البيانات الأساسية لعرض السعر</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <FileText className="w-4 h-4 text-blue-500" />
+                                    رابط بطلب سعر (اختياري)
+                                </label>
+                                <select
+                                    value={formData.rfqId || 0}
+                                    onChange={(e) => handleRFQLink(parseInt(e.target.value))}
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                >
+                                    <option value={0}>لا يوجد...</option>
+                                    {rfqs.map(r => (
+                                        <option key={r.id} value={r.id}>{r.rfqNumber} - {r.supplierNameAr}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Truck className="w-4 h-4 text-brand-primary" />
+                                    المورد <span className="text-rose-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={formData.supplierId}
+                                        onChange={(e) => handleSupplierChange(parseInt(e.target.value))}
+                                        required
+                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                            focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    >
+                                        <option value={0}>اختر المورد...</option>
+                                        {suppliers.map(s => (
+                                            <option key={s.id} value={s.id}>{s.supplierNameAr} ({s.supplierCode})</option>
+                                        ))}
+                                    </select>
+                                    {loadingSupplierItems && (
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                                            <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                                        </div>
+                                    )}
+                                </div>
+                                {supplierItems.length > 0 && (
+                                    <p className="text-xs text-emerald-600 flex items-center gap-1 bg-emerald-50 px-3 py-2 rounded-lg">
+                                        <Sparkles className="w-3 h-3" />
+                                        تم تحميل {supplierItems.length} صنف من كتالوج المورد - الأسعار ستُحفظ تلقائياً
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <FileText className="w-4 h-4 text-brand-primary" />
+                                    رقم عرض السعر (عند المورد) <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.quotationNumber || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, quotationNumber: e.target.value }))}
+                                    required
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    placeholder="INV-XXX"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Calendar className="w-4 h-4 text-brand-primary" />
+                                    تاريخ العرض <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formData.quotationDate}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, quotationDate: e.target.value }))}
+                                    required
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Calendar className="w-4 h-4 text-rose-500" />
+                                    صالح حتى <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formData.validUntilDate || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, validUntilDate: e.target.value }))}
+                                    required
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Clock className="w-4 h-4 text-brand-primary" />
+                                    مدة التوريد (أيام) <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    value={formData.deliveryDays}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, deliveryDays: parseInt(e.target.value) }))}
+                                    required
+                                    min="0"
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                />
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 block">المورد</label>
-                        <div className="relative">
-                            <select
-                                value={formData.supplierId}
-                                onChange={(e) => handleSupplierChange(parseInt(e.target.value))}
-                                className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
-                            >
-                                <option value={0}>اختر المورد...</option>
-                                {suppliers.map(s => (
-                                    <option key={s.id} value={s.id}>{s.supplierNameAr} ({s.supplierCode})</option>
-                                ))}
-                            </select>
-                            {loadingSupplierItems && (
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                    <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    {/* Items Table */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '100ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-purple-100 rounded-xl">
+                                        <ShoppingCart className="w-5 h-5 text-purple-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المسعرة</h3>
+                                        <p className="text-slate-500 text-sm">قائمة الأصناف وأسعارها حسب عرض المورد</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={addItem}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
+                                        font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
+                                        hover:scale-105 active:scale-95"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    إضافة صنف
+                                </button>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-600 text-sm font-bold border-b border-slate-200">
+                                        <th className="py-4 pr-6 text-right">
+                                            الصنف <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">
+                                            الكمية <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">
+                                            السعر <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">خصم %</th>
+                                        <th className="py-4 px-4 text-center">الضريبة %</th>
+                                        <th className="py-4 px-4 text-center">الإجمالي</th>
+                                        <th className="py-4 pl-6"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {formData.items.map((item, index) => (
+                                        <tr key={index} className="group hover:bg-slate-50/50 transition-colors">
+                                            <td className="py-4 pr-6">
+                                                <select
+                                                    value={item.itemId}
+                                                    onChange={(e) => updateItem(index, 'itemId', parseInt(e.target.value))}
+                                                    required
+                                                    className="w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
+                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all"
+                                                >
+                                                    <option value={0}>اختر صنف...</option>
+                                                    {items.map(i => (
+                                                        <option key={i.id} value={i.id}>{i.itemNameAr}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="number"
+                                                    value={item.offeredQty}
+                                                    onChange={(e) => updateItem(index, 'offeredQty', parseFloat(e.target.value))}
+                                                    required
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-bold text-brand-primary outline-none 
+                                                        focus:border-brand-primary transition-all"
+                                                />
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="number"
+                                                    value={item.unitPrice}
+                                                    onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value))}
+                                                    required
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-bold text-emerald-600 outline-none 
+                                                        focus:border-brand-primary transition-all"
+                                                />
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="number"
+                                                    value={item.discountPercentage}
+                                                    onChange={(e) => updateItem(index, 'discountPercentage', parseFloat(e.target.value))}
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                    className="w-20 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all"
+                                                />
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="number"
+                                                    value={item.taxPercentage}
+                                                    onChange={(e) => updateItem(index, 'taxPercentage', parseFloat(e.target.value))}
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                    className="w-20 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all"
+                                                />
+                                            </td>
+                                            <td className="py-4 px-4 text-center font-bold text-slate-800">
+                                                {item.totalPrice.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="py-4 pl-6 text-left">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(index)}
+                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
+                                                        rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {formData.items.length === 0 && (
+                                <div className="py-20 text-center">
+                                    <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                        <Package className="w-10 h-10 text-slate-400" />
+                                    </div>
+                                    <p className="text-slate-400 font-semibold">لا توجد أصناف مضافة</p>
+                                    <p className="text-slate-400 text-sm mt-1">انقر على "إضافة صنف" لبدء الإضافة</p>
                                 </div>
                             )}
                         </div>
-                        {supplierItems.length > 0 && (
-                            <p className="text-xs text-emerald-600 flex items-center gap-1">
-                                <Sparkles className="w-3 h-3" />
-                                تم تحميل {supplierItems.length} صنف من كتالوج المورد - الأسعار ستُحفظ تلقائياً
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 block">رقم عرض السعر (عند المورد)</label>
-                        <input
-                            type="text"
-                            value={formData.quotationNumber || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, quotationNumber: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
-                            placeholder="INV-XXX"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 block">تاريخ العرض</label>
-                        <input
-                            type="date"
-                            value={formData.quotationDate}
-                            onChange={(e) => setFormData(prev => ({ ...prev, quotationDate: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 block">صالح حتى</label>
-                        <input
-                            type="date"
-                            value={formData.validUntilDate || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, validUntilDate: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 block">مدة التوريد (أيام)</label>
-                        <input
-                            type="number"
-                            value={formData.deliveryDays}
-                            onChange={(e) => setFormData(prev => ({ ...prev, deliveryDays: parseInt(e.target.value) }))}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none transition-all"
-                        />
                     </div>
                 </div>
 
-                {/* Items Table */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <ShoppingCart className="w-5 h-5 text-indigo-600" />
-                            الأصناف المسعرة
-                        </h2>
-                        <button
-                            type="button"
-                            onClick={addItem}
-                            className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-all"
-                        >
-                            + إضافة صنف
-                        </button>
+                {/* Sidebar */}
+                <div className="space-y-6">
+                    {/* Financial Summary */}
+                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
+                        rounded-3xl p-6 text-white shadow-2xl animate-slide-in"
+                        style={{ animationDelay: '200ms' }}>
+                        <div className="flex items-center gap-3 pb-6 border-b border-white/10">
+                            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
+                                <DollarSign className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <h3 className="font-bold text-xl">الملخص المالي</h3>
+                        </div>
+                        <div className="space-y-5 mt-6">
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">الإجمالي قبل الضريبة</span>
+                                <span className="font-bold text-lg">
+                                    {formData.items.reduce((sum, i) => sum + (i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100)), 0)
+                                        .toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                <span className="text-emerald-400 font-semibold text-sm">ضريبة القيمة المضافة</span>
+                                <span className="font-bold text-lg text-emerald-400">
+                                    {formData.items.reduce((sum, i) => {
+                                        const beforeTax = i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100);
+                                        const taxAmount = beforeTax * ((i.taxPercentage || 0) / 100);
+                                        return sum + taxAmount;
+                                    }, 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="pt-6 border-t border-white/10">
+                                <div className="text-xs text-white/40 mb-2">الإجمالي النهائي</div>
+                                <div className="text-4xl font-black text-emerald-400">
+                                    {formData.totalAmount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    <span className="text-sm font-bold mr-2">{formData.currency}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-right">
-                            <thead>
-                                <tr className="text-slate-500 text-xs border-b border-slate-100">
-                                    <th className="pb-3 pr-2">الصنف</th>
-                                    <th className="pb-3">الكمية</th>
-                                    <th className="pb-3">السعر</th>
-                                    <th className="pb-3">خصم %</th>
-                                    <th className="pb-3">الضريبة %</th>
-                                    <th className="pb-3 text-left pl-2">الإجمالي</th>
-                                    <th className="pb-3 w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {formData.items.map((item, index) => (
-                                    <tr key={index} className="group">
-                                        <td className="py-3 pr-2">
-                                            <select
-                                                value={item.itemId}
-                                                onChange={(e) => updateItem(index, 'itemId', parseInt(e.target.value))}
-                                                className="w-48 px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-600 outline-none text-sm"
-                                            >
-                                                <option value={0}>اختر...</option>
-                                                {items.map(i => (
-                                                    <option key={i.id} value={i.id}>{i.itemNameAr}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td className="py-3">
-                                            <input
-                                                type="number"
-                                                value={item.offeredQty}
-                                                onChange={(e) => updateItem(index, 'offeredQty', parseFloat(e.target.value))}
-                                                className="w-20 px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-600 outline-none text-sm"
-                                            />
-                                        </td>
-                                        <td className="py-3">
-                                            <input
-                                                type="number"
-                                                value={item.unitPrice}
-                                                onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value))}
-                                                className="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-600 outline-none text-sm"
-                                            />
-                                        </td>
-                                        <td className="py-3">
-                                            <input
-                                                type="number"
-                                                value={item.discountPercentage}
-                                                onChange={(e) => updateItem(index, 'discountPercentage', parseFloat(e.target.value))}
-                                                className="w-16 px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-600 outline-none text-sm"
-                                            />
-                                        </td>
-                                        <td className="py-3">
-                                            <input
-                                                type="number"
-                                                value={item.taxPercentage}
-                                                onChange={(e) => updateItem(index, 'taxPercentage', parseFloat(e.target.value))}
-                                                className="w-16 px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-600 outline-none text-sm"
-                                            />
-                                        </td>
-                                        <td className="py-3 text-left pl-2 font-bold text-slate-700">
-                                            {item.totalPrice.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeItem(index)}
-                                                className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    {/* Notes */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '300ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 rounded-xl">
+                                    <FileText className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            <textarea
+                                value={formData.notes || ''}
+                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
+                                    focus:border-brand-primary focus:bg-white outline-none transition-all 
+                                    text-sm leading-relaxed h-40 resize-none"
+                                placeholder="أي ملاحظات حول العرض أو شروط خاصة..."
+                            />
+                        </div>
                     </div>
 
-                    {/* Totals */}
-                    <div className="flex justify-end pt-4 border-t border-slate-100">
-                        <div className="w-64 space-y-2">
-                            <div className="flex justify-between items-center text-slate-500">
-                                <span>الإجمالي قبل الضريبة:</span>
-                                <span>{formData.items.reduce((sum, i) => sum + (i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100)), 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-slate-500">
-                                <span>ضريبة القيمة المضافة:</span>
-                                <span>{formData.items.reduce((sum, i) => sum + (calculateItemTotal(i) - (i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100))), 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-xl font-bold text-indigo-600 pt-2 border-t border-slate-50">
-                                <span>الإجمالي النهائي:</span>
-                                <span>{formData.totalAmount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                            </div>
+                    {/* Info Alert */}
+                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
+                        flex gap-4 animate-slide-in shadow-lg"
+                        style={{ animationDelay: '400ms' }}>
+                        <div className="p-3 bg-blue-100 rounded-xl h-fit">
+                            <AlertCircle className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
+                            <p className="text-sm leading-relaxed text-blue-700">
+                                سيتم حفظ أسعار الأصناف تلقائياً في <strong>كتالوج المورد</strong> لاستخدامها في الطلبات المستقبلية.
+                            </p>
                         </div>
                     </div>
                 </div>

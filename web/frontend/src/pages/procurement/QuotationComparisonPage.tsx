@@ -5,17 +5,14 @@ import {
     FileText,
     Scale,
     Trophy,
-    Award,
-    Zap,
-    ShoppingCart,
     CheckCircle2,
     XCircle,
     Clock,
     Search,
     RefreshCw,
     X,
-    TrendingUp,
-    Package
+    ShoppingCart,
+    Eye
 } from 'lucide-react';
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
 
@@ -66,9 +63,14 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             label: 'مراجعة مالية'
         },
         'Pending Management': {
-            icon: Award,
+            icon: Clock,
             className: 'bg-blue-50 text-blue-700 border-blue-200',
             label: 'اعتماد الإدارة'
+        },
+        'Pending Approval': {
+            icon: Clock,
+            className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+            label: 'بانتظار الاعتماد'
         },
         'Approved': {
             icon: CheckCircle2,
@@ -92,170 +94,134 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     );
 };
 
-// Comparison Card Component
-const ComparisonCard: React.FC<{
+// Table Row Component
+const ComparisonTableRow: React.FC<{
     comparison: QuotationComparison;
     index: number;
     onView: (id: number) => void;
     onCreatePO: (compId: number, quotId: number) => void;
-    onSubmit: (id: number) => void;
-    onFinanceReview: (id: number, userId: number, approved: boolean) => void;
-    onManagementApprove: (id: number, userId: number, approved: boolean) => void;
-}> = ({ comparison, index, onView, onCreatePO, onSubmit, onFinanceReview, onManagementApprove }) => (
-    <div
-        className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-lg 
-            hover:border-brand-primary/20 transition-all duration-300 flex flex-col group"
+}> = ({ comparison, index, onView, onCreatePO }) => (
+    <tr
+        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
-            animationDelay: `${index * 50}ms`,
-            animation: 'fadeInUp 0.4s ease-out forwards'
+            animationDelay: `${index * 30}ms`,
+            animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
-        <div className="flex items-start justify-between mb-4">
-            <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary 
-                group-hover:scale-110 transition-transform duration-300">
-                <Scale className="w-6 h-6" />
-            </div>
-            <StatusBadge status={comparison.status!} />
-        </div>
-
-        <h3 className="text-xl font-bold text-slate-800 mb-1 group-hover:text-brand-primary transition-colors">
-            {comparison.itemNameAr}
-        </h3>
-        <p className="text-sm text-slate-500 mb-4">طلب شراء #{comparison.prNumber}</p>
-
-        <div className="space-y-3 mb-6">
-            <div className="flex justify-between text-sm p-3 bg-slate-50 rounded-lg">
-                <span className="text-slate-500 font-medium">عدد العروض:</span>
-                <span className="font-bold text-slate-700">{comparison.details?.length || 0} موردين</span>
-            </div>
-            {comparison.selectedSupplierNameAr && (
-                <div className="flex flex-col gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-emerald-600 font-bold flex items-center gap-1.5">
-                            <Trophy className="w-4 h-4" />
-                            المورد الفائز:
-                        </span>
-                        <span className="text-emerald-700 font-bold">{comparison.selectedSupplierNameAr}</span>
-                    </div>
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Scale className="w-5 h-5 text-brand-primary" />
                 </div>
+                <div>
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors block">
+                        #{comparison.comparisonNumber || 'بدون رقم'}
+                    </span>
+                    {comparison.prNumber && (
+                        <span className="text-xs text-slate-400">طلب شراء #{comparison.prNumber}</span>
+                    )}
+                </div>
+            </div>
+        </td>
+        <td className="px-6 py-4">
+            <span className="text-sm font-medium text-slate-700">{comparison.itemNameAr || '-'}</span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-bold">
+                {comparison.details?.length || 0}
+            </span>
+        </td>
+        <td className="px-6 py-4">
+            {comparison.selectedSupplierNameAr ? (
+                <div className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm font-medium text-emerald-600">{comparison.selectedSupplierNameAr}</span>
+                </div>
+            ) : (
+                <span className="text-sm text-slate-400">لم يتم الاختيار</span>
             )}
-        </div>
-
-        <div className="flex flex-col gap-3 mt-auto">
-            <div className="grid grid-cols-2 gap-3">
+        </td>
+        <td className="px-6 py-4">
+            <StatusBadge status={comparison.status!} />
+        </td>
+        <td className="px-6 py-4">
+            <div className="flex items-center justify-end gap-2">
                 <button
                     onClick={() => onView(comparison.id!)}
-                    className="py-3 bg-slate-50 text-slate-600 font-bold rounded-xl hover:bg-slate-100 
-                        transition-all flex items-center justify-center gap-2"
+                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                    title="عرض التفاصيل"
                 >
-                    <FileText className="w-4 h-4" />
-                    التفاصيل
+                    <Eye className="w-4 h-4" />
                 </button>
+
+
                 {comparison.status === 'Approved' && comparison.selectedQuotationId && (
                     <button
                         onClick={() => onCreatePO(comparison.id!, comparison.selectedQuotationId!)}
-                        className="py-3 bg-brand-primary text-white font-bold rounded-xl hover:bg-brand-primary/90 
-                            transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20"
+                        className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
+                        title="إصدار أمر شراء"
                     >
                         <ShoppingCart className="w-4 h-4" />
-                        أمر شراء
                     </button>
                 )}
             </div>
-
-            {comparison.status === 'Draft' && (
-                <button
-                    onClick={() => onSubmit(comparison.id!)}
-                    className="w-full py-3 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 
-                        transition-all shadow-lg shadow-amber-500/20"
-                >
-                    رفع للمراجعة المالية
-                </button>
-            )}
-
-            {comparison.status === 'Pending Finance' && (
-                <div className="grid grid-cols-2 gap-2">
-                    <button
-                        onClick={() => onFinanceReview(comparison.id!, 1, true)}
-                        className="py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-bold 
-                            shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all"
-                    >
-                        موافقة مالية
-                    </button>
-                    <button
-                        onClick={() => onFinanceReview(comparison.id!, 1, false)}
-                        className="py-2.5 bg-rose-500 text-white rounded-lg text-sm font-bold 
-                            shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all"
-                    >
-                        رفض
-                    </button>
-                </div>
-            )}
-
-            {comparison.status === 'Pending Management' && (
-                <div className="grid grid-cols-2 gap-2">
-                    <button
-                        onClick={() => onManagementApprove(comparison.id!, 1, true)}
-                        className="py-2.5 bg-brand-primary text-white rounded-lg text-sm font-bold 
-                            shadow-lg shadow-brand-primary/20 hover:bg-brand-primary/90 transition-all"
-                    >
-                        اعتماد الإدارة
-                    </button>
-                    <button
-                        onClick={() => onManagementApprove(comparison.id!, 1, false)}
-                        className="py-2.5 bg-rose-500 text-white rounded-lg text-sm font-bold 
-                            shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all"
-                    >
-                        رفض
-                    </button>
-                </div>
-            )}
-        </div>
-    </div>
+        </td>
+    </tr>
 );
 
 // Loading Skeleton
-const CardSkeleton: React.FC = () => (
+const TableSkeleton: React.FC = () => (
     <>
-        {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-100 p-6 animate-pulse">
-                <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 bg-slate-100 rounded-xl" />
-                    <div className="h-6 w-24 bg-slate-100 rounded-full" />
-                </div>
-                <div className="h-6 w-3/4 bg-slate-200 rounded mb-2" />
-                <div className="h-4 w-1/2 bg-slate-100 rounded mb-4" />
-                <div className="space-y-3 mb-6">
-                    <div className="h-12 bg-slate-50 rounded-lg" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="h-12 bg-slate-100 rounded-xl" />
-                    <div className="h-12 bg-slate-100 rounded-xl" />
-                </div>
-            </div>
+        {[1, 2, 3, 4, 5].map(i => (
+            <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-lg" />
+                        <div>
+                            <div className="h-4 w-24 bg-slate-100 rounded mb-2" />
+                            <div className="h-3 w-20 bg-slate-50 rounded" />
+                        </div>
+                    </div>
+                </td>
+                <td className="px-6 py-4"><div className="h-4 w-32 bg-slate-100 rounded" /></td>
+                <td className="px-6 py-4"><div className="h-6 w-8 bg-slate-100 rounded-full mx-auto" /></td>
+                <td className="px-6 py-4"><div className="h-4 w-28 bg-slate-100 rounded" /></td>
+                <td className="px-6 py-4"><div className="h-6 w-20 bg-slate-100 rounded-full" /></td>
+                <td className="px-6 py-4">
+                    <div className="flex gap-2 justify-end">
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg" />
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg" />
+                    </div>
+                </td>
+            </tr>
         ))}
     </>
 );
 
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
-    <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-        <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
-            {searchTerm ? (
-                <Search className="w-12 h-12 text-slate-400" />
-            ) : (
-                <Scale className="w-12 h-12 text-slate-400" />
-            )}
-        </div>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">
-            {searchTerm ? 'لا توجد نتائج' : 'لا توجد مقارنات'}
-        </h3>
-        <p className="text-slate-500 max-w-md mx-auto">
-            {searchTerm
-                ? `لم يتم العثور على مقارنات تطابق "${searchTerm}"`
-                : 'ابدأ بإنشاء مقارنة جديدة لعروض الأسعار'}
-        </p>
-    </div>
+    <tr>
+        <td colSpan={6} className="px-6 py-16">
+            <div className="text-center">
+                <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
+                    {searchTerm ? (
+                        <Search className="w-12 h-12 text-slate-400" />
+                    ) : (
+                        <Scale className="w-12 h-12 text-slate-400" />
+                    )}
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                    {searchTerm ? 'لا توجد نتائج' : 'لا توجد مقارنات'}
+                </h3>
+                <p className="text-slate-500 max-w-md mx-auto">
+                    {searchTerm
+                        ? `لم يتم العثور على مقارنات تطابق "${searchTerm}"`
+                        : 'ابدأ بإنشاء مقارنة جديدة لعروض الأسعار'}
+                </p>
+            </div>
+        </td>
+    </tr>
 );
 
 const QuotationComparisonPage: React.FC = () => {
@@ -285,7 +251,8 @@ const QuotationComparisonPage: React.FC = () => {
         return comparisons.filter(comp => {
             return comp.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                comp.selectedSupplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
+                comp.selectedSupplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                comp.comparisonNumber?.toLowerCase().includes(searchTerm.toLowerCase());
         });
     }, [comparisons, searchTerm]);
 
@@ -296,32 +263,6 @@ const QuotationComparisonPage: React.FC = () => {
         approved: comparisons.filter(c => c.status === 'Approved').length,
     }), [comparisons]);
 
-    const handleSubmitComparison = async (id: number) => {
-        try {
-            await purchaseService.submitComparison(id);
-            fetchComparisons();
-        } catch (error) {
-            console.error('Error submitting comparison:', error);
-        }
-    };
-
-    const handleFinanceReview = async (id: number, userId: number, approved: boolean) => {
-        try {
-            await purchaseService.financeReviewComparison(id, userId, approved);
-            fetchComparisons();
-        } catch (error) {
-            console.error('Error in finance review:', error);
-        }
-    };
-
-    const handleManagementApprove = async (id: number, userId: number, approved: boolean) => {
-        try {
-            await purchaseService.managementApproveComparison(id, userId, approved);
-            fetchComparisons();
-        } catch (error) {
-            console.error('Error in management approval:', error);
-        }
-    };
 
     const handleCreatePO = (compId: number, quotId: number) => {
         navigate(`/dashboard/procurement/po/new?comparisonId=${compId}&quotationId=${quotId}`);
@@ -416,7 +357,7 @@ const QuotationComparisonPage: React.FC = () => {
                             ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                         <input
                             type="text"
-                            placeholder="بحث باسم الصنف، رقم الطلب، أو المورد..."
+                            placeholder="بحث باسم الصنف، رقم الطلب، المورد، أو رقم المقارنة..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
@@ -461,26 +402,39 @@ const QuotationComparisonPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Comparisons Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                    <CardSkeleton />
-                ) : filteredComparisons.length === 0 ? (
-                    <EmptyState searchTerm={searchTerm} />
-                ) : (
-                    filteredComparisons.map((comparison, index) => (
-                        <ComparisonCard
-                            key={comparison.id}
-                            comparison={comparison}
-                            index={index}
-                            onView={handleViewComparison}
-                            onCreatePO={handleCreatePO}
-                            onSubmit={handleSubmitComparison}
-                            onFinanceReview={handleFinanceReview}
-                            onManagementApprove={handleManagementApprove}
-                        />
-                    ))
-                )}
+            {/* Table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
+                            <tr>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم المقارنة</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الصنف</th>
+                                <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">عدد العروض</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد المختار</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <TableSkeleton />
+                            ) : filteredComparisons.length === 0 ? (
+                                <EmptyState searchTerm={searchTerm} />
+                            ) : (
+                                filteredComparisons.map((comparison, index) => (
+                                    <ComparisonTableRow
+                                        key={comparison.id}
+                                        comparison={comparison}
+                                        index={index}
+                                        onView={handleViewComparison}
+                                        onCreatePO={handleCreatePO}
+                                    />
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

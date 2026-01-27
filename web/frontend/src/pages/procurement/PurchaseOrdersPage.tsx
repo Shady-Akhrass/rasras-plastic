@@ -7,14 +7,14 @@ import {
     Calendar,
     CheckCircle2,
     Clock,
-    RefreshCw,
-    DollarSign,
-    ShoppingCart,
-    Package,
     Filter,
+    Package,
+    ShoppingCart,
     X,
     Eye,
-    TrendingUp
+    TrendingUp,
+    RefreshCw,
+    DollarSign
 } from 'lucide-react';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
 
@@ -78,6 +78,16 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             icon: CheckCircle2,
             className: 'bg-emerald-100 text-emerald-700 border-emerald-300',
             label: 'مغلق'
+        },
+        'Approved': {
+            icon: CheckCircle2,
+            className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+            label: 'معتمد'
+        },
+        'Confirmed': {
+            icon: CheckCircle2,
+            className: 'bg-brand-primary/10 text-brand-primary border-brand-primary/20',
+            label: 'مؤكد'
         }
     };
 
@@ -223,6 +233,9 @@ const PurchaseOrdersPage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
+    const queryParams = new URLSearchParams(location.search);
+    const prIdFilter = queryParams.get('prId');
+
     useEffect(() => {
         fetchOrders();
     }, []);
@@ -245,9 +258,10 @@ const PurchaseOrdersPage: React.FC = () => {
                 o.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 o.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesStatus = statusFilter === 'All' || o.status === statusFilter;
-            return matchesSearch && matchesStatus;
+            const matchesPR = !prIdFilter || o.prId === parseInt(prIdFilter);
+            return matchesSearch && matchesStatus && matchesPR;
         });
-    }, [orders, searchTerm, statusFilter]);
+    }, [orders, searchTerm, statusFilter, prIdFilter]);
 
     const stats = useMemo(() => ({
         total: orders.length,
@@ -281,6 +295,18 @@ const PurchaseOrdersPage: React.FC = () => {
             `}</style>
 
             {/* Header Section */}
+            {prIdFilter && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-xl flex items-center justify-between mb-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 text-sm font-bold">
+                        <Filter className="w-4 h-4" />
+                        <span>عرض أوامر الشراء المرتبطة بطلب الشراء رقم: {orders.find(o => o.prId === parseInt(prIdFilter))?.prId || prIdFilter}</span>
+                    </div>
+                    <button onClick={() => navigate('/dashboard/procurement/po')} className="p-1 hover:bg-amber-100 rounded-lg">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
                 rounded-3xl p-8 text-white">
                 {/* Decorative Elements */}
@@ -385,6 +411,8 @@ const PurchaseOrdersPage: React.FC = () => {
                                 <option value="Pending">قيد الاعتماد</option>
                                 <option value="PartiallyReceived">استلام جزئي</option>
                                 <option value="Received">تم الاستلام</option>
+                                <option value="Approved">معتمد</option>
+                                <option value="Confirmed">مؤكد</option>
                                 <option value="Closed">مغلق</option>
                             </select>
                         </div>

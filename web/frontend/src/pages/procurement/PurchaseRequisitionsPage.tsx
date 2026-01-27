@@ -118,9 +118,9 @@ const PRTableRow: React.FC<{
     pr: PurchaseRequisition;
     index: number;
     onView: (id: number) => void;
-    onCreateRFQ: (id: number) => void;
     onSubmit: (id: number) => void;
-}> = ({ pr, index, onView, onCreateRFQ, onSubmit }) => (
+    onViewPOs: (id: number) => void;
+}> = ({ pr, index, onView, onSubmit, onViewPOs }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -177,12 +177,12 @@ const PRTableRow: React.FC<{
                 )}
                 {pr.status === 'Approved' && (
                     <button
-                        onClick={() => onCreateRFQ(pr.id!)}
-                        className="p-2 text-indigo-500 hover:bg-indigo-50 
+                        onClick={() => onViewPOs(pr.id!)}
+                        className="p-2 text-blue-500 hover:bg-blue-50 
                             rounded-lg transition-all duration-200"
-                        title="إنشاء طلب عرض سعر"
+                        title="عرض أوامر الشراء المرتبطة"
                     >
-                        <ShoppingCart className="w-5 h-5" />
+                        <Package className="w-5 h-5" />
                     </button>
                 )}
                 <button
@@ -328,9 +328,6 @@ const PurchaseRequisitionsPage: React.FC = () => {
         navigate(`/dashboard/procurement/pr/${id}`);
     };
 
-    const handleCreateRFQ = (id: number) => {
-        navigate(`/dashboard/procurement/rfq/new?prId=${id}`);
-    };
 
     return (
         <div className="space-y-6">
@@ -543,8 +540,8 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                         pr={pr}
                                         index={index}
                                         onView={handleViewPR}
-                                        onCreateRFQ={handleCreateRFQ}
                                         onSubmit={handleSubmit}
+                                        onViewPOs={(id) => navigate(`/dashboard/procurement/po?prId=${id}`)}
                                     />
                                 ))
                             )}

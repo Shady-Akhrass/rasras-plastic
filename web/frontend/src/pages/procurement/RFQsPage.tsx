@@ -130,8 +130,15 @@ const RFQTableRow: React.FC<{
                 </div>
             ) : '-'}
         </td>
-        <td className="px-6 py-4 text-sm text-slate-600">
-            {rfq.responseDueDate ? new Date(rfq.responseDueDate).toLocaleDateString('ar-EG') : '-'}
+        <td className="px-6 py-4 text-sm font-bold">
+            {rfq.responseDueDate ? (
+                <div className={`flex items-center gap-2 ${new Date(rfq.responseDueDate) < new Date() ? 'text-rose-500' :
+                    new Date(rfq.responseDueDate).getTime() - new Date().getTime() < 86400000 * 2 ? 'text-amber-500' : 'text-slate-600'
+                    }`}>
+                    <Clock className="w-4 h-4" />
+                    <span>{new Date(rfq.responseDueDate).toLocaleDateString('ar-EG')}</span>
+                </div>
+            ) : '-'}
         </td>
         <td className="px-6 py-4">
             <StatusBadge status={rfq.status || 'Sent'} />
@@ -394,7 +401,7 @@ const RFQsPage: React.FC = () => {
                                     />
                                 ))
                             ) : (
-                                filteredPRs.map((pr, index) => (
+                                filteredPRs.map((pr) => (
                                     <tr key={pr.id} className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0">
                                         <td className="px-6 py-4 font-bold text-slate-800">#{pr.prNumber}</td>
                                         <td className="px-6 py-4 text-sm text-slate-600">{new Date(pr.prDate).toLocaleDateString('ar-EG')}</td>

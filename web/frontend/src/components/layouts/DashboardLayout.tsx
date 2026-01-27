@@ -285,7 +285,7 @@ const DashboardLayout: React.FC = () => {
                             active={location.pathname === item.to ||
                                 (item.to !== '/dashboard' && location.pathname.startsWith(item.to))}
                             collapsed={sidebarCollapsed}
-                        // badge={item.badge}
+                            badge={item.badge}
                         />
                     ))}
 
@@ -301,7 +301,7 @@ const DashboardLayout: React.FC = () => {
                                     label={item.label}
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
-                                // badge={item.badge}
+                                    badge={item.badge}
                                 />
                             ))}
                         </>
@@ -319,6 +319,7 @@ const DashboardLayout: React.FC = () => {
                                     label={item.label}
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
+                                    badge={item.badge}
                                 />
                             ))}
                         </>
@@ -336,6 +337,7 @@ const DashboardLayout: React.FC = () => {
                                     label={item.label}
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
+                                    badge={item.badge}
                                 />
                             ))}
                         </>
@@ -351,7 +353,7 @@ const DashboardLayout: React.FC = () => {
                             label={item.label}
                             active={location.pathname.startsWith(item.to)}
                             collapsed={sidebarCollapsed}
-                        // badge={item.badge}
+                            badge={item.badge}
                         />
                     ))}
                 </nav>

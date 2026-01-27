@@ -8,11 +8,20 @@ import com.rasras.erp.procurement.PurchaseRequisitionRepository;
 import com.rasras.erp.supplier.SupplierRepository;
 import com.rasras.erp.user.User;
 import com.rasras.erp.user.UserRepository;
+import com.rasras.erp.procurement.QuotationComparisonRepository;
+import com.rasras.erp.procurement.SupplierQuotationRepository;
+import com.rasras.erp.procurement.PurchaseOrder;
+import com.rasras.erp.procurement.PurchaseOrderItem;
+import com.rasras.erp.procurement.SupplierQuotation;
+import com.rasras.erp.procurement.SupplierQuotationItem;
+import com.rasras.erp.inventory.UnitRepository;
+import com.rasras.erp.inventory.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,6 +42,10 @@ public class ApprovalService {
     private final GoodsReceiptNoteRepository grnRepo;
     private final com.rasras.erp.supplier.SupplierInvoiceService supplierInvoiceService;
     private final InventoryService inventoryService;
+    private final QuotationComparisonRepository comparisonRepo;
+    private final SupplierQuotationRepository quotationRepo;
+    private final ItemRepository itemRepo;
+    private final UnitRepository unitRepo;
 
     @Transactional
     public ApprovalRequest initiateApproval(String workflowCode, String docType, Integer docId,
@@ -228,6 +241,80 @@ public class ApprovalService {
                 }
                 grnRepo.save(grn);
             });
+        } else if ("QuotationComparison".equalsIgnoreCase(type) || "QC".equalsIgnoreCase(type)) {
+            comparisonRepo.findById(id).ifPresent(qc -> {
+                qc.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    qc.setStatus("Approved");
+                    // NEW: Automatically create PO and initiate its approval
+                    createPOFromComparison(qc, userId);
+                } else if ("Rejected".equals(status)) {
+                    qc.setStatus("Rejected");
+                }
+                comparisonRepo.save(qc);
+            });
         }
+    }
+
+    private void createPOFromComparison(com.rasras.erp.procurement.QuotationComparison qc, Integer userId) {
+        if (qc.getSelectedQuotation() == null)
+            return;
+
+        SupplierQuotation quoted = qc.getSelectedQuotation();
+
+        // 1. Create the PO record
+        PurchaseOrder po = PurchaseOrder.builder()
+                .poNumber(generatePONumber())
+                .poDate(LocalDateTime.now())
+                .prId(qc.getPurchaseRequisition() != null ? qc.getPurchaseRequisition().getId() : null)
+                .quotationId(quoted.getId())
+                .supplier(quoted.getSupplier())
+                .expectedDeliveryDate(
+                        LocalDate.now().plusDays(quoted.getDeliveryDays() != null ? quoted.getDeliveryDays() : 7))
+                .currency(quoted.getCurrency())
+                .exchangeRate(quoted.getExchangeRate())
+                .subTotal(quoted.getTotalAmount())
+                .totalAmount(quoted.getTotalAmount())
+                .status("Pending")
+                .approvalStatus("Pending")
+                .notes("Auto-generated from Approved Comparison: " + qc.getComparisonNumber())
+                .build();
+
+        // 2. Map items
+        if (quoted.getItems() != null) {
+            po.setItems(quoted.getItems().stream().map(qi -> {
+                return PurchaseOrderItem.builder()
+                        .purchaseOrder(po)
+                        .item(qi.getItem())
+                        .unit(qi.getUnit())
+                        .orderedQty(qi.getOfferedQty())
+                        .unitPrice(qi.getUnitPrice())
+                        .discountPercentage(qi.getDiscountPercentage())
+                        .discountAmount(qi.getDiscountAmount())
+                        .taxPercentage(qi.getTaxPercentage())
+                        .taxAmount(qi.getTaxAmount())
+                        .totalPrice(qi.getTotalPrice())
+                        .receivedQty(BigDecimal.ZERO)
+                        .status("Pending")
+                        .build();
+            }).collect(Collectors.toList()));
+        }
+
+        PurchaseOrder savedPo = poRepo.save(po);
+
+        // 3. Initiate PO Approval Workflow
+        initiateApproval(
+                "PO_APPROVAL",
+                "PurchaseOrder",
+                savedPo.getId(),
+                savedPo.getPoNumber(),
+                userId,
+                savedPo.getTotalAmount());
+    }
+
+    private String generatePONumber() {
+        long count = poRepo.count() + 1;
+        LocalDateTime now = LocalDateTime.now();
+        return String.format("PO-%d%02d-%03d", now.getYear(), now.getMonthValue(), count);
     }
 }

@@ -15,7 +15,8 @@ import {
     ShoppingCart,
     X,
     XCircle,
-    Eye
+    Eye,
+    AlertCircle
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation } from '../../services/purchaseService';
 
@@ -134,7 +135,15 @@ const QuotationTableRow: React.FC<{
             {quotation.deliveryDays ? `${quotation.deliveryDays} يوم` : '-'}
         </td>
         <td className="px-6 py-4">
-            <StatusBadge status={quotation.status || 'Received'} />
+            <div className="flex flex-col gap-1">
+                <StatusBadge status={quotation.status || 'Received'} />
+                {quotation.validUntilDate && new Date(quotation.validUntilDate) < new Date() && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-rose-600 text-[10px] font-bold border border-rose-100">
+                        <AlertCircle className="w-3 h-3" />
+                        منتهي
+                    </span>
+                )}
+            </div>
         </td>
         <td className="px-6 py-4">
             <div className="flex items-center justify-end gap-2">
@@ -229,6 +238,7 @@ const SupplierQuotationsPage: React.FC = () => {
     const [quotations, setQuotations] = useState<SupplierQuotation[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
+    const [showExpired, setShowExpired] = useState(false);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     useEffect(() => {
@@ -248,7 +258,13 @@ const SupplierQuotationsPage: React.FC = () => {
     };
 
     const filteredQuotations = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         return quotations.filter(q => {
+            const isExpired = q.validUntilDate && new Date(q.validUntilDate) < today;
+            if (!showExpired && isExpired) return false;
+
             const matchesSearch =
                 q.quotationNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 q.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -256,7 +272,7 @@ const SupplierQuotationsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || q.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-    }, [quotations, searchTerm, statusFilter]);
+    }, [quotations, searchTerm, statusFilter, showExpired]);
 
     const stats = useMemo(() => {
         const total = quotations.length;
@@ -399,11 +415,21 @@ const SupplierQuotationsPage: React.FC = () => {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
                             >
-                                <option value="All">جميع الحالات</option>
-                                <option value="Received">مستلم</option>
-                                <option value="Selected">مقبول</option>
                                 <option value="Rejected">مرفوض</option>
                             </select>
+                        </div>
+
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-slate-200 transition-all duration-200">
+                            <input
+                                type="checkbox"
+                                id="showExpired"
+                                checked={showExpired}
+                                onChange={(e) => setShowExpired(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                            />
+                            <label htmlFor="showExpired" className="text-sm font-bold text-slate-600 cursor-pointer">
+                                إظهار العروض المنتهية
+                            </label>
                         </div>
 
                         <button

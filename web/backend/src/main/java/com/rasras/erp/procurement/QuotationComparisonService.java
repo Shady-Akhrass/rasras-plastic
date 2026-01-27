@@ -2,6 +2,7 @@ package com.rasras.erp.procurement;
 
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.supplier.SupplierRepository;
+import com.rasras.erp.approval.ApprovalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ public class QuotationComparisonService {
         private final SupplierRepository supplierRepository;
         private final ItemRepository itemRepository;
         private final SupplierQuotationRepository quotationRepository;
+        private final ApprovalService approvalService;
 
         @Transactional(readOnly = true)
         public List<QuotationComparisonDto> getAllComparisons() {
@@ -158,11 +160,19 @@ public class QuotationComparisonService {
                 QuotationComparison comparison = comparisonRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Comparison not found"));
 
-                comparison.setStatus("Pending Finance");
+                comparison.setStatus("Pending Approval");
                 comparison.setApprovalStatus("Pending");
 
-                // Here we would ideally call approvalService.initiateApproval
-                // but for now we follow the 10-step manual flow if workflow isn't fully set up
+                // Initiate formal approval workflow
+                approvalService.initiateApproval(
+                                "QC_APPROVAL",
+                                "QuotationComparison",
+                                comparison.getId(),
+                                comparison.getComparisonNumber(),
+                                comparison.getCreatedBy(),
+                                java.math.BigDecimal.ZERO // Amount not strictly applicable here but can be added if
+                                                          // needed
+                );
 
                 return mapToDto(comparisonRepository.save(comparison));
         }

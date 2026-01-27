@@ -13,9 +13,13 @@ import {
     CheckCircle2,
     RefreshCw,
     Edit3,
-    ExternalLink
+    ExternalLink,
+    MoreVertical,
+    Eye,
+    Trash2
 } from 'lucide-react';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
+import toast from 'react-hot-toast';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -61,9 +65,9 @@ const StatusBadge: React.FC<{ active: boolean; status: SupplierDto['status'] }> 
     const config = statusConfig[normalizedStatus] || statusConfig.DRAFT;
 
     return (
-        <div className="flex flex-col gap-1 items-end">
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${config.class}`}>
-                {normalizedStatus === 'APPROVED' && <CheckCircle2 className="w-2.5 h-2.5" />}
+        <div className="flex flex-col gap-1">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${config.class}`}>
+                {normalizedStatus === 'APPROVED' && <CheckCircle2 className="w-3 h-3" />}
                 {config.label}
             </span>
             {!active && (
@@ -74,99 +78,6 @@ const StatusBadge: React.FC<{ active: boolean; status: SupplierDto['status'] }> 
         </div>
     );
 };
-
-// Supplier Card Component
-const SupplierCard: React.FC<{
-    supplier: SupplierDto;
-    index: number;
-    onEdit: (id: number) => void;
-    onApprove: (id: number) => void;
-    onReview: () => void;
-}> = ({ supplier, index, onEdit, onApprove, onReview }) => (
-    <div
-        className="bg-white rounded-3xl border border-slate-100 p-6 hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-        style={{
-            animationDelay: `${index * 50}ms`,
-            animation: 'fadeInUp 0.4s ease-out forwards'
-        }}
-    >
-        {/* Decorative corner */}
-        <div className="absolute top-0 left-0 w-24 h-24 bg-brand-primary/5 rounded-br-full -translate-x-12 -translate-y-12 transition-transform group-hover:scale-150" />
-
-        <div className="relative">
-            <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
-                        rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                        <Truck className="w-7 h-7 text-brand-primary" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                            {supplier.supplierNameAr}
-                        </h3>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 font-mono">
-                            <span className="bg-slate-100 px-2 py-0.5 rounded italic">#{supplier.supplierCode}</span>
-                            <span>•</span>
-                            <span>{supplier.supplierType || 'عام'}</span>
-                        </div>
-                    </div>
-                </div>
-                <StatusBadge active={supplier.isActive ?? true} status={supplier.status} />
-            </div>
-
-            <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 text-sm text-slate-500">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
-                        <Users className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <span className="flex-1 truncate">{supplier.contactPerson || 'لا يوجد مسئول اتصال'}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-slate-500">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
-                        <Phone className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <span dir="ltr">{supplier.phone || '-'}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-slate-500">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
-                        <MapPin className="w-4 h-4 text-slate-400" />
-                    </div>
-                    <span className="truncate">{supplier.city ? `${supplier.city}, ${supplier.country}` : 'العنوان غير مسجل'}</span>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-4 border-t border-slate-50">
-                <button
-                    onClick={() => onEdit(supplier.id!)}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-primary/5 text-brand-primary rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all duration-200"
-                >
-                    <Edit3 className="w-4 h-4" />
-                    <span>تعديل</span>
-                </button>
-                {['PENDING', 'Pending'].includes(supplier.status || '') && (
-                    <button
-                        onClick={onReview}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all duration-200 shadow-lg shadow-amber-500/20"
-                    >
-                        <ExternalLink className="w-4 h-4" />
-                        <span>مراجعة الطلب</span>
-                    </button>
-                )}
-                {['DRAFT', 'Draft'].includes(supplier.status || '') && (
-                    <button
-                        onClick={() => onApprove(supplier.id!)}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all duration-200 shadow-lg shadow-emerald-500/20"
-                    >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>اعتماد</span>
-                    </button>
-                )}
-            </div>
-        </div>
-    </div>
-);
-
-import toast from 'react-hot-toast';
 
 const SuppliersPage: React.FC = () => {
     const navigate = useNavigate();
@@ -187,6 +98,7 @@ const SuppliersPage: React.FC = () => {
             setSuppliers(data.data || []);
         } catch (error) {
             console.error('Failed to fetch suppliers:', error);
+            toast.error('فشل تحميل الموردين');
         } finally {
             setLoading(false);
         }
@@ -227,26 +139,36 @@ const SuppliersPage: React.FC = () => {
                     from { opacity: 0; transform: translateY(20px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+                @keyframes slideInRight {
+                    from { opacity: 0; transform: translateX(-20px); }
+                    to { opacity: 1; transform: translateX(0); }
+                }
             `}</style>
 
+            {/* Enhanced Header */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
-                rounded-3xl p-8 text-white">
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
-                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
                             <Truck className="w-10 h-10" />
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">سجل الموردين</h1>
-                            <p className="text-white/70 text-lg">إدارة بيانات الموردين، الشروط المالية، والتواصل</p>
+                            <p className="text-white/80 text-lg">إدارة بيانات الموردين، الشروط المالية، والتواصل</p>
                         </div>
                     </div>
 
                     <button
                         onClick={() => navigate('/dashboard/procurement/suppliers/new')}
-                        className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
-                            hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
-                            hover:shadow-xl hover:scale-105"
+                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
                     >
                         <Plus className="w-5 h-5" />
                         <span>إضافة مورد جديد</span>
@@ -254,6 +176,7 @@ const SuppliersPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard icon={Building2} value={stats.total} label="إجمالي الموردين" color="primary" />
                 <StatCard icon={CheckCircle2} value={stats.active} label="مورد نشط" color="success" />
@@ -261,6 +184,7 @@ const SuppliersPage: React.FC = () => {
                 <StatCard icon={MapPin} value={stats.local} label="مورد محلي" color="warning" />
             </div>
 
+            {/* Filters */}
             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
                 <div className="relative flex-1">
                     <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors 
@@ -289,39 +213,194 @@ const SuppliersPage: React.FC = () => {
                         <option value="Service">خدمي</option>
                     </select>
                 </div>
-                <button onClick={fetchSuppliers} className="p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
+                <button 
+                    onClick={fetchSuppliers} 
+                    className="p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
+                >
                     <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
 
-            {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3, 4, 5, 6].map(i => (
-                        <div key={i} className="h-64 bg-white rounded-3xl border border-slate-100 animate-pulse" />
-                    ))}
-                </div>
-            ) : filteredSuppliers.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Truck className="w-10 h-10 text-slate-300" />
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">لا توجد نتائج بحث</h3>
-                    <p className="text-slate-500">جرب البحث بكلمات مختلفة أو إضافة مورد جديد</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                    {filteredSuppliers.map((s, idx) => (
-                        <SupplierCard
-                            key={s.id}
-                            supplier={s}
-                            index={idx}
-                            onEdit={(id) => navigate(`/dashboard/procurement/suppliers/${id}`)}
-                            onApprove={handleApprove}
-                            onReview={() => navigate('/dashboard/procurement/approvals?type=Supplier')}
-                        />
-                    ))}
+            {/* Results Count */}
+            {!loading && (
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-brand-primary rounded-full" />
+                    <span className="text-slate-600">
+                        عرض <span className="font-bold text-slate-800">{filteredSuppliers.length}</span> من{' '}
+                        <span className="font-bold text-slate-800">{suppliers.length}</span> مورد
+                    </span>
                 </div>
             )}
+
+            {/* Table */}
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden"
+                style={{ animation: 'slideInRight 0.4s ease-out' }}>
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="bg-gradient-to-l from-slate-50 to-white border-b-2 border-slate-200">
+                                <th className="py-4 pr-6 text-right text-sm font-bold text-slate-700">
+                                    المورد
+                                </th>
+                                <th className="py-4 px-4 text-right text-sm font-bold text-slate-700">
+                                    الكود
+                                </th>
+                                <th className="py-4 px-4 text-right text-sm font-bold text-slate-700">
+                                    النوع
+                                </th>
+                                <th className="py-4 px-4 text-right text-sm font-bold text-slate-700">
+                                    <div className="flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-slate-400" />
+                                        مسئول الاتصال
+                                    </div>
+                                </th>
+                                <th className="py-4 px-4 text-right text-sm font-bold text-slate-700">
+                                    <div className="flex items-center gap-2">
+                                        <Phone className="w-4 h-4 text-slate-400" />
+                                        الهاتف
+                                    </div>
+                                </th>
+                                <th className="py-4 px-4 text-right text-sm font-bold text-slate-700">
+                                    <div className="flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-slate-400" />
+                                        الموقع
+                                    </div>
+                                </th>
+                                <th className="py-4 px-4 text-center text-sm font-bold text-slate-700">
+                                    الحالة
+                                </th>
+                                <th className="py-4 pl-6 text-center text-sm font-bold text-slate-700">
+                                    الإجراءات
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {loading ? (
+                                // Loading Skeleton
+                                [...Array(6)].map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td className="py-4 pr-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-slate-200 rounded-xl" />
+                                                <div className="space-y-2">
+                                                    <div className="h-4 w-32 bg-slate-200 rounded" />
+                                                    <div className="h-3 w-20 bg-slate-100 rounded" />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="py-4 px-4"><div className="h-4 w-16 bg-slate-200 rounded" /></td>
+                                        <td className="py-4 px-4"><div className="h-4 w-20 bg-slate-200 rounded" /></td>
+                                        <td className="py-4 px-4"><div className="h-4 w-24 bg-slate-200 rounded" /></td>
+                                        <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-200 rounded" /></td>
+                                        <td className="py-4 px-4"><div className="h-4 w-32 bg-slate-200 rounded" /></td>
+                                        <td className="py-4 px-4"><div className="h-6 w-20 bg-slate-200 rounded-full mx-auto" /></td>
+                                        <td className="py-4 pl-6"><div className="h-8 w-8 bg-slate-200 rounded-lg mx-auto" /></td>
+                                    </tr>
+                                ))
+                            ) : filteredSuppliers.length === 0 ? (
+                                // Empty State
+                                <tr>
+                                    <td colSpan={8} className="py-20 text-center">
+                                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Truck className="w-10 h-10 text-slate-300" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-slate-800 mb-2">لا توجد نتائج بحث</h3>
+                                        <p className="text-slate-500">جرب البحث بكلمات مختلفة أو إضافة مورد جديد</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                // Data Rows
+                                filteredSuppliers.map((supplier, index) => (
+                                    <tr 
+                                        key={supplier.id} 
+                                        className="group hover:bg-slate-50/50 transition-colors"
+                                        style={{
+                                            animationDelay: `${index * 30}ms`,
+                                            animation: 'fadeInUp 0.3s ease-out forwards'
+                                        }}
+                                    >
+                                        <td className="py-4 pr-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                                                    rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                    <Truck className="w-5 h-5 text-brand-primary" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                                                        {supplier.supplierNameAr}
+                                                    </div>
+                                                    <div className="text-xs text-slate-400">
+                                                        {supplier.supplierNameEn}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="py-4 px-4">
+                                            <span className="font-mono text-sm font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                                                #{supplier.supplierCode}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4">
+                                            <span className="text-sm text-slate-600 font-medium">
+                                                {supplier.supplierType || 'عام'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4">
+                                            <span className="text-sm text-slate-600">
+                                                {supplier.contactPerson || '-'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4">
+                                            <span className="text-sm text-slate-600 font-mono" dir="ltr">
+                                                {supplier.phone || '-'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4">
+                                            <span className="text-sm text-slate-600">
+                                                {supplier.city ? `${supplier.city}, ${supplier.country}` : '-'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4">
+                                            <div className="flex justify-center">
+                                                <StatusBadge active={supplier.isActive ?? true} status={supplier.status} />
+                                            </div>
+                                        </td>
+                                        <td className="py-4 pl-6">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => navigate(`/dashboard/procurement/suppliers/${supplier.id}`)}
+                                                    className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
+                                                    title="تعديل"
+                                                >
+                                                    <Edit3 className="w-4 h-4" />
+                                                </button>
+                                                {['PENDING', 'Pending'].includes(supplier.status || '') && (
+                                                    <button
+                                                        onClick={() => navigate('/dashboard/procurement/approvals?type=Supplier')}
+                                                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                                        title="مراجعة"
+                                                    >
+                                                        <ExternalLink className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {['DRAFT', 'Draft'].includes(supplier.status || '') && (
+                                                    <button
+                                                        onClick={() => handleApprove(supplier.id!)}
+                                                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                        title="اعتماد"
+                                                    >
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 };
