@@ -1,5 +1,6 @@
 package com.rasras.erp.inventory;
 
+import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,11 @@ public class ItemService {
 
         @Transactional
         public ItemDto createItem(ItemDto dto) {
+                // Check if ItemCode already exists
+                if (itemRepository.existsByItemCode(dto.getItemCode())) {
+                        throw new BadRequestException("كود الصنف موجود بالفعل: " + dto.getItemCode());
+                }
+
                 Item item = Item.builder()
                                 .itemCode(dto.getItemCode())
                                 .itemNameAr(dto.getItemNameAr())
@@ -77,6 +83,13 @@ public class ItemService {
                 Item item = itemRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
 
+                // Check if ItemCode is being changed and if the new code already exists
+                if (!item.getItemCode().equals(dto.getItemCode())) {
+                        if (itemRepository.existsByItemCodeAndIdNot(dto.getItemCode(), id)) {
+                                throw new BadRequestException("كود الصنف موجود بالفعل: " + dto.getItemCode());
+                        }
+                }
+
                 item.setItemCode(dto.getItemCode());
                 item.setItemNameAr(dto.getItemNameAr());
                 item.setItemNameEn(dto.getItemNameEn());
@@ -99,6 +112,7 @@ public class ItemService {
                 item.setIsActive(dto.getIsActive());
                 item.setIsSellable(dto.getIsSellable());
                 item.setIsPurchasable(dto.getIsPurchasable());
+                item.setUpdatedAt(java.time.LocalDateTime.now());
 
                 return mapToDto(itemRepository.save(item));
         }
