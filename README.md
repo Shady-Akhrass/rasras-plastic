@@ -1,406 +1,166 @@
-# نظام RasRas Plastics ERP
 
-نظام إدارة موارد المؤسسة (ERP) لشركة RasRas Plastics للتجارة.
+# Working with this repository (step-by-step)
 
-## 📋 نظرة عامة
+This README is written for collaborators who are new to Git and GitHub. Follow the sections in order. Commands below are for PowerShell on Windows; they also work in other shells with minimal changes.
 
-هذا المشروع يتكون من:
-- **Backend**: Spring Boot 3.2.1 مع Java 17
-- **Frontend**: React 19 مع TypeScript و Vite
-- **Database**: MySQL 8.0+
+**Prerequisites**
+- Create a GitHub account at https://github.com if you don't have one.
+- Install Git for Windows: https://git-scm.com/download/win
+- Optional but recommended: install GitHub Desktop (GUI) or GitHub CLI (`gh`).
 
----
-
-## 🛠️ المتطلبات الأساسية
-
-قبل البدء، تأكد من تثبيت المتطلبات التالية:
-
-### للباك إند (Backend):
-1. **Java Development Kit (JDK) 17** أو أحدث
-   - تحميل: [Oracle JDK](https://www.oracle.com/java/technologies/downloads/#java17) أو [OpenJDK](https://adoptium.net/)
-   - التحقق من التثبيت:
-     ```bash
-     java -version
-     ```
-   - يجب أن يظهر الإصدار 17 أو أحدث
-
-2. **Apache Maven 3.6+** (اختياري - يوجد Maven Wrapper في المشروع)
-   - تحميل: [Maven Download](https://maven.apache.org/download.cgi)
-   - التحقق من التثبيت:
-     ```bash
-     mvn -version
-     ```
-
-3. **MySQL Server 8.0+**
-   - تحميل: [MySQL Download](https://dev.mysql.com/downloads/mysql/)
-   - تأكد من تشغيل خدمة MySQL
-
-### للفرونت إند (Frontend):
-1. **Node.js 18+** و **npm** أو **yarn**
-   - تحميل: [Node.js Download](https://nodejs.org/)
-   - التحقق من التثبيت:
-     ```bash
-     node --version
-     npm --version
-     ```
-   - يجب أن يكون Node.js 18 أو أحدث
-
----
-
-## 🗄️ إعداد قاعدة البيانات
-
-### الخطوة 1: تشغيل MySQL Server
-تأكد من تشغيل خدمة MySQL على جهازك.
-
-### الخطوة 2: إنشاء قاعدة البيانات
-افتح MySQL Command Line Client أو MySQL Workbench وقم بتنفيذ:
-
-```sql
-CREATE DATABASE rasrasplastics CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+**1) Configure Git (one-time on your machine)**
+- Open PowerShell and run:
+-add it just for test
+```
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+git config --global core.autocrlf true
+git config --global credential.helper manager-core
 ```
 
-### الخطوة 3: استيراد البيانات (اختياري)
-إذا كان لديك ملف SQL لقاعدة البيانات، قم باستيراده:
+**2) Choose HTTPS or SSH (recommend SSH once set up)**
+- HTTPS: easier to start, prompts username/password (or token). Good if you don't want to manage SSH keys.
+- SSH: more convenient long-term (no passwords on each push). If you want SSH, generate a key and add it to GitHub (steps below).
 
-```bash
-mysql -u root -p rasrasplastics < doc/rasrasplastics(2).sql
-```
-
-أو من MySQL Workbench:
-- File → Run SQL Script
-- اختر ملف SQL
-- Execute
-
-### الخطوة 4: إعداد بيانات المدير (اختياري)
-لإنشاء مستخدم مدير افتراضي:
-
-```bash
-mysql -u root -p rasrasplastics < doc/seed_admin.sql
-```
-
-**بيانات تسجيل الدخول الافتراضية:**
-- **Username:** `admin`
-- **Password:** `password123`
-
-⚠️ **مهم:** قم بتغيير كلمة المرور بعد أول تسجيل دخول!
-
-### الخطوة 5: تحديث إعدادات الاتصال
-افتح ملف `web/backend/src/main/resources/application.yml` وقم بتحديث إعدادات قاعدة البيانات:
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/rasrasplastics?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root          # اسم المستخدم الخاص بك
-    password: your_password # كلمة مرور MySQL الخاصة بك
-```
-
----
-
-## 🚀 تشغيل الباك إند (Backend)
-
-### الطريقة 1: استخدام Maven Wrapper (موصى بها)
-
-#### على Windows:
-```bash
-cd web/backend
-.\mvnw.cmd clean install
-.\mvnw.cmd spring-boot:run
-```
-
-#### على Linux/Mac:
-```bash
-cd web/backend
-./mvnw clean install
-./mvnw spring-boot:run
-```
-
-### الطريقة 2: استخدام Maven المثبت محلياً
-
-```bash
-cd web/backend
-mvn clean install
-mvn spring-boot:run
-```
-
-### الطريقة 3: تشغيل JAR ملف مباشرة
-
-```bash
-cd web/backend
-mvn clean package
-java -jar target/erp-1.0.0-SNAPSHOT.jar
-```
-
-### التحقق من تشغيل الباك إند
-
-بعد تشغيل التطبيق بنجاح، يجب أن ترى رسائل في الكونسول تشير إلى:
-- ✅ بدء تشغيل Spring Boot
-- ✅ الاتصال بقاعدة البيانات
-- ✅ بدء الخادم على المنفذ 8080
-
-### الوصول إلى الباك إند:
-
-- **API Base URL:** `http://localhost:8080/api`
-- **Swagger UI (التوثيق التفاعلي):** `http://localhost:8080/api/swagger-ui.html`
-- **API Documentation:** `http://localhost:8080/api/api-docs`
-
----
-
-## 🎨 تشغيل الفرونت إند (Frontend)
-
-### الخطوة 1: تثبيت المكتبات المطلوبة
-
-```bash
-cd web/frontend
-npm install
-```
-
-أو إذا كنت تستخدم yarn:
-
-```bash
-cd web/frontend
-yarn install
-```
-
-### الخطوة 2: تشغيل خادم التطوير
-
-```bash
-npm run dev
-```
-
-أو:
-
-```bash
-yarn dev
-```
-
-### التحقق من تشغيل الفرونت إند
-
-بعد تشغيل التطبيق بنجاح، يجب أن ترى رسالة في الكونسول تشير إلى:
-- ✅ Vite dev server running
-- ✅ Local: `http://localhost:5173` (أو منفذ آخر)
-
-### الوصول إلى الفرونت إند:
-
-افتح المتصفح وانتقل إلى: `http://localhost:5173`
-
-⚠️ **ملاحظة:** تأكد من تشغيل الباك إند أولاً قبل تشغيل الفرونت إند!
-
-### بناء نسخة الإنتاج (Production Build)
-
-لإنشاء نسخة جاهزة للنشر:
-
-```bash
-cd web/frontend
-npm run build
-```
-
-الملفات المبنية ستكون في مجلد `dist/`
-
----
-
-## 📁 هيكل المشروع
+Generate SSH key (if using SSH):
 
 ```
-rasras-plastic/
-├── doc/                    # الوثائق وملفات SQL
-│   ├── migrations/         # ملفات ترحيل قاعدة البيانات
-│   └── *.sql              # ملفات SQL
-├── web/
-│   ├── backend/           # تطبيق Spring Boot
-│   │   ├── src/
-│   │   │   └── main/
-│   │   │       ├── java/  # الكود المصدري Java
-│   │   │       └── resources/
-│   │   │           └── application.yml  # إعدادات التطبيق
-│   │   ├── pom.xml        # ملف إعدادات Maven
-│   │   └── mvnw           # Maven Wrapper
-│   └── frontend/          # تطبيق React
-│       ├── src/
-│       │   ├── components/  # المكونات
-│       │   ├── pages/       # الصفحات
-│       │   ├── services/    # خدمات API
-│       │   └── App.tsx      # الملف الرئيسي
-│       ├── package.json     # ملف إعدادات npm
-│       └── vite.config.ts   # إعدادات Vite
-└── README.md              # هذا الملف
+ssh-keygen -t ed25519 -C "your.email@example.com"
+# Press Enter to accept default file locations and optionally set a passphrase
+type $env:USERPROFILE"\.ssh\id_ed25519.pub" | clip
+# Then paste the copied key into GitHub Profile → Settings → SSH and GPG keys → New SSH key
 ```
 
----
-
-## ⚙️ الإعدادات المهمة
-
-### إعدادات الباك إند
-
-**المنفذ:** 8080 (يمكن تغييره في `application.yml`)
-```yaml
-server:
-  port: 8080
-  servlet:
-    context-path: /api
+**3) Clone the repository (first time only)**
+- HTTPS example:
+```
+git clone https://github.com/Shady-Akhrass/rasras-plastic.git
+```
+- SSH example:
+```
+git clone git@github.com:Shady-Akhrass/rasras-plastic.git
+```
+- Change into the project folder:
+```
+cd rasras-plastic
 ```
 
-**قاعدة البيانات:** MySQL على `localhost:3306`
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/rasrasplastics
-    username: root
-    password: your_password
+**4) Daily workflow — keep `main` updated**
+- Fetch and update `main` before starting work:
+```
+git fetch origin
+git switch main
+git pull origin main
 ```
 
-### إعدادات الفرونت إند
+**5) Create a feature branch (always work on branches, not `main`)**
+- Create and switch to a new branch:
+```
+git switch -c feature/short-description
+```
+- Example branch name: `feature/login-form`, `fix/fix-header`, `chore/update-deps`.
 
-**API Base URL:** `http://localhost:8080/api`
-(موجود في `src/services/apiClient.ts`)
+**6) Make changes, stage, commit**
+- Stage changed files:
+```
+git add .
+```
+- Commit with a clear message:
+```
+git commit -m "feat(auth): add login screen and validation"
+```
 
-إذا غيرت منفذ الباك إند، يجب تحديث هذا الملف أيضاً.
+**7) Keep your branch up-to-date with `main` (recommended before pushing or opening PR)**
+Option A — Rebase (clean history):
+```
+git fetch origin
+git switch feature/your-branch
+git rebase origin/main
+```
+Resolve conflicts if they appear (see section below). After a successful rebase, push:
+```
+git push -u origin feature/your-branch
+```
+If the remote branch exists and you've rewritten history with rebase, you may need to force-push safely:
+```
+git push --force-with-lease
+```
 
----
+Option B — Merge (safer for beginners):
+```
+git fetch origin
+git switch feature/your-branch
+git merge origin/main
+git push -u origin feature/your-branch
+```
 
-## 🔧 استكشاف الأخطاء وحلها
+**8) Open a Pull Request (PR)**
+- Go to the repository page on GitHub.
+- Click `Compare & pull request` for your branch or `New pull request` and choose your branch into `main`.
+- In the PR description include:
+  - What changed and why
+  - How to test the changes (commands, env vars, steps)
+  - Any screenshots or logs if relevant
+- Request review from your teammate, wait for approvals, address review comments, then merge via the GitHub UI.
 
-### مشاكل الباك إند
+**9) After merging PR**
+- Update local `main`:
+```
+git switch main
+git pull origin main
+```
+- Delete your branch locally and remotely (optional cleanup):
+```
+git branch -d feature/your-branch
+git push origin --delete feature/your-branch
+```
 
-#### ❌ خطأ: "Cannot connect to database"
-**الحل:**
-1. تأكد من تشغيل MySQL Server
-2. تحقق من اسم المستخدم وكلمة المرور في `application.yml`
-3. تأكد من وجود قاعدة البيانات `rasrasplastics`
-4. تحقق من أن MySQL يستمع على المنفذ 3306
+**10) Resolving conflicts (step-by-step)**
+- If a merge or rebase reports conflicts, Git will pause and mark conflicted files with markers:
+```
+your local code
+incoming remote code
+```
+- Open each conflicted file in an editor and decide which code to keep. Remove the conflict markers and save.
+- Stage the resolved files:
+```
+git add path/to/resolved-file
+```
+- Continue rebase or finish merge:
+```
+git rebase --continue   # if you were rebasing
+git commit              # if you were merging and Git didn't auto-commit
+```
+- If you want to abort the operation and return to the previous state:
+```
+git rebase --abort
+git merge --abort
+```
 
-#### ❌ خطأ: "Port 8080 already in use"
-**الحل:**
-1. غير المنفذ في `application.yml`:
-   ```yaml
-   server:
-     port: 8081  # أو أي منفذ آخر متاح
-   ```
-2. أو أوقف التطبيق الذي يستخدم المنفذ 8080
+**11) Common problems & fixes**
+- "remote: Repository not found" — Make sure the repository URL is correct and you have access. If it is private, invite your GitHub user as a collaborator.
+- "permission denied (publickey)" — You're using SSH and GitHub doesn't have your SSH key; add your public key to GitHub.
+- "Updates were rejected because the remote contains work that you do not have locally" — run `git pull --rebase origin main` on your `main`, or follow the rebase/merge steps on your branch.
+- Authentication with HTTPS requiring token: GitHub no longer accepts password authentication; use a Personal Access Token if prompted, or set up the credential manager.
 
-#### ❌ خطأ: "Java version not supported"
-**الحل:**
-1. تأكد من تثبيت JDK 17 أو أحدث
-2. تحقق من متغير البيئة `JAVA_HOME`
-3. على Windows:
-   ```powershell
-   $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
-   ```
+**12) Undo mistakes (safety nets)**
+- See recent actions and commits:
+```
+git status
+git log --oneline --graph -n 20
+git reflog
+```
+- Reset to a previous commit (destructive):
+```
+git reset --hard <commit-hash>
+```
+- If you accidentally deleted a branch, recover from reflog:
+```
+git reflog
+git checkout -b restore-branch <commit-hash-from-reflog>
 
-#### ❌ خطأ: "Maven not found"
-**الحل:**
-- استخدم Maven Wrapper الموجود في المشروع:
-  - Windows: `.\mvnw.cmd`
-  - Linux/Mac: `./mvnw`
+# rasras-plastic
 
-### مشاكل الفرونت إند
-
-#### ❌ خطأ: "Cannot find module" أو "npm install failed"
-**الحل:**
-1. احذف مجلد `node_modules` وملف `package-lock.json`:
-   ```bash
-   cd web/frontend
-   rm -rf node_modules package-lock.json
-   ```
-2. قم بتثبيت المكتبات مرة أخرى:
-   ```bash
-   npm install
-   ```
-
-#### ❌ خطأ: "Network Error" أو "Cannot connect to API"
-**الحل:**
-1. تأكد من تشغيل الباك إند على `http://localhost:8080`
-2. تحقق من إعدادات `apiClient.ts` في `src/services/`
-3. تأكد من أن CORS مفعل في الباك إند (عادة يكون مفعل افتراضياً)
-
-#### ❌ خطأ: "Port 5173 already in use"
-**الحل:**
-- Vite سيستخدم منفذ آخر تلقائياً، أو يمكنك تحديد منفذ في `vite.config.ts`:
-  ```typescript
-  export default defineConfig({
-    server: {
-      port: 3000  // أو أي منفذ آخر
-    }
-  })
-  ```
-
-### مشاكل قاعدة البيانات
-
-#### ❌ خطأ: "Access denied for user"
-**الحل:**
-1. تحقق من اسم المستخدم وكلمة المرور
-2. تأكد من أن المستخدم لديه صلاحيات على قاعدة البيانات:
-   ```sql
-   GRANT ALL PRIVILEGES ON rasrasplastics.* TO 'root'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
-
-#### ❌ خطأ: "Unknown database 'rasrasplastics'"
-**الحل:**
-1. قم بإنشاء قاعدة البيانات:
-   ```sql
-   CREATE DATABASE rasrasplastics CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-
----
-
-## 📚 موارد إضافية
-
-### وثائق API
-بعد تشغيل الباك إند، يمكنك الوصول إلى وثائق API التفاعلية:
-- Swagger UI: `http://localhost:8080/api/swagger-ui.html`
-
-### ملفات SQL
-- ملف قاعدة البيانات الكامل: `doc/rasrasplastics(2).sql`
-- بيانات المدير الافتراضية: `doc/seed_admin.sql`
-- ملفات الترحيل: `doc/migrations/`
-
----
-
-## 🔐 الأمان
-
-⚠️ **تحذيرات مهمة:**
-
-1. **كلمة مرور قاعدة البيانات:** لا ترفع ملف `application.yml` مع كلمة المرور الحقيقية إلى Git
-2. **JWT Secret:** في الإنتاج، يجب تغيير JWT Secret في `application.yml`
-3. **بيانات المدير:** قم بتغيير كلمة مرور المدير الافتراضية فوراً
-
----
-
-## 📞 الدعم
-
-إذا واجهت أي مشاكل:
-1. راجع قسم "استكشاف الأخطاء وحلها" أعلاه
-2. تحقق من ملفات README في مجلدات `web/backend` و `web/frontend`
-3. راجع ملفات التوثيق في مجلد `doc/`
-
----
-
-## 📝 ملاحظات
-
-- التطبيق يستخدم Spring Boot 3.2.1
-- يستخدم JWT للمصادقة
-- يدعم Swagger/OpenAPI للتوثيق التفاعلي
-- يستخدم Spring Modulith للهندسة المعمارية النمطية
-- الفرونت إند مبني بـ React 19 و TypeScript و Vite
-- يستخدم Tailwind CSS للتصميم
-
----
-
-## ✅ قائمة التحقق السريعة
-
-قبل البدء، تأكد من:
-
-- [ ] تثبيت JDK 17 أو أحدث
-- [ ] تثبيت Node.js 18 أو أحدث
-- [ ] تثبيت وتشغيل MySQL Server
-- [ ] إنشاء قاعدة البيانات `rasrasplastics`
-- [ ] تحديث إعدادات قاعدة البيانات في `application.yml`
-- [ ] تشغيل الباك إند بنجاح
-- [ ] تثبيت مكتبات الفرونت إند (`npm install`)
-- [ ] تشغيل الفرونت إند بنجاح
-
----
-
-**تم إنشاء هذا الملف بواسطة:** نظام RasRas Plastics ERP  
-**آخر تحديث:** يناير 2026
+that make sense 
+sdf s
+sdf
