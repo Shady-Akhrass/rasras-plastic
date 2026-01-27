@@ -1,0 +1,45 @@
+package com.rasras.erp.sales;
+
+import com.rasras.erp.shared.dto.ApiResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/sales/receipts")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "*")
+public class PaymentReceiptController {
+
+    private final PaymentReceiptService receiptService;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<PaymentReceiptDto>>> getAllReceipts() {
+        return ResponseEntity.ok(ApiResponse.success(receiptService.getAllReceipts()));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<PaymentReceiptDto>> getReceiptById(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(receiptService.getReceiptById(id)));
+    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<PaymentReceiptDto>> createReceipt(@RequestBody PaymentReceiptDto dto) {
+        return ResponseEntity.ok(ApiResponse.success(receiptService.createReceipt(dto)));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<PaymentReceiptDto>> updateReceipt(
+            @PathVariable Integer id,
+            @RequestBody PaymentReceiptDto dto) {
+        return ResponseEntity.ok(ApiResponse.success(receiptService.updateReceipt(id, dto)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteReceipt(@PathVariable Integer id) {
+        receiptService.deleteReceipt(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+}

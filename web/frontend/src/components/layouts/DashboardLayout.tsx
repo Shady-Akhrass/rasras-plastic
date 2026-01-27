@@ -3,12 +3,9 @@ import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
     Settings, User, X, ChevronLeft, ChevronRight,
     HelpCircle, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse
-    , ShoppingCart,
-    Layers, Box, UserSquare2, Undo2
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart, ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { approvalService } from '../../services/approvalService';
 
 // Sidebar Link Component
 const SidebarLink = ({
@@ -120,13 +117,13 @@ const NotificationItem = ({
 const DashboardLayout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const mainContentRef = React.useRef<HTMLDivElement>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
@@ -142,20 +139,10 @@ const DashboardLayout: React.FC = () => {
         setMobileMenuOpen(false);
     }, [location.pathname]);
 
-    // Fetch pending approvals count
+    // التمرير لأعلى منطقة المحتوى عند تغيير المسار (السايد بار أو أي تنقل)
     useEffect(() => {
-        const fetchPendingCount = async () => {
-            const userString = localStorage.getItem('user');
-            const user = userString ? JSON.parse(userString) : null;
-            if (user?.userId) {
-                const count = await approvalService.getPendingCount(user.userId);
-                setPendingApprovalsCount(count);
-            }
-        };
-        fetchPendingCount();
-        const interval = setInterval(fetchPendingCount, 60000); // Refresh every minute
-        return () => clearInterval(interval);
-    }, []);
+        mainContentRef.current?.scrollTo(0, 0);
+    }, [location.pathname]);
 
     const handleLogout = () => {
         localStorage.removeItem('accessToken');
@@ -178,40 +165,29 @@ const DashboardLayout: React.FC = () => {
     };
 
     const navItems = [
-        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations' },
         { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
         { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
         { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
         { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'operations' },
         { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'operations' },
         { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'operations' },
-        // { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة التحكم', section: 'main' },
-        // { to: '/dashboard/users', icon: UserSquare2, label: 'إدارة المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        // { to: '/dashboard/employees', icon: Users, label: 'إدارة الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        // { to: '/dashboard/inventory/categories', icon: Layers, label: 'تصنيفات الأصناف', section: 'operations' },
-        // { to: '/dashboard/inventory/items', icon: Package, label: 'دليل الأصناف', section: 'operations' },
         { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'operations' },
-        { to: '/dashboard/inventory/stocks', icon: LayoutDashboard, label: 'أرصدة المخازن', section: 'operations' },
         { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations' },
         { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations' },
-        { to: '/dashboard/inventory/units', icon: Box, label: 'وحدات القياس', section: 'operations' },
+        { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations' },
+        { to: '/dashboard/inventory/warehouse/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse' },
+        { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse' },
+        { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse' },
+        { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales' },
         { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
         { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
-        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement' },
+        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'عروض الأسعار (RFQ)', section: 'procurement' },
         { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement' },
-        { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement' },
-        { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement' },
-        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement' },
-        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement' },
-        { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
-        // { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system' },
-        // { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system' },
-        { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات العامة', section: 'system' },
+        { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات', section: 'system' },
     ];
 
     const filteredNavItems = navItems.filter(item =>
@@ -307,6 +283,23 @@ const DashboardLayout: React.FC = () => {
                         </>
                     )}
 
+                    {/* Sales Section */}
+                    {filteredNavItems.some(i => i.section === 'sales') && (
+                        <>
+                            <SidebarSection title="المبيعات" collapsed={sidebarCollapsed} />
+                            {filteredNavItems.filter(i => i.section === 'sales').map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
+                                />
+                            ))}
+                        </>
+                    )}
+
                     {/* CRM Section */}
                     {filteredNavItems.some(i => i.section === 'crm') && (
                         <>
@@ -320,6 +313,23 @@ const DashboardLayout: React.FC = () => {
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
                                     badge={item.badge}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {/* Warehouse Section */}
+                    {filteredNavItems.some(i => i.section === 'warehouse') && (
+                        <>
+                            <SidebarSection title="دورة المخازن" collapsed={sidebarCollapsed} />
+                            {filteredNavItems.filter(i => i.section === 'warehouse').map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
                                 />
                             ))}
                         </>
@@ -551,7 +561,7 @@ const DashboardLayout: React.FC = () => {
                 </header>
 
                 {/* Page Content */}
-                <div className="flex-1 overflow-y-auto">
+                <div ref={mainContentRef} className="flex-1 overflow-y-auto">
                     <div className="p-4 md:p-8">
                         <Outlet />
                     </div>
