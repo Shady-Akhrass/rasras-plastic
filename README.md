@@ -1,166 +1,93 @@
 
-# Working with this repository (step-by-step)
+```markdown
+# RasRas Plastic Web
 
-This README is written for collaborators who are new to Git and GitHub. Follow the sections in order. Commands below are for PowerShell on Windows; they also work in other shells with minimal changes.
+A full-stack web application for RasRas Plastic with React TypeScript + Vite frontend and Java Spring Boot backend.
 
-**Prerequisites**
-- Create a GitHub account at https://github.com if you don't have one.
-- Install Git for Windows: https://git-scm.com/download/win
-- Optional but recommended: install GitHub Desktop (GUI) or GitHub CLI (`gh`).
-
-**1) Configure Git (one-time on your machine)**
-- Open PowerShell and run:
--add it just for test
-```
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-git config --global core.autocrlf true
-git config --global credential.helper manager-core
-```
-
-**2) Choose HTTPS or SSH (recommend SSH once set up)**
-- HTTPS: easier to start, prompts username/password (or token). Good if you don't want to manage SSH keys.
-- SSH: more convenient long-term (no passwords on each push). If you want SSH, generate a key and add it to GitHub (steps below).
-
-Generate SSH key (if using SSH):
+## Project Structure
 
 ```
-ssh-keygen -t ed25519 -C "your.email@example.com"
-# Press Enter to accept default file locations and optionally set a passphrase
-type $env:USERPROFILE"\.ssh\id_ed25519.pub" | clip
-# Then paste the copied key into GitHub Profile → Settings → SSH and GPG keys → New SSH key
+web/
+├── frontend/    # React TypeScript + Vite application
+└── backend/     # Java Spring Boot application
 ```
 
-**3) Clone the repository (first time only)**
-- HTTPS example:
-```
-git clone https://github.com/Shady-Akhrass/rasras-plastic.git
-```
-- SSH example:
-```
-git clone git@github.com:Shady-Akhrass/rasras-plastic.git
-```
-- Change into the project folder:
-```
-cd rasras-plastic
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js** (v18 or higher) and **npm** (v9 or higher)
+- **Java JDK** (v17 or higher)
+- **Maven** (v3.6 or higher)
+
+## Frontend Setup
+
+### Installation
+
+1. Navigate to the frontend directory:
+```bash
+cd web/frontend
 ```
 
-**4) Daily workflow — keep `main` updated**
-- Fetch and update `main` before starting work:
-```
-git fetch origin
-git switch main
-git pull origin main
+2. Install dependencies:
+```bash
+npm install
 ```
 
-**5) Create a feature branch (always work on branches, not `main`)**
-- Create and switch to a new branch:
-```
-git switch -c feature/short-description
-```
-- Example branch name: `feature/login-form`, `fix/fix-header`, `chore/update-deps`.
+### Running the Frontend
 
-**6) Make changes, stage, commit**
-- Stage changed files:
-```
-git add .
-```
-- Commit with a clear message:
-```
-git commit -m "feat(auth): add login screen and validation"
+To start the Vite development server:
+```bash
+npm run dev
 ```
 
-**7) Keep your branch up-to-date with `main` (recommended before pushing or opening PR)**
-Option A — Rebase (clean history):
-```
-git fetch origin
-git switch feature/your-branch
-git rebase origin/main
-```
-Resolve conflicts if they appear (see section below). After a successful rebase, push:
-```
-git push -u origin feature/your-branch
-```
-If the remote branch exists and you've rewritten history with rebase, you may need to force-push safely:
-```
-git push --force-with-lease
+The application will be available at `http://localhost:5173`
+
+## Backend Setup
+
+### Installation
+
+1. Navigate to the backend directory:
+```bash
+cd web/backend
 ```
 
-Option B — Merge (safer for beginners):
-```
-git fetch origin
-git switch feature/your-branch
-git merge origin/main
-git push -u origin feature/your-branch
+2. Install dependencies (Maven will handle this automatically):
+```bash
+mvn clean install
 ```
 
-**8) Open a Pull Request (PR)**
-- Go to the repository page on GitHub.
-- Click `Compare & pull request` for your branch or `New pull request` and choose your branch into `main`.
-- In the PR description include:
-  - What changed and why
-  - How to test the changes (commands, env vars, steps)
-  - Any screenshots or logs if relevant
-- Request review from your teammate, wait for approvals, address review comments, then merge via the GitHub UI.
+### Running the Backend
 
-**9) After merging PR**
-- Update local `main`:
-```
-git switch main
-git pull origin main
-```
-- Delete your branch locally and remotely (optional cleanup):
-```
-git branch -d feature/your-branch
-git push origin --delete feature/your-branch
+Run the Spring Boot application using Maven:
+```bash
+mvn spring-boot:run
 ```
 
-**10) Resolving conflicts (step-by-step)**
-- If a merge or rebase reports conflicts, Git will pause and mark conflicted files with markers:
-```
-your local code
-incoming remote code
-```
-- Open each conflicted file in an editor and decide which code to keep. Remove the conflict markers and save.
-- Stage the resolved files:
-```
-git add path/to/resolved-file
-```
-- Continue rebase or finish merge:
-```
-git rebase --continue   # if you were rebasing
-git commit              # if you were merging and Git didn't auto-commit
-```
-- If you want to abort the operation and return to the previous state:
-```
-git rebase --abort
-git merge --abort
+The API will be available at `http://localhost:8080`
+
+## Running the Full Stack Application
+
+### Development Mode
+
+1. **Terminal 1** - Start the backend:
+```bash
+cd web/backend
+mvn spring-boot:run
 ```
 
-**11) Common problems & fixes**
-- "remote: Repository not found" — Make sure the repository URL is correct and you have access. If it is private, invite your GitHub user as a collaborator.
-- "permission denied (publickey)" — You're using SSH and GitHub doesn't have your SSH key; add your public key to GitHub.
-- "Updates were rejected because the remote contains work that you do not have locally" — run `git pull --rebase origin main` on your `main`, or follow the rebase/merge steps on your branch.
-- Authentication with HTTPS requiring token: GitHub no longer accepts password authentication; use a Personal Access Token if prompted, or set up the credential manager.
+2. **Terminal 2** - Start the frontend:
+```bash
+cd web/frontend
+npm run dev
+```
 
-**12) Undo mistakes (safety nets)**
-- See recent actions and commits:
-```
-git status
-git log --oneline --graph -n 20
-git reflog
-```
-- Reset to a previous commit (destructive):
-```
-git reset --hard <commit-hash>
-```
-- If you accidentally deleted a branch, recover from reflog:
-```
-git reflog
-git checkout -b restore-branch <commit-hash-from-reflog>
+3. Access the application at `http://localhost:5173`
 
-# rasras-plastic
+## Environment Variables
 
-that make sense 
-sdf s
-sdf
+### Backend (application.properties)
+Configure in `web/backend/src/main/resources/application.properties`
+```
+
+You can now copy this entire content and save it as `README.md` in your project root directory!
