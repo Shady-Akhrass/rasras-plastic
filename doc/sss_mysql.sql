@@ -27,8 +27,8 @@ SET time_zone = "+00:00";
 -- Table structure for table `alertrules`
 --
 
-CREATE TABLE `alertrules` (
-  `AlertRuleID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `alertrules` (
+  `AlertRuleID` int(11) NOT NULL AUTO_INCREMENT,
   `RuleCode` varchar(20) NOT NULL,
   `RuleName` varchar(100) NOT NULL,
   `RuleType` varchar(30) NOT NULL,
@@ -42,7 +42,11 @@ CREATE TABLE `alertrules` (
   `IsActive` tinyint(1) DEFAULT 1,
   `Frequency` varchar(20) DEFAULT NULL,
   `LastExecutedAt` datetime DEFAULT NULL,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`AlertRuleID`),
+  UNIQUE KEY `RuleCode` (`RuleCode`),
+  KEY `FK_AlertRule_Role` (`NotifyRoleID`),
+  KEY `FK_AlertRule_User` (`NotifyUserID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -51,8 +55,8 @@ CREATE TABLE `alertrules` (
 -- Table structure for table `approvalactions`
 --
 
-CREATE TABLE `approvalactions` (
-  `ActionID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `approvalactions` (
+  `ActionID` int(11) NOT NULL AUTO_INCREMENT,
   `RequestID` int(11) NOT NULL,
   `StepID` int(11) NOT NULL,
   `ActionByUserID` int(11) NOT NULL,
@@ -60,7 +64,12 @@ CREATE TABLE `approvalactions` (
   `ActionType` varchar(20) NOT NULL,
   `DelegatedToUserID` int(11) DEFAULT NULL,
   `Comments` varchar(1000) DEFAULT NULL,
-  `AttachmentPath` varchar(500) DEFAULT NULL
+  `AttachmentPath` varchar(500) DEFAULT NULL,
+  PRIMARY KEY (`ActionID`),
+  KEY `FK_ApprovalAction_Request` (`RequestID`),
+  KEY `FK_ApprovalAction_Step` (`StepID`),
+  KEY `FK_ApprovalAction_User` (`ActionByUserID`),
+  KEY `FK_ApprovalAction_Delegate` (`DelegatedToUserID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -69,8 +78,8 @@ CREATE TABLE `approvalactions` (
 -- Table structure for table `approvallimits`
 --
 
-CREATE TABLE `approvallimits` (
-  `ApprovalLimitID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `approvallimits` (
+  `ApprovalLimitID` int(11) NOT NULL AUTO_INCREMENT,
   `ActivityType` varchar(50) NOT NULL,
   `RoleID` int(11) NOT NULL,
   `MinAmount` decimal(18,2) NOT NULL DEFAULT 0.00,
@@ -79,7 +88,10 @@ CREATE TABLE `approvallimits` (
   `MaxPercentage` decimal(5,2) DEFAULT NULL,
   `RequiresReviewBy` int(11) DEFAULT NULL,
   `IsActive` tinyint(1) DEFAULT 1,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`ApprovalLimitID`),
+  KEY `FK_ApprovalLimits_Role` (`RoleID`),
+  KEY `FK_ApprovalLimits_ReviewRole` (`RequiresReviewBy`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -88,8 +100,8 @@ CREATE TABLE `approvallimits` (
 -- Table structure for table `approvalrequests`
 --
 
-CREATE TABLE `approvalrequests` (
-  `RequestID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `approvalrequests` (
+  `RequestID` int(11) NOT NULL AUTO_INCREMENT,
   `WorkflowID` int(11) NOT NULL,
   `DocumentType` varchar(30) NOT NULL,
   `DocumentID` int(11) NOT NULL,
@@ -102,7 +114,13 @@ CREATE TABLE `approvalrequests` (
   `Priority` varchar(10) DEFAULT 'Normal',
   `DueDate` datetime DEFAULT NULL,
   `Notes` varchar(1000) DEFAULT NULL,
-  `CompletedDate` datetime DEFAULT NULL
+  `CompletedDate` datetime DEFAULT NULL,
+  PRIMARY KEY (`RequestID`),
+  KEY `FK_ApprovalReq_Workflow` (`WorkflowID`),
+  KEY `FK_ApprovalReq_Step` (`CurrentStepID`),
+  KEY `FK_ApprovalReq_User` (`RequestedByUserID`),
+  KEY `IX_ApprovalReq_Status` (`Status`),
+  KEY `IX_ApprovalReq_Document` (`DocumentType`,`DocumentID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -111,20 +129,22 @@ CREATE TABLE `approvalrequests` (
 -- Table structure for table `approvalworkflows`
 --
 
-CREATE TABLE `approvalworkflows` (
-  `WorkflowID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `approvalworkflows` (
+  `WorkflowID` int(11) NOT NULL AUTO_INCREMENT,
   `WorkflowCode` varchar(20) NOT NULL,
   `WorkflowName` varchar(100) NOT NULL,
   `DocumentType` varchar(30) NOT NULL,
   `IsActive` tinyint(1) DEFAULT 1,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`WorkflowID`),
+  UNIQUE KEY `WorkflowCode` (`WorkflowCode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `approvalworkflows`
 --
 
-INSERT INTO `approvalworkflows` (`WorkflowID`, `WorkflowCode`, `WorkflowName`, `DocumentType`, `IsActive`, `CreatedAt`) VALUES
+INSERT IGNORE INTO `approvalworkflows` (`WorkflowID`, `WorkflowCode`, `WorkflowName`, `DocumentType`, `IsActive`, `CreatedAt`) VALUES
 (1, 'PO_APPROVAL', 'اعتماد أوامر الشراء', 'PurchaseOrder', 1, '2026-01-12 23:13:08'),
 (2, 'PAY_APPROVAL', 'اعتماد سندات الصرف', 'PaymentVoucher', 1, '2026-01-12 23:13:08'),
 (3, 'DISC_APPROVAL', 'اعتماد الخصومات', 'SalesDiscount', 1, '2026-01-12 23:13:08'),
@@ -136,8 +156,8 @@ INSERT INTO `approvalworkflows` (`WorkflowID`, `WorkflowCode`, `WorkflowName`, `
 -- Table structure for table `approvalworkflowsteps`
 --
 
-CREATE TABLE `approvalworkflowsteps` (
-  `StepID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `approvalworkflowsteps` (
+  `StepID` int(11) NOT NULL AUTO_INCREMENT,
   `WorkflowID` int(11) NOT NULL,
   `StepNumber` int(11) NOT NULL,
   `StepName` varchar(100) NOT NULL,
@@ -150,7 +170,11 @@ CREATE TABLE `approvalworkflowsteps` (
   `CanSkip` tinyint(1) DEFAULT 0,
   `EscalationDays` int(11) DEFAULT 3,
   `EscalateToStepID` int(11) DEFAULT NULL,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`StepID`),
+  KEY `FK_WFStep_Workflow` (`WorkflowID`),
+  KEY `FK_WFStep_Role` (`ApproverRoleID`),
+  KEY `FK_WFStep_User` (`ApproverUserID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -159,8 +183,8 @@ CREATE TABLE `approvalworkflowsteps` (
 -- Table structure for table `attendance`
 --
 
-CREATE TABLE `attendance` (
-  `AttendanceID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `attendance` (
+  `AttendanceID` int(11) NOT NULL AUTO_INCREMENT,
   `EmployeeID` int(11) NOT NULL,
   `AttendanceDate` date NOT NULL,
   `CheckInTime` time DEFAULT NULL,
@@ -169,7 +193,9 @@ CREATE TABLE `attendance` (
   `LeaveType` varchar(20) DEFAULT NULL,
   `OvertimeHours` decimal(5,2) DEFAULT 0.00,
   `Notes` varchar(500) DEFAULT NULL,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`AttendanceID`),
+  UNIQUE KEY `UQ_Attendance` (`EmployeeID`,`AttendanceDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -178,8 +204,8 @@ CREATE TABLE `attendance` (
 -- Table structure for table `auditlog`
 --
 
-CREATE TABLE `auditlog` (
-  `AuditLogID` bigint(20) NOT NULL,
+CREATE TABLE IF NOT EXISTS `auditlog` (
+  `AuditLogID` bigint(20) NOT NULL AUTO_INCREMENT,
   `TableName` varchar(100) NOT NULL,
   `RecordID` int(11) NOT NULL,
   `ActionType` varchar(20) NOT NULL,
@@ -188,7 +214,11 @@ CREATE TABLE `auditlog` (
   `UserID` int(11) NOT NULL,
   `ActionDate` datetime DEFAULT current_timestamp(),
   `IPAddress` varchar(50) DEFAULT NULL,
-  `MachineName` varchar(100) DEFAULT NULL
+  `MachineName` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`AuditLogID`),
+  KEY `IX_AuditLog_Table` (`TableName`,`RecordID`),
+  KEY `IX_AuditLog_Date` (`ActionDate`),
+  KEY `IX_AuditLog_User` (`UserID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -197,8 +227,8 @@ CREATE TABLE `auditlog` (
 -- Table structure for table `bankaccounts`
 --
 
-CREATE TABLE `bankaccounts` (
-  `BankAccountID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `bankaccounts` (
+  `BankAccountID` int(11) NOT NULL AUTO_INCREMENT,
   `AccountNumber` varchar(50) NOT NULL,
   `AccountNameAr` varchar(100) NOT NULL,
   `AccountNameEn` varchar(100) DEFAULT NULL,
@@ -211,7 +241,10 @@ CREATE TABLE `bankaccounts` (
   `CurrentBalance` decimal(18,2) DEFAULT 0.00,
   `GLAccountID` int(11) DEFAULT NULL,
   `IsActive` tinyint(1) DEFAULT 1,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`BankAccountID`),
+  KEY `FK_BankAcc_Bank` (`BankID`),
+  KEY `FK_BankAcc_GLAccount` (`GLAccountID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -220,13 +253,15 @@ CREATE TABLE `bankaccounts` (
 -- Table structure for table `banks`
 --
 
-CREATE TABLE `banks` (
-  `BankID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `banks` (
+  `BankID` int(11) NOT NULL AUTO_INCREMENT,
   `BankCode` varchar(10) NOT NULL,
   `BankNameAr` varchar(100) NOT NULL,
   `BankNameEn` varchar(100) DEFAULT NULL,
   `SwiftCode` varchar(20) DEFAULT NULL,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`BankID`),
+  UNIQUE KEY `BankCode` (`BankCode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -235,8 +270,8 @@ CREATE TABLE `banks` (
 -- Table structure for table `banktransactions`
 --
 
-CREATE TABLE `banktransactions` (
-  `TransactionID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `banktransactions` (
+  `TransactionID` int(11) NOT NULL AUTO_INCREMENT,
   `BankAccountID` int(11) NOT NULL,
   `TransactionDate` date NOT NULL,
   `TransactionType` varchar(20) NOT NULL,
@@ -251,7 +286,11 @@ CREATE TABLE `banktransactions` (
   `StatementReference` varchar(50) DEFAULT NULL,
   `JournalEntryID` int(11) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) NOT NULL
+  `CreatedBy` int(11) NOT NULL,
+  PRIMARY KEY (`TransactionID`),
+  KEY `FK_BankTrans_Account` (`BankAccountID`),
+  KEY `FK_BankTrans_JE` (`JournalEntryID`),
+  KEY `IX_BankTrans_Date` (`TransactionDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -260,8 +299,8 @@ CREATE TABLE `banktransactions` (
 -- Table structure for table `cashregisters`
 --
 
-CREATE TABLE `cashregisters` (
-  `CashRegisterID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `cashregisters` (
+  `CashRegisterID` int(11) NOT NULL AUTO_INCREMENT,
   `RegisterCode` varchar(20) NOT NULL,
   `RegisterNameAr` varchar(100) NOT NULL,
   `RegisterNameEn` varchar(100) DEFAULT NULL,
@@ -273,7 +312,11 @@ CREATE TABLE `cashregisters` (
   `GLAccountID` int(11) DEFAULT NULL,
   `MaxBalance` decimal(18,2) DEFAULT NULL,
   `IsActive` tinyint(1) DEFAULT 1,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`CashRegisterID`),
+  UNIQUE KEY `RegisterCode` (`RegisterCode`),
+  KEY `FK_Cash_Custodian` (`CustodianID`),
+  KEY `FK_Cash_GLAccount` (`GLAccountID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -282,8 +325,8 @@ CREATE TABLE `cashregisters` (
 -- Table structure for table `chartofaccounts`
 --
 
-CREATE TABLE `chartofaccounts` (
-  `AccountID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `chartofaccounts` (
+  `AccountID` int(11) NOT NULL AUTO_INCREMENT,
   `AccountCode` varchar(20) NOT NULL,
   `AccountNameAr` varchar(200) NOT NULL,
   `AccountNameEn` varchar(200) DEFAULT NULL,
@@ -298,7 +341,10 @@ CREATE TABLE `chartofaccounts` (
   `OpeningBalance` decimal(18,2) DEFAULT 0.00,
   `CurrentBalance` decimal(18,2) DEFAULT 0.00,
   `Description` varchar(500) DEFAULT NULL,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`AccountID`),
+  UNIQUE KEY `AccountCode` (`AccountCode`),
+  KEY `FK_COA_Parent` (`ParentAccountID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -307,8 +353,8 @@ CREATE TABLE `chartofaccounts` (
 -- Table structure for table `chequesissued`
 --
 
-CREATE TABLE `chequesissued` (
-  `ChequeID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `chequesissued` (
+  `ChequeID` int(11) NOT NULL AUTO_INCREMENT,
   `ChequeNumber` varchar(30) NOT NULL,
   `BankAccountID` int(11) NOT NULL,
   `ChequeDate` date NOT NULL,
@@ -323,7 +369,11 @@ CREATE TABLE `chequesissued` (
   `CancelReason` varchar(200) DEFAULT NULL,
   `Notes` varchar(500) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) NOT NULL
+  `CreatedBy` int(11) NOT NULL,
+  PRIMARY KEY (`ChequeID`),
+  KEY `FK_ChequeIss_Bank` (`BankAccountID`),
+  KEY `FK_ChequeIss_Supplier` (`SupplierID`),
+  KEY `FK_ChequeIss_Payment` (`PaymentVoucherID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -332,8 +382,8 @@ CREATE TABLE `chequesissued` (
 -- Table structure for table `chequesreceived`
 --
 
-CREATE TABLE `chequesreceived` (
-  `ChequeID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `chequesreceived` (
+  `ChequeID` int(11) NOT NULL AUTO_INCREMENT,
   `ChequeNumber` varchar(30) NOT NULL,
   `BankName` varchar(100) DEFAULT NULL,
   `BranchName` varchar(100) DEFAULT NULL,
@@ -351,7 +401,12 @@ CREATE TABLE `chequesreceived` (
   `EndorsedDate` date DEFAULT NULL,
   `Notes` varchar(500) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) NOT NULL
+  `CreatedBy` int(11) NOT NULL,
+  PRIMARY KEY (`ChequeID`),
+  KEY `FK_ChequeRec_Customer` (`CustomerID`),
+  KEY `FK_ChequeRec_Receipt` (`ReceiptVoucherID`),
+  KEY `FK_ChequeRec_Bank` (`CollectionBankAccountID`),
+  KEY `FK_ChequeRec_Endorsed` (`EndorsedToSupplierID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -360,7 +415,7 @@ CREATE TABLE `chequesreceived` (
 -- Table structure for table `companyinfo`
 --
 
-CREATE TABLE `companyinfo` (
+CREATE TABLE IF NOT EXISTS `companyinfo` (
   `CompanyID` int(11) NOT NULL,
   `CompanyNameAr` varchar(200) NOT NULL,
   `CompanyNameEn` varchar(200) DEFAULT NULL,
@@ -388,13 +443,17 @@ CREATE TABLE `companyinfo` (
 -- Table structure for table `costcenters`
 --
 
-CREATE TABLE `costcenters` (
-  `CostCenterID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `costcenters` (
+  `CostCenterID` int(11) NOT NULL AUTO_INCREMENT,
   `CostCenterCode` varchar(20) NOT NULL,
   `CostCenterName` varchar(100) NOT NULL,
   `ParentCostCenterID` int(11) DEFAULT NULL,
   `DepartmentID` int(11) DEFAULT NULL,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`CostCenterID`),
+  UNIQUE KEY `CostCenterCode` (`CostCenterCode`),
+  KEY `FK_CC_Parent` (`ParentCostCenterID`),
+  KEY `FK_CC_Dept` (`DepartmentID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -403,8 +462,8 @@ CREATE TABLE `costcenters` (
 -- Table structure for table `creditnotes`
 --
 
-CREATE TABLE `creditnotes` (
-  `CreditNoteID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `creditnotes` (
+  `CreditNoteID` int(11) NOT NULL AUTO_INCREMENT,
   `CreditNoteNumber` varchar(20) NOT NULL,
   `CreditNoteDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `CustomerID` int(11) NOT NULL,
@@ -423,7 +482,14 @@ CREATE TABLE `creditnotes` (
   `ApprovedDate` datetime DEFAULT NULL,
   `Notes` varchar(1000) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) NOT NULL
+  `CreatedBy` int(11) NOT NULL,
+  PRIMARY KEY (`CreditNoteID`),
+  UNIQUE KEY `CreditNoteNumber` (`CreditNoteNumber`),
+  KEY `FK_CreditNote_Customer` (`CustomerID`),
+  KEY `FK_CreditNote_Return` (`SalesReturnID`),
+  KEY `FK_CreditNote_Invoice` (`SalesInvoiceID`),
+  KEY `FK_CreditNote_JE` (`JournalEntryID`),
+  KEY `FK_CreditNote_ApprovedBy` (`ApprovedByUserID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -432,8 +498,8 @@ CREATE TABLE `creditnotes` (
 -- Table structure for table `customercontacts`
 --
 
-CREATE TABLE `customercontacts` (
-  `ContactID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `customercontacts` (
+  `ContactID` int(11) NOT NULL AUTO_INCREMENT,
   `CustomerID` int(11) NOT NULL,
   `ContactName` varchar(100) NOT NULL,
   `JobTitle` varchar(100) DEFAULT NULL,
@@ -441,7 +507,9 @@ CREATE TABLE `customercontacts` (
   `Mobile` varchar(20) DEFAULT NULL,
   `Email` varchar(100) DEFAULT NULL,
   `IsPrimary` tinyint(1) DEFAULT 0,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`ContactID`),
+  KEY `FK_CustomerContacts_Customer` (`CustomerID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -450,7 +518,7 @@ CREATE TABLE `customercontacts` (
 -- Table structure for table `customers`
 --
 
-CREATE TABLE `customers` (
+CREATE TABLE IF NOT EXISTS `customers` (
   `CustomerID` int(11) NOT NULL,
   `CustomerCode` varchar(20) NOT NULL,
   `CustomerNameAr` varchar(200) NOT NULL,
@@ -492,8 +560,8 @@ CREATE TABLE `customers` (
 -- Table structure for table `dailymarketprices`
 --
 
-CREATE TABLE `dailymarketprices` (
-  `PriceID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `dailymarketprices` (
+  `PriceID` int(11) NOT NULL AUTO_INCREMENT,
   `PriceDate` date NOT NULL,
   `ItemID` int(11) NOT NULL,
   `Currency` varchar(3) DEFAULT 'USD',
@@ -503,7 +571,10 @@ CREATE TABLE `dailymarketprices` (
   `Source` varchar(100) DEFAULT NULL,
   `Notes` varchar(500) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) DEFAULT NULL
+  `CreatedBy` int(11) DEFAULT NULL,
+  PRIMARY KEY (`PriceID`),
+  UNIQUE KEY `UQ_DailyPrice` (`PriceDate`,`ItemID`),
+  KEY `FK_MarketPrice_Item` (`ItemID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -512,8 +583,8 @@ CREATE TABLE `dailymarketprices` (
 -- Table structure for table `debitnotes`
 --
 
-CREATE TABLE `debitnotes` (
-  `DebitNoteID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `debitnotes` (
+  `DebitNoteID` int(11) NOT NULL AUTO_INCREMENT,
   `DebitNoteNumber` varchar(20) NOT NULL,
   `DebitNoteDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `SupplierID` int(11) NOT NULL,
@@ -532,7 +603,14 @@ CREATE TABLE `debitnotes` (
   `ApprovedDate` datetime DEFAULT NULL,
   `Notes` varchar(1000) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) NOT NULL
+  `CreatedBy` int(11) NOT NULL,
+  PRIMARY KEY (`DebitNoteID`),
+  UNIQUE KEY `DebitNoteNumber` (`DebitNoteNumber`),
+  KEY `FK_DebitNote_Supplier` (`SupplierID`),
+  KEY `FK_DebitNote_Return` (`PurchaseReturnID`),
+  KEY `FK_DebitNote_Invoice` (`SupplierInvoiceID`),
+  KEY `FK_DebitNote_JE` (`JournalEntryID`),
+  KEY `FK_DebitNote_ApprovedBy` (`ApprovedByUserID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -541,8 +619,8 @@ CREATE TABLE `debitnotes` (
 -- Table structure for table `deliveryorders`
 --
 
-CREATE TABLE `deliveryorders` (
-  `DeliveryOrderID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `deliveryorders` (
+  `DeliveryOrderID` int(11) NOT NULL AUTO_INCREMENT,
   `DeliveryOrderNumber` varchar(20) NOT NULL,
   `OrderDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `IssueNoteID` int(11) NOT NULL,
@@ -568,7 +646,14 @@ CREATE TABLE `deliveryorders` (
   `CreatedAt` datetime DEFAULT current_timestamp(),
   `CreatedBy` int(11) NOT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
-  `UpdatedBy` int(11) DEFAULT NULL
+  `UpdatedBy` int(11) DEFAULT NULL,
+  PRIMARY KEY (`DeliveryOrderID`),
+  UNIQUE KEY `DeliveryOrderNumber` (`DeliveryOrderNumber`),
+  KEY `FK_DO_IssueNote` (`IssueNoteID`),
+  KEY `FK_DO_Customer` (`CustomerID`),
+  KEY `FK_DO_Zone` (`ZoneID`),
+  KEY `FK_DO_Vehicle` (`VehicleID`),
+  KEY `FK_DO_Contractor` (`ContractorID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -577,14 +662,16 @@ CREATE TABLE `deliveryorders` (
 -- Table structure for table `deliveryzones`
 --
 
-CREATE TABLE `deliveryzones` (
-  `ZoneID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `deliveryzones` (
+  `ZoneID` int(11) NOT NULL AUTO_INCREMENT,
   `ZoneCode` varchar(20) NOT NULL,
   `ZoneName` varchar(100) NOT NULL,
   `Cities` varchar(500) DEFAULT NULL,
   `DeliveryCost` decimal(18,2) DEFAULT NULL,
   `EstimatedDays` int(11) DEFAULT NULL,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`ZoneID`),
+  UNIQUE KEY `ZoneCode` (`ZoneCode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -593,8 +680,8 @@ CREATE TABLE `deliveryzones` (
 -- Table structure for table `departments`
 --
 
-CREATE TABLE `departments` (
-  `DepartmentID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `departments` (
+  `DepartmentID` int(11) NOT NULL AUTO_INCREMENT,
   `DepartmentCode` varchar(10) NOT NULL,
   `DepartmentNameAr` varchar(100) NOT NULL,
   `DepartmentNameEn` varchar(100) DEFAULT NULL,
@@ -603,7 +690,10 @@ CREATE TABLE `departments` (
   `CreatedAt` datetime DEFAULT current_timestamp(),
   `CreatedBy` int(11) DEFAULT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
-  `UpdatedBy` int(11) DEFAULT NULL
+  `UpdatedBy` int(11) DEFAULT NULL,
+  PRIMARY KEY (`DepartmentID`),
+  UNIQUE KEY `DepartmentCode` (`DepartmentCode`),
+  KEY `FK_Departments_Parent` (`ParentDepartmentID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -628,8 +718,8 @@ INSERT INTO `departments` (`DepartmentID`, `DepartmentCode`, `DepartmentNameAr`,
 -- Table structure for table `documentcycletracking`
 --
 
-CREATE TABLE `documentcycletracking` (
-  `TrackingID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `documentcycletracking` (
+  `TrackingID` int(11) NOT NULL AUTO_INCREMENT,
   `CycleType` varchar(30) NOT NULL,
   `CycleStartDocumentType` varchar(30) DEFAULT NULL,
   `CycleStartDocumentID` int(11) DEFAULT NULL,
@@ -642,7 +732,8 @@ CREATE TABLE `documentcycletracking` (
   `EndDate` datetime DEFAULT NULL,
   `TotalDaysToComplete` int(11) DEFAULT NULL,
   `Notes` varchar(500) DEFAULT NULL,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`TrackingID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -651,8 +742,8 @@ CREATE TABLE `documentcycletracking` (
 -- Table structure for table `documentrelationships`
 --
 
-CREATE TABLE `documentrelationships` (
-  `RelationshipID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `documentrelationships` (
+  `RelationshipID` int(11) NOT NULL AUTO_INCREMENT,
   `ParentDocumentType` varchar(30) NOT NULL,
   `ParentDocumentID` int(11) NOT NULL,
   `ParentDocumentNumber` varchar(30) DEFAULT NULL,
@@ -661,7 +752,9 @@ CREATE TABLE `documentrelationships` (
   `ChildDocumentNumber` varchar(30) DEFAULT NULL,
   `RelationshipType` varchar(20) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) NOT NULL
+  `CreatedBy` int(11) NOT NULL,
+  PRIMARY KEY (`RelationshipID`),
+  KEY `FK_DocRel_CreatedBy` (`CreatedBy`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -670,8 +763,8 @@ CREATE TABLE `documentrelationships` (
 -- Table structure for table `documentsequences`
 --
 
-CREATE TABLE `documentsequences` (
-  `SequenceID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `documentsequences` (
+  `SequenceID` int(11) NOT NULL AUTO_INCREMENT,
   `DocumentTypeID` int(11) NOT NULL,
   `FiscalYearID` int(11) DEFAULT NULL,
   `WarehouseID` int(11) DEFAULT NULL,
@@ -681,7 +774,12 @@ CREATE TABLE `documentsequences` (
   `CurrentNumber` int(11) DEFAULT 0,
   `NumberFormat` varchar(50) DEFAULT NULL,
   `LastGeneratedDate` datetime DEFAULT NULL,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`SequenceID`),
+  KEY `FK_DocSeq_Type` (`DocumentTypeID`),
+  KEY `FK_DocSeq_Year` (`FiscalYearID`),
+  KEY `FK_DocSeq_Warehouse` (`WarehouseID`),
+  KEY `FK_DocSeq_Dept` (`DepartmentID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -690,8 +788,8 @@ CREATE TABLE `documentsequences` (
 -- Table structure for table `documenttypes`
 --
 
-CREATE TABLE `documenttypes` (
-  `DocumentTypeID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `documenttypes` (
+  `DocumentTypeID` int(11) NOT NULL AUTO_INCREMENT,
   `DocumentTypeCode` varchar(20) NOT NULL,
   `DocumentTypeNameAr` varchar(100) NOT NULL,
   `DocumentTypeNameEn` varchar(100) DEFAULT NULL,
@@ -703,7 +801,10 @@ CREATE TABLE `documenttypes` (
   `RequiresApproval` tinyint(1) DEFAULT 0,
   `WorkflowID` int(11) DEFAULT NULL,
   `IsActive` tinyint(1) DEFAULT 1,
-  `CreatedAt` datetime DEFAULT current_timestamp()
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`DocumentTypeID`),
+  UNIQUE KEY `DocumentTypeCode` (`DocumentTypeCode`),
+  KEY `FK_DocType_Workflow` (`WorkflowID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -733,8 +834,8 @@ INSERT INTO `documenttypes` (`DocumentTypeID`, `DocumentTypeCode`, `DocumentType
 -- Table structure for table `employees`
 --
 
-CREATE TABLE `employees` (
-  `EmployeeID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `employees` (
+  `EmployeeID` int(11) NOT NULL AUTO_INCREMENT,
   `EmployeeCode` varchar(20) NOT NULL,
   `FirstNameAr` varchar(50) NOT NULL,
   `LastNameAr` varchar(50) NOT NULL,
@@ -755,7 +856,11 @@ CREATE TABLE `employees` (
   `CreatedAt` datetime DEFAULT current_timestamp(),
   `CreatedBy` int(11) DEFAULT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
-  `UpdatedBy` int(11) DEFAULT NULL
+  `UpdatedBy` int(11) DEFAULT NULL,
+  PRIMARY KEY (`EmployeeID`),
+  UNIQUE KEY `EmployeeCode` (`EmployeeCode`),
+  KEY `FK_Employees_Manager` (`ManagerID`),
+  KEY `IX_Employees_Department` (`DepartmentID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -764,14 +869,17 @@ CREATE TABLE `employees` (
 -- Table structure for table `employeesalarystructure`
 --
 
-CREATE TABLE `employeesalarystructure` (
-  `StructureID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `employeesalarystructure` (
+  `StructureID` int(11) NOT NULL AUTO_INCREMENT,
   `EmployeeID` int(11) NOT NULL,
   `ComponentID` int(11) NOT NULL,
   `Amount` decimal(18,2) NOT NULL,
   `EffectiveFrom` date NOT NULL,
   `EffectiveTo` date DEFAULT NULL,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`StructureID`),
+  KEY `FK_SalaryStruct_Employee` (`EmployeeID`),
+  KEY `FK_SalaryStruct_Component` (`ComponentID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -780,8 +888,8 @@ CREATE TABLE `employeesalarystructure` (
 -- Table structure for table `exchangerates`
 --
 
-CREATE TABLE `exchangerates` (
-  `ExchangeRateID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `exchangerates` (
+  `ExchangeRateID` int(11) NOT NULL AUTO_INCREMENT,
   `FromCurrency` varchar(3) NOT NULL,
   `ToCurrency` varchar(3) NOT NULL,
   `RateDate` date NOT NULL,
@@ -790,7 +898,9 @@ CREATE TABLE `exchangerates` (
   `AverageRate` decimal(18,6) NOT NULL,
   `Source` varchar(50) DEFAULT NULL,
   `CreatedAt` datetime DEFAULT current_timestamp(),
-  `CreatedBy` int(11) DEFAULT NULL
+  `CreatedBy` int(11) DEFAULT NULL,
+  PRIMARY KEY (`ExchangeRateID`),
+  UNIQUE KEY `UQ_ExchangeRate` (`FromCurrency`,`ToCurrency`,`RateDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -799,8 +909,8 @@ CREATE TABLE `exchangerates` (
 -- Table structure for table `fiscalperiods`
 --
 
-CREATE TABLE `fiscalperiods` (
-  `PeriodID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `fiscalperiods` (
+  `PeriodID` int(11) NOT NULL AUTO_INCREMENT,
   `FiscalYearID` int(11) NOT NULL,
   `PeriodNumber` int(11) NOT NULL,
   `PeriodName` varchar(50) NOT NULL,
@@ -808,7 +918,9 @@ CREATE TABLE `fiscalperiods` (
   `EndDate` date NOT NULL,
   `IsClosed` tinyint(1) DEFAULT 0,
   `ClosedByUserID` int(11) DEFAULT NULL,
-  `ClosedDate` datetime DEFAULT NULL
+  `ClosedDate` datetime DEFAULT NULL,
+  PRIMARY KEY (`PeriodID`),
+  KEY `FK_Period_Year` (`FiscalYearID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -817,8 +929,8 @@ CREATE TABLE `fiscalperiods` (
 -- Table structure for table `fiscalyears`
 --
 
-CREATE TABLE `fiscalyears` (
-  `FiscalYearID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `fiscalyears` (
+  `FiscalYearID` int(11) NOT NULL AUTO_INCREMENT,
   `YearCode` varchar(10) NOT NULL,
   `YearName` varchar(50) NOT NULL,
   `StartDate` date NOT NULL,
@@ -826,7 +938,9 @@ CREATE TABLE `fiscalyears` (
   `IsClosed` tinyint(1) DEFAULT 0,
   `ClosedByUserID` int(11) DEFAULT NULL,
   `ClosedDate` datetime DEFAULT NULL,
-  `IsActive` tinyint(1) DEFAULT 1
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`FiscalYearID`),
+  UNIQUE KEY `YearCode` (`YearCode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -835,8 +949,8 @@ CREATE TABLE `fiscalyears` (
 -- Table structure for table `goodsreceiptnotes`
 --
 
-CREATE TABLE `goodsreceiptnotes` (
-  `GRNID` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `goodsreceiptnotes` (
+  `GRNID` int(11) NOT NULL AUTO_INCREMENT,
   `GRNNumber` varchar(20) NOT NULL,
   `GRNDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `POID` int(11) NOT NULL,
@@ -855,7 +969,15 @@ CREATE TABLE `goodsreceiptnotes` (
   `CreatedAt` datetime DEFAULT current_timestamp(),
   `CreatedBy` int(11) NOT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
-  `UpdatedBy` int(11) DEFAULT NULL
+  `UpdatedBy` int(11) DEFAULT NULL,
+  PRIMARY KEY (`GRNID`),
+  UNIQUE KEY `GRNNumber` (`GRNNumber`),
+  KEY `FK_GRN_Supplier` (`SupplierID`),
+  KEY `FK_GRN_Warehouse` (`WarehouseID`),
+  KEY `FK_GRN_ReceivedBy` (`ReceivedByUserID`),
+  KEY `FK_GRN_InspectedBy` (`InspectedByUserID`),
+  KEY `IX_GRN_PO` (`POID`),
+  KEY `IX_GRN_Status` (`Status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -864,7 +986,7 @@ CREATE TABLE `goodsreceiptnotes` (
 -- Table structure for table `grnitems`
 --
 
-CREATE TABLE `grnitems` (
+CREATE TABLE IF NOT EXISTS `grnitems` (
   `GRNItemID` int(11) NOT NULL,
   `GRNID` int(11) NOT NULL,
   `POItemID` int(11) NOT NULL,
@@ -892,7 +1014,7 @@ CREATE TABLE `grnitems` (
 -- Table structure for table `inventorybatches` (new - supports FIFO / batch tracking)
 --
 
-CREATE TABLE `inventorybatches` (
+CREATE TABLE IF NOT EXISTS `inventorybatches` (
   `BatchID` int(11) NOT NULL,
   `BatchNumber` varchar(100) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -915,7 +1037,7 @@ CREATE TABLE `inventorybatches` (
 -- later in the Indexes/Constraints section so they run after the referenced tables are created.
 
 
-CREATE TABLE `itemcategories` (
+CREATE TABLE IF NOT EXISTS `itemcategories` (
   `CategoryID` int(11) NOT NULL,
   `CategoryCode` varchar(20) NOT NULL,
   `CategoryNameAr` varchar(100) NOT NULL,
@@ -965,33 +1087,11 @@ CREATE TABLE IF NOT EXISTS `qualityparameters` (
   UNIQUE KEY `uk_qualityparameters_code` (`ParameterCode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
-
---
--- Table structure for table `itemqualityspecs`
---
-
-CREATE TABLE IF NOT EXISTS `itemqualityspecs` (
-  `SpecID` int(11) NOT NULL AUTO_INCREMENT,
-  `ItemID` int(11) NOT NULL,
-  `ParameterID` int(11) NOT NULL,
-  `MinValue` decimal(18,6) DEFAULT NULL,
-  `MaxValue` decimal(18,6) DEFAULT NULL,
-  `TargetValue` decimal(18,6) DEFAULT NULL,
-  `IsCritical` tinyint(1) DEFAULT 0,
-  `IsActive` tinyint(1) DEFAULT 1,
-  PRIMARY KEY (`SpecID`),
-  KEY `fk_itemqualityspecs_item` (`ItemID`),
-  KEY `fk_itemqualityspecs_parameter` (`ParameterID`),
-  CONSTRAINT `fk_itemqualityspecs_item` FOREIGN KEY (`ItemID`) REFERENCES `items` (`ItemID`) ON DELETE CASCADE,
-  CONSTRAINT `fk_itemqualityspecs_parameter` FOREIGN KEY (`ParameterID`) REFERENCES `qualityparameters` (`ParameterID`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 --
 -- Dumping data for table `qualityparameters`
 --
 
-INSERT INTO `qualityparameters` (`ParameterCode`, `ParameterNameAr`, `ParameterNameEn`, `UnitOfMeasure`, `DataType`, `Description`, `IsActive`) VALUES
+INSERT IGNORE INTO `qualityparameters` (`ParameterCode`, `ParameterNameAr`, `ParameterNameEn`, `UnitOfMeasure`, `DataType`, `Description`, `IsActive`) VALUES
 ('DEN', 'الكثافة', 'Density', 'g/cm³', 'NUMERIC', 'كثافة المادة', 1),
 ('MFI', 'معامل الانصهار', 'Melt Flow Index', 'g/10min', 'NUMERIC', 'معدل سريان المصهور', 1),
 ('TENS', 'قوة الشد', 'Tensile Strength', 'MPa', 'NUMERIC', 'مقاومة الشد', 1),
@@ -1007,7 +1107,7 @@ INSERT INTO `qualityparameters` (`ParameterCode`, `ParameterNameAr`, `ParameterN
 -- Table structure for table `items`
 --
 
-CREATE TABLE `items` (
+CREATE TABLE IF NOT EXISTS `items` (
   `ItemID` int(11) NOT NULL,
   `ItemCode` varchar(30) NOT NULL,
   `ItemNameAr` varchar(200) NOT NULL,
@@ -1034,7 +1134,31 @@ CREATE TABLE `items` (
   `CreatedAt` datetime DEFAULT current_timestamp(),
   `CreatedBy` int(11) DEFAULT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
-  `UpdatedBy` int(11) DEFAULT NULL
+  `UpdatedBy` int(11) DEFAULT NULL,
+  PRIMARY KEY (`ItemID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `itemqualityspecs`
+-- (must be after `items` and `qualityparameters` due to foreign keys)
+--
+
+CREATE TABLE IF NOT EXISTS `itemqualityspecs` (
+  `SpecID` int(11) NOT NULL AUTO_INCREMENT,
+  `ItemID` int(11) NOT NULL,
+  `ParameterID` int(11) NOT NULL,
+  `MinValue` decimal(18,6) DEFAULT NULL,
+  `MaxValue` decimal(18,6) DEFAULT NULL,
+  `TargetValue` decimal(18,6) DEFAULT NULL,
+  `IsCritical` tinyint(1) DEFAULT 0,
+  `IsActive` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`SpecID`),
+  KEY `fk_itemqualityspecs_item` (`ItemID`),
+  KEY `fk_itemqualityspecs_parameter` (`ParameterID`),
+  CONSTRAINT `fk_itemqualityspecs_item` FOREIGN KEY (`ItemID`) REFERENCES `items` (`ItemID`) ON DELETE CASCADE,
+  CONSTRAINT `fk_itemqualityspecs_parameter` FOREIGN KEY (`ParameterID`) REFERENCES `qualityparameters` (`ParameterID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -1043,7 +1167,7 @@ CREATE TABLE `items` (
 -- Table structure for table `journalentries`
 --
 
-CREATE TABLE `journalentries` (
+CREATE TABLE IF NOT EXISTS `journalentries` (
   `JournalEntryID` int(11) NOT NULL,
   `EntryNumber` varchar(20) NOT NULL,
   `EntryDate` date NOT NULL,
@@ -1075,7 +1199,7 @@ CREATE TABLE `journalentries` (
 -- Table structure for table `journalentrylines`
 --
 
-CREATE TABLE `journalentrylines` (
+CREATE TABLE IF NOT EXISTS `journalentrylines` (
   `LineID` int(11) NOT NULL,
   `JournalEntryID` int(11) NOT NULL,
   `LineNumber` int(11) NOT NULL,
@@ -1098,7 +1222,7 @@ CREATE TABLE `journalentrylines` (
 -- Table structure for table `leaverequests`
 --
 
-CREATE TABLE `leaverequests` (
+CREATE TABLE IF NOT EXISTS `leaverequests` (
   `LeaveRequestID` int(11) NOT NULL,
   `EmployeeID` int(11) NOT NULL,
   `LeaveType` varchar(20) NOT NULL,
@@ -1119,7 +1243,7 @@ CREATE TABLE `leaverequests` (
 -- Table structure for table `notifications`
 --
 
-CREATE TABLE `notifications` (
+CREATE TABLE IF NOT EXISTS `notifications` (
   `NotificationID` int(11) NOT NULL,
   `NotificationType` varchar(30) NOT NULL,
   `Title` varchar(200) NOT NULL,
@@ -1145,7 +1269,7 @@ CREATE TABLE `notifications` (
 -- Table structure for table `numberseries`
 --
 
-CREATE TABLE `numberseries` (
+CREATE TABLE IF NOT EXISTS `numberseries` (
   `SeriesID` int(11) NOT NULL,
   `SeriesCode` varchar(20) NOT NULL,
   `SeriesName` varchar(100) NOT NULL,
@@ -1170,7 +1294,7 @@ CREATE TABLE `numberseries` (
 -- Table structure for table `paymentvoucherallocations`
 --
 
-CREATE TABLE `paymentvoucherallocations` (
+CREATE TABLE IF NOT EXISTS `paymentvoucherallocations` (
   `AllocationID` int(11) NOT NULL,
   `PaymentVoucherID` int(11) NOT NULL,
   `SupplierInvoiceID` int(11) NOT NULL,
@@ -1185,7 +1309,7 @@ CREATE TABLE `paymentvoucherallocations` (
 -- Table structure for table `paymentvouchers`
 --
 
-CREATE TABLE `paymentvouchers` (
+CREATE TABLE IF NOT EXISTS `paymentvouchers` (
   `PaymentVoucherID` int(11) NOT NULL,
   `VoucherNumber` varchar(20) NOT NULL,
   `VoucherDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1224,7 +1348,7 @@ CREATE TABLE `paymentvouchers` (
 -- Table structure for table `payroll`
 --
 
-CREATE TABLE `payroll` (
+CREATE TABLE IF NOT EXISTS `payroll` (
   `PayrollID` int(11) NOT NULL,
   `PayrollMonth` int(11) NOT NULL,
   `PayrollYear` int(11) NOT NULL,
@@ -1248,7 +1372,7 @@ CREATE TABLE `payroll` (
 -- Table structure for table `payrolldetails`
 --
 
-CREATE TABLE `payrolldetails` (
+CREATE TABLE IF NOT EXISTS `payrolldetails` (
   `PayrollDetailID` int(11) NOT NULL,
   `PayrollID` int(11) NOT NULL,
   `ComponentID` int(11) NOT NULL,
@@ -1261,7 +1385,7 @@ CREATE TABLE `payrolldetails` (
 -- Table structure for table `permissions`
 --
 
-CREATE TABLE `permissions` (
+CREATE TABLE IF NOT EXISTS `permissions` (
   `PermissionID` int(11) NOT NULL,
   `PermissionCode` varchar(50) NOT NULL,
   `PermissionNameAr` varchar(100) NOT NULL,
@@ -1308,7 +1432,7 @@ INSERT INTO `permissions` (`PermissionID`, `PermissionCode`, `PermissionNameAr`,
 -- Table structure for table `pricelistitems`
 --
 
-CREATE TABLE `pricelistitems` (
+CREATE TABLE IF NOT EXISTS `pricelistitems` (
   `PriceListItemID` int(11) NOT NULL,
   `PriceListID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -1324,7 +1448,7 @@ CREATE TABLE `pricelistitems` (
 -- Table structure for table `pricelists`
 --
 
-CREATE TABLE `pricelists` (
+CREATE TABLE IF NOT EXISTS `pricelists` (
   `PriceListID` int(11) NOT NULL,
   `PriceListCode` varchar(20) NOT NULL,
   `PriceListName` varchar(100) NOT NULL,
@@ -1343,7 +1467,7 @@ CREATE TABLE `pricelists` (
 -- Table structure for table `purchaseorderitems`
 --
 
-CREATE TABLE `purchaseorderitems` (
+CREATE TABLE IF NOT EXISTS `purchaseorderitems` (
   `POItemID` int(11) NOT NULL,
   `POID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -1368,7 +1492,7 @@ CREATE TABLE `purchaseorderitems` (
 -- Table structure for table `purchaseorders`
 --
 
-CREATE TABLE `purchaseorders` (
+CREATE TABLE IF NOT EXISTS `purchaseorders` (
   `POID` int(11) NOT NULL,
   `PONumber` varchar(20) NOT NULL,
   `PODate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1413,7 +1537,7 @@ CREATE TABLE `purchaseorders` (
 -- Table structure for table `purchaserequisitionitems`
 --
 
-CREATE TABLE `purchaserequisitionitems` (
+CREATE TABLE IF NOT EXISTS `purchaserequisitionitems` (
   `PRItemID` int(11) NOT NULL,
   `PRID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -1432,7 +1556,7 @@ CREATE TABLE `purchaserequisitionitems` (
 -- Table structure for table `purchaserequisitions`
 --
 
-CREATE TABLE `purchaserequisitions` (
+CREATE TABLE IF NOT EXISTS `purchaserequisitions` (
   `PRID` int(11) NOT NULL,
   `PRNumber` varchar(20) NOT NULL,
   `PRDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1459,7 +1583,7 @@ CREATE TABLE `purchaserequisitions` (
 -- Table structure for table `purchasereturnitems`
 --
 
-CREATE TABLE `purchasereturnitems` (
+CREATE TABLE IF NOT EXISTS `purchasereturnitems` (
   `ReturnItemID` int(11) NOT NULL,
   `PurchaseReturnID` int(11) NOT NULL,
   `GRNItemID` int(11) DEFAULT NULL,
@@ -1481,7 +1605,7 @@ CREATE TABLE `purchasereturnitems` (
 -- Table structure for table `purchasereturns`
 --
 
-CREATE TABLE `purchasereturns` (
+CREATE TABLE IF NOT EXISTS `purchasereturns` (
   `PurchaseReturnID` int(11) NOT NULL,
   `ReturnNumber` varchar(20) NOT NULL,
   `ReturnDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1511,7 +1635,7 @@ CREATE TABLE `purchasereturns` (
 -- Table structure for table `qualityinspectionresults`
 --
 
-CREATE TABLE `qualityinspectionresults` (
+CREATE TABLE IF NOT EXISTS `qualityinspectionresults` (
   `ResultID` int(11) NOT NULL,
   `InspectionID` int(11) NOT NULL,
   `ParameterID` int(11) NOT NULL,
@@ -1527,7 +1651,7 @@ CREATE TABLE `qualityinspectionresults` (
 -- Table structure for table `qualityinspections`
 --
 
-CREATE TABLE `qualityinspections` (
+CREATE TABLE IF NOT EXISTS `qualityinspections` (
   `InspectionID` int(11) NOT NULL,
   `InspectionNumber` varchar(20) NOT NULL,
   `InspectionDate` datetime NOT NULL DEFAULT current_timestamp(),
@@ -1555,7 +1679,7 @@ CREATE TABLE `qualityinspections` (
 -- Table structure for table `qualityparameters`
 --
 
-CREATE TABLE `qualityparameters` (
+CREATE TABLE IF NOT EXISTS `qualityparameters` (
   `ParameterID` int(11) NOT NULL,
   `ParameterCode` varchar(20) NOT NULL,
   `ParameterNameAr` varchar(100) NOT NULL,
@@ -1575,7 +1699,7 @@ CREATE TABLE `qualityparameters` (
 -- Table structure for table `quotationcomparisondetails`
 --
 
-CREATE TABLE `quotationcomparisondetails` (
+CREATE TABLE IF NOT EXISTS `quotationcomparisondetails` (
   `CompDetailID` int(11) NOT NULL,
   `ComparisonID` int(11) NOT NULL,
   `QuotationID` int(11) NOT NULL,
@@ -1596,7 +1720,7 @@ CREATE TABLE `quotationcomparisondetails` (
 -- Table structure for table `quotationcomparisons`
 --
 
-CREATE TABLE `quotationcomparisons` (
+CREATE TABLE IF NOT EXISTS `quotationcomparisons` (
   `ComparisonID` int(11) NOT NULL,
   `ComparisonNumber` varchar(20) NOT NULL,
   `ComparisonDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1621,7 +1745,7 @@ CREATE TABLE `quotationcomparisons` (
 -- Table structure for table `receiptvoucherallocations`
 --
 
-CREATE TABLE `receiptvoucherallocations` (
+CREATE TABLE IF NOT EXISTS `receiptvoucherallocations` (
   `AllocationID` int(11) NOT NULL,
   `ReceiptVoucherID` int(11) NOT NULL,
   `SalesInvoiceID` int(11) NOT NULL,
@@ -1636,7 +1760,7 @@ CREATE TABLE `receiptvoucherallocations` (
 -- Table structure for table `receiptvouchers`
 --
 
-CREATE TABLE `receiptvouchers` (
+CREATE TABLE IF NOT EXISTS `receiptvouchers` (
   `ReceiptVoucherID` int(11) NOT NULL,
   `VoucherNumber` varchar(20) NOT NULL,
   `VoucherDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1669,7 +1793,7 @@ CREATE TABLE `receiptvouchers` (
 -- Table structure for table `requestforquotations`
 --
 
-CREATE TABLE `requestforquotations` (
+CREATE TABLE IF NOT EXISTS `requestforquotations` (
   `RFQID` int(11) NOT NULL,
   `RFQNumber` varchar(20) NOT NULL,
   `RFQDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1690,7 +1814,7 @@ CREATE TABLE `requestforquotations` (
 -- Table structure for table `rfqitems`
 --
 
-CREATE TABLE `rfqitems` (
+CREATE TABLE IF NOT EXISTS `rfqitems` (
   `RFQItemID` int(11) NOT NULL,
   `RFQID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -1705,7 +1829,7 @@ CREATE TABLE `rfqitems` (
 -- Table structure for table `rolepermissions`
 --
 
-CREATE TABLE `rolepermissions` (
+CREATE TABLE IF NOT EXISTS `rolepermissions` (
   `RolePermissionID` int(11) NOT NULL,
   `RoleID` int(11) NOT NULL,
   `PermissionID` int(11) NOT NULL,
@@ -1718,7 +1842,7 @@ CREATE TABLE `rolepermissions` (
 -- Table structure for table `roles`
 --
 
-CREATE TABLE `roles` (
+CREATE TABLE IF NOT EXISTS `roles` (
   `RoleID` int(11) NOT NULL,
   `RoleCode` varchar(20) NOT NULL,
   `RoleNameAr` varchar(100) NOT NULL,
@@ -1751,7 +1875,7 @@ INSERT INTO `roles` (`RoleID`, `RoleCode`, `RoleNameAr`, `RoleNameEn`, `Descript
 -- Table structure for table `salarycomponents`
 --
 
-CREATE TABLE `salarycomponents` (
+CREATE TABLE IF NOT EXISTS `salarycomponents` (
   `ComponentID` int(11) NOT NULL,
   `ComponentCode` varchar(20) NOT NULL,
   `ComponentName` varchar(100) NOT NULL,
@@ -1766,7 +1890,7 @@ CREATE TABLE `salarycomponents` (
 -- Table structure for table `salesinvoiceitems`
 --
 
-CREATE TABLE `salesinvoiceitems` (
+CREATE TABLE IF NOT EXISTS `salesinvoiceitems` (
   `InvoiceItemID` int(11) NOT NULL,
   `SalesInvoiceID` int(11) NOT NULL,
   `IssueItemID` int(11) DEFAULT NULL,
@@ -1790,7 +1914,7 @@ CREATE TABLE `salesinvoiceitems` (
 -- Table structure for table `salesinvoices`
 --
 
-CREATE TABLE `salesinvoices` (
+CREATE TABLE IF NOT EXISTS `salesinvoices` (
   `SalesInvoiceID` int(11) NOT NULL,
   `InvoiceNumber` varchar(20) NOT NULL,
   `InvoiceDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1827,7 +1951,7 @@ CREATE TABLE `salesinvoices` (
 -- Table structure for table `salesorderitems`
 --
 
-CREATE TABLE `salesorderitems` (
+CREATE TABLE IF NOT EXISTS `salesorderitems` (
   `SOItemID` int(11) NOT NULL,
   `SOID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -1854,7 +1978,7 @@ CREATE TABLE `salesorderitems` (
 -- Table structure for table `salesorders`
 --
 
-CREATE TABLE `salesorders` (
+CREATE TABLE IF NOT EXISTS `salesorders` (
   `SOID` int(11) NOT NULL,
   `SONumber` varchar(20) NOT NULL,
   `SODate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1894,7 +2018,7 @@ CREATE TABLE `salesorders` (
 -- Table structure for table `salesquotationitems`
 --
 
-CREATE TABLE `salesquotationitems` (
+CREATE TABLE IF NOT EXISTS `salesquotationitems` (
   `SQItemID` int(11) NOT NULL,
   `SalesQuotationID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -1916,7 +2040,7 @@ CREATE TABLE `salesquotationitems` (
 -- Table structure for table `salesquotations`
 --
 
-CREATE TABLE `salesquotations` (
+CREATE TABLE IF NOT EXISTS `salesquotations` (
   `SalesQuotationID` int(11) NOT NULL,
   `QuotationNumber` varchar(20) NOT NULL,
   `QuotationDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1952,7 +2076,7 @@ CREATE TABLE `salesquotations` (
 -- Table structure for table `salesreturnitems`
 --
 
-CREATE TABLE `salesreturnitems` (
+CREATE TABLE IF NOT EXISTS `salesreturnitems` (
   `ReturnItemID` int(11) NOT NULL,
   `SalesReturnID` int(11) NOT NULL,
   `InvoiceItemID` int(11) DEFAULT NULL,
@@ -1975,7 +2099,7 @@ CREATE TABLE `salesreturnitems` (
 -- Table structure for table `salesreturns`
 --
 
-CREATE TABLE `salesreturns` (
+CREATE TABLE IF NOT EXISTS `salesreturns` (
   `SalesReturnID` int(11) NOT NULL,
   `ReturnNumber` varchar(20) NOT NULL,
   `ReturnDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2002,7 +2126,7 @@ CREATE TABLE `salesreturns` (
 -- Table structure for table `stockadjustmentitems`
 --
 
-CREATE TABLE `stockadjustmentitems` (
+CREATE TABLE IF NOT EXISTS `stockadjustmentitems` (
   `AdjItemID` int(11) NOT NULL,
   `AdjustmentID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -2023,7 +2147,7 @@ CREATE TABLE `stockadjustmentitems` (
 -- Table structure for table `stockadjustments`
 --
 
-CREATE TABLE `stockadjustments` (
+CREATE TABLE IF NOT EXISTS `stockadjustments` (
   `AdjustmentID` int(11) NOT NULL,
   `AdjustmentNumber` varchar(20) NOT NULL,
   `AdjustmentDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2045,7 +2169,7 @@ CREATE TABLE `stockadjustments` (
 -- Table structure for table `stockbalances`
 --
 
-CREATE TABLE `stockbalances` (
+CREATE TABLE IF NOT EXISTS `stockbalances` (
   `StockBalanceID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
   `WarehouseID` int(11) NOT NULL,
@@ -2066,7 +2190,7 @@ CREATE TABLE `stockbalances` (
 -- Table structure for table `stockissuenoteitems`
 --
 
-CREATE TABLE `stockissuenoteitems` (
+CREATE TABLE IF NOT EXISTS `stockissuenoteitems` (
   `IssueItemID` int(11) NOT NULL,
   `IssueNoteID` int(11) NOT NULL,
   `SOItemID` int(11) NOT NULL,
@@ -2087,7 +2211,7 @@ CREATE TABLE `stockissuenoteitems` (
 -- Table structure for table `stockissuenotes`
 --
 
-CREATE TABLE `stockissuenotes` (
+CREATE TABLE IF NOT EXISTS `stockissuenotes` (
   `IssueNoteID` int(11) NOT NULL,
   `IssueNoteNumber` varchar(20) NOT NULL,
   `IssueDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2115,7 +2239,7 @@ CREATE TABLE `stockissuenotes` (
 -- Table structure for table `stockmovements`
 --
 
-CREATE TABLE `stockmovements` (
+CREATE TABLE IF NOT EXISTS `stockmovements` (
   `MovementID` bigint(20) NOT NULL,
   `MovementDate` datetime NOT NULL DEFAULT current_timestamp(),
   `MovementType` varchar(20) NOT NULL,
@@ -2143,7 +2267,7 @@ CREATE TABLE `stockmovements` (
 -- Table structure for table `stockreservations`
 --
 
-CREATE TABLE `stockreservations` (
+CREATE TABLE IF NOT EXISTS `stockreservations` (
   `ReservationID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
   `WarehouseID` int(11) NOT NULL,
@@ -2163,7 +2287,7 @@ CREATE TABLE `stockreservations` (
 -- Table structure for table `stocktransferitems`
 --
 
-CREATE TABLE `stocktransferitems` (
+CREATE TABLE IF NOT EXISTS `stocktransferitems` (
   `TransferItemID` int(11) NOT NULL,
   `TransferID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -2183,7 +2307,7 @@ CREATE TABLE `stocktransferitems` (
 -- Table structure for table `stocktransfers`
 --
 
-CREATE TABLE `stocktransfers` (
+CREATE TABLE IF NOT EXISTS `stocktransfers` (
   `TransferID` int(11) NOT NULL,
   `TransferNumber` varchar(20) NOT NULL,
   `TransferDate` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2206,7 +2330,7 @@ CREATE TABLE `stocktransfers` (
 -- Table structure for table `suggestedsellingprices`
 --
 
-CREATE TABLE `suggestedsellingprices` (
+CREATE TABLE IF NOT EXISTS `suggestedsellingprices` (
   `SuggestedPriceID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
   `EffectiveDate` date NOT NULL,
@@ -2229,7 +2353,7 @@ CREATE TABLE `suggestedsellingprices` (
 -- Table structure for table `supplierinvoiceitems`
 --
 
-CREATE TABLE `supplierinvoiceitems` (
+CREATE TABLE IF NOT EXISTS `supplierinvoiceitems` (
   `SIItemID` int(11) NOT NULL,
   `SupplierInvoiceID` int(11) NOT NULL,
   `GRNItemID` int(11) DEFAULT NULL,
@@ -2251,7 +2375,7 @@ CREATE TABLE `supplierinvoiceitems` (
 -- Table structure for table `supplierinvoices`
 --
 
-CREATE TABLE `supplierinvoices` (
+CREATE TABLE IF NOT EXISTS `supplierinvoices` (
   `SupplierInvoiceID` int(11) NOT NULL,
   `InvoiceNumber` varchar(30) NOT NULL,
   `SupplierInvoiceNo` varchar(50) NOT NULL,
@@ -2288,7 +2412,7 @@ CREATE TABLE `supplierinvoices` (
 -- Table structure for table `supplieritems`
 --
 
-CREATE TABLE `supplieritems` (
+CREATE TABLE IF NOT EXISTS `supplieritems` (
   `SupplierItemID` int(11) NOT NULL,
   `SupplierID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -2307,7 +2431,7 @@ CREATE TABLE `supplieritems` (
 -- Table structure for table `supplierquotationitems`
 --
 
-CREATE TABLE `supplierquotationitems` (
+CREATE TABLE IF NOT EXISTS `supplierquotationitems` (
   `SQItemID` int(11) NOT NULL,
   `QuotationID` int(11) NOT NULL,
   `ItemID` int(11) NOT NULL,
@@ -2329,7 +2453,7 @@ CREATE TABLE `supplierquotationitems` (
 -- Table structure for table `supplierquotations`
 --
 
-CREATE TABLE `supplierquotations` (
+CREATE TABLE IF NOT EXISTS `supplierquotations` (
   `QuotationID` int(11) NOT NULL,
   `QuotationNumber` varchar(30) DEFAULT NULL,
   `RFQID` int(11) DEFAULT NULL,
@@ -2357,7 +2481,7 @@ CREATE TABLE `supplierquotations` (
 -- Table structure for table `suppliers`
 --
 
-CREATE TABLE `suppliers` (
+CREATE TABLE IF NOT EXISTS `suppliers` (
   `SupplierID` int(11) NOT NULL,
   `SupplierCode` varchar(20) NOT NULL,
   `SupplierNameAr` varchar(200) NOT NULL,
@@ -2398,7 +2522,7 @@ CREATE TABLE `suppliers` (
 -- Table structure for table `systemsettings`
 --
 
-CREATE TABLE `systemsettings` (
+CREATE TABLE IF NOT EXISTS `systemsettings` (
   `SettingID` int(11) NOT NULL,
   `SettingGroup` varchar(50) NOT NULL,
   `SettingKey` varchar(100) NOT NULL,
@@ -2432,7 +2556,7 @@ INSERT INTO `systemsettings` (`SettingID`, `SettingGroup`, `SettingKey`, `Settin
 -- Table structure for table `transportcontractors`
 --
 
-CREATE TABLE `transportcontractors` (
+CREATE TABLE IF NOT EXISTS `transportcontractors` (
   `ContractorID` int(11) NOT NULL,
   `ContractorCode` varchar(20) NOT NULL,
   `ContractorName` varchar(200) NOT NULL,
@@ -2452,7 +2576,7 @@ CREATE TABLE `transportcontractors` (
 -- Table structure for table `unitsofmeasure`
 --
 
-CREATE TABLE `unitsofmeasure` (
+CREATE TABLE IF NOT EXISTS `unitsofmeasure` (
   `UnitID` int(11) NOT NULL,
   `UnitCode` varchar(10) NOT NULL,
   `UnitNameAr` varchar(50) NOT NULL,
@@ -2480,7 +2604,7 @@ INSERT INTO `unitsofmeasure` (`UnitID`, `UnitCode`, `UnitNameAr`, `UnitNameEn`, 
 -- Table structure for table `users`
 --
 
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
   `UserID` int(11) NOT NULL,
   `Username` varchar(50) NOT NULL,
   `PasswordHash` varchar(256) NOT NULL,
@@ -2502,7 +2626,7 @@ CREATE TABLE `users` (
 -- Table structure for table `vehicles`
 --
 
-CREATE TABLE `vehicles` (
+CREATE TABLE IF NOT EXISTS `vehicles` (
   `VehicleID` int(11) NOT NULL,
   `VehicleCode` varchar(20) NOT NULL,
   `PlateNumber` varchar(20) NOT NULL,
@@ -2525,7 +2649,7 @@ CREATE TABLE `vehicles` (
 -- Stand-in structure for view `vw_customeroutstanding`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_customeroutstanding` (
+CREATE TABLE IF NOT EXISTS `vw_customeroutstanding` (
 `CustomerID` int(11)
 ,`CustomerCode` varchar(20)
 ,`CustomerNameAr` varchar(200)
@@ -2544,7 +2668,7 @@ CREATE TABLE `vw_customeroutstanding` (
 -- Stand-in structure for view `vw_dailysalessummary`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_dailysalessummary` (
+CREATE TABLE IF NOT EXISTS `vw_dailysalessummary` (
 `SalesDate` date
 ,`InvoiceCount` bigint(21)
 ,`SubTotal` decimal(40,2)
@@ -2561,7 +2685,7 @@ CREATE TABLE `vw_dailysalessummary` (
 -- Stand-in structure for view `vw_pendingapprovals`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_pendingapprovals` (
+CREATE TABLE IF NOT EXISTS `vw_pendingapprovals` (
 `RequestID` int(11)
 ,`DocumentType` varchar(30)
 ,`DocumentID` int(11)
@@ -2582,7 +2706,7 @@ CREATE TABLE `vw_pendingapprovals` (
 -- Stand-in structure for view `vw_purchaseorderstatus`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_purchaseorderstatus` (
+CREATE TABLE IF NOT EXISTS `vw_purchaseorderstatus` (
 `POID` int(11)
 ,`PONumber` varchar(20)
 ,`PODate` date
@@ -2602,7 +2726,7 @@ CREATE TABLE `vw_purchaseorderstatus` (
 -- Stand-in structure for view `vw_stocksummary`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_stocksummary` (
+CREATE TABLE IF NOT EXISTS `vw_stocksummary` (
 `ItemID` int(11)
 ,`ItemCode` varchar(30)
 ,`ItemNameAr` varchar(200)
@@ -2622,7 +2746,7 @@ CREATE TABLE `vw_stocksummary` (
 -- Stand-in structure for view `vw_supplieroutstanding`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_supplieroutstanding` (
+CREATE TABLE IF NOT EXISTS `vw_supplieroutstanding` (
 `SupplierID` int(11)
 ,`SupplierCode` varchar(20)
 ,`SupplierNameAr` varchar(200)
@@ -2639,7 +2763,7 @@ CREATE TABLE `vw_supplieroutstanding` (
 -- Table structure for table `warehouselocations`
 --
 
-CREATE TABLE `warehouselocations` (
+CREATE TABLE IF NOT EXISTS `warehouselocations` (
   `LocationID` int(11) NOT NULL,
   `WarehouseID` int(11) NOT NULL,
   `LocationCode` varchar(30) NOT NULL,
@@ -2656,7 +2780,7 @@ CREATE TABLE `warehouselocations` (
 -- Table structure for table `warehouses`
 --
 
-CREATE TABLE `warehouses` (
+CREATE TABLE IF NOT EXISTS `warehouses` (
   `WarehouseID` int(11) NOT NULL,
   `WarehouseCode` varchar(20) NOT NULL,
   `WarehouseNameAr` varchar(100) NOT NULL,
@@ -2674,6 +2798,7 @@ CREATE TABLE `warehouses` (
 --
 -- Structure for view `vw_customeroutstanding`
 --
+DROP VIEW IF EXISTS `vw_customeroutstanding`;
 DROP TABLE IF EXISTS `vw_customeroutstanding`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_customeroutstanding`  AS SELECT `c`.`CustomerID` AS `CustomerID`, `c`.`CustomerCode` AS `CustomerCode`, `c`.`CustomerNameAr` AS `CustomerNameAr`, `c`.`CustomerType` AS `CustomerType`, `c`.`CreditLimit` AS `CreditLimit`, sum(`si`.`TotalAmount`) AS `TotalInvoiced`, sum(`si`.`PaidAmount`) AS `TotalPaid`, sum(`si`.`TotalAmount` - `si`.`PaidAmount`) AS `OutstandingBalance`, `c`.`CreditLimit`- sum(`si`.`TotalAmount` - `si`.`PaidAmount`) AS `AvailableCredit`, sum(case when `si`.`Status` = 'Overdue' then 1 else 0 end) AS `OverdueInvoices` FROM (`customers` `c` left join `salesinvoices` `si` on(`c`.`CustomerID` = `si`.`CustomerID` and `si`.`Status` not in ('Cancelled','Draft'))) GROUP BY `c`.`CustomerID`, `c`.`CustomerCode`, `c`.`CustomerNameAr`, `c`.`CustomerType`, `c`.`CreditLimit` ;
@@ -2683,6 +2808,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 -- Structure for view `vw_dailysalessummary`
 --
+DROP VIEW IF EXISTS `vw_dailysalessummary`;
 DROP TABLE IF EXISTS `vw_dailysalessummary`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_dailysalessummary`  AS SELECT cast(`si`.`InvoiceDate` as date) AS `SalesDate`, count(`si`.`SalesInvoiceID`) AS `InvoiceCount`, sum(`si`.`SubTotal`) AS `SubTotal`, sum(`si`.`DiscountAmount`) AS `TotalDiscount`, sum(`si`.`TaxAmount`) AS `TotalTax`, sum(`si`.`TotalAmount`) AS `TotalSales`, sum(`si`.`PaidAmount`) AS `TotalCollected`, sum(`si`.`TotalAmount` - `si`.`PaidAmount`) AS `TotalOutstanding` FROM `salesinvoices` AS `si` WHERE `si`.`Status` not in ('Cancelled','Draft') GROUP BY cast(`si`.`InvoiceDate` as date) ;
@@ -2692,6 +2818,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 -- Structure for view `vw_pendingapprovals`
 --
+DROP VIEW IF EXISTS `vw_pendingapprovals`;
 DROP TABLE IF EXISTS `vw_pendingapprovals`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_pendingapprovals`  AS SELECT `ar`.`RequestID` AS `RequestID`, `ar`.`DocumentType` AS `DocumentType`, `ar`.`DocumentID` AS `DocumentID`, `ar`.`DocumentNumber` AS `DocumentNumber`, `ar`.`TotalAmount` AS `TotalAmount`, `ar`.`RequestedDate` AS `RequestedDate`, `ar`.`Priority` AS `Priority`, `ar`.`DueDate` AS `DueDate`, `u`.`Username` AS `RequestedByUser`, concat(`e`.`FirstNameAr`,' ',`e`.`LastNameAr`) AS `RequestedByName`, `aws`.`StepName` AS `CurrentStep`, `aw`.`WorkflowName` AS `WorkflowName` FROM ((((`approvalrequests` `ar` join `users` `u` on(`ar`.`RequestedByUserID` = `u`.`UserID`)) join `employees` `e` on(`u`.`EmployeeID` = `e`.`EmployeeID`)) join `approvalworkflows` `aw` on(`ar`.`WorkflowID` = `aw`.`WorkflowID`)) left join `approvalworkflowsteps` `aws` on(`ar`.`CurrentStepID` = `aws`.`StepID`)) WHERE `ar`.`Status` in ('Pending','InProgress') ;
@@ -2701,6 +2828,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 -- Structure for view `vw_purchaseorderstatus`
 --
+DROP VIEW IF EXISTS `vw_purchaseorderstatus`;
 DROP TABLE IF EXISTS `vw_purchaseorderstatus`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_purchaseorderstatus`  AS SELECT `po`.`POID` AS `POID`, `po`.`PONumber` AS `PONumber`, `po`.`PODate` AS `PODate`, `s`.`SupplierNameAr` AS `SupplierNameAr`, `po`.`TotalAmount` AS `TotalAmount`, `po`.`Status` AS `Status`, `po`.`ApprovalStatus` AS `ApprovalStatus`, count(`poi`.`POItemID`) AS `TotalItems`, sum(`poi`.`OrderedQty`) AS `TotalOrderedQty`, sum(`poi`.`ReceivedQty`) AS `TotalReceivedQty`, CASE WHEN sum(`poi`.`ReceivedQty`) = 0 THEN 'لم يتم الاستلام' WHEN sum(`poi`.`ReceivedQty`) < sum(`poi`.`OrderedQty`) THEN 'استلام جزئي' ELSE 'تم الاستلام بالكامل' END AS `ReceiptStatus` FROM ((`purchaseorders` `po` join `suppliers` `s` on(`po`.`SupplierID` = `s`.`SupplierID`)) join `purchaseorderitems` `poi` on(`po`.`POID` = `poi`.`POID`)) GROUP BY `po`.`POID`, `po`.`PONumber`, `po`.`PODate`, `s`.`SupplierNameAr`, `po`.`TotalAmount`, `po`.`Status`, `po`.`ApprovalStatus` ;
@@ -2710,6 +2838,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 -- Structure for view `vw_stocksummary`
 --
+DROP VIEW IF EXISTS `vw_stocksummary`;
 DROP TABLE IF EXISTS `vw_stocksummary`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_stocksummary`  AS SELECT `sb`.`ItemID` AS `ItemID`, `i`.`ItemCode` AS `ItemCode`, `i`.`ItemNameAr` AS `ItemNameAr`, `i`.`GradeName` AS `GradeName`, `sb`.`WarehouseID` AS `WarehouseID`, `w`.`WarehouseNameAr` AS `WarehouseNameAr`, sum(`sb`.`QuantityOnHand`) AS `TotalQuantityOnHand`, sum(`sb`.`QuantityReserved`) AS `TotalQuantityReserved`, sum(`sb`.`QuantityOnHand` - `sb`.`QuantityReserved`) AS `TotalQuantityAvailable`, avg(`sb`.`AverageCost`) AS `AverageCost`, sum((`sb`.`QuantityOnHand` - `sb`.`QuantityReserved`) * ifnull(`sb`.`AverageCost`,0)) AS `StockValue` FROM ((`stockbalances` `sb` join `items` `i` on(`sb`.`ItemID` = `i`.`ItemID`)) join `warehouses` `w` on(`sb`.`WarehouseID` = `w`.`WarehouseID`)) GROUP BY `sb`.`ItemID`, `i`.`ItemCode`, `i`.`ItemNameAr`, `i`.`GradeName`, `sb`.`WarehouseID`, `w`.`WarehouseNameAr` ;
@@ -2719,6 +2848,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 -- Structure for view `vw_supplieroutstanding`
 --
+DROP VIEW IF EXISTS `vw_supplieroutstanding`;
 DROP TABLE IF EXISTS `vw_supplieroutstanding`;
 
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_supplieroutstanding`  AS SELECT `s`.`SupplierID` AS `SupplierID`, `s`.`SupplierCode` AS `SupplierCode`, `s`.`SupplierNameAr` AS `SupplierNameAr`, `s`.`SupplierType` AS `SupplierType`, sum(`si`.`TotalAmount`) AS `TotalInvoiced`, sum(`si`.`PaidAmount`) AS `TotalPaid`, sum(`si`.`TotalAmount` - `si`.`PaidAmount`) AS `OutstandingBalance`, sum(case when `si`.`DueDate` < current_timestamp() and `si`.`Status` not in ('Paid','Cancelled') then 1 else 0 end) AS `OverdueInvoices` FROM (`suppliers` `s` left join `supplierinvoices` `si` on(`s`.`SupplierID` = `si`.`SupplierID` and `si`.`Status` <> 'Cancelled')) GROUP BY `s`.`SupplierID`, `s`.`SupplierCode`, `s`.`SupplierNameAr`, `s`.`SupplierType` ;
@@ -2729,305 +2859,178 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 
 --
 -- Indexes for table `alertrules`
+-- (PRIMARY KEY, UNIQUE RuleCode, and KEYs are in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `alertrules`
-  ADD PRIMARY KEY (`AlertRuleID`),
-  ADD UNIQUE KEY `RuleCode` (`RuleCode`),
-  ADD KEY `FK_AlertRule_Role` (`NotifyRoleID`),
-  ADD KEY `FK_AlertRule_User` (`NotifyUserID`);
 
 --
 -- Indexes for table `approvalactions`
+-- (PRIMARY KEY and KEYs are in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `approvalactions`
-  ADD PRIMARY KEY (`ActionID`),
-  ADD KEY `FK_ApprovalAction_Request` (`RequestID`),
-  ADD KEY `FK_ApprovalAction_Step` (`StepID`),
-  ADD KEY `FK_ApprovalAction_User` (`ActionByUserID`),
-  ADD KEY `FK_ApprovalAction_Delegate` (`DelegatedToUserID`);
 
 --
 -- Indexes for table `approvallimits`
+-- (PRIMARY KEY and KEYs are in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `approvallimits`
-  ADD PRIMARY KEY (`ApprovalLimitID`),
-  ADD KEY `FK_ApprovalLimits_Role` (`RoleID`),
-  ADD KEY `FK_ApprovalLimits_ReviewRole` (`RequiresReviewBy`);
 
 --
 -- Indexes for table `approvalrequests`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `approvalrequests`
-  ADD PRIMARY KEY (`RequestID`),
-  ADD KEY `FK_ApprovalReq_Workflow` (`WorkflowID`),
-  ADD KEY `FK_ApprovalReq_Step` (`CurrentStepID`),
-  ADD KEY `FK_ApprovalReq_User` (`RequestedByUserID`),
-  ADD KEY `IX_ApprovalReq_Status` (`Status`),
-  ADD KEY `IX_ApprovalReq_Document` (`DocumentType`,`DocumentID`);
 
 --
 -- Indexes for table `approvalworkflows`
+-- (PRIMARY KEY and UNIQUE are in CREATE TABLE; skip ALTER to avoid "Duplicate" when re-running)
 --
-ALTER TABLE `approvalworkflows`
-  ADD PRIMARY KEY (`WorkflowID`),
-  ADD UNIQUE KEY `WorkflowCode` (`WorkflowCode`);
 
 --
 -- Indexes for table `approvalworkflowsteps`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `approvalworkflowsteps`
-  ADD PRIMARY KEY (`StepID`),
-  ADD KEY `FK_WFStep_Workflow` (`WorkflowID`),
-  ADD KEY `FK_WFStep_Role` (`ApproverRoleID`),
-  ADD KEY `FK_WFStep_User` (`ApproverUserID`);
 
 --
 -- Indexes for table `attendance`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `attendance`
-  ADD PRIMARY KEY (`AttendanceID`),
-  ADD UNIQUE KEY `UQ_Attendance` (`EmployeeID`,`AttendanceDate`);
 
 --
 -- Indexes for table `auditlog`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `auditlog`
-  ADD PRIMARY KEY (`AuditLogID`),
-  ADD KEY `IX_AuditLog_Table` (`TableName`,`RecordID`),
-  ADD KEY `IX_AuditLog_Date` (`ActionDate`),
-  ADD KEY `IX_AuditLog_User` (`UserID`);
 
 --
 -- Indexes for table `bankaccounts`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `bankaccounts`
-  ADD PRIMARY KEY (`BankAccountID`),
-  ADD KEY `FK_BankAcc_Bank` (`BankID`),
-  ADD KEY `FK_BankAcc_GLAccount` (`GLAccountID`);
 
 --
 -- Indexes for table `banks`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `banks`
-  ADD PRIMARY KEY (`BankID`),
-  ADD UNIQUE KEY `BankCode` (`BankCode`);
 
 --
 -- Indexes for table `banktransactions`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `banktransactions`
-  ADD PRIMARY KEY (`TransactionID`),
-  ADD KEY `FK_BankTrans_Account` (`BankAccountID`),
-  ADD KEY `FK_BankTrans_JE` (`JournalEntryID`),
-  ADD KEY `IX_BankTrans_Date` (`TransactionDate`);
 
 --
 -- Indexes for table `cashregisters`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `cashregisters`
-  ADD PRIMARY KEY (`CashRegisterID`),
-  ADD UNIQUE KEY `RegisterCode` (`RegisterCode`),
-  ADD KEY `FK_Cash_Custodian` (`CustodianID`),
-  ADD KEY `FK_Cash_GLAccount` (`GLAccountID`);
 
 --
 -- Indexes for table `chartofaccounts`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `chartofaccounts`
-  ADD PRIMARY KEY (`AccountID`),
-  ADD UNIQUE KEY `AccountCode` (`AccountCode`),
-  ADD KEY `FK_COA_Parent` (`ParentAccountID`);
 
 --
 -- Indexes for table `chequesissued`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `chequesissued`
-  ADD PRIMARY KEY (`ChequeID`),
-  ADD KEY `FK_ChequeIss_Bank` (`BankAccountID`),
-  ADD KEY `FK_ChequeIss_Supplier` (`SupplierID`),
-  ADD KEY `FK_ChequeIss_Payment` (`PaymentVoucherID`);
 
 --
 -- Indexes for table `chequesreceived`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `chequesreceived`
-  ADD PRIMARY KEY (`ChequeID`),
-  ADD KEY `FK_ChequeRec_Customer` (`CustomerID`),
-  ADD KEY `FK_ChequeRec_Receipt` (`ReceiptVoucherID`),
-  ADD KEY `FK_ChequeRec_Bank` (`CollectionBankAccountID`),
-  ADD KEY `FK_ChequeRec_Endorsed` (`EndorsedToSupplierID`);
 
 --
 -- Indexes for table `companyinfo`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `companyinfo`
-  ADD PRIMARY KEY (`CompanyID`);
 
 --
 -- Indexes for table `costcenters`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `costcenters`
-  ADD PRIMARY KEY (`CostCenterID`),
-  ADD UNIQUE KEY `CostCenterCode` (`CostCenterCode`),
-  ADD KEY `FK_CC_Parent` (`ParentCostCenterID`),
-  ADD KEY `FK_CC_Dept` (`DepartmentID`);
 
 --
 -- Indexes for table `creditnotes`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `creditnotes`
-  ADD PRIMARY KEY (`CreditNoteID`),
-  ADD UNIQUE KEY `CreditNoteNumber` (`CreditNoteNumber`),
-  ADD KEY `FK_CreditNote_Customer` (`CustomerID`),
-  ADD KEY `FK_CreditNote_Return` (`SalesReturnID`),
-  ADD KEY `FK_CreditNote_Invoice` (`SalesInvoiceID`),
-  ADD KEY `FK_CreditNote_JE` (`JournalEntryID`),
-  ADD KEY `FK_CreditNote_ApprovedBy` (`ApprovedByUserID`);
 
 --
 -- Indexes for table `customercontacts`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `customercontacts`
-  ADD PRIMARY KEY (`ContactID`),
-  ADD KEY `FK_CustomerContacts_Customer` (`CustomerID`);
 
 --
 -- Indexes for table `customers`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `customers`
-  ADD PRIMARY KEY (`CustomerID`),
-  ADD UNIQUE KEY `CustomerCode` (`CustomerCode`),
-  ADD KEY `FK_Customers_SalesRep` (`SalesRepID`),
-  ADD KEY `FK_Customers_ApprovedBy` (`ApprovedBy`);
 
 --
 -- Indexes for table `dailymarketprices`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `dailymarketprices`
-  ADD PRIMARY KEY (`PriceID`),
-  ADD UNIQUE KEY `UQ_DailyPrice` (`PriceDate`,`ItemID`),
-  ADD KEY `FK_MarketPrice_Item` (`ItemID`);
 
 --
 -- Indexes for table `debitnotes`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `debitnotes`
-  ADD PRIMARY KEY (`DebitNoteID`),
-  ADD UNIQUE KEY `DebitNoteNumber` (`DebitNoteNumber`),
-  ADD KEY `FK_DebitNote_Supplier` (`SupplierID`),
-  ADD KEY `FK_DebitNote_Return` (`PurchaseReturnID`),
-  ADD KEY `FK_DebitNote_Invoice` (`SupplierInvoiceID`),
-  ADD KEY `FK_DebitNote_JE` (`JournalEntryID`),
-  ADD KEY `FK_DebitNote_ApprovedBy` (`ApprovedByUserID`);
 
 --
 -- Indexes for table `deliveryorders`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `deliveryorders`
-  ADD PRIMARY KEY (`DeliveryOrderID`),
-  ADD UNIQUE KEY `DeliveryOrderNumber` (`DeliveryOrderNumber`),
-  ADD KEY `FK_DO_IssueNote` (`IssueNoteID`),
-  ADD KEY `FK_DO_Customer` (`CustomerID`),
-  ADD KEY `FK_DO_Zone` (`ZoneID`),
-  ADD KEY `FK_DO_Vehicle` (`VehicleID`),
-  ADD KEY `FK_DO_Contractor` (`ContractorID`);
 
 --
 -- Indexes for table `deliveryzones`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `deliveryzones`
-  ADD PRIMARY KEY (`ZoneID`),
-  ADD UNIQUE KEY `ZoneCode` (`ZoneCode`);
 
 --
 -- Indexes for table `departments`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `departments`
-  ADD PRIMARY KEY (`DepartmentID`),
-  ADD UNIQUE KEY `DepartmentCode` (`DepartmentCode`),
-  ADD KEY `FK_Departments_Parent` (`ParentDepartmentID`);
 
 --
 -- Indexes for table `documentcycletracking`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `documentcycletracking`
-  ADD PRIMARY KEY (`TrackingID`);
 
 --
 -- Indexes for table `documentrelationships`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `documentrelationships`
-  ADD PRIMARY KEY (`RelationshipID`),
-  ADD KEY `FK_DocRel_CreatedBy` (`CreatedBy`);
 
 --
 -- Indexes for table `documentsequences`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `documentsequences`
-  ADD PRIMARY KEY (`SequenceID`),
-  ADD KEY `FK_DocSeq_Type` (`DocumentTypeID`),
-  ADD KEY `FK_DocSeq_Year` (`FiscalYearID`),
-  ADD KEY `FK_DocSeq_Warehouse` (`WarehouseID`),
-  ADD KEY `FK_DocSeq_Dept` (`DepartmentID`);
 
 --
 -- Indexes for table `documenttypes`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `documenttypes`
-  ADD PRIMARY KEY (`DocumentTypeID`),
-  ADD UNIQUE KEY `DocumentTypeCode` (`DocumentTypeCode`),
-  ADD KEY `FK_DocType_Workflow` (`WorkflowID`);
 
 --
 -- Indexes for table `employees`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `employees`
-  ADD PRIMARY KEY (`EmployeeID`),
-  ADD UNIQUE KEY `EmployeeCode` (`EmployeeCode`),
-  ADD KEY `FK_Employees_Manager` (`ManagerID`),
-  ADD KEY `IX_Employees_Department` (`DepartmentID`);
 
 --
 -- Indexes for table `employeesalarystructure`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `employeesalarystructure`
-  ADD PRIMARY KEY (`StructureID`),
-  ADD KEY `FK_SalaryStruct_Employee` (`EmployeeID`),
-  ADD KEY `FK_SalaryStruct_Component` (`ComponentID`);
 
 --
 -- Indexes for table `exchangerates`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `exchangerates`
-  ADD PRIMARY KEY (`ExchangeRateID`),
-  ADD UNIQUE KEY `UQ_ExchangeRate` (`FromCurrency`,`ToCurrency`,`RateDate`);
 
 --
 -- Indexes for table `fiscalperiods`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `fiscalperiods`
-  ADD PRIMARY KEY (`PeriodID`),
-  ADD KEY `FK_Period_Year` (`FiscalYearID`);
 
 --
 -- Indexes for table `fiscalyears`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `fiscalyears`
-  ADD PRIMARY KEY (`FiscalYearID`),
-  ADD UNIQUE KEY `YearCode` (`YearCode`);
 
 --
 -- Indexes for table `goodsreceiptnotes`
+-- (in CREATE TABLE; skip to avoid "Multiple primary key defined")
 --
-ALTER TABLE `goodsreceiptnotes`
-  ADD PRIMARY KEY (`GRNID`),
-  ADD UNIQUE KEY `GRNNumber` (`GRNNumber`),
-  ADD KEY `FK_GRN_Supplier` (`SupplierID`),
-  ADD KEY `FK_GRN_Warehouse` (`WarehouseID`),
-  ADD KEY `FK_GRN_ReceivedBy` (`ReceivedByUserID`),
-  ADD KEY `FK_GRN_InspectedBy` (`InspectedByUserID`),
-  ADD KEY `IX_GRN_PO` (`POID`),
-  ADD KEY `IX_GRN_Status` (`Status`);
 
 --
 -- Indexes for table `grnitems`
@@ -3060,7 +3063,6 @@ ALTER TABLE `itemqualityspecs`
 -- Indexes for table `items`
 --
 ALTER TABLE `items`
-  ADD PRIMARY KEY (`ItemID`),
   ADD UNIQUE KEY `ItemCode` (`ItemCode`),
   ADD KEY `FK_Items_Category` (`CategoryID`),
   ADD KEY `FK_Items_Unit` (`UnitID`);

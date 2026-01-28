@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
     Package, Building2, Tag, Scale, Microscope, DollarSign,
     AlertTriangle, TrendingDown, Activity, ClipboardCheck,
-    Zap, ChevronLeft, Warehouse, BarChart3, Calculator
+    Zap, ChevronLeft, Warehouse, BarChart3, Calculator,
+    FileDown, ArrowRightLeft, LogIn, LogOut
 } from 'lucide-react';
 
 // Card for each section
@@ -139,8 +140,46 @@ const InventorySectionsPage: React.FC = () => {
                         icon={Calculator}
                         title="تقييم المخزون المزدوج"
                         description="التكلفة التاريخية (محاسبة) + سعر الإحلال (قرارات). تنبيه عند فرق كبير"
-                        to="/dashboard/inventory/items"
+                        to="/dashboard/inventory/reports/dual-valuation"
                         color="rose"
+                    />
+                </div>
+            </div>
+
+            {/* دورة المخزن: إضافة، صرف، تحويل */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-l from-emerald-50 to-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-emerald-100">
+                            <LogIn className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-slate-900">دورة المخزن</h2>
+                            <p className="text-sm text-slate-500">إذن إضافة (GRN)، إذن صرف، وإذن تحويل بين مخازن</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <SectionCard
+                        icon={LogIn}
+                        title="إذن إضافة (GRN)"
+                        description="استلام مواد بعد موافقة الجودة وربطها بأمر الشراء"
+                        to="/dashboard/inventory/grn"
+                        color="emerald"
+                    />
+                    <SectionCard
+                        icon={LogOut}
+                        title="إذن صرف"
+                        description="صرف مواد لأمر بيع، تشغيل، مشروع أو قسم داخلي"
+                        to="/dashboard/inventory/issue"
+                        color="amber"
+                    />
+                    <SectionCard
+                        icon={ArrowRightLeft}
+                        title="إذن تحويل بين مخازن"
+                        description="تحويل صنف من مخزن إلى آخر"
+                        to="/dashboard/inventory/transfer"
+                        color="purple"
                     />
                 </div>
             </div>
@@ -193,6 +232,20 @@ const InventorySectionsPage: React.FC = () => {
                         description="جرد مفاجئ للتحقق من الرصيد الفعلي"
                         to="/dashboard/inventory/count?type=surprise"
                         color="purple"
+                    />
+                    <SectionCard
+                        icon={FileDown}
+                        title="تقرير المخزون الدوري"
+                        description="رصيد أول/آخر المدة، الإضافات، المصروفات، والأصناف تحت الحد"
+                        to="/dashboard/inventory/reports/periodic-inventory"
+                        color="blue"
+                    />
+                    <SectionCard
+                        icon={BarChart3}
+                        title="تقرير الفروقات"
+                        description="فروقات الجرد: الرصيد النظري مقابل الفعلي والأسباب"
+                        to="/dashboard/inventory/reports/variance"
+                        color="rose"
                     />
                 </div>
             </div>
