@@ -18,6 +18,7 @@ import {
     Package
 } from 'lucide-react';
 import purchaseService, { type PurchaseRequisition } from '../../services/purchaseService';
+import Pagination from '../../components/common/Pagination';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -267,6 +268,8 @@ const PurchaseRequisitionsPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
     const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
@@ -305,7 +308,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
     };
 
     const filteredPRs = useMemo(() => {
-        return prs.filter(pr => {
+        const filtered = prs.filter(pr => {
             const matchesSearch =
                 pr.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 pr.requestedByUserName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -313,7 +316,22 @@ const PurchaseRequisitionsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || pr.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = (a.prDate || a.createdAt) ? new Date(a.prDate || a.createdAt!).getTime() : 0;
+            const dateB = (b.prDate || b.createdAt) ? new Date(b.prDate || b.createdAt!).getTime() : 0;
+            return dateB - dateA;
+        });
     }, [prs, searchTerm, statusFilter]);
+
+    const paginatedPRs = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredPRs.slice(start, start + pageSize);
+    }, [filteredPRs, currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
 
     const stats = useMemo(() => ({
         total: prs.length,
@@ -534,7 +552,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
                             ) : filteredPRs.length === 0 ? (
                                 <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
                             ) : (
-                                filteredPRs.map((pr, index) => (
+                                paginatedPRs.map((pr, index) => (
                                     <PRTableRow
                                         key={pr.id}
                                         pr={pr}
@@ -548,6 +566,15 @@ const PurchaseRequisitionsPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filteredPRs.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredPRs.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                    />
+                )}
             </div>
         </div>
     );

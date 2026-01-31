@@ -84,6 +84,50 @@ public class GRNService {
     }
 
     @Transactional
+    public GoodsReceiptNoteDto updateGRN(Integer id, GoodsReceiptNoteDto dto) {
+        GoodsReceiptNote grn = grnRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("GRN not found"));
+
+        if (!"Draft".equals(grn.getStatus()) && !"Pending Inspection".equals(grn.getStatus())) {
+            throw new RuntimeException("Only draft or pending inspection GRN can be updated");
+        }
+
+        PurchaseOrder po = grn.getPurchaseOrder();
+
+        // Revert PO quantities for current GRN items before replacing
+        if (grn.getItems() != null) {
+            for (GRNItem oldItem : grn.getItems()) {
+                PurchaseOrderItem poItem = po.getItems().stream()
+                        .filter(pi -> pi.getId().equals(oldItem.getPoItemId()))
+                        .findFirst()
+                        .orElse(null);
+                if (poItem != null) {
+                    BigDecimal reverted = poItem.getReceivedQty().subtract(oldItem.getReceivedQty());
+                    poItem.setReceivedQty(reverted.max(BigDecimal.ZERO));
+                    poItem.setStatus(reverted.compareTo(BigDecimal.ZERO) <= 0 ? "Open" : "PartiallyReceived");
+                }
+            }
+        }
+
+        grn.setDeliveryNoteNo(dto.getDeliveryNoteNo());
+        grn.setSupplierInvoiceNo(dto.getSupplierInvoiceNo());
+        grn.setNotes(dto.getNotes());
+
+        if (dto.getItems() != null) {
+            grn.getItems().clear();
+            grn.setItems(dto.getItems().stream()
+                    .map(itemDto -> mapToItemEntity(grn, itemDto))
+                    .collect(Collectors.toList()));
+            updatePOQuantities(po, grn.getItems());
+            grn.setTotalReceivedQty(grn.getItems().stream()
+                    .map(GRNItem::getReceivedQty)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+        }
+
+        return mapToDto(grnRepo.save(grn));
+    }
+
+    @Transactional
     public GoodsReceiptNoteDto finalizeStoreIn(Integer grnId, Integer userId) {
         GoodsReceiptNote grn = grnRepo.findById(grnId)
                 .orElseThrow(() -> new RuntimeException("GRN not found"));

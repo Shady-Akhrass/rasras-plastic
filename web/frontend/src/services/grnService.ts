@@ -49,5 +49,19 @@ export const grnService = {
     createGRN: async (grn: GoodsReceiptNoteDto) => {
         const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>('/inventory/grn', grn);
         return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
-    }
+    },
+    updateGRN: async (id: number, grn: GoodsReceiptNoteDto) => {
+        const response = await apiClient.put<{ data: GoodsReceiptNoteDto }>(`/inventory/grn/${id}`, grn);
+        return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
+    },
+    finalizeStoreIn: async (id: number, userId?: number) => {
+        const url = userId != null ? `/inventory/grn/${id}/finalize?userId=${userId}` : `/inventory/grn/${id}/finalize`;
+        const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>(url);
+        return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
+    },
+    submitGRN: async (id: number, userId?: number) => {
+        const url = userId != null ? `/inventory/grn/${id}/submit?userId=${userId}` : `/inventory/grn/${id}/submit`;
+        const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>(url);
+        return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
+    },
 };

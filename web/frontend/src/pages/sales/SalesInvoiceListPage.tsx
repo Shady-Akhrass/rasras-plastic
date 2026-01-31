@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Receipt, RefreshCw, Eye, FileText } from 'lucide-react';
 import { salesInvoiceService, type SalesInvoiceDto } from '../../services/salesInvoiceService';
+import Pagination from '../../components/common/Pagination';
 import { toast } from 'react-hot-toast';
 
 const SalesInvoiceListPage: React.FC = () => {
@@ -9,8 +10,11 @@ const SalesInvoiceListPage: React.FC = () => {
     const [list, setList] = useState<SalesInvoiceDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => { fetchList(); }, []);
+    useEffect(() => { setCurrentPage(1); }, [search]);
 
     const fetchList = async () => {
         try {
@@ -23,11 +27,23 @@ const SalesInvoiceListPage: React.FC = () => {
         } finally { setLoading(false); }
     };
 
-    const filtered = list.filter((inv) =>
-        !search ||
-        (inv.invoiceNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-        (inv.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = useMemo(() => {
+        const f = list.filter((inv) =>
+            !search ||
+            (inv.invoiceNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+            (inv.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
+        );
+        return [...f].sort((a, b) => {
+            const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.id ?? 0);
+            const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
+    }, [list, search]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
 
     return (
         <div className="space-y-6">
@@ -95,7 +111,7 @@ const SalesInvoiceListPage: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((inv) => (
+                                paginated.map((inv) => (
                                     <tr key={inv.id} className="border-b border-slate-100 hover:bg-purple-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-purple-700">{inv.invoiceNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('ar-EG') : '—'}</td>
@@ -112,6 +128,9 @@ const SalesInvoiceListPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filtered.length > 0 && (
+                    <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                )}
             </div>
         </div>
     );

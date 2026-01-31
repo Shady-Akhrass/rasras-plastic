@@ -52,6 +52,8 @@ import QuotationListPage from './pages/sales/QuotationListPage';
 import QuotationFormPage from './pages/sales/QuotationFormPage';
 import SaleOrderListPage from './pages/sales/SaleOrderListPage';
 import SaleOrderFormPage from './pages/sales/SaleOrderFormPage';
+import StockIssueNoteListPage from './pages/sales/StockIssueNoteListPage';
+import StockIssueNoteFormPage from './pages/sales/StockIssueNoteFormPage';
 import DeliveryOrderListPage from './pages/sales/DeliveryOrderListPage';
 import DeliveryOrderFormPage from './pages/sales/DeliveryOrderFormPage';
 import SalesInvoiceListPage from './pages/sales/SalesInvoiceListPage';
@@ -61,6 +63,16 @@ import ReceiptFormPage from './pages/sales/ReceiptFormPage';
 import SalesReportsPage from './pages/sales/SalesReportsPage';
 import { Toaster } from 'react-hot-toast';
 import StockLevelsPage from './pages/inventory/StockLevelsPage';
+import QualityInspectionPage from './pages/inventory/QualityInspectionPage';
+import ApprovalsInbox from './pages/procurement/ApprovalsInbox';
+import PurchaseOrdersPage from './pages/procurement/PurchaseOrdersPage';
+import PurchaseOrderFormPage from './pages/procurement/PurchaseOrderFormPage';
+import GRNsPage from './pages/procurement/GRNsPage';
+import ProcurementGRNFormPage from './pages/procurement/GRNFormPage';
+import SupplierInvoicesPage from './pages/procurement/SupplierInvoicesPage';
+import SupplierInvoiceFormPage from './pages/procurement/SupplierInvoiceFormPage';
+import PurchaseReturnsPage from './pages/procurement/PurchaseReturnsPage';
+import PurchaseReturnFormPage from './pages/procurement/PurchaseReturnFormPage';
 
 // Simple Auth Guard Placeholder
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -88,6 +100,7 @@ function App() {
           </ProtectedRoute>
         }>
           <Route index element={<DashboardHome />} />
+          <Route path="approvals" element={<ApprovalsInbox />} />
           <Route path="employees" element={<EmployeeList />} />
           <Route path="users" element={<UserList />} />
           <Route path="settings">
@@ -138,6 +151,7 @@ function App() {
             </Route>
             <Route path="count" element={<InventoryCountPage />} />
             <Route path="stocks" element={<StockLevelsPage />} />
+            <Route path="quality-inspection" element={<QualityInspectionPage />} />
           </Route>
 
           <Route path="crm">
@@ -159,6 +173,11 @@ function App() {
               <Route index element={<SaleOrderListPage />} />
               <Route path="new" element={<SaleOrderFormPage />} />
               <Route path=":id" element={<SaleOrderFormPage />} />
+            </Route>
+            <Route path="issue-notes">
+              <Route index element={<StockIssueNoteListPage />} />
+              <Route path="new" element={<StockIssueNoteFormPage />} />
+              <Route path=":id" element={<StockIssueNoteFormPage />} />
             </Route>
             <Route path="delivery-orders">
               <Route index element={<DeliveryOrderListPage />} />
@@ -198,6 +217,26 @@ function App() {
               <Route index element={<QuotationComparisonPage />} />
               <Route path="new" element={<QuotationComparisonFormPage />} />
               <Route path=":id" element={<QuotationComparisonFormPage />} />
+            </Route>
+            <Route path="po">
+              <Route index element={<PurchaseOrdersPage />} />
+              <Route path="new" element={<PurchaseOrderFormPage />} />
+              <Route path=":id" element={<PurchaseOrderFormPage />} />
+            </Route>
+            <Route path="grn">
+              <Route index element={<GRNsPage />} />
+              <Route path="new" element={<ProcurementGRNFormPage />} />
+              <Route path=":id" element={<ProcurementGRNFormPage />} />
+            </Route>
+            <Route path="invoices">
+              <Route index element={<SupplierInvoicesPage />} />
+              <Route path="new" element={<SupplierInvoiceFormPage />} />
+              <Route path=":id" element={<SupplierInvoiceFormPage />} />
+            </Route>
+            <Route path="returns">
+              <Route index element={<PurchaseReturnsPage />} />
+              <Route path="new" element={<PurchaseReturnFormPage />} />
+              <Route path=":id" element={<PurchaseReturnFormPage />} />
             </Route>
             <Route path="suppliers">
               <Route index element={<SuppliersPage />} />

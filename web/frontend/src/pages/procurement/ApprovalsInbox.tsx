@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
+import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -325,7 +326,7 @@ const ApprovalsInbox: React.FC = () => {
     };
 
     const filteredRequests = useMemo(() => {
-        return requests.filter(req => {
+        const filtered = requests.filter(req => {
             const matchesSearch =
                 req.documentNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 req.workflowName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -333,7 +334,23 @@ const ApprovalsInbox: React.FC = () => {
             const matchesType = typeFilter === 'All' || req.documentType === typeFilter;
             return matchesSearch && matchesType;
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.requestedDate ? new Date(a.requestedDate).getTime() : (a.id ?? 0);
+            const dateB = b.requestedDate ? new Date(b.requestedDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
     }, [requests, searchTerm, typeFilter]);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
+    const paginatedRequests = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredRequests.slice(start, start + pageSize);
+    }, [filteredRequests, currentPage, pageSize]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, typeFilter]);
 
     const stats = useMemo(() => {
         return {
@@ -500,7 +517,7 @@ const ApprovalsInbox: React.FC = () => {
                 ) : filteredRequests.length === 0 ? (
                     <EmptyState searchTerm={searchTerm} />
                 ) : (
-                    filteredRequests.map((req, index) => (
+                    paginatedRequests.map((req, index) => (
                         <RequestCard
                             key={req.id}
                             request={req}
@@ -512,6 +529,15 @@ const ApprovalsInbox: React.FC = () => {
                     ))
                 )}
             </div>
+            {!loading && filteredRequests.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredRequests.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                />
+            )}
         </div>
     );
 };

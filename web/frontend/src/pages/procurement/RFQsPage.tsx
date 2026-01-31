@@ -16,6 +16,7 @@ import {
     Tag
 } from 'lucide-react';
 import purchaseService, { type RFQ } from '../../services/purchaseService';
+import Pagination from '../../components/common/Pagination';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -177,6 +178,8 @@ const RFQsPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         if (activeTab === 'rfqs') {
@@ -185,6 +188,10 @@ const RFQsPage: React.FC = () => {
             fetchPendingPRs();
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, searchTerm, statusFilter]);
 
     const fetchRFQs = async () => {
         try {
@@ -212,7 +219,7 @@ const RFQsPage: React.FC = () => {
     };
 
     const filteredRFQs = useMemo(() => {
-        return rfqs.filter(rfq => {
+        const filtered = rfqs.filter(rfq => {
             const matchesSearch =
                 rfq.rfqNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 rfq.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -220,15 +227,37 @@ const RFQsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || rfq.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.rfqDate ? new Date(a.rfqDate).getTime() : (a.id ?? 0);
+            const dateB = b.rfqDate ? new Date(b.rfqDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
     }, [rfqs, searchTerm, statusFilter]);
 
     const filteredPRs = useMemo(() => {
-        return pendingPRs.filter(pr =>
+        const filtered = pendingPRs.filter(pr =>
             pr.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             pr.requestedByDeptName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             pr.requestedByUserName?.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.prDate ? new Date(a.prDate).getTime() : (a.id ?? 0);
+            const dateB = b.prDate ? new Date(b.prDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
     }, [pendingPRs, searchTerm]);
+
+    const paginatedRFQs = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredRFQs.slice(start, start + pageSize);
+    }, [filteredRFQs, currentPage, pageSize]);
+
+    const paginatedPRs = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredPRs.slice(start, start + pageSize);
+    }, [filteredPRs, currentPage, pageSize]);
 
     const stats = useMemo(() => ({
         total: rfqs.length,
@@ -391,7 +420,7 @@ const RFQsPage: React.FC = () => {
                                     </div>
                                 </td></tr>
                             ) : activeTab === 'rfqs' ? (
-                                filteredRFQs.map((rfq, index) => (
+                                paginatedRFQs.map((rfq, index) => (
                                     <RFQTableRow
                                         key={rfq.id}
                                         rfq={rfq}
@@ -401,7 +430,7 @@ const RFQsPage: React.FC = () => {
                                     />
                                 ))
                             ) : (
-                                filteredPRs.map((pr) => (
+                                paginatedPRs.map((pr) => (
                                     <tr key={pr.id} className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0">
                                         <td className="px-6 py-4 font-bold text-slate-800">#{pr.prNumber}</td>
                                         <td className="px-6 py-4 text-sm text-slate-600">{new Date(pr.prDate).toLocaleDateString('ar-EG')}</td>
@@ -428,6 +457,15 @@ const RFQsPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && (activeTab === 'rfqs' ? filteredRFQs.length : filteredPRs.length) > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={activeTab === 'rfqs' ? filteredRFQs.length : filteredPRs.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                    />
+                )}
             </div>
         </div>
     );

@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Package, FileText, RefreshCw, Eye, AlertCircle } from 'lucide-react';
 import materialIssueService, { type MaterialIssueDto } from '../../../services/materialIssueService';
+import Pagination from '../../../components/common/Pagination';
 import { toast } from 'react-hot-toast';
 
 const MaterialIssueListPage: React.FC = () => {
     const navigate = useNavigate();
     const [list, setList] = useState<MaterialIssueDto[]>([]);
     const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => { fetchList(); }, []);
 
@@ -29,6 +32,15 @@ const MaterialIssueListPage: React.FC = () => {
         PROJECT: 'مشروع',
         INTERNAL: 'قسم داخلي'
     };
+
+    const filtered = useMemo(() => {
+        return [...list].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+    }, [list]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
 
     return (
         <div className="space-y-6">
@@ -75,13 +87,13 @@ const MaterialIssueListPage: React.FC = () => {
                             ) : (
                                 list.map((m) => (
                                     <tr key={m.id} className="border-b hover:bg-amber-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-amber-700">{m.issueNumber || '—'}</td>
-                                        <td className="px-6 py-4">{typeLabel[m.issueType as string] || m.issueType}</td>
-                                        <td className="px-6 py-4">{m.referenceNo || '—'}</td>
-                                        <td className="px-6 py-4">{m.receiverName || '—'}</td>
+                                        <td className="px-6 py-4 font-mono font-bold text-amber-700">{(m as any).issueNoteNumber || m.issueNumber || '—'}</td>
+                                        <td className="px-6 py-4">{typeLabel[((m as any).salesOrderId ? 'SALE_ORDER' : m.issueType) as string] || m.issueType || '—'}</td>
+                                        <td className="px-6 py-4">{(m as any).soNumber || m.referenceNo || '—'}</td>
+                                        <td className="px-6 py-4">{(m as any).receivedByName || m.receiverName || '—'}</td>
                                         <td className="px-6 py-4">
-                                            <button 
-                                                onClick={() => navigate(`/dashboard/inventory/warehouse/issue/${m.id}`)} 
+                                            <button
+                                                onClick={() => navigate(`/dashboard/inventory/warehouse/issue/${m.id}`)}
                                                 className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                                             >
                                                 <Eye className="w-5 h-5" />
@@ -93,6 +105,9 @@ const MaterialIssueListPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filtered.length > 0 && (
+                    <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                )}
             </div>
         </div>
     );

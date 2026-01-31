@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Search, Package, Calendar, Truck, Building2, FileText,
     ChevronRight, RefreshCw, Eye, XCircle
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../../services/grnService';
+import Pagination from '../../../components/common/Pagination';
 import { toast } from 'react-hot-toast';
 
 const GRNListPage: React.FC = () => {
@@ -13,10 +14,13 @@ const GRNListPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         fetchList();
     }, []);
+    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
 
     const fetchList = async () => {
         try {
@@ -31,16 +35,26 @@ const GRNListPage: React.FC = () => {
         }
     };
 
-    const filtered = list.filter(
-        (g) => {
+    const filtered = useMemo(() => {
+        const f = list.filter((g) => {
             const matchesSearch = !search ||
                 (g.grnNumber || '').toLowerCase().includes(search.toLowerCase()) ||
                 (g.poNumber || '').toLowerCase().includes(search.toLowerCase()) ||
                 (g.supplierNameAr || '').toLowerCase().includes(search.toLowerCase());
             const matchesStatus = statusFilter === 'all' || g.status === statusFilter;
             return matchesSearch && matchesStatus;
-        }
-    );
+        });
+        return [...f].sort((a, b) => {
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : (a.id ?? 0);
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
+    }, [list, search, statusFilter]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
 
     return (
         <div className="space-y-6">
@@ -142,7 +156,7 @@ const GRNListPage: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((g) => (
+                                paginated.map((g) => (
                                     <tr
                                         key={g.id}
                                         className="border-b border-slate-100 hover:bg-emerald-50/50"
@@ -177,6 +191,9 @@ const GRNListPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filtered.length > 0 && (
+                    <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                )}
             </div>
         </div>
     );

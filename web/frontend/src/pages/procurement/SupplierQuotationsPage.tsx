@@ -19,6 +19,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation } from '../../services/purchaseService';
+import Pagination from '../../components/common/Pagination';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -213,7 +214,7 @@ const SupplierQuotationsPage: React.FC = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        return quotations.filter(q => {
+        const filtered = quotations.filter(q => {
             const isExpired = q.validUntilDate && new Date(q.validUntilDate) < today;
             if (!showExpired && isExpired) return false;
 
@@ -224,7 +225,23 @@ const SupplierQuotationsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || q.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.quotationDate ? new Date(a.quotationDate).getTime() : (a.id ?? 0);
+            const dateB = b.quotationDate ? new Date(b.quotationDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
     }, [quotations, searchTerm, statusFilter, showExpired]);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
+    const paginatedQuotations = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredQuotations.slice(start, start + pageSize);
+    }, [filteredQuotations, currentPage, pageSize]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, showExpired]);
 
     const stats = useMemo(() => {
         const total = quotations.length;
@@ -386,7 +403,7 @@ const SupplierQuotationsPage: React.FC = () => {
                             ) : filteredQuotations.length === 0 ? (
                                 <tr><td colSpan={6} className="text-center py-10 text-slate-500">لا توجد نتائج</td></tr>
                             ) : (
-                                filteredQuotations.map((q, index) => (
+                                paginatedQuotations.map((q, index) => (
                                     <QuotationTableRow
                                         key={q.id}
                                         quotation={q}
@@ -399,6 +416,15 @@ const SupplierQuotationsPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filteredQuotations.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredQuotations.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                    />
+                )}
             </div>
         </div>
     );

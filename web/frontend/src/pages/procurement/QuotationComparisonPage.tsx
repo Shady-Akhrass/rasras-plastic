@@ -15,6 +15,7 @@ import {
     Eye
 } from 'lucide-react';
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
+import Pagination from '../../components/common/Pagination';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -230,10 +231,16 @@ const QuotationComparisonPage: React.FC = () => {
     const [comparisons, setComparisons] = useState<QuotationComparison[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         fetchComparisons();
     }, []);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const fetchComparisons = async () => {
         try {
@@ -248,13 +255,20 @@ const QuotationComparisonPage: React.FC = () => {
     };
 
     const filteredComparisons = useMemo(() => {
-        return comparisons.filter(comp => {
+        const filtered = comparisons.filter(comp => {
             return comp.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.selectedSupplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.comparisonNumber?.toLowerCase().includes(searchTerm.toLowerCase());
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [comparisons, searchTerm]);
+
+    const paginatedComparisons = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredComparisons.slice(start, start + pageSize);
+    }, [filteredComparisons, currentPage, pageSize]);
 
     const stats = useMemo(() => ({
         total: comparisons.length,
@@ -422,7 +436,7 @@ const QuotationComparisonPage: React.FC = () => {
                             ) : filteredComparisons.length === 0 ? (
                                 <EmptyState searchTerm={searchTerm} />
                             ) : (
-                                filteredComparisons.map((comparison, index) => (
+                                paginatedComparisons.map((comparison, index) => (
                                     <ComparisonTableRow
                                         key={comparison.id}
                                         comparison={comparison}
@@ -435,6 +449,15 @@ const QuotationComparisonPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filteredComparisons.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredComparisons.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                    />
+                )}
             </div>
         </div>
     );

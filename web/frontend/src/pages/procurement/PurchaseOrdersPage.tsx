@@ -17,6 +17,7 @@ import {
     DollarSign
 } from 'lucide-react';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
+import Pagination from '../../components/common/Pagination';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -232,6 +233,8 @@ const PurchaseOrdersPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     const queryParams = new URLSearchParams(location.search);
     const prIdFilter = queryParams.get('prId');
@@ -253,7 +256,7 @@ const PurchaseOrdersPage: React.FC = () => {
     };
 
     const filteredOrders = useMemo(() => {
-        return orders.filter(o => {
+        const filtered = orders.filter(o => {
             const matchesSearch =
                 o.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 o.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -261,7 +264,22 @@ const PurchaseOrdersPage: React.FC = () => {
             const matchesPR = !prIdFilter || o.prId === parseInt(prIdFilter);
             return matchesSearch && matchesStatus && matchesPR;
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.poDate ? new Date(a.poDate).getTime() : 0;
+            const dateB = b.poDate ? new Date(b.poDate).getTime() : 0;
+            return dateB - dateA;
+        });
     }, [orders, searchTerm, statusFilter, prIdFilter]);
+
+    const paginatedOrders = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredOrders.slice(start, start + pageSize);
+    }, [filteredOrders, currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, prIdFilter]);
 
     const stats = useMemo(() => ({
         total: orders.length,
@@ -461,7 +479,7 @@ const PurchaseOrdersPage: React.FC = () => {
                             ) : filteredOrders.length === 0 ? (
                                 <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
                             ) : (
-                                filteredOrders.map((order, index) => (
+                                paginatedOrders.map((order, index) => (
                                     <POTableRow
                                         key={order.id}
                                         order={order}
@@ -474,6 +492,18 @@ const PurchaseOrdersPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filteredOrders.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredOrders.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => {
+                            setPageSize(size);
+                            setCurrentPage(1);
+                        }}
+                    />
+                )}
             </div>
         </div>
     );

@@ -14,6 +14,7 @@ const MaterialIssueFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const isNew = !id || id === 'new';
     const [loading, setLoading] = useState(false);
+    const [finalizing, setFinalizing] = useState(false);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [saleOrders, setSaleOrders] = useState<any[]>([]);
@@ -46,30 +47,64 @@ const MaterialIssueFormPage: React.FC = () => {
     }, []);
 
     const onSaleOrderSelect = async (soId: number) => {
-        if (!soId) { setForm((f) => ({ ...f, referenceNo: '', items: [] })); return; }
+        if (!soId) {
+            setForm((f) => ({ ...f, salesOrderId: undefined, customerId: undefined, referenceNo: '', items: [] }));
+            return;
+        }
         const so = saleOrders.find((o) => o.id === soId);
         if (!so) return;
-        const refNo = so.orderNumber || `SO-${so.id}`;
+        const refNo = so.orderNumber || so.soNumber || `SO-${so.id}`;
         try {
             const full = await saleOrderService.getById(soId);
-            const newItems = (full?.items || []).map((i: any) => ({
-                itemId: i.itemId,
-                itemNameAr: i.itemNameAr,
-                itemCode: i.itemCode,
-                requestedQty: i.qty || 0,
-                issuedQty: i.qty || 0,
-                unitId: i.unitId,
-                unitNameAr: i.unitNameAr
+            const soDto = full as any;
+            const orderItems = soDto?.items || [];
+            const newItems = orderItems.map((i: any) => {
+                const ordered = Number(i.orderedQty ?? i.qty ?? 0);
+                const delivered = Number(i.deliveredQty ?? 0);
+                const remaining = Math.max(0, ordered - delivered);
+                return {
+                    itemId: i.itemId,
+                    itemNameAr: i.itemNameAr,
+                    itemCode: i.itemCode,
+                    soItemId: i.id,
+                    requestedQty: remaining,
+                    issuedQty: remaining,
+                    unitId: i.unitId,
+                    unitNameAr: i.unitNameAr,
+                };
+            });
+            setForm((f) => ({
+                ...f,
+                salesOrderId: soId,
+                customerId: soDto?.customerId ?? so.customerId,
+                referenceNo: refNo,
+                items: newItems.length ? newItems : f.items,
             }));
-            setForm((f) => ({ ...f, referenceNo: refNo, items: newItems.length ? newItems : f.items }));
         } catch {
-            setForm((f) => ({ ...f, referenceNo: refNo }));
+            setForm((f) => ({ ...f, referenceNo: refNo, salesOrderId: soId }));
         }
     };
 
     useEffect(() => {
         if (!isNew && id) {
-            materialIssueService.getById(parseInt(id)).then((d) => d && setForm(d)).catch(() => toast.error('فشل التحميل'));
+            materialIssueService.getById(parseInt(id)).then((d) => {
+                if (!d) return;
+                setForm({
+                    ...d,
+                    issueNumber: (d as any).issueNoteNumber ?? d.issueNumber,
+                    referenceNo: (d as any).soNumber ?? d.referenceNo,
+                    issueType: (d as any).salesOrderId ? 'SALE_ORDER' : (d.issueType ?? 'SALE_ORDER'),
+                    salesOrderId: (d as any).salesOrderId,
+                    customerId: (d as any).customerId,
+                    warehouseId: d.warehouseId,
+                    items: (d.items || []).map((i: any) => ({
+                        ...i,
+                        soItemId: i.soItemId,
+                        requestedQty: i.requestedQty ?? 0,
+                        issuedQty: i.issuedQty ?? i.requestedQty ?? 0,
+                    })),
+                });
+            }).catch(() => toast.error('فشل التحميل'));
         }
     }, [id, isNew]);
 
@@ -84,12 +119,12 @@ const MaterialIssueFormPage: React.FC = () => {
             const arr = [...f.items];
             const it = items.find((i) => i.id === (upd.itemId ?? arr[idx]?.itemId));
             arr[idx] = { ...arr[idx], ...upd, unitId: upd.unitId ?? it?.unitId ?? 0, unitNameAr: it?.unitName, itemNameAr: it?.itemNameAr };
-            
+
             // Check stock availability when item or warehouse changes
             if ((upd.itemId || arr[idx]?.itemId) && f.warehouseId) {
                 checkStockAvailability(arr[idx].itemId, f.warehouseId);
             }
-            
+
             return { ...f, items: arr };
         });
     };
@@ -120,13 +155,13 @@ const MaterialIssueFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Validation
         if (!form.warehouseId) {
             toast.error('الرجاء اختيار المستودع');
             return;
         }
-        
+
         if (form.items.length === 0) {
             toast.error('يجب إضافة صنف واحد على الأقل');
             return;
@@ -142,7 +177,7 @@ const MaterialIssueFormPage: React.FC = () => {
                 toast.error(`الكمية المصروفة للصنف ${item.itemNameAr || ''} يجب أن تكون أكبر من صفر`);
                 return;
             }
-            
+
             // Check stock availability
             const availableStock = stockLevels[item.itemId] || 0;
             if (item.issuedQty > availableStock) {
@@ -151,16 +186,41 @@ const MaterialIssueFormPage: React.FC = () => {
             }
         }
 
-        // Validate issue type specific requirements
-        if (form.issueType === 'SALE_ORDER' && !form.referenceNo) {
-            toast.error('يجب إدخال رقم أمر البيع عند اختيار نوع الصرف "صرف لأمر بيع"');
+        if (form.issueType === 'SALE_ORDER' && (!form.referenceNo || !form.salesOrderId || !form.customerId)) {
+            toast.error('يجب اختيار أمر بيع لتحميل المرجع والبنود عند نوع الصرف "صرف لأمر بيع"');
             return;
         }
 
         setLoading(true);
         try {
-            await materialIssueService.create(form);
-            toast.success('تم إنشاء إذن الصرف بنجاح');
+            const payload =
+                form.issueType === 'SALE_ORDER' && form.salesOrderId && form.customerId
+                    ? {
+                        salesOrderId: form.salesOrderId,
+                        customerId: form.customerId,
+                        warehouseId: form.warehouseId,
+                        issuedByUserId: 1,
+                        receivedByName: form.receiverName,
+                        receivedById: form.receiverPhone,
+                        vehicleNo: form.vehicleNo,
+                        driverName: form.driverName,
+                        notes: form.notes,
+                        items: form.items.map((i) => ({
+                            soItemId: i.soItemId,
+                            itemId: i.itemId,
+                            requestedQty: i.requestedQty,
+                            issuedQty: i.issuedQty,
+                            unitId: i.unitId,
+                        })),
+                    }
+                    : form;
+
+            if (isNew) {
+                await materialIssueService.create(payload as any);
+            } else {
+                await materialIssueService.update(parseInt(id!), payload as any);
+            }
+            toast.success(isNew ? 'تم إنشاء إذن الصرف بنجاح' : 'تم تحديث إذن الصرف بنجاح');
             navigate('/dashboard/inventory/warehouse/issue');
         } catch (err: any) {
             if (err?.response?.status === 404 || err?.message?.includes('404')) {
@@ -170,6 +230,20 @@ const MaterialIssueFormPage: React.FC = () => {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleFinalize = async () => {
+        if (!id || id === 'new') return;
+        setFinalizing(true);
+        try {
+            await materialIssueService.finalize(parseInt(id));
+            toast.success('تم إتمام الصرف وتحديث المخزون');
+            navigate('/dashboard/inventory/warehouse/issue');
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'فشل إتمام الصرف');
+        } finally {
+            setFinalizing(false);
         }
     };
 
@@ -216,9 +290,9 @@ const MaterialIssueFormPage: React.FC = () => {
                         {form.issueType === 'SALE_ORDER' && (
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">أمر البيع (تحميل المرجع والبنود)</label>
-                                <select 
-                                    value={form.referenceNo ? saleOrders.find((o) => (o.orderNumber || `SO-${o.id}`) === form.referenceNo)?.id ?? '' : ''} 
-                                    onChange={(e) => onSaleOrderSelect(parseInt(e.target.value) || 0)} 
+                                <select
+                                    value={form.referenceNo ? saleOrders.find((o) => (o.orderNumber || `SO-${o.id}`) === form.referenceNo)?.id ?? '' : ''}
+                                    onChange={(e) => onSaleOrderSelect(parseInt(e.target.value) || 0)}
                                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
                                 >
                                     <option value="">— اختر أمر بيع لتعبئة المرجع والبنود...</option>
@@ -266,9 +340,9 @@ const MaterialIssueFormPage: React.FC = () => {
                             <h2 className="font-bold text-slate-800">البيان المصروف</h2>
                             <p className="text-xs text-slate-500 mt-1">يتم تطبيق نظام FIFO (الأقدم أولاً) تلقائياً عند الصرف</p>
                         </div>
-                        <button 
-                            type="button" 
-                            onClick={addItem} 
+                        <button
+                            type="button"
+                            onClick={addItem}
                             className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-xl font-medium hover:bg-amber-200 transition-colors"
                         >
                             <Plus className="w-4 h-4" /> إضافة صنف
@@ -292,10 +366,10 @@ const MaterialIssueFormPage: React.FC = () => {
                                     return (
                                         <tr key={idx} className="border-b hover:bg-amber-50/30">
                                             <td className="px-3 py-2">
-                                                <select 
-                                                    value={it.itemId || ''} 
-                                                    onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })} 
-                                                    className="w-full min-w-[200px] px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none" 
+                                                <select
+                                                    value={it.itemId || ''}
+                                                    onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })}
+                                                    className="w-full min-w-[200px] px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
                                                     required
                                                 >
                                                     <option value="">اختر الصنف...</option>
@@ -303,29 +377,28 @@ const MaterialIssueFormPage: React.FC = () => {
                                                 </select>
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input 
-                                                    type="number" 
-                                                    min={0} 
+                                                <input
+                                                    type="number"
+                                                    min={0}
                                                     step="0.001"
-                                                    value={it.requestedQty || ''} 
-                                                    onChange={(e) => updateItem(idx, { requestedQty: parseFloat(e.target.value) || 0 })} 
-                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none" 
+                                                    value={it.requestedQty || ''}
+                                                    onChange={(e) => updateItem(idx, { requestedQty: parseFloat(e.target.value) || 0 })}
+                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input 
-                                                    type="number" 
-                                                    min={0} 
+                                                <input
+                                                    type="number"
+                                                    min={0}
                                                     max={stockLevels[it.itemId] || undefined}
                                                     step="0.001"
-                                                    value={it.issuedQty || ''} 
-                                                    onChange={(e) => updateItem(idx, { issuedQty: parseFloat(e.target.value) || 0 })} 
-                                                    className={`w-24 px-2 py-1.5 border rounded-lg focus:ring-1 outline-none ${
-                                                        stockStatus?.status === 'none' || (it.issuedQty > (stockLevels[it.itemId] || 0))
+                                                    value={it.issuedQty || ''}
+                                                    onChange={(e) => updateItem(idx, { issuedQty: parseFloat(e.target.value) || 0 })}
+                                                    className={`w-24 px-2 py-1.5 border rounded-lg focus:ring-1 outline-none ${stockStatus?.status === 'none' || (it.issuedQty > (stockLevels[it.itemId] || 0))
                                                             ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
                                                             : 'border-slate-300 focus:border-amber-500 focus:ring-amber-500'
-                                                    }`}
-                                                    required 
+                                                        }`}
+                                                    required
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -338,18 +411,18 @@ const MaterialIssueFormPage: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input 
-                                                    type="text" 
-                                                    value={it.lotNumber || ''} 
-                                                    onChange={(e) => updateItem(idx, { lotNumber: e.target.value || undefined })} 
-                                                    placeholder="رقم اللوت" 
-                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none text-sm" 
+                                                <input
+                                                    type="text"
+                                                    value={it.lotNumber || ''}
+                                                    onChange={(e) => updateItem(idx, { lotNumber: e.target.value || undefined })}
+                                                    placeholder="رقم اللوت"
+                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none text-sm"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => removeItem(idx)} 
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(idx)}
                                                     className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -369,26 +442,37 @@ const MaterialIssueFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <button 
-                            type="submit" 
-                            disabled={loading || form.items.length === 0} 
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                            type="submit"
+                            disabled={loading || form.items.length === 0}
                             className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-amber-500/25"
                         >
-                            {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
-                            حفظ إذن الصرف
+                            {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                            {isNew ? 'حفظ إذن الصرف' : 'تحديث إذن الصرف'}
                         </button>
+                        {!isNew && (form.status === 'Draft' || !form.status) && (
+                            <button
+                                type="button"
+                                onClick={handleFinalize}
+                                disabled={finalizing}
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                            >
+                                {finalizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                                إتمام الصرف وتحديث المخزون
+                            </button>
+                        )}
                         {form.items.length > 0 && (
                             <div className="flex items-center gap-2 text-sm text-slate-600">
                                 <CheckCircle className="w-4 h-4 text-amber-600" />
-                                <span>{form.items.length} صنف جاهز للحفظ</span>
+                                <span>{form.items.length} صنف</span>
                             </div>
                         )}
                     </div>
-                    <button 
-                        type="button" 
-                        onClick={() => navigate('/dashboard/inventory/warehouse/issue')} 
+                    <button
+                        type="button"
+                        onClick={() => navigate('/dashboard/inventory/warehouse/issue')}
                         className="px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-colors"
                     >
                         إلغاء
