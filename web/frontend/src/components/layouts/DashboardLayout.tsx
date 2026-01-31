@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
-    Settings, User, X, ChevronLeft, ChevronRight,
+    Settings, User, X, ChevronLeft, ChevronRight, ChevronDown,
     HelpCircle, Shield, Sparkles, Building2,
     Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart, ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine
 } from 'lucide-react';
@@ -74,6 +74,53 @@ const SidebarSection = ({ title, collapsed }: { title: string; collapsed: boolea
     )
 );
 
+// Navigation Group Component
+const NavGroup = ({
+    title,
+    isOpen,
+    onToggle,
+    children,
+    collapsed
+}: {
+    title: string;
+    isOpen: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+    collapsed: boolean;
+}) => {
+    if (collapsed) {
+        return (
+            <div className="space-y-1">
+                <div className="my-4 mx-3 border-t border-slate-200" />
+                {children}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-1">
+            <button
+                onClick={onToggle}
+                className="w-full flex items-center justify-between px-4 py-2 mt-6 mb-1 group transition-colors"
+            >
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider group-hover:text-brand-primary">
+                    {title}
+                </span>
+                <ChevronDown
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-300 group-hover:text-brand-primary
+                        ${isOpen ? '' : '-rotate-90'}`}
+                />
+            </button>
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out px-1
+                ${isOpen ? 'max-h-[2000px] opacity-100 visible' : 'max-h-0 opacity-0 invisible'}`}>
+                <div className="space-y-1">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Notification Item
 const NotificationItem = ({
     title,
@@ -124,6 +171,21 @@ const DashboardLayout: React.FC = () => {
     const [searchFocused, setSearchFocused] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+    const [openSections, setOpenSections] = useState({
+        main: true,
+        operations: true,
+        crm: true,
+        procurement: true,
+        system: true
+    });
+
+    const toggleSection = (section: string) => {
+        setOpenSections(prev => ({
+            ...prev,
+            [section]: !prev[section as keyof typeof prev]
+        }));
+    };
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
@@ -249,26 +311,35 @@ const DashboardLayout: React.FC = () => {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-                    {/* Main Section */}
-                    <SidebarSection title="الرئيسية" collapsed={sidebarCollapsed} />
-                    {filteredNavItems.filter(i => i.section === 'main').map((item) => (
-                        <SidebarLink
-                            key={item.to}
-                            to={item.to}
-                            icon={item.icon}
-                            label={item.label}
-                            active={location.pathname === item.to ||
-                                (item.to !== '/dashboard' && location.pathname.startsWith(item.to))}
-                            collapsed={sidebarCollapsed}
-                            badge={item.badge}
-                        />
-                    ))}
+                <nav className="flex-1 overflow-y-auto p-4 pt-0">
+                    <NavGroup
+                        title="الرئيسية"
+                        isOpen={openSections.main}
+                        onToggle={() => toggleSection('main')}
+                        collapsed={sidebarCollapsed}
+                    >
+                        {filteredNavItems.filter(i => i.section === 'main').map((item) => (
+                            <SidebarLink
+                                key={item.to}
+                                to={item.to}
+                                icon={item.icon}
+                                label={item.label}
+                                active={location.pathname === item.to ||
+                                    (item.to !== '/dashboard' && location.pathname.startsWith(item.to))}
+                                collapsed={sidebarCollapsed}
+                                badge={item.badge}
+                            />
+                        ))}
+                    </NavGroup>
 
                     {/* Operations Section */}
                     {filteredNavItems.some(i => i.section === 'operations') && (
-                        <>
-                            <SidebarSection title="العمليات" collapsed={sidebarCollapsed} />
+                        <NavGroup
+                            title="العمليات"
+                            isOpen={openSections.operations}
+                            onToggle={() => toggleSection('operations')}
+                            collapsed={sidebarCollapsed}
+                        >
                             {filteredNavItems.filter(i => i.section === 'operations').map((item) => (
                                 <SidebarLink
                                     key={item.to}
@@ -280,7 +351,7 @@ const DashboardLayout: React.FC = () => {
                                     badge={item.badge}
                                 />
                             ))}
-                        </>
+                        </NavGroup>
                     )}
 
                     {/* Sales Section */}
@@ -302,8 +373,12 @@ const DashboardLayout: React.FC = () => {
 
                     {/* CRM Section */}
                     {filteredNavItems.some(i => i.section === 'crm') && (
-                        <>
-                            <SidebarSection title="إدارة العملاء" collapsed={sidebarCollapsed} />
+                        <NavGroup
+                            title="إدارة العملاء"
+                            isOpen={openSections.crm}
+                            onToggle={() => toggleSection('crm')}
+                            collapsed={sidebarCollapsed}
+                        >
                             {filteredNavItems.filter(i => i.section === 'crm').map((item) => (
                                 <SidebarLink
                                     key={item.to}
@@ -315,7 +390,7 @@ const DashboardLayout: React.FC = () => {
                                     badge={item.badge}
                                 />
                             ))}
-                        </>
+                        </NavGroup>
                     )}
 
                     {/* Warehouse Section */}
@@ -337,8 +412,12 @@ const DashboardLayout: React.FC = () => {
 
                     {/* Procurement Section */}
                     {filteredNavItems.some(i => i.section === 'procurement') && (
-                        <>
-                            <SidebarSection title="المشتريات" collapsed={sidebarCollapsed} />
+                        <NavGroup
+                            title="المشتريات"
+                            isOpen={openSections.procurement}
+                            onToggle={() => toggleSection('procurement')}
+                            collapsed={sidebarCollapsed}
+                        >
                             {filteredNavItems.filter(i => i.section === 'procurement').map((item) => (
                                 <SidebarLink
                                     key={item.to}
@@ -350,22 +429,28 @@ const DashboardLayout: React.FC = () => {
                                     badge={item.badge}
                                 />
                             ))}
-                        </>
+                        </NavGroup>
                     )}
 
                     {/* System Section */}
-                    <SidebarSection title="النظام" collapsed={sidebarCollapsed} />
-                    {filteredNavItems.filter(i => i.section === 'system').map((item) => (
-                        <SidebarLink
-                            key={item.to}
-                            to={item.to}
-                            icon={item.icon}
-                            label={item.label}
-                            active={location.pathname.startsWith(item.to)}
-                            collapsed={sidebarCollapsed}
-                            badge={item.badge}
-                        />
-                    ))}
+                    <NavGroup
+                        title="النظام"
+                        isOpen={openSections.system}
+                        onToggle={() => toggleSection('system')}
+                        collapsed={sidebarCollapsed}
+                    >
+                        {filteredNavItems.filter(i => i.section === 'system').map((item) => (
+                            <SidebarLink
+                                key={item.to}
+                                to={item.to}
+                                icon={item.icon}
+                                label={item.label}
+                                active={location.pathname.startsWith(item.to)}
+                                collapsed={sidebarCollapsed}
+                                badge={item.badge}
+                            />
+                        ))}
+                    </NavGroup>
                 </nav>
 
                 {/* User Profile Section */}
