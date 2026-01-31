@@ -17,6 +17,7 @@ import {
     Archive
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
+import Pagination from '../../components/common/Pagination';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -225,6 +226,8 @@ const GRNsPage: React.FC = () => {
     const [receipts, setReceipts] = useState<GoodsReceiptNoteDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         fetchReceipts();
@@ -243,16 +246,29 @@ const GRNsPage: React.FC = () => {
     };
 
     const filteredReceipts = useMemo(() => {
-        return receipts.filter(r => {
+        const filtered = receipts.filter(r => {
             const matchesSearch = r.grnNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 r.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 r.poNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-
             const isNotReturned = r.status?.toLowerCase() !== 'returned';
-
             return matchesSearch && isNotReturned;
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : 0;
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : 0;
+            return dateB - dateA;
+        });
     }, [receipts, searchTerm]);
+
+    const paginatedReceipts = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredReceipts.slice(start, start + pageSize);
+    }, [filteredReceipts, currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const stats = useMemo(() => {
         const activeReceipts = receipts.filter(r => r.status?.toLowerCase() !== 'returned');
@@ -443,7 +459,7 @@ const GRNsPage: React.FC = () => {
                             ) : filteredReceipts.length === 0 ? (
                                 <EmptyState searchTerm={searchTerm} />
                             ) : (
-                                filteredReceipts.map((receipt, index) => (
+                                paginatedReceipts.map((receipt, index) => (
                                     <GRNTableRow
                                         key={receipt.id}
                                         receipt={receipt}
@@ -456,6 +472,15 @@ const GRNsPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filteredReceipts.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredReceipts.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                    />
+                )}
             </div>
         </div>
     );

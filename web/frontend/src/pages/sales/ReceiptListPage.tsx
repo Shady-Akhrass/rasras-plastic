@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Banknote, RefreshCw, Eye, FileText } from 'lucide-react';
 import { receiptService, type ReceiptDto } from '../../services/receiptService';
+import Pagination from '../../components/common/Pagination';
 import { toast } from 'react-hot-toast';
 
 const RECEIPT_TYPE_LABELS: Record<string, string> = { FROM_CUSTOMER: 'من عميل', FROM_EMPLOYEE: 'من موظف', GENERAL_INCOME: 'إيراد عام', OTHER: 'أخرى' };
@@ -12,8 +13,11 @@ const ReceiptListPage: React.FC = () => {
     const [list, setList] = useState<ReceiptDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => { fetchList(); }, []);
+    useEffect(() => { setCurrentPage(1); }, [search]);
 
     const fetchList = async () => {
         try {
@@ -26,12 +30,24 @@ const ReceiptListPage: React.FC = () => {
         } finally { setLoading(false); }
     };
 
-    const filtered = list.filter((r) =>
-        !search ||
-        (r.receiptNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-        (r.depositorName || '').toLowerCase().includes(search.toLowerCase()) ||
-        (r.invoiceNumber || '').toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = useMemo(() => {
+        const f = list.filter((r) =>
+            !search ||
+            (r.receiptNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+            (r.depositorName || '').toLowerCase().includes(search.toLowerCase()) ||
+            (r.invoiceNumber || '').toLowerCase().includes(search.toLowerCase())
+        );
+        return [...f].sort((a, b) => {
+            const dateA = a.receiptDate ? new Date(a.receiptDate).getTime() : (a.id ?? 0);
+            const dateB = b.receiptDate ? new Date(b.receiptDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
+    }, [list, search]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
 
     return (
         <div className="space-y-6">
@@ -101,7 +117,7 @@ const ReceiptListPage: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((r) => (
+                                paginated.map((r) => (
                                     <tr key={r.id} className="border-b border-slate-100 hover:bg-rose-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-rose-700">{r.receiptNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{r.receiptDate ? new Date(r.receiptDate).toLocaleDateString('ar-EG') : '—'}</td>
@@ -119,6 +135,9 @@ const ReceiptListPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filtered.length > 0 && (
+                    <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                )}
             </div>
         </div>
     );

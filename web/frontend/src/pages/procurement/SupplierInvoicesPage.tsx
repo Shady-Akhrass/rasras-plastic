@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 import { grnService } from '../../services/grnService';
+import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 
 const SupplierInvoicesPage: React.FC = () => {
@@ -27,6 +28,8 @@ const SupplierInvoicesPage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [activeTab, setActiveTab] = useState<'invoices' | 'pending'>('invoices');
     const [pendingGRNs, setPendingGRNs] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         if (activeTab === 'invoices') {
@@ -35,6 +38,10 @@ const SupplierInvoicesPage: React.FC = () => {
             fetchPendingGRNs();
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, searchTerm, statusFilter]);
 
     const fetchInvoices = async () => {
         try {
@@ -64,25 +71,45 @@ const SupplierInvoicesPage: React.FC = () => {
     };
 
     const filteredInvoices = useMemo(() => {
-        return invoices.filter(inv => {
+        const filtered = invoices.filter(inv => {
             const matchesSearch =
                 inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 inv.supplierInvoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 inv.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
-
             const matchesStatus = statusFilter === 'All' || inv.status === statusFilter;
-
             return matchesSearch && matchesStatus;
+        });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.id ?? 0);
+            const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
         });
     }, [invoices, searchTerm, statusFilter]);
 
     const filteredPending = useMemo(() => {
-        return pendingGRNs.filter(g =>
+        const filtered = pendingGRNs.filter(g =>
             g.grnNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             g.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             g.poNumber?.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : (a.id ?? 0);
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : (b.id ?? 0);
+            return dateB - dateA;
+        });
     }, [pendingGRNs, searchTerm]);
+
+    const paginatedInvoices = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredInvoices.slice(start, start + pageSize);
+    }, [filteredInvoices, currentPage, pageSize]);
+
+    const paginatedPending = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredPending.slice(start, start + pageSize);
+    }, [filteredPending, currentPage, pageSize]);
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -322,7 +349,7 @@ const SupplierInvoicesPage: React.FC = () => {
                                     </tr>
                                 ))
                             ) : (
-                                filteredPending.map((g, idx) => (
+                                paginatedPending.map((g, idx) => (
                                     <tr key={g.id} className="hover:bg-slate-50/50 transition-colors animate-slide-in" style={{ animationDelay: `${idx * 40}ms` }}>
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-slate-800">#{g.grnNumber}</div>
@@ -349,6 +376,15 @@ const SupplierInvoicesPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && (activeTab === 'invoices' ? filteredInvoices.length : filteredPending.length) > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={activeTab === 'invoices' ? filteredInvoices.length : filteredPending.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                    />
+                )}
             </div>
         </div>
     );

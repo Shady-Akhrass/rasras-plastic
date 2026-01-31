@@ -17,6 +17,7 @@ import {
     Filter
 } from 'lucide-react';
 import { purchaseReturnService, type PurchaseReturnDto } from '../../services/purchaseReturnService';
+import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -209,6 +210,8 @@ const PurchaseReturnsPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         fetchReturns();
@@ -228,7 +231,7 @@ const PurchaseReturnsPage: React.FC = () => {
     };
 
     const filteredReturns = useMemo(() => {
-        return returns.filter(r => {
+        const filtered = returns.filter(r => {
             const matchesSearch =
                 r.returnNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 r.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -236,7 +239,22 @@ const PurchaseReturnsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => {
+            const dateA = a.returnDate ? new Date(a.returnDate).getTime() : 0;
+            const dateB = b.returnDate ? new Date(b.returnDate).getTime() : 0;
+            return dateB - dateA;
+        });
     }, [returns, searchTerm, statusFilter]);
+
+    const paginatedReturns = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredReturns.slice(start, start + pageSize);
+    }, [filteredReturns, currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
 
     const stats = useMemo(() => ({
         total: returns.length,
@@ -419,7 +437,7 @@ const PurchaseReturnsPage: React.FC = () => {
                                 ) : filteredReturns.length === 0 ? (
                                     <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
                                 ) : (
-                                    filteredReturns.map((returnItem, index) => (
+                                    paginatedReturns.map((returnItem, index) => (
                                         <ReturnTableRow
                                             key={returnItem.id || index}
                                             returnItem={returnItem}
@@ -431,6 +449,15 @@ const PurchaseReturnsPage: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
+                    {!loading && filteredReturns.length > 0 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filteredReturns.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                        />
+                    )}
                 </div>
             </div>
         </div>
