@@ -38,7 +38,7 @@ public class DataSeeder implements CommandLineRunner {
         if (deptCount == null || deptCount == 0) {
             log.info("Seeding default department...");
             jdbcTemplate.update(
-                    "INSERT INTO departments (DepartmentID, DepartmentNameAr, DepartmentNameEn, IsActive) VALUES (1, 'الإدارة', 'Management', 1)");
+                    "INSERT INTO departments (DepartmentID, DepartmentCode, DepartmentNameAr, DepartmentNameEn, IsActive) VALUES (1, 'MGT', 'الإدارة', 'Management', 1)");
         }
 
         // 2. Ensure Employee 103 exists (needed for user 'shady')
