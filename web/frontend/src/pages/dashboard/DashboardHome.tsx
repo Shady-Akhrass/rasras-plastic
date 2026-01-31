@@ -339,7 +339,7 @@ const DashboardHome: React.FC = () => {
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
-    const userName = user?.fullNameAr || user?.username || 'المستخدم';
+    const employeeDisplayName = user?.fullNameAr || user?.username || 'المستخدم';
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -427,7 +427,7 @@ const DashboardHome: React.FC = () => {
                         </div>
 
                         <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-                            {getGreeting()}، {userName}
+                            {getGreeting()}، {employeeDisplayName}
                             <motion.span
                                 animate={{ rotate: [0, 20, 0] }}
                                 transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }}

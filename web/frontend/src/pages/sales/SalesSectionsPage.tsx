@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     FileText, ShoppingCart, Truck, Receipt, Banknote,
-    ChevronLeft, Tag, Percent, LogOut
+    ChevronLeft, Tag, Percent, Package
 } from 'lucide-react';
 
 const SectionCard: React.FC<{
@@ -92,16 +92,16 @@ const SalesSectionsPage: React.FC = () => {
                         color="emerald"
                     />
                     <SectionCard
-                        icon={LogOut}
-                        title="إذن صرف (المخزن)"
-                        description="صرف مواد لأمر بيع أو تشغيل — من أقسام المخزن، مرتبط بأمر البيع"
-                        to="/dashboard/inventory/issue"
+                        icon={Package}
+                        title="إذونات الصرف"
+                        description="إذن صرف من المخزن بناءً على أمر البيع (SO)، اعتماد وتحديث المخزون"
+                        to="/dashboard/sales/issue-notes"
                         color="amber"
                     />
                     <SectionCard
                         icon={Truck}
                         title="أوامر التوصيل"
-                        description="أمر توصيل مرتبط بأمر البيع، مكان وتاريخ التسليم"
+                        description="أمر توصيل مرتبط بإذن الصرف، السائق والمركبة والتاريخ"
                         to="/dashboard/sales/delivery-orders"
                         color="amber"
                     />

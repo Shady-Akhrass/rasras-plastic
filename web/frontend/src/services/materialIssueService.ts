@@ -12,6 +12,8 @@ export interface MaterialIssueItemDto {
     itemId: number;
     itemNameAr?: string;
     itemCode?: string;
+    /** معرف بند أمر البيع (مطلوب عند الصرف لأمر بيع) */
+    soItemId?: number;
     requestedQty: number;
     issuedQty: number;
     unitId: number;
@@ -26,9 +28,15 @@ export type IssueType = 'SALE_ORDER' | 'PRODUCTION' | 'PROJECT' | 'INTERNAL';
 export interface MaterialIssueDto {
     id?: number;
     issueNumber?: string;
+    issueNoteNumber?: string;
     issueDate?: string;
     issueType: IssueType;
     referenceNo?: string;
+    /** مطلوب عند الصرف لأمر بيع */
+    salesOrderId?: number;
+    soNumber?: string;
+    customerId?: number;
+    customerNameAr?: string;
     warehouseId: number;
     warehouseNameAr?: string;
     receiverName?: string;
@@ -65,7 +73,16 @@ export const materialIssueService = {
     create: async (dto: MaterialIssueDto): Promise<MaterialIssueDto | null> => {
         const res = await apiClient.post<{ data?: MaterialIssueDto }>(_api, dto);
         return (res.data as any)?.data ?? null;
-    }
+    },
+    update: async (id: number, dto: MaterialIssueDto): Promise<MaterialIssueDto | null> => {
+        const res = await apiClient.put<{ data?: MaterialIssueDto }>(`${_api}/${id}`, dto);
+        return (res.data as any)?.data ?? null;
+    },
+    finalize: async (id: number, userId?: number): Promise<MaterialIssueDto | null> => {
+        const url = userId != null ? `${_api}/${id}/finalize?userId=${userId}` : `${_api}/${id}/finalize`;
+        const res = await apiClient.post<{ data?: MaterialIssueDto }>(url);
+        return (res.data as any)?.data ?? null;
+    },
 };
 
 export default materialIssueService;

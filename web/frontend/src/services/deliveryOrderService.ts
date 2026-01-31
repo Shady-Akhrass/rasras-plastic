@@ -2,8 +2,8 @@ import apiClient from './apiClient';
 
 /**
  * أمر التوصيل (Delivery Order)
- * API متوقع: GET/POST /sales/delivery-orders, GET /sales/delivery-orders/:id
- * مرتبط بأمر البيع SO.
+ * API: /sales/delivery-orders
+ * مرتبط بإذن الصرف (Stock Issue Note)
  */
 
 export interface DeliveryOrderItemDto {
@@ -19,19 +19,41 @@ export interface DeliveryOrderItemDto {
 export interface DeliveryOrderDto {
     id?: number;
     deliveryOrderNumber?: string;
-    deliveryDate: string;
-    saleOrderId: number;
-    saleOrderNumber?: string;
-    customerId: number;
+    orderDate?: string;
+    issueNoteId: number;
+    issueNoteNumber?: string;
+    customerId?: number;
     customerNameAr?: string;
-    customerNameEn?: string;
+    customerCode?: string;
     deliveryAddress?: string;
-    deliveryPlace?: string;
+    zoneId?: number;
+    deliveryType?: string;
+    vehicleId?: number;
+    contractorId?: number;
     driverName?: string;
-    vehicleNo?: string;
+    driverPhone?: string;
+    scheduledDate?: string;
+    scheduledTime?: string;
+    actualDeliveryDate?: string;
+    deliveryCost?: number;
+    isCostOnCustomer?: boolean;
     status?: string;
+    receiverName?: string;
+    receiverPhone?: string;
+    receiverSignature?: string;
+    podAttachmentPath?: string;
     notes?: string;
-    items: DeliveryOrderItemDto[];
+    createdAt?: string;
+    createdBy?: number;
+    updatedAt?: string;
+    updatedBy?: number;
+    /** للتوافق مع الصفحات القديمة */
+    deliveryDate?: string;
+    saleOrderId?: number;
+    saleOrderNumber?: string;
+    deliveryPlace?: string;
+    vehicleNo?: string;
+    items?: DeliveryOrderItemDto[];
 }
 
 const _api = '/sales/delivery-orders';
@@ -45,6 +67,7 @@ export const deliveryOrderService = {
             return [];
         }
     },
+
     getById: async (id: number): Promise<DeliveryOrderDto | null> => {
         try {
             const res = await apiClient.get<{ data?: DeliveryOrderDto }>(`${_api}/${id}`);
@@ -53,8 +76,50 @@ export const deliveryOrderService = {
             return null;
         }
     },
+
+    getByIssueNoteId: async (issueNoteId: number): Promise<DeliveryOrderDto[]> => {
+        try {
+            const res = await apiClient.get<{ data?: DeliveryOrderDto[] }>(`${_api}/by-issue-note/${issueNoteId}`);
+            return (res.data as any)?.data ?? [];
+        } catch {
+            return [];
+        }
+    },
+
+    createFromIssueNote: async (issueNoteId: number, createdByUserId?: number): Promise<DeliveryOrderDto | null> => {
+        try {
+            const params = createdByUserId != null ? `?createdByUserId=${createdByUserId}` : '';
+            const res = await apiClient.post<{ data?: DeliveryOrderDto }>(`${_api}/from-issue-note/${issueNoteId}${params}`);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
+        }
+    },
+
     create: async (dto: DeliveryOrderDto): Promise<DeliveryOrderDto | null> => {
-        const res = await apiClient.post<{ data?: DeliveryOrderDto }>(_api, dto);
-        return (res.data as any)?.data ?? null;
+        try {
+            const res = await apiClient.post<{ data?: DeliveryOrderDto }>(_api, dto);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
+        }
+    },
+
+    update: async (id: number, dto: DeliveryOrderDto): Promise<DeliveryOrderDto | null> => {
+        try {
+            const res = await apiClient.put<{ data?: DeliveryOrderDto }>(`${_api}/${id}`, dto);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
+        }
+    },
+
+    delete: async (id: number): Promise<boolean> => {
+        try {
+            await apiClient.delete(`${_api}/${id}`);
+            return true;
+        } catch {
+            return false;
+        }
     },
 };

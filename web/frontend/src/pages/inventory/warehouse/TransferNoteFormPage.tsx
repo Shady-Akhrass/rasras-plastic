@@ -13,6 +13,7 @@ const TransferNoteFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const isNew = !id || id === 'new';
     const [loading, setLoading] = useState(false);
+    const [finalizing, setFinalizing] = useState(false);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [stockLevels, setStockLevels] = useState<Record<number, number>>({});
@@ -37,7 +38,13 @@ const TransferNoteFormPage: React.FC = () => {
 
     useEffect(() => {
         if (!isNew && id) {
-            transferNoteService.getById(parseInt(id)).then((d) => d && setForm(d)).catch(() => toast.error('فشل التحميل'));
+            transferNoteService.getById(parseInt(id)).then((d) => {
+                if (!d) return;
+                setForm({
+                    ...d,
+                    items: (d.items || []).map((i) => ({ ...i, quantity: (i as any).requestedQty ?? i.quantity ?? 0 })),
+                });
+            }).catch(() => toast.error('فشل التحميل'));
         }
     }, [id, isNew]);
 
@@ -52,12 +59,12 @@ const TransferNoteFormPage: React.FC = () => {
             const arr = [...f.items];
             const it = items.find((i) => i.id === (upd.itemId ?? arr[idx]?.itemId));
             arr[idx] = { ...arr[idx], ...upd, unitId: upd.unitId ?? it?.unitId ?? 0, unitNameAr: it?.unitName, itemNameAr: it?.itemNameAr };
-            
+
             // Check stock availability when item or warehouse changes
             if ((upd.itemId || arr[idx]?.itemId) && f.fromWarehouseId) {
                 checkStockAvailability(arr[idx].itemId, f.fromWarehouseId);
             }
-            
+
             return { ...f, items: arr };
         });
     };
@@ -86,18 +93,18 @@ const TransferNoteFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Validation
         if (!form.fromWarehouseId || !form.toWarehouseId) {
             toast.error('الرجاء اختيار المخزن المصدر والمخزن الهدف');
             return;
         }
-        
+
         if (form.fromWarehouseId === form.toWarehouseId) {
             toast.error('المخزن المصدر والمخزن الهدف يجب أن يكونا مختلفين');
             return;
         }
-        
+
         if (form.items.length === 0) {
             toast.error('يجب إضافة صنف واحد على الأقل');
             return;
@@ -113,7 +120,7 @@ const TransferNoteFormPage: React.FC = () => {
                 toast.error(`الكمية للصنف ${item.itemNameAr || ''} يجب أن تكون أكبر من صفر`);
                 return;
             }
-            
+
             // Check stock availability
             const availableStock = stockLevels[item.itemId] || 0;
             if (item.quantity > availableStock) {
@@ -124,8 +131,13 @@ const TransferNoteFormPage: React.FC = () => {
 
         setLoading(true);
         try {
-            await transferNoteService.create(form);
-            toast.success('تم إنشاء إذن التحويل بنجاح');
+            if (isNew) {
+                await transferNoteService.create(form);
+                toast.success('تم إنشاء إذن التحويل بنجاح');
+            } else {
+                await transferNoteService.update(parseInt(id!), form);
+                toast.success('تم تحديث إذن التحويل بنجاح');
+            }
             navigate('/dashboard/inventory/warehouse/transfer');
         } catch (err: any) {
             if (err?.response?.status === 404) {
@@ -170,10 +182,10 @@ const TransferNoteFormPage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">من المخزن *</label>
-                            <select 
-                                value={form.fromWarehouseId || ''} 
-                                onChange={(e) => setForm((f) => ({ ...f, fromWarehouseId: parseInt(e.target.value) || 0 }))} 
-                                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all" 
+                            <select
+                                value={form.fromWarehouseId || ''}
+                                onChange={(e) => setForm((f) => ({ ...f, fromWarehouseId: parseInt(e.target.value) || 0 }))}
+                                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
                                 required
                             >
                                 <option value="">اختر المخزن المصدر...</option>
@@ -184,10 +196,10 @@ const TransferNoteFormPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">إلى المخزن *</label>
-                            <select 
-                                value={form.toWarehouseId || ''} 
-                                onChange={(e) => setForm((f) => ({ ...f, toWarehouseId: parseInt(e.target.value) || 0 }))} 
-                                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all" 
+                            <select
+                                value={form.toWarehouseId || ''}
+                                onChange={(e) => setForm((f) => ({ ...f, toWarehouseId: parseInt(e.target.value) || 0 }))}
+                                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
                                 required
                             >
                                 <option value="">اختر المخزن الهدف...</option>
@@ -221,9 +233,9 @@ const TransferNoteFormPage: React.FC = () => {
                             <h2 className="font-bold text-slate-800">البيان المحوّل</h2>
                             <p className="text-xs text-slate-500 mt-1">تحويل أصناف من المخزن المصدر إلى المخزن الهدف</p>
                         </div>
-                        <button 
-                            type="button" 
-                            onClick={addItem} 
+                        <button
+                            type="button"
+                            onClick={addItem}
                             className="flex items-center gap-2 px-4 py-2 bg-violet-100 text-violet-700 rounded-xl font-medium hover:bg-violet-200 transition-colors"
                         >
                             <Plus className="w-4 h-4" /> إضافة صنف
@@ -246,10 +258,10 @@ const TransferNoteFormPage: React.FC = () => {
                                     return (
                                         <tr key={idx} className="border-b hover:bg-violet-50/30">
                                             <td className="px-3 py-2">
-                                                <select 
-                                                    value={it.itemId || ''} 
-                                                    onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })} 
-                                                    className="w-full min-w-[200px] px-2 py-1.5 border border-slate-300 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none" 
+                                                <select
+                                                    value={it.itemId || ''}
+                                                    onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })}
+                                                    className="w-full min-w-[200px] px-2 py-1.5 border border-slate-300 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                                                     required
                                                 >
                                                     <option value="">اختر الصنف...</option>
@@ -257,19 +269,18 @@ const TransferNoteFormPage: React.FC = () => {
                                                 </select>
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input 
-                                                    type="number" 
-                                                    min={0} 
+                                                <input
+                                                    type="number"
+                                                    min={0}
                                                     max={stockLevels[it.itemId] || undefined}
                                                     step="0.001"
-                                                    value={it.quantity || ''} 
-                                                    onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} 
-                                                    className={`w-24 px-2 py-1.5 border rounded-lg focus:ring-1 outline-none ${
-                                                        stockStatus?.status === 'none' || (it.quantity > (stockLevels[it.itemId] || 0))
+                                                    value={it.quantity || ''}
+                                                    onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                                                    className={`w-24 px-2 py-1.5 border rounded-lg focus:ring-1 outline-none ${stockStatus?.status === 'none' || (it.quantity > (stockLevels[it.itemId] || 0))
                                                             ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
                                                             : 'border-slate-300 focus:border-violet-500 focus:ring-violet-500'
-                                                    }`}
-                                                    required 
+                                                        }`}
+                                                    required
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -282,18 +293,18 @@ const TransferNoteFormPage: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input 
-                                                    type="text" 
-                                                    value={it.lotNumber || ''} 
-                                                    onChange={(e) => updateItem(idx, { lotNumber: e.target.value || undefined })} 
-                                                    placeholder="رقم اللوت" 
-                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none text-sm" 
+                                                <input
+                                                    type="text"
+                                                    value={it.lotNumber || ''}
+                                                    onChange={(e) => updateItem(idx, { lotNumber: e.target.value || undefined })}
+                                                    placeholder="رقم اللوت"
+                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none text-sm"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => removeItem(idx)} 
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(idx)}
                                                     className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -313,26 +324,37 @@ const TransferNoteFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <button 
-                            type="submit" 
-                            disabled={loading || form.items.length === 0} 
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                            type="submit"
+                            disabled={loading || form.items.length === 0}
                             className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-violet-500/25"
                         >
-                            {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} 
-                            حفظ إذن التحويل
+                            {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                            {isNew ? 'حفظ إذن التحويل' : 'تحديث إذن التحويل'}
                         </button>
+                        {!isNew && (form.status === 'Draft' || !form.status) && (
+                            <button
+                                type="button"
+                                onClick={handleFinalize}
+                                disabled={finalizing || form.items.length === 0}
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                            >
+                                {finalizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                                إتمام التحويل وتحديث المخزون
+                            </button>
+                        )}
                         {form.items.length > 0 && (
                             <div className="flex items-center gap-2 text-sm text-slate-600">
                                 <CheckCircle className="w-4 h-4 text-violet-600" />
-                                <span>{form.items.length} صنف جاهز للحفظ</span>
+                                <span>{form.items.length} صنف</span>
                             </div>
                         )}
                     </div>
-                    <button 
-                        type="button" 
-                        onClick={() => navigate('/dashboard/inventory/warehouse/transfer')} 
+                    <button
+                        type="button"
+                        onClick={() => navigate('/dashboard/inventory/warehouse/transfer')}
                         className="px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-colors"
                     >
                         إلغاء

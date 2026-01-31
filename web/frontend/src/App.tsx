@@ -52,6 +52,8 @@ import QuotationListPage from './pages/sales/QuotationListPage';
 import QuotationFormPage from './pages/sales/QuotationFormPage';
 import SaleOrderListPage from './pages/sales/SaleOrderListPage';
 import SaleOrderFormPage from './pages/sales/SaleOrderFormPage';
+import StockIssueNoteListPage from './pages/sales/StockIssueNoteListPage';
+import StockIssueNoteFormPage from './pages/sales/StockIssueNoteFormPage';
 import DeliveryOrderListPage from './pages/sales/DeliveryOrderListPage';
 import DeliveryOrderFormPage from './pages/sales/DeliveryOrderFormPage';
 import SalesInvoiceListPage from './pages/sales/SalesInvoiceListPage';
@@ -159,6 +161,11 @@ function App() {
               <Route index element={<SaleOrderListPage />} />
               <Route path="new" element={<SaleOrderFormPage />} />
               <Route path=":id" element={<SaleOrderFormPage />} />
+            </Route>
+            <Route path="issue-notes">
+              <Route index element={<StockIssueNoteListPage />} />
+              <Route path="new" element={<StockIssueNoteFormPage />} />
+              <Route path=":id" element={<StockIssueNoteFormPage />} />
             </Route>
             <Route path="delivery-orders">
               <Route index element={<DeliveryOrderListPage />} />

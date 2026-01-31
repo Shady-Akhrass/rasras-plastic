@@ -30,6 +30,12 @@ public class GRNController {
         return ResponseEntity.ok(Map.of("data", grnService.createGRN(dto)));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, GoodsReceiptNoteDto>> updateGRN(@PathVariable Integer id,
+            @RequestBody GoodsReceiptNoteDto dto) {
+        return ResponseEntity.ok(Map.of("data", grnService.updateGRN(id, dto)));
+    }
+
     @PostMapping("/{id}/finalize")
     public ResponseEntity<Map<String, GoodsReceiptNoteDto>> finalizeStoreIn(@PathVariable Integer id,
             @RequestParam Integer userId) {
