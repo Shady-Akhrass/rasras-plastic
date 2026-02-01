@@ -8,15 +8,11 @@ import {
     Building2,
     Users,
     Phone,
-    Mail,
     MapPin,
     CheckCircle2,
     RefreshCw,
     Edit3,
-    ExternalLink,
-    MoreVertical,
-    Eye,
-    Trash2
+    ExternalLink
 } from 'lucide-react';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import toast from 'react-hot-toast';
@@ -213,8 +209,8 @@ const SuppliersPage: React.FC = () => {
                         <option value="Service">خدمي</option>
                     </select>
                 </div>
-                <button 
-                    onClick={fetchSuppliers} 
+                <button
+                    onClick={fetchSuppliers}
                     className="p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
                 >
                     <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -311,8 +307,8 @@ const SuppliersPage: React.FC = () => {
                             ) : (
                                 // Data Rows
                                 filteredSuppliers.map((supplier, index) => (
-                                    <tr 
-                                        key={supplier.id} 
+                                    <tr
+                                        key={supplier.id}
                                         className="group hover:bg-slate-50/50 transition-colors"
                                         style={{
                                             animationDelay: `${index * 30}ms`,

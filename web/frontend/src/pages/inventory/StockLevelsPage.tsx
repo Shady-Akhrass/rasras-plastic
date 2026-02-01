@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Activity,
     Search,
     Filter,
     Package,
     AlertTriangle,
-    TrendingUp,
     RefreshCw,
     Download,
     Plus,

@@ -20,15 +20,14 @@ const QuotationFormPage: React.FC = () => {
 
     const [form, setForm] = useState<SalesQuotationDto>({
         quotationDate: new Date().toISOString().split('T')[0],
-        validUntil: '',
+        validUntilDate: '',
         customerId: 0,
         priceListId: 0,
         currency: 'EGP',
         exchangeRate: 1,
         paymentTerms: '',
-        deliveryDays: 0,
-        discountPercent: 0,
-        taxPercent: 0,
+        discountPercentage: 0,
+        taxAmount: 0,
         notes: '',
         items: []
     });
@@ -74,10 +73,11 @@ const QuotationFormPage: React.FC = () => {
                     itemId: x.itemId,
                     itemNameAr: x.itemNameAr,
                     itemCode: x.itemCode,
-                    qty: x.minQty || 1,
+                    quantity: x.minQty || 1,
                     unitId: 0,
                     unitPrice: x.unitPrice ?? 0,
-                    discountPercent: x.discountPercentage ?? 0
+                    discountPercentage: x.discountPercentage ?? 0,
+                    totalPrice: (x.minQty || 1) * (x.unitPrice ?? 0) * (1 - (x.discountPercentage ?? 0) / 100)
                 }));
                 setForm((f) => ({ ...f, items: rows }));
             }
@@ -85,7 +85,7 @@ const QuotationFormPage: React.FC = () => {
     };
 
     const addItem = () => {
-        setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, qty: 1, unitId: 0, unitPrice: 0, discountPercent: 0 }] }));
+        setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, quantity: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, totalPrice: 0 }] }));
     };
     const removeItem = (idx: number) => {
         setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
@@ -100,10 +100,10 @@ const QuotationFormPage: React.FC = () => {
         });
     };
 
-    const subtotal = form.items.reduce((s, i) => s + (i.qty || 0) * (i.unitPrice || 0) * (1 - (i.discountPercent || 0) / 100), 0);
-    const disc = subtotal * ((form.discountPercent || 0) / 100);
+    const subtotal = form.items.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0) * (1 - (i.discountPercentage || 0) / 100), 0);
+    const disc = subtotal * ((form.discountPercentage || 0) / 100);
     const afterDisc = subtotal - disc;
-    const tax = afterDisc * ((form.taxPercent || 0) / 100);
+    const tax = form.taxAmount || 0;
     const total = afterDisc + tax;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -160,23 +160,19 @@ const QuotationFormPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">صلاحية العرض</label>
-                            <input type="date" value={form.validUntil || ''} onChange={(e) => setForm((f) => ({ ...f, validUntil: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <input type="date" value={form.validUntilDate || ''} onChange={(e) => setForm((f) => ({ ...f, validUntilDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">شروط الدفع</label>
                             <input type="text" value={form.paymentTerms || ''} onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" placeholder="مثال: آجل 30 يوم" />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">أيام التوريد</label>
-                            <input type="number" min={0} value={form.deliveryDays || ''} onChange={(e) => setForm((f) => ({ ...f, deliveryDays: parseInt(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
-                        </div>
-                        <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">خصم %</label>
-                            <input type="number" min={0} max={100} step={0.01} value={form.discountPercent || ''} onChange={(e) => setForm((f) => ({ ...f, discountPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <input type="number" min={0} max={100} step={0.01} value={form.discountPercentage || ''} onChange={(e) => setForm((f) => ({ ...f, discountPercentage: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">ضريبة %</label>
-                            <input type="number" min={0} step={0.01} value={form.taxPercent || ''} onChange={(e) => setForm((f) => ({ ...f, taxPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">ضريبة القيمة</label>
+                            <input type="number" min={0} step={0.01} value={form.taxAmount || ''} onChange={(e) => setForm((f) => ({ ...f, taxAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div className="md:col-span-2">
                             <label className="block text-sm font-semibold text-slate-700 mb-1">ملاحظات</label>
@@ -204,10 +200,10 @@ const QuotationFormPage: React.FC = () => {
                                                 {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr || i.itemCode}</option>)}
                                             </select>
                                         </td>
-                                        <td className="px-2 py-2"><input type="number" min={0.001} value={it.qty || ''} onChange={(e) => updateItem(idx, { qty: parseFloat(e.target.value) || 0 })} className="w-20 px-2 py-1 border rounded" /></td>
+                                        <td className="px-2 py-2"><input type="number" min={0.001} value={it.quantity || ''} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} className="w-20 px-2 py-1 border rounded" /></td>
                                         <td className="px-2 py-2 text-sm text-slate-600">{items.find((x) => x.id === it.itemId)?.unitName || '—'}</td>
                                         <td className="px-2 py-2"><input type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-1 border rounded" /></td>
-                                        <td className="px-2 py-2"><input type="number" min={0} max={100} step={0.01} value={it.discountPercent || ''} onChange={(e) => updateItem(idx, { discountPercent: parseFloat(e.target.value) || 0 })} className="w-16 px-2 py-1 border rounded" /></td>
+                                        <td className="px-2 py-2"><input type="number" min={0} max={100} step={0.01} value={it.discountPercentage || ''} onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })} className="w-16 px-2 py-1 border rounded" /></td>
                                         <td className="px-2 py-2"><button type="button" onClick={() => removeItem(idx)} className="p-1 text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
                                     </tr>
                                 ))}

@@ -180,7 +180,10 @@ export const ToggleSwitch: React.FC<{
     checked: boolean;
     onChange: (checked: boolean) => void;
 }> = ({ label, checked, onChange }) => (
-    <label className="flex items-center gap-3 cursor-pointer group">
+    <label
+        className="flex items-center gap-3 cursor-pointer group"
+        onClick={() => onChange(!checked)}
+    >
         <div className={`relative w-12 h-6 rounded-full transition-colors duration-200
             ${checked ? 'bg-brand-primary' : 'bg-slate-200'}`}>
             <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-200

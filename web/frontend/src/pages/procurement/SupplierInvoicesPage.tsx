@@ -8,7 +8,6 @@ import {
     Calendar,
     ArrowLeft,
     RefreshCw,
-    Download,
     Eye,
     AlertCircle,
     CheckCircle2,
@@ -101,15 +100,9 @@ const SupplierInvoicesPage: React.FC = () => {
         });
     }, [pendingGRNs, searchTerm]);
 
-    const paginatedInvoices = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return filteredInvoices.slice(start, start + pageSize);
-    }, [filteredInvoices, currentPage, pageSize]);
+    const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize);
 
-    const paginatedPending = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return filteredPending.slice(start, start + pageSize);
-    }, [filteredPending, currentPage, pageSize]);
+    const paginatedPending = filteredPending.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize);
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -273,7 +266,7 @@ const SupplierInvoicesPage: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : activeTab === 'invoices' ? (
-                                filteredInvoices.map((inv, idx) => (
+                                paginatedInvoices.map((inv, idx) => (
                                     <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors animate-slide-in" style={{ animationDelay: `${idx * 40}ms` }}>
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-slate-800">{inv.invoiceNumber}</div>

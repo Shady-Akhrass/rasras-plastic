@@ -78,17 +78,6 @@ const SidebarSubGroupTitle = ({ title, collapsed }: { title: string; collapsed: 
     )
 );
 
-// Section Header for Sidebar (plain, non-dropdown)
-const SidebarSection = ({ title, collapsed }: { title: string; collapsed: boolean }) => (
-    !collapsed ? (
-        <div className="px-4 py-2 mt-6 mb-2">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{title}</span>
-        </div>
-    ) : (
-        <div className="my-4 mx-3 border-t border-slate-200" />
-    )
-);
-
 // Collapsible Dropdown Section for Sidebar
 const SidebarDropdownSection = ({
     id: _id,
@@ -609,7 +598,7 @@ const DashboardLayout: React.FC = () => {
                                 icon={item.icon}
                                 label={item.label}
                                 active={location.pathname.startsWith(item.to)}
-                                    collapsed={sidebarCollapsed}
+                                collapsed={sidebarCollapsed}
                                 badge={(item as { badge?: number }).badge}
                             />
                         ))}

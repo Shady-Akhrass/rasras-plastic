@@ -69,11 +69,11 @@ const PeriodicInventoryReportPage: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
                             <select value={month} onChange={(e) => setMonth(parseInt(e.target.value))} className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white">
-                                {[1,2,3,4,5,6,7,8,9,10,11,12].map((m) => <option key={m} value={m}>{m}</option>)}
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => <option key={m} value={m}>{m}</option>)}
                             </select>
                             <span className="text-white/80">/</span>
                             <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white">
-                                {[year, year-1, year-2].map((y) => <option key={y} value={y}>{y}</option>)}
+                                {[year, year - 1, year - 2].map((y) => <option key={y} value={y}>{y}</option>)}
                             </select>
                         </div>
                         <button onClick={fetchData} disabled={loading} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl"><RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /></button>
@@ -114,9 +114,7 @@ const PeriodicInventoryReportPage: React.FC = () => {
                                             <td className="px-6 py-3 font-mono text-slate-700">{b.itemCode || '—'}</td>
                                             <td className="px-6 py-3">{b.itemNameAr || '—'}</td>
                                             <td className="px-6 py-3">{b.warehouseNameAr || '—'}</td>
-                                            <td className="px-6 py-3 font-medium">{(Number(b.quantityOnHand) || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-3">{(Number(b.averageCost) || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-6 py-3">{(Number(b.quantityOnHand) || 0) * (Number(b.averageCost) || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</td>
+                                            <td className="px-6 py-3">{((Number(b.quantityOnHand) || 0) * (Number(b.averageCost) || 0)).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</td>
                                         </tr>
                                     ))
                                 )}

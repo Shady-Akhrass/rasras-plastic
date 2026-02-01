@@ -30,12 +30,12 @@ const SaleOrderListPage: React.FC = () => {
     const filtered = useMemo(() => {
         const f = list.filter((o) =>
             !search ||
-            (o.orderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+            (o.soNumber || '').toLowerCase().includes(search.toLowerCase()) ||
             (o.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
         );
         return [...f].sort((a, b) => {
-            const dateA = a.orderDate ? new Date(a.orderDate).getTime() : (a.id ?? 0);
-            const dateB = b.orderDate ? new Date(b.orderDate).getTime() : (b.id ?? 0);
+            const dateA = a.soDate ? new Date(a.soDate).getTime() : (a.id ?? 0);
+            const dateB = b.soDate ? new Date(b.soDate).getTime() : (b.id ?? 0);
             return dateB - dateA;
         });
     }, [list, search]);
@@ -111,10 +111,10 @@ const SaleOrderListPage: React.FC = () => {
                             ) : (
                                 paginated.map((o) => (
                                     <tr key={o.id} className="border-b border-slate-100 hover:bg-emerald-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-emerald-700">{o.orderNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 font-mono font-bold text-emerald-700">{o.soNumber || '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{o.soDate ? new Date(o.soDate).toLocaleDateString('ar-EG') : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{o.customerNameAr || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{o.expectedDeliveryDate ? new Date(o.expectedDeliveryDate).toLocaleDateString('ar-EG') : '—'}</td>
                                         <td className="px-6 py-4">{(o.totalAmount ?? 0).toLocaleString('ar-EG')} {o.currency || ''}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/orders/${o.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>

@@ -21,15 +21,15 @@ const SaleOrderFormPage: React.FC = () => {
     const [quotations, setQuotations] = useState<any[]>([]);
 
     const [form, setForm] = useState<SaleOrderDto>({
-        orderDate: new Date().toISOString().split('T')[0],
-        deliveryDate: '',
+        soDate: new Date().toISOString().split('T')[0],
+        expectedDeliveryDate: '',
         customerId: 0,
-        quotationId: 0,
+        salesQuotationId: 0,
         currency: 'EGP',
         exchangeRate: 1,
         paymentTerms: '',
-        discountPercent: 0,
-        taxPercent: 0,
+        discountPercentage: 0,
+        taxAmount: 0,
         notes: '',
         items: []
     });
@@ -56,23 +56,24 @@ const SaleOrderFormPage: React.FC = () => {
             if (q) {
                 setForm((f) => ({
                     ...f,
-                    quotationId: q.id!,
+                    salesQuotationId: q.id!,
                     quotationNumber: q.quotationNumber,
                     customerId: q.customerId,
                     customerNameAr: q.customerNameAr,
                     currency: q.currency,
                     paymentTerms: q.paymentTerms ?? f.paymentTerms,
-                    discountPercent: q.discountPercent ?? 0,
-                    taxPercent: q.taxPercent ?? 0,
+                    discountPercentage: q.discountPercentage ?? 0,
+                    taxAmount: q.taxAmount ?? 0,
                     items: (q.items || []).map((i) => ({
                         itemId: i.itemId,
                         itemNameAr: i.itemNameAr,
                         itemCode: i.itemCode,
-                        qty: i.qty,
+                        orderedQty: i.quantity,
                         unitId: i.unitId,
                         unitNameAr: i.unitNameAr,
                         unitPrice: i.unitPrice,
-                        discountPercent: i.discountPercent
+                        discountPercentage: i.discountPercentage,
+                        totalPrice: i.totalPrice
                     }))
                 }));
             }
@@ -97,7 +98,7 @@ const SaleOrderFormPage: React.FC = () => {
         }
     }, [id, isNew, navigate]);
 
-    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, qty: 1, unitId: 0, unitPrice: 0, discountPercent: 0 }] })); };
+    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, orderedQty: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, totalPrice: 0 }] })); };
     const removeItem = (idx: number) => { setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
     const updateItem = (idx: number, u: Partial<SaleOrderItemDto>) => {
         setForm((f) => {
@@ -109,9 +110,9 @@ const SaleOrderFormPage: React.FC = () => {
         });
     };
 
-    const subtotal = form.items.reduce((s, i) => s + (i.qty || 0) * (i.unitPrice || 0) * (1 - (i.discountPercent || 0) / 100), 0);
-    const disc = subtotal * ((form.discountPercent || 0) / 100);
-    const tax = (subtotal - disc) * ((form.taxPercent || 0) / 100);
+    const subtotal = form.items.reduce((s, i) => s + (i.orderedQty || 0) * (i.unitPrice || 0) * (1 - (i.discountPercentage || 0) / 100), 0);
+    const disc = subtotal * ((form.discountPercentage || 0) / 100);
+    const tax = form.taxAmount || 0;
     const total = subtotal - disc + tax;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -135,13 +136,13 @@ const SaleOrderFormPage: React.FC = () => {
         } finally { setSaving(false); }
     };
 
-    if (!isNew && !form.orderNumber && loading) return <div className="p-8 text-center">جاري التحميل...</div>;
+    if (!isNew && !form.soNumber && loading) return <div className="p-8 text-center">جاري التحميل...</div>;
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12">
             <div className="flex items-center gap-4">
                 <button onClick={() => navigate('/dashboard/sales/orders')} className="p-2 hover:bg-slate-100 rounded-xl"><ChevronRight className="w-6 h-6" /></button>
-                <h1 className="text-xl font-bold text-slate-800">{isNew ? 'أمر بيع جديد' : `أمر بيع ${form.orderNumber || ''}`}</h1>
+                <h1 className="text-xl font-bold text-slate-800">{isNew ? 'أمر بيع جديد' : `أمر بيع ${form.soNumber || ''}`}</h1>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -150,7 +151,7 @@ const SaleOrderFormPage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">عرض السعر (تحويل من)</label>
-                            <select value={form.quotationId || ''} onChange={(e) => loadFromQuotation(parseInt(e.target.value) || 0)} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none">
+                            <select value={form.salesQuotationId || ''} onChange={(e) => loadFromQuotation(parseInt(e.target.value) || 0)} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none">
                                 <option value="">—</option>
                                 {quotations.map((q) => <option key={q.id} value={q.id}>{q.quotationNumber} — {q.customerNameAr}</option>)}
                             </select>
@@ -164,11 +165,11 @@ const SaleOrderFormPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">تاريخ الأمر *</label>
-                            <input type="date" value={form.orderDate || ''} onChange={(e) => setForm((f) => ({ ...f, orderDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required />
+                            <input type="date" value={form.soDate || ''} onChange={(e) => setForm((f) => ({ ...f, soDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required />
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">تاريخ التسليم</label>
-                            <input type="date" value={form.deliveryDate || ''} onChange={(e) => setForm((f) => ({ ...f, deliveryDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <input type="date" value={form.expectedDeliveryDate || ''} onChange={(e) => setForm((f) => ({ ...f, expectedDeliveryDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">شروط الدفع</label>
@@ -176,11 +177,11 @@ const SaleOrderFormPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">خصم %</label>
-                            <input type="number" min={0} max={100} step={0.01} value={form.discountPercent || ''} onChange={(e) => setForm((f) => ({ ...f, discountPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <input type="number" min={0} max={100} step={0.01} value={form.discountPercentage || ''} onChange={(e) => setForm((f) => ({ ...f, discountPercentage: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">ضريبة %</label>
-                            <input type="number" min={0} step={0.01} value={form.taxPercent || ''} onChange={(e) => setForm((f) => ({ ...f, taxPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">ضريبة القيمة</label>
+                            <input type="number" min={0} step={0.01} value={form.taxAmount || ''} onChange={(e) => setForm((f) => ({ ...f, taxAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div className="md:col-span-2">
                             <label className="block text-sm font-semibold text-slate-700 mb-1">ملاحظات</label>
@@ -208,9 +209,9 @@ const SaleOrderFormPage: React.FC = () => {
                                                 {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr || i.itemCode}</option>)}
                                             </select>
                                         </td>
-                                        <td className="px-2 py-2"><input type="number" min={0.001} value={it.qty || ''} onChange={(e) => updateItem(idx, { qty: parseFloat(e.target.value) || 0 })} className="w-20 px-2 py-1 border rounded" /></td>
+                                        <td className="px-2 py-2"><input type="number" min={0.001} value={it.orderedQty || ''} onChange={(e) => updateItem(idx, { orderedQty: parseFloat(e.target.value) || 0 })} className="w-20 px-2 py-1 border rounded" /></td>
                                         <td className="px-2 py-2"><input type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-1 border rounded" /></td>
-                                        <td className="px-2 py-2"><input type="number" min={0} max={100} step={0.01} value={it.discountPercent || ''} onChange={(e) => updateItem(idx, { discountPercent: parseFloat(e.target.value) || 0 })} className="w-16 px-2 py-1 border rounded" /></td>
+                                        <td className="px-2 py-2"><input type="number" min={0} max={100} step={0.01} value={it.discountPercentage || ''} onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })} className="w-16 px-2 py-1 border rounded" /></td>
                                         <td className="px-2 py-2"><button type="button" onClick={() => removeItem(idx)} className="p-1 text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
                                     </tr>
                                 ))}

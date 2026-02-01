@@ -200,12 +200,10 @@ export const salesInvoiceService = {
             return [];
         }
     },
-    getById: async (id: number): Promise<SalesInvoiceDto | LegacySalesInvoiceDto | null> => {
+    getById: async (id: number): Promise<SalesInvoiceDto | null> => {
         try {
             const res = await apiClient.get<{ data?: SalesInvoiceDto }>(`${_api}/${id}`);
-            const dto = (res.data as any)?.data ?? null;
-            // Return in legacy format for backward compatibility
-            return dto ? mapToLegacy(dto) : null;
+            return (res.data as any)?.data ?? null;
         } catch {
             return null;
         }
