@@ -3,7 +3,7 @@ import {
     Plus, Search, Edit2, Trash2, Microscope, X,
     RefreshCw, CheckCircle2, XCircle, Hash, Type,
     ToggleLeft, FileText, Tag, Activity, Save,
-    ChevronRight, AlertCircle, Beaker, Gauge
+    ChevronRight, Beaker, Gauge
 } from 'lucide-react';
 import { qualityService, type QualityParameterDto } from '../../services/qualityService';
 import ConfirmModal from '../../components/common/ConfirmModal';

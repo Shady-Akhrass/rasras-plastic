@@ -38,8 +38,8 @@ const ReceiptListPage: React.FC = () => {
             (r.invoiceNumber || '').toLowerCase().includes(search.toLowerCase())
         );
         return [...f].sort((a, b) => {
-            const dateA = a.receiptDate ? new Date(a.receiptDate).getTime() : (a.id ?? 0);
-            const dateB = b.receiptDate ? new Date(b.receiptDate).getTime() : (b.id ?? 0);
+            const dateA = a.voucherDate ? new Date(a.voucherDate).getTime() : (a.id ?? 0);
+            const dateB = b.voucherDate ? new Date(b.voucherDate).getTime() : (b.id ?? 0);
             return dateB - dateA;
         });
     }, [list, search]);
@@ -119,12 +119,12 @@ const ReceiptListPage: React.FC = () => {
                             ) : (
                                 paginated.map((r) => (
                                     <tr key={r.id} className="border-b border-slate-100 hover:bg-rose-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-rose-700">{r.receiptNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{r.receiptDate ? new Date(r.receiptDate).toLocaleDateString('ar-EG') : '—'}</td>
-                                        <td className="px-6 py-4 text-slate-700">{RECEIPT_TYPE_LABELS[r.receiptType] || r.receiptType}</td>
+                                        <td className="px-6 py-4 font-mono font-bold text-rose-700">{r.voucherNumber || '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{r.voucherDate ? new Date(r.voucherDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-700">{RECEIPT_TYPE_LABELS[r.receiptType || ''] || r.receiptType || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{r.depositorName || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{r.invoiceNumber || '—'}</td>
-                                        <td className="px-6 py-4 font-semibold">{(r.receivedAmount ?? 0).toLocaleString('ar-EG')} {r.currency || ''}</td>
+                                        <td className="px-6 py-4 font-semibold">{(r.amount ?? 0).toLocaleString('ar-EG')} {r.currency || ''}</td>
                                         <td className="px-6 py-4 text-slate-600">{PAYMENT_METHOD_LABELS[r.paymentMethod] || r.paymentMethod}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/receipts/${r.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>

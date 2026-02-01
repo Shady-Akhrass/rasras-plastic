@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronRight, Save, Plus, Trash2, RefreshCw, AlertCircle, CheckCircle, Info, Package, Truck } from 'lucide-react';
+import { ChevronRight, Save, Plus, Trash2, RefreshCw, AlertCircle, CheckCircle, Package } from 'lucide-react';
 import materialIssueService, { type MaterialIssueDto, type MaterialIssueItemDto, type IssueType } from '../../../services/materialIssueService';
 import warehouseService from '../../../services/warehouseService';
 import type { WarehouseDto } from '../../../services/warehouseService';
@@ -395,8 +395,8 @@ const MaterialIssueFormPage: React.FC = () => {
                                                     value={it.issuedQty || ''}
                                                     onChange={(e) => updateItem(idx, { issuedQty: parseFloat(e.target.value) || 0 })}
                                                     className={`w-24 px-2 py-1.5 border rounded-lg focus:ring-1 outline-none ${stockStatus?.status === 'none' || (it.issuedQty > (stockLevels[it.itemId] || 0))
-                                                            ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
-                                                            : 'border-slate-300 focus:border-amber-500 focus:ring-amber-500'
+                                                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
+                                                        : 'border-slate-300 focus:border-amber-500 focus:ring-amber-500'
                                                         }`}
                                                     required
                                                 />

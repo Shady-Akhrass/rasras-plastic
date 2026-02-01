@@ -10,10 +10,8 @@ import {
     FileText,
     Package,
     Building2,
-    User,
     Flag,
-    ClipboardList,
-    CheckCircle2
+    ClipboardList
 } from 'lucide-react';
 import purchaseService, { type PurchaseRequisition, type PurchaseRequisitionItem } from '../../services/purchaseService';
 import { itemService } from '../../services/itemService';
@@ -136,7 +134,7 @@ const PurchaseRequisitionFormPage = () => {
     const updateItem = (index: number, field: keyof PurchaseRequisitionItem, value: any) => {
         const newItems = [...(formData.items || [])];
         newItems[index] = { ...newItems[index], [field]: value };
-        
+
         // Auto-select unit when item is selected
         if (field === 'itemId') {
             const selectedItem = items.find(i => i.id === value);
@@ -144,7 +142,7 @@ const PurchaseRequisitionFormPage = () => {
                 newItems[index].unitId = selectedItem.unitId;
             }
         }
-        
+
         setFormData(prev => ({ ...prev, items: newItems }));
     };
 
@@ -156,7 +154,7 @@ const PurchaseRequisitionFormPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!formData.requestedByDeptId) {
             toast.error('الرجاء اختيار القسم');
             return;
@@ -427,7 +425,7 @@ const PurchaseRequisitionFormPage = () => {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>

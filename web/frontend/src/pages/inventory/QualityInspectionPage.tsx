@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
     CheckCircle2,
-    XCircle,
     Search,
     Package,
     ClipboardCheck,
     Save,
     RotateCcw,
-    AlertCircle,
-    RefreshCw,
-    X,
-    TrendingUp,
-    Clock
+    Clock,
+    X
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
 import { qualityService } from '../../services/qualityService';
@@ -149,7 +144,6 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
 );
 
 const QualityInspectionPage: React.FC = () => {
-    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [grns, setGrns] = useState<GoodsReceiptNoteDto[]>([]);
     const [selectedGrn, setSelectedGrn] = useState<GoodsReceiptNoteDto | null>(null);

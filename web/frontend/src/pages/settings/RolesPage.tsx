@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
     Shield, Search, Plus, Edit2, Trash2, X, Save, RefreshCw,
-    CheckCircle2, XCircle, LayoutGrid, CheckSquare, Square,
-    Tag, Type, FileText, Users, Key, Lock, ChevronRight
+    CheckCircle2, XCircle, LayoutGrid,
+    Tag, Type, FileText, Users, Key, Lock
 } from 'lucide-react';
 import { roleService, type RoleDto, type PermissionDto } from '../../services/roleService';
 import { toast } from 'react-hot-toast';
@@ -450,8 +450,8 @@ const PermissionMatrix: React.FC<{
                                     <span>{module}</span>
                                 </button>
                                 <span className={`text-xs px-3 py-1 rounded-full font-semibold
-                                    ${allSelected 
-                                        ? 'bg-brand-primary/10 text-brand-primary' 
+                                    ${allSelected
+                                        ? 'bg-brand-primary/10 text-brand-primary'
                                         : 'bg-slate-100 text-slate-500'}`}>
                                     {perms.filter(p => selectedIds.includes(p.permissionId)).length} / {perms.length}
                                 </span>
@@ -635,7 +635,7 @@ const RolesPage: React.FC = () => {
         total: roles.length,
         active: roles.filter(r => r.isActive).length,
         totalPerms: permissions.length,
-        avgPerms: roles.length > 0 
+        avgPerms: roles.length > 0
             ? Math.round(roles.reduce((sum, r) => sum + (r.permissionIds?.length || 0), 0) / roles.length)
             : 0,
     }), [roles, permissions]);

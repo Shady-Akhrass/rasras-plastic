@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-    Plus, Search, Edit2, Trash2, Package, Filter, Download, Upload,
+    Plus, Search, Edit2, Trash2, Package, Download, Upload,
     RefreshCw, CheckCircle2, XCircle, Eye, ChevronLeft, ChevronRight,
     ChevronsLeft, ChevronsRight, DollarSign, Layers,
     Tag, Box, TrendingUp, TrendingDown, AlertTriangle,
     Barcode, ShoppingCart, ShoppingBag, Percent, Scale,
-    BarChart3, Info
+    Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { itemService, type ItemDto } from '../../services/itemService';

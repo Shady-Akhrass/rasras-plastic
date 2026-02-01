@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { 
-    Search, Edit2, Trash2, UserPlus, Users, UserCheck, 
-    UserX, RefreshCw, CheckCircle2, XCircle, Clock,
-    TrendingUp, Briefcase, Building2, Mail, Phone,
+import {
+    Search, Edit2, Trash2, UserPlus, Users, UserCheck,
+    UserX, RefreshCw, CheckCircle2, XCircle,
+    TrendingUp, Briefcase, Building2, Mail,
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import type { Employee } from '../../services/employeeService';
@@ -77,9 +77,9 @@ const EmployeeTableRow: React.FC<{
     };
 
     return (
-        <tr 
+        <tr
             className="group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0"
-            style={{ 
+            style={{
                 animationDelay: `${index * 30}ms`,
                 animation: 'fadeInUp 0.3s ease-out forwards'
             }}
@@ -137,8 +137,8 @@ const EmployeeTableRow: React.FC<{
             {/* Status */}
             <td className="px-6 py-4">
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                    ${employee.isActive 
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                    ${employee.isActive
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
                     {employee.isActive ? (
                         <>
@@ -197,7 +197,7 @@ const EmptyState: React.FC<{ searchTerm: string; onAdd: () => void }> = ({ searc
                     {searchTerm ? 'لا توجد نتائج' : 'لا يوجد موظفين'}
                 </h3>
                 <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                    {searchTerm 
+                    {searchTerm
                         ? `لم يتم العثور على موظفين يطابقون "${searchTerm}"`
                         : 'ابدأ بإضافة موظفين جدد لإدارة فريق العمل'}
                 </p>
@@ -321,8 +321,8 @@ const EmployeeList: React.FC = () => {
             const matchesSearch = emp.fullNameAr.includes(searchTerm) ||
                 emp.employeeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (emp.email && emp.email.toLowerCase().includes(searchTerm.toLowerCase()));
-            
-            const matchesFilter = filterStatus === 'all' || 
+
+            const matchesFilter = filterStatus === 'all' ||
                 (filterStatus === 'active' && emp.isActive) ||
                 (filterStatus === 'inactive' && !emp.isActive);
 
@@ -411,8 +411,8 @@ const EmployeeList: React.FC = () => {
                             <span className="text-sm text-emerald-600">تم التحديث بنجاح</span>
                         </div>
                     </div>
-                    <button 
-                        onClick={() => setSuccessMessage('')} 
+                    <button
+                        onClick={() => setSuccessMessage('')}
                         className="p-2 hover:bg-emerald-100 rounded-lg transition-colors"
                     >
                         <XCircle className="w-5 h-5" />
@@ -422,26 +422,26 @@ const EmployeeList: React.FC = () => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard 
+                <StatCard
                     icon={Users}
                     value={stats.total}
                     label="إجمالي الموظفين"
                     color="primary"
                 />
-                <StatCard 
+                <StatCard
                     icon={UserCheck}
                     value={stats.active}
                     label="موظف نشط"
                     trend={stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}%` : undefined}
                     color="success"
                 />
-                <StatCard 
+                <StatCard
                     icon={UserX}
                     value={stats.inactive}
                     label="غير نشط"
                     color="warning"
                 />
-                <StatCard 
+                <StatCard
                     icon={Building2}
                     value={stats.departments}
                     label="الأقسام"
@@ -462,8 +462,8 @@ const EmployeeList: React.FC = () => {
                             placeholder="بحث بالاسم أو الكود أو البريد..."
                             className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
                                 outline-none bg-slate-50
-                                ${isSearchFocused 
-                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10' 
+                                ${isSearchFocused
+                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
                                     : 'border-transparent hover:border-slate-200'}`}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -604,7 +604,7 @@ const EmployeeList: React.FC = () => {
                             صفحة <span className="font-bold text-slate-700">{currentPage}</span> من{' '}
                             <span className="font-bold text-slate-700">{totalPages}</span>
                         </div>
-                        
+
                         <div className="flex items-center gap-1">
                             {/* First Page */}
                             <button
@@ -615,7 +615,7 @@ const EmployeeList: React.FC = () => {
                             >
                                 <ChevronsRight className="w-5 h-5" />
                             </button>
-                            
+
                             {/* Previous */}
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -639,7 +639,7 @@ const EmployeeList: React.FC = () => {
                                     } else {
                                         page = currentPage - 2 + i;
                                     }
-                                    
+
                                     return (
                                         <button
                                             key={page}

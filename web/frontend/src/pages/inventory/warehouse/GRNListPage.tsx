@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Plus, Search, Package, Calendar, Truck, Building2, FileText,
-    ChevronRight, RefreshCw, Eye, XCircle
+    Plus, Search, Package, FileText,
+    RefreshCw, Eye
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../../services/grnService';
 import Pagination from '../../../components/common/Pagination';
@@ -171,9 +171,8 @@ const GRNListPage: React.FC = () => {
                                         <td className="px-6 py-4 text-slate-700">{g.supplierNameAr || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">المستودع #{g.warehouseId}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${
-                                                g.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                                            }`}>
+                                            <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${g.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                                                }`}>
                                                 {g.status === 'Completed' ? 'مكتمل' : g.status || '—'}
                                             </span>
                                         </td>

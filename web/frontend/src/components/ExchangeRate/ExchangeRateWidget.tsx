@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { 
-    DollarSign, TrendingUp, TrendingDown, RefreshCw, 
-    AlertCircle, Banknote, ArrowLeftRight 
+import {
+    DollarSign, TrendingUp, TrendingDown, RefreshCw,
+    AlertCircle, Banknote, ArrowLeftRight
 } from 'lucide-react';
 
 interface ExchangeRateData {
@@ -35,7 +35,7 @@ const ExchangeRateWidget = () => {
 
             // Using free Exchange Rate API (no API key required)
             const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-            
+
             if (!response.ok) {
                 throw new Error('Failed to fetch exchange rate');
             }
@@ -69,18 +69,9 @@ const ExchangeRateWidget = () => {
         return () => clearInterval(interval);
     }, [fetchExchangeRate]);
 
-    const formatTime = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleTimeString('ar-EG', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-        });
-    };
-
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('ar-EG', { 
+        return date.toLocaleDateString('ar-EG', {
             day: 'numeric',
             month: 'long',
             year: 'numeric'
@@ -132,8 +123,8 @@ const ExchangeRateWidget = () => {
     }
 
     const change = exchangeRate.rate - exchangeRate.previousRate;
-    const changePercent = exchangeRate.previousRate > 0 
-        ? ((change / exchangeRate.previousRate) * 100) 
+    const changePercent = exchangeRate.previousRate > 0
+        ? ((change / exchangeRate.previousRate) * 100)
         : 0;
     const isPositive = change >= 0;
     const TrendIcon = isPositive ? TrendingUp : TrendingDown;
@@ -149,7 +140,7 @@ const ExchangeRateWidget = () => {
             {/* Background Decorations */}
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
             <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-            
+
             {/* Dollar Icon Decoration */}
             <div className="absolute top-4 left-4 opacity-10">
                 <DollarSign className="w-24 h-24" />
@@ -177,7 +168,7 @@ const ExchangeRateWidget = () => {
                             </p>
                         </div>
                     </div>
-                    
+
                     <button
                         onClick={fetchExchangeRate}
                         disabled={isRefreshing}
@@ -203,8 +194,8 @@ const ExchangeRateWidget = () => {
                 {/* Change Indicator */}
                 <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg
-                        ${isPositive 
-                            ? 'bg-emerald-400/30 text-white' 
+                        ${isPositive
+                            ? 'bg-emerald-400/30 text-white'
                             : 'bg-rose-500/30 text-white'
                         }`}>
                         <TrendIcon className="w-4 h-4" />

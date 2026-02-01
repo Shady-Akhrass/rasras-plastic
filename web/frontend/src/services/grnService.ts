@@ -12,6 +12,7 @@ export interface GRNItemDto {
     unitNameAr?: string;
     unitCost?: number;
     totalCost?: number;
+    rejectedQty?: number;
     lotNumber?: string;
     manufactureDate?: string;
     expiryDate?: string;
@@ -32,6 +33,7 @@ export interface GoodsReceiptNoteDto {
     supplierInvoiceNo?: string;
     receivedByUserId: number;
     status?: string;
+    approvalStatus?: string;
     totalReceivedQty?: number;
     notes?: string;
     items: GRNItemDto[];
