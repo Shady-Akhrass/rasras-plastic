@@ -1,0 +1,19 @@
+*   [33mfa1dcff[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m resolve merge conflicts
+[31m|[m[32m\[m  
+[31m|[m *   [33m0b0937d[m Merge pull request #15 from Shady-Akhrass/my-new-branch2
+[31m|[m [33m|[m[34m\[m  
+[31m|[m [33m|[m * [33m5eec93c[m[33m ([m[1;31morigin/my-new-branch2[m[33m)[m Save my current work
+[31m|[m [33m|[m[33m/[m  
+[31m|[m *   [33mddbc68d[m Merge pull request #14 from Shady-Akhrass/my-new-branch
+[31m|[m [35m|[m[36m\[m  
+[31m|[m [35m|[m * [33m3d90cc5[m[33m ([m[1;31morigin/my-new-branch[m[33m)[m Fix build issues
+[31m|[m [35m|[m[35m/[m  
+* [35m/[m [33mdd3484b[m inventory updates + frontend changes
+[35m|[m[35m/[m  
+*   [33mcfcd10e[m Merge pull request #13 from Shady-Akhrass/new-branch-name
+[1;31m|[m[1;32m\[m  
+[1;31m|[m * [33m6ceb195[m[33m ([m[1;31morigin/new-branch-name[m[33m, [m[1;32mnew-branch-name[m[33m)[m Add local changes after resolving stash conflicts
+[1;31m|[m * [33mc44e208[m Resolve stash conflicts
+[1;31m|[m[1;31m/[m  
+*   [33mdb72aeb[m Merge pull request #12 from Shady-Akhrass/dashboard-layout
+[1;33m|[m[1;34m\[m  
