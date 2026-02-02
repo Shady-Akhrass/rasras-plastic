@@ -2,11 +2,18 @@ package com.rasras.erp.inventory;
 
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import com.rasras.erp.procurement.PurchaseReturnItem;
+import com.rasras.erp.procurement.PurchaseReturnItemRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +22,10 @@ public class ItemService {
         private final ItemRepository itemRepository;
         private final ItemCategoryRepository itemCategoryRepository;
         private final UnitRepository unitRepository;
+        private final StockBalanceRepository stockBalanceRepository;
+        private final StockMovementRepository stockMovementRepository;
+        private final GRNItemRepository grnItemRepository;
+        private final PurchaseReturnItemRepository purchaseReturnItemRepository;
 
         public List<ItemDto> getAllItems() {
                 List<Item> items = itemRepository.findAll();
@@ -107,8 +118,33 @@ public class ItemService {
         public void deleteItem(Integer id) {
                 Item item = itemRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
-                item.setIsActive(false);
-                itemRepository.save(item);
+
+                List<StockBalance> balances = stockBalanceRepository.findByItemId(id);
+                BigDecimal totalStock = balances.stream()
+                                .map(StockBalance::getQuantityOnHand)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                if (totalStock.compareTo(BigDecimal.ZERO) > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "لا يمكن حذف الصنف لوجود كمية في المخزون. يجب أن تكون الكمية صفراً للحذف.");
+                }
+
+                try {
+                        List<GRNItem> grnItems = grnItemRepository.findByItemId(id);
+                        List<Integer> grnItemIds = grnItems.stream().map(GRNItem::getId).toList();
+                        if (!grnItemIds.isEmpty()) {
+                                List<PurchaseReturnItem> returnItems = purchaseReturnItemRepository.findByGrnItemIdIn(grnItemIds);
+                                purchaseReturnItemRepository.deleteAll(returnItems);
+                        }
+                        grnItemRepository.deleteAll(grnItems);
+                        List<StockMovement> movements = stockMovementRepository.findByItemId(id);
+                        stockMovementRepository.deleteAll(movements);
+                        stockBalanceRepository.deleteAll(balances);
+                        itemRepository.delete(item);
+                } catch (DataIntegrityViolationException e) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "لا يمكن حذف الصنف لوجود استخدامات له في مستندات (إذن استلام، تحويل، قوائم أسعار، إلخ).");
+                }
         }
 
         private ItemDto mapToDto(Item entity) {

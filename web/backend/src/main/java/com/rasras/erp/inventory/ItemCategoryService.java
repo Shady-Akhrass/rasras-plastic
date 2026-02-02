@@ -2,8 +2,10 @@ package com.rasras.erp.inventory;
 
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -13,6 +15,7 @@ import java.util.stream.Collectors;
 public class ItemCategoryService {
 
     private final ItemCategoryRepository itemCategoryRepository;
+    private final ItemRepository itemRepository;
 
     public List<ItemCategoryDto> getAllCategories() {
         List<ItemCategory> categories = itemCategoryRepository.findAll();
@@ -69,8 +72,16 @@ public class ItemCategoryService {
     public void deleteCategory(Integer id) {
         ItemCategory category = itemCategoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ItemCategory", "id", id));
-        category.setIsActive(false);
-        itemCategoryRepository.save(category);
+        if (itemRepository.existsByCategoryId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "لا يمكن حذف التصنيف لوجود أصناف مرتبطة به. انقل الأصناف لتصنيف آخر ثم احذف.");
+        }
+        List<ItemCategory> children = itemCategoryRepository.findByParentCategoryId(id);
+        for (ItemCategory child : children) {
+            child.setParentCategoryId(null);
+            itemCategoryRepository.save(child);
+        }
+        itemCategoryRepository.delete(category);
     }
 
     private ItemCategoryDto mapToDto(ItemCategory entity) {

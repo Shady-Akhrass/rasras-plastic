@@ -121,8 +121,9 @@ const ItemRow: React.FC<{
     onEdit: () => void;
     onDelete: () => void;
     onView: () => void;
+    canDelete: boolean;
     index: number;
-}> = ({ item, onEdit, onDelete, onView, index }) => {
+}> = ({ item, onEdit, onDelete, onView, canDelete, index }) => {
     // Calculate profit margin
     const profitMargin = item.lastSalePrice && item.lastPurchasePrice
         ? ((item.lastSalePrice - item.lastPurchasePrice) / item.lastPurchasePrice * 100).toFixed(1)
@@ -328,10 +329,14 @@ const ItemRow: React.FC<{
                         <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                        onClick={onDelete}
-                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
-                            rounded-lg transition-all duration-200"
-                        title="حذف"
+                        onClick={canDelete ? onDelete : undefined}
+                        disabled={!canDelete}
+                        className={`p-2 rounded-lg transition-all duration-200 ${
+                            canDelete
+                                ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
+                                : 'text-slate-300 cursor-not-allowed opacity-60'
+                        }`}
+                        title={canDelete ? 'حذف' : 'لا يمكن الحذف: يوجد كمية في المخزون. يجب أن تكون الكمية صفراً.'}
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
@@ -482,14 +487,18 @@ const ItemsMasterPage: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (!itemToDelete) return;
+        const idToDelete = itemToDelete;
         setIsDeleting(true);
         try {
-            await itemService.deleteItem(itemToDelete);
-            toast.success('تم حذف الصنف بنجاح', { icon: '🗑️' });
-            fetchItems();
+            await itemService.deleteItem(idToDelete);
+            setItems(prev => prev.filter(i => i.id !== idToDelete));
             setIsDeleteModalOpen(false);
-        } catch (error) {
-            toast.error('فشل في حذف الصنف');
+            setItemToDelete(null);
+            toast.success('تم حذف الصنف نهائياً', { icon: '🗑️' });
+            await fetchItems();
+            setItems(prev => prev.filter(i => i.id !== idToDelete));
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'فشل في حذف الصنف');
         } finally {
             setIsDeleting(false);
         }
@@ -927,6 +936,7 @@ const ItemsMasterPage: React.FC = () => {
                                         onEdit={() => navigate(`/dashboard/inventory/items/${item.id}`)}
                                         onDelete={() => item.id && handleDeleteClick(item.id)}
                                         onView={() => navigate(`/dashboard/inventory/items/${item.id}`)}
+                                        canDelete={(item.currentStock ?? 0) <= 0}
                                         index={index}
                                     />
                                 ))
@@ -1019,12 +1029,12 @@ const ItemsMasterPage: React.FC = () => {
             {/* Delete Modal */}
             <ConfirmModal
                 isOpen={isDeleteModalOpen}
-                title="حذف صنف"
-                message="هل أنت متأكد من حذف هذا الصنف؟ سيتم تعطيله في النظام ولن يظهر في العمليات الجديدة."
-                confirmText="حذف"
+                title="حذف صنف نهائياً"
+                message="هل أنت متأكد من حذف هذا الصنف؟ سيتم حذفه من النظام نهائياً. الحذف مسموح فقط عندما تكون الكمية في المخزون صفراً."
+                confirmText="حذف نهائياً"
                 cancelText="إلغاء"
                 onConfirm={handleDeleteConfirm}
-                onCancel={() => setIsDeleteModalOpen(false)}
+                onCancel={() => { setIsDeleteModalOpen(false); setItemToDelete(null); }}
                 isLoading={isDeleting}
                 variant="danger"
             />

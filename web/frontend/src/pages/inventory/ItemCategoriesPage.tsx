@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
     Plus, Search, Edit2, Trash2, X, RefreshCw, CheckCircle2, XCircle,
     FolderOpen, FolderTree, Tag, Type, Save, ChevronRight, Layers,
-    FileText, GitBranch
+    FileText, GitBranch, Power, PowerOff
 } from 'lucide-react';
 import { itemCategoryService, type ItemCategoryDto } from '../../services/itemCategoryService';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -57,8 +57,10 @@ const CategoryRow: React.FC<{
     category: ItemCategoryDto;
     onEdit: () => void;
     onDelete: () => void;
+    onToggleActive: () => void;
+    isTogglingActive: boolean;
     index: number;
-}> = ({ category, onEdit, onDelete, index }) => (
+}> = ({ category, onEdit, onDelete, onToggleActive, isTogglingActive, index }) => (
     <tr
         className="group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0"
         style={{
@@ -129,6 +131,24 @@ const CategoryRow: React.FC<{
         {/* Actions */}
         <td className="px-6 py-4">
             <div className="flex items-center justify-center gap-1">
+                <button
+                    onClick={onToggleActive}
+                    disabled={isTogglingActive}
+                    className={`p-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        category.isActive
+                            ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                            : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                    }`}
+                    title={category.isActive ? 'تعطيل التصنيف' : 'تفعيل التصنيف'}
+                >
+                    {isTogglingActive ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : category.isActive ? (
+                        <PowerOff className="w-4 h-4" />
+                    ) : (
+                        <Power className="w-4 h-4" />
+                    )}
+                </button>
                 <button
                     onClick={onEdit}
                     className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
@@ -420,8 +440,9 @@ const ItemCategoriesPage: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
+    const [categoryToDelete, setCategoryToDelete] = useState<{ id: number; nameAr: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [togglingActiveId, setTogglingActiveId] = useState<number | null>(null);
 
     const [formData, setFormData] = useState<ItemCategoryDto>({
         categoryCode: '',
@@ -471,25 +492,47 @@ const ItemCategoriesPage: React.FC = () => {
         }
     };
 
-    const handleDeleteClick = (id: number) => {
-        setCategoryToDelete(id);
+    const handleDeleteClick = (category: ItemCategoryDto) => {
+        if (!category.id) return;
+        setCategoryToDelete({ id: category.id, nameAr: category.categoryNameAr });
         setIsDeleteModalOpen(true);
     };
 
     const handleDeleteConfirm = async () => {
         if (!categoryToDelete) return;
+        const idToDelete = categoryToDelete.id;
         setIsDeleting(true);
         try {
-            await itemCategoryService.deleteCategory(categoryToDelete);
-            toast.success('تم حذف التصنيف بنجاح', { icon: '🗑️' });
+            await itemCategoryService.deleteCategory(idToDelete);
+            setCategories(prev => prev.filter(c => c.id !== idToDelete));
             setIsDeleteModalOpen(false);
             setCategoryToDelete(null);
-            fetchCategories();
+            toast.success('تم حذف التصنيف نهائياً', { icon: '🗑️' });
+            await fetchCategories();
         } catch (error: any) {
             console.error('Error deleting category:', error);
-            toast.error(error.response?.data?.message || 'فشل حذف التصنيف');
+            const msg = error.response?.data?.message || 'فشل حذف التصنيف';
+            toast.error(msg);
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleToggleActive = async (category: ItemCategoryDto) => {
+        if (!category.id) return;
+        setTogglingActiveId(category.id);
+        try {
+            await itemCategoryService.updateCategory(category.id, {
+                ...category,
+                isActive: !category.isActive
+            });
+            toast.success(category.isActive ? 'تم تعطيل التصنيف' : 'تم تفعيل التصنيف');
+            fetchCategories();
+        } catch (error: any) {
+            console.error('Error toggling category active:', error);
+            toast.error(error.response?.data?.message || 'فشل تغيير الحالة');
+        } finally {
+            setTogglingActiveId(null);
         }
     };
 
@@ -684,7 +727,9 @@ const ItemCategoriesPage: React.FC = () => {
                                         key={category.id}
                                         category={category}
                                         onEdit={() => openEditModal(category)}
-                                        onDelete={() => category.id && handleDeleteClick(category.id)}
+                                        onDelete={() => handleDeleteClick(category)}
+                                        onToggleActive={() => handleToggleActive(category)}
+                                        isTogglingActive={togglingActiveId === category.id}
                                         index={index}
                                     />
                                 ))
@@ -790,12 +835,14 @@ const ItemCategoriesPage: React.FC = () => {
             {/* Delete Confirmation */}
             <ConfirmModal
                 isOpen={isDeleteModalOpen}
-                title="حذف تصنيف"
-                message="هل أنت متأكد من حذف هذا التصنيف؟ سيتم إخفاؤه من القوائم النشطة."
-                confirmText="حذف"
+                title="حذف التصنيف نهائياً"
+                message={categoryToDelete
+                    ? `هل أنت متأكد من حذف التصنيف "${categoryToDelete.nameAr}" نهائياً؟ سيتم حذفه من النظام. التصنيفات الفرعية التابعة له ستصبح تصنيفات رئيسية. لا يمكن الحذف إذا كان هناك أصناف مرتبطة بهذا التصنيف.`
+                    : ''}
+                confirmText="حذف نهائياً"
                 cancelText="إلغاء"
                 onConfirm={handleDeleteConfirm}
-                onCancel={() => setIsDeleteModalOpen(false)}
+                onCancel={() => { setIsDeleteModalOpen(false); setCategoryToDelete(null); }}
                 isLoading={isDeleting}
                 variant="danger"
             />

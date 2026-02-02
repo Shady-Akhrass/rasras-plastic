@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { approvalService } from '../../services/approvalService';
-import { grnService } from '../../services/grnService';
+import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
 
 // Sidebar Link Component
 const SidebarLink = ({
@@ -155,11 +155,16 @@ const SidebarDropdownSection = ({
                     )}
                 </div>
             </button>
-            {isOpen && (
-                <div className="mt-1 mr-2 space-y-0.5 border-r-2 border-slate-100 pr-2 animate-in slide-in-from-top-1 duration-200">
-                    {children}
+            <div
+                className="grid transition-[grid-template-rows] duration-300 ease-out"
+                style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+            >
+                <div className="overflow-hidden">
+                    <div className="mt-1 mr-2 space-y-0.5 border-r-2 border-slate-100 pr-2 min-h-0">
+                        {children}
+                    </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
@@ -262,10 +267,21 @@ const DashboardLayout: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
+    // Auto logout when session (JWT) expires
+    useEffect(() => {
+        const token = localStorage.getItem('accessToken');
+        if (!token) return;
+        const remainingMs = getSessionRemainingMs(token);
+        if (remainingMs <= 0) {
+            clearSession();
+            return;
+        }
+        const timeoutId = setTimeout(() => clearSession(), remainingMs);
+        return () => clearTimeout(timeoutId);
+    }, []);
+
     const handleLogout = () => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('user');
-        navigate('/login');
+        clearSession();
     };
 
     const toggleFullscreen = () => {
@@ -295,7 +311,7 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management' },
         { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management' },
         { to: '/dashboard/inventory/stocks', icon: Package, label: 'أرصدة المخزون', section: 'warehouse', warehouseGroup: 'management' },
-        { to: '/dashboard/inventory/warehouse/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle' },
+        { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle' },
         { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle' },
         { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle' },
         { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports' },
@@ -350,25 +366,26 @@ const DashboardLayout: React.FC = () => {
 
     useEffect(() => {
         const path = location.pathname;
-        setOpenSections(prev => {
-            let changed = false;
-            const next = { ...prev };
-            sectionIds.forEach(id => {
+        setOpenSections(() => {
+            const next: Record<string, boolean> = {};
+            for (const id of sectionIds) {
                 const itemsInSection = navItems.filter(i => i.section === id);
-                const hasActive = itemsInSection.some(item =>
+                next[id] = itemsInSection.some(item =>
                     path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
                 );
-                if (hasActive && !prev[id]) {
-                    next[id] = true;
-                    changed = true;
-                }
-            });
-            return changed ? next : prev;
+            }
+            return next;
         });
     }, [location.pathname]);
 
     const toggleSection = (id: string) => {
-        setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
+        setOpenSections(prev => {
+            const willBeOpen = !prev[id];
+            if (willBeOpen) {
+                return Object.fromEntries(sectionIds.map(s => [s, s === id])) as Record<string, boolean>;
+            }
+            return { ...prev, [id]: false };
+        });
     };
 
     const notifications = [

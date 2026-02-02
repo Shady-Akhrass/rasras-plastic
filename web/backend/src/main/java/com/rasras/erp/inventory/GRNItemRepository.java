@@ -8,8 +8,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
+public interface GRNItemRepository extends JpaRepository<GRNItem, Integer> {
 
-    @Query("SELECT m FROM StockMovement m WHERE m.item.id = :itemId")
-    List<StockMovement> findByItemId(@Param("itemId") Integer itemId);
+    @Query("SELECT g FROM GRNItem g WHERE g.item.id = :itemId")
+    List<GRNItem> findByItemId(@Param("itemId") Integer itemId);
 }

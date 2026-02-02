@@ -8,6 +8,10 @@ import { grnService, type GoodsReceiptNoteDto } from '../../../services/grnServi
 import Pagination from '../../../components/common/Pagination';
 import { toast } from 'react-hot-toast';
 
+/**
+ * تم دمج هذه الصفحة مع صفحة GRN الموحدة في قسم المشتريات
+ * يتم إعادة التوجيه تلقائياً إلى /dashboard/procurement/grn
+ */
 const GRNListPage: React.FC = () => {
     const navigate = useNavigate();
     const [list, setList] = useState<GoodsReceiptNoteDto[]>([]);
