@@ -19,8 +19,9 @@ import ItemsBelowMinReportPage from './pages/inventory/reports/ItemsBelowMinRepo
 import StagnantItemsReportPage from './pages/inventory/reports/StagnantItemsReportPage';
 import ItemMovementReportPage from './pages/inventory/reports/ItemMovementReportPage';
 import InventoryCountPage from './pages/inventory/InventoryCountPage';
-import GRNListPage from './pages/inventory/warehouse/GRNListPage';
-import GRNFormPage from './pages/inventory/warehouse/GRNFormPage';
+// GRN pages in inventory/warehouse now redirect to procurement/grn
+import GRNListPageRedirect from './pages/inventory/warehouse/GRNListPage';
+import GRNFormPageRedirect from './pages/inventory/warehouse/GRNFormPage';
 import MaterialIssueListPage from './pages/inventory/warehouse/MaterialIssueListPage';
 import MaterialIssueFormPage from './pages/inventory/warehouse/MaterialIssueFormPage';
 import TransferNoteListPage from './pages/inventory/warehouse/TransferNoteListPage';
@@ -133,10 +134,10 @@ function App() {
               <Route path="dual-valuation" element={<DualInventoryValuationPage />} />
             </Route>
             <Route path="warehouse">
-              <Route path="grn">
-                <Route index element={<GRNListPage />} />
-                <Route path="new" element={<GRNFormPage />} />
-                <Route path=":id" element={<GRNFormPage />} />
+                          <Route path="grn">
+                <Route index element={<GRNListPageRedirect />} />
+                <Route path="new" element={<GRNFormPageRedirect />} />
+                <Route path=":id" element={<GRNFormPageRedirect />} />
               </Route>
               <Route path="issue">
                 <Route index element={<MaterialIssueListPage />} />

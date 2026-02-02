@@ -10,4 +10,6 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
     List<Item> findByIsActiveTrue();
 
     List<Item> findByCategoryId(Integer categoryId);
+
+    boolean existsByCategoryId(Integer categoryId);
 }

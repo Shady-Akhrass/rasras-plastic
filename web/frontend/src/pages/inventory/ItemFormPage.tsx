@@ -449,8 +449,54 @@ const ItemFormPage: React.FC = () => {
         }
     };
 
+    /** فحص المدخلات قبل الحفظ */
+    const validateForm = (): { valid: boolean; error?: string } => {
+        const code = (formData.itemCode || '').trim();
+        const nameAr = (formData.itemNameAr || '').trim();
+
+        if (!code) return { valid: false, error: 'كود الصنف مطلوب' };
+        if (!nameAr) return { valid: false, error: 'الاسم العربي مطلوب' };
+        if (!formData.categoryId) return { valid: false, error: 'يرجى اختيار التصنيف' };
+        if (!formData.unitId) return { valid: false, error: 'يرجى اختيار وحدة القياس' };
+
+        const min = Number(formData.minStockLevel) || 0;
+        const reorder = Number(formData.reorderLevel) || 0;
+        const max = Number(formData.maxStockLevel) || 0;
+        if (min < 0 || reorder < 0 || max < 0) {
+            return { valid: false, error: 'مستويات المخزون لا يمكن أن تكون سالبة' };
+        }
+        if (max > 0 && (min > reorder || reorder > max)) {
+            return { valid: false, error: 'الحد الأدنى ≤ حد إعادة الطلب ≤ الحد الأقصى' };
+        }
+
+        const cost = Number(formData.standardCost) || 0;
+        const purchase = Number(formData.lastPurchasePrice) || 0;
+        const sale = Number(formData.lastSalePrice) || 0;
+        const replacement = Number(formData.replacementPrice) || 0;
+        if (cost < 0 || purchase < 0 || sale < 0 || replacement < 0) {
+            return { valid: false, error: 'الأسعار والتكاليف لا يمكن أن تكون سالبة' };
+        }
+
+        const vat = Number(formData.defaultVatRate) ?? 14;
+        if (vat < 0 || vat > 100) {
+            return { valid: false, error: 'نسبة الضريبة يجب أن تكون بين 0 و 100' };
+        }
+
+        const avg = Number(formData.avgMonthlyConsumption) || 0;
+        if (avg < 0) return { valid: false, error: 'متوسط الاستهلاك الشهري لا يمكن أن يكون سالباً' };
+
+        return { valid: true };
+    };
+
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
+
+        const { valid, error } = validateForm();
+        if (!valid) {
+            toast.error(error || 'يرجى تصحيح المدخلات');
+            return;
+        }
+
         try {
             setLoading(true);
             if (isEdit && id) {
