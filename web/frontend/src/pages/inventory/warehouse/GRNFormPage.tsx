@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
     ChevronRight, Save, Truck,
     RefreshCw, CheckCircle, Info, DollarSign
@@ -15,6 +15,7 @@ import { toast } from 'react-hot-toast';
  * يتم إعادة التوجيه تلقائياً إلى /dashboard/procurement/grn
  */
 const GRNFormPage: React.FC = () => {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const isNew = !id || id === 'new';
 
