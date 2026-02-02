@@ -27,5 +27,14 @@ public class SupplierQuotationItemDto {
     private BigDecimal taxAmount;
     private BigDecimal totalPrice;
     private Integer deliveryDays;
+    private String polymerGrade;
     private String notes;
+
+    public String getPolymerGrade() {
+        return polymerGrade;
+    }
+
+    public void setPolymerGrade(String polymerGrade) {
+        this.polymerGrade = polymerGrade;
+    }
 }

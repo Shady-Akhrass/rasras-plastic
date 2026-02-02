@@ -430,12 +430,39 @@ const QualityInspectionPage: React.FC = () => {
                         <button
                             onClick={handleSaveInspection}
                             disabled={saving}
-                            className="flex items-center gap-2 px-8 py-3 bg-brand-primary text-white rounded-xl 
-                                font-bold shadow-lg shadow-brand-primary/20 hover:scale-105 transition-all
+                            className="flex items-center gap-2 px-6 py-3 bg-white border border-brand-primary text-brand-primary 
+                                rounded-xl font-bold hover:bg-brand-primary/5 transition-all
                                 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Save className="w-5 h-5" />
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ تقرير الفحص'}</span>
+                            <span>{saving ? 'جاري الحفظ...' : 'حفظ مسودة'}</span>
+                        </button>
+                        <button
+                            onClick={async () => {
+                                await handleSaveInspection();
+                                if (selectedGrn?.id) {
+                                    if (window.confirm('هل أنت متأكد من إرسال نتيجة الفحص للاعتماد؟')) {
+                                        try {
+                                            setSaving(true);
+                                            await grnService.submitGRN(selectedGrn.id, 1);
+                                            toast.success('تم إرسال الفحص للاعتماد');
+                                            setSelectedGrn(null);
+                                            fetchPendingGRNs();
+                                        } catch (e) {
+                                            toast.error('فشل الإرسال للاعتماد');
+                                        } finally {
+                                            setSaving(false);
+                                        }
+                                    }
+                                }
+                            }}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl 
+                                font-bold shadow-lg shadow-emerald-500/20 hover:scale-105 hover:bg-emerald-700 transition-all
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <ClipboardCheck className="w-5 h-5" />
+                            <span>إرسال للاعتماد</span>
                         </button>
                     </div>
                 </div>

@@ -193,10 +193,14 @@ const PurchaseRequisitionFormPage = () => {
 
             if (isEditMode) {
                 await purchaseService.updatePR(parseInt(id), submissionData as PurchaseRequisition);
-                toast.success('تم تحديث طلب الشراء بنجاح');
+                await purchaseService.submitPR(parseInt(id));
+                toast.success('تم تحديث طلب الشراء وإرساله للاعتماد بنجاح');
             } else {
-                await purchaseService.createPR(submissionData as PurchaseRequisition);
-                toast.success('تم إنشاء طلب الشراء بنجاح');
+                const createdPr = await purchaseService.createPR(submissionData as PurchaseRequisition);
+                if (createdPr && createdPr.id) {
+                    await purchaseService.submitPR(createdPr.id);
+                }
+                toast.success('تم إنشاء طلب الشراء وإرساله للاعتماد بنجاح');
             }
             navigate('/dashboard/procurement/pr');
         } catch (error) {
