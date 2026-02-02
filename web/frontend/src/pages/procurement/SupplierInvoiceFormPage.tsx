@@ -226,17 +226,17 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!formData.supplierId) {
             toast.error('يرجى اختيار المورد');
             return;
         }
-        
+
         if (!formData.supplierInvoiceNo?.trim()) {
             toast.error('يرجى إدخال رقم فاتورة المورد (الورقي)');
             return;
         }
-        
+
         if (!formData.items || formData.items.length === 0) {
             toast.error('يرجى إضافة صنف واحد على الأقل');
             return;
@@ -384,7 +384,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                 {grnId ? `GRN #${formData.grnNumber || grnId}` : `Quotation #${quotationId}`}
                                             </div>
                                         </div>
-                                        {!loading && formData.items.length > 0 && (
+                                        {!loading && (formData.items || []).length > 0 && (
                                             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                                         )}
                                     </div>

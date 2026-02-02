@@ -1,28 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { systemService } from '../../services/systemService';
 import {
     Save,
     ArrowRight,
-    FileText,
-    CheckCircle2,
-    AlertCircle,
-    Info,
-    Trophy,
-    Calendar,
-    TrendingUp,
-    Star,
     Clock,
-    DollarSign,
-    Shield,
-    Award,
     Target,
-    Tag
+    TrendingUp,
+    FileText,
+    Star,
+    DollarSign,
+    CheckCircle2,
+    Info,
+    AlertCircle,
+    Tag,
+    Calendar
 } from 'lucide-react';
 import purchaseService, {
-    type QuotationComparison,
     type SupplierQuotation,
     type PurchaseRequisition,
-    type PurchaseRequisitionItem
+    type PurchaseRequisitionItem,
+    type QuotationComparison,
+    type QuotationComparisonDetail
 } from '../../services/purchaseService';
 import toast from 'react-hot-toast';
 
@@ -37,7 +36,7 @@ const QuotationComparisonFormPage: React.FC = () => {
     const [prs, setPrs] = useState<PurchaseRequisition[]>([]);
     const [selectedPrId, setSelectedPrId] = useState<number | undefined>();
     const [quotations, setQuotations] = useState<SupplierQuotation[]>([]);
-
+    const [requireThreeQuotations, setRequireThreeQuotations] = useState(true);
     const [formData, setFormData] = useState<Partial<QuotationComparison>>({
         comparisonDate: new Date().toISOString(),
         prId: undefined,
@@ -50,10 +49,23 @@ const QuotationComparisonFormPage: React.FC = () => {
     // Load Initial Data
     useEffect(() => {
         loadPRs();
+        loadSettings();
         if (isEdit) {
             loadComparison(parseInt(id));
         }
     }, [id]);
+
+    const loadSettings = async () => {
+        try {
+            const data = await systemService.getAllSettings();
+            const setting = data.data.find(s => s.settingKey === 'RequireThreeQuotations');
+            if (setting) {
+                setRequireThreeQuotations(setting.settingValue === 'true');
+            }
+        } catch (error) {
+            console.error('Failed to load settings:', error);
+        }
+    };
 
     const loadPRs = async () => {
         try {
@@ -64,10 +76,33 @@ const QuotationComparisonFormPage: React.FC = () => {
         }
     };
 
-    const loadComparison = async (compId: number) => {
+    const calculateRatings = (details: QuotationComparisonDetail[]) => {
+        if (!details || details.length === 0) return details;
+
+        const validPrices = details.map(d => d.unitPrice || 0).filter(p => p > 0);
+        const validDelivery = details.map(d => d.deliveryDays || 0).filter(d => d > 0);
+
+        const minUnitPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+        const minDeliveryDays = validDelivery.length > 0 ? Math.min(...validDelivery) : 0;
+
+        return details.map(d => {
+            const priceRate = d.unitPrice && d.unitPrice > 0 && minUnitPrice > 0 ? (minUnitPrice / d.unitPrice) * 10 : 0;
+            const deliveryRate = d.deliveryDays && d.deliveryDays > 0 && minDeliveryDays > 0 ? (minDeliveryDays / d.deliveryDays) * 10 : 0;
+            const overallScore = (priceRate + deliveryRate) / 2;
+
+            return {
+                ...d,
+                priceRating: parseFloat(priceRate.toFixed(1)),
+                qualityRating: parseFloat(deliveryRate.toFixed(1)),
+                overallScore: parseFloat(overallScore.toFixed(1))
+            };
+        });
+    };
+
+    const loadComparison = async (comparisonId: number) => {
         try {
             setLoading(true);
-            const data = await purchaseService.getComparisonById(compId);
+            const data = await purchaseService.getComparisonById(comparisonId);
             setFormData(data);
             if (data.prId) {
                 fetchQuotationsForPR(data.prId);
@@ -134,18 +169,18 @@ const QuotationComparisonFormPage: React.FC = () => {
                         qualityRating: 0,
                         priceRating: 0,
                         overallScore: 0,
-                        comments: ''
+                        comments: '',
+                        polymerGrade: firstItem?.polymerGrade || ''
                     };
                 });
 
-                // Find lowest price
-                const lowestQuote = [...initialDetails].sort((a, b) => (a.totalPrice || 0) - (b.totalPrice || 0))[0];
+                const detailsWithRating = calculateRatings(initialDetails);
 
                 setFormData(prev => ({
                     ...prev,
-                    details: initialDetails,
-                    selectedQuotationId: lowestQuote?.quotationId,
-                    selectionReason: 'افضل سعر'
+                    details: detailsWithRating,
+                    selectedQuotationId: detailsWithRating.sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0))[0]?.quotationId,
+                    selectionReason: 'أفضل عرض متكامل (سعر وتوريد)'
                 }));
             }
         } catch (error) {
@@ -156,27 +191,63 @@ const QuotationComparisonFormPage: React.FC = () => {
     };
 
     const updateDetail = (quotationId: number, field: string, value: any) => {
-        setFormData(prev => ({
-            ...prev,
-            details: prev.details?.map(d => {
+        setFormData(prev => {
+            const updatedDetails = prev.details?.map(d => {
                 if (d.quotationId === quotationId) {
-                    const updated = { ...d, [field]: value };
-                    if (field === 'qualityRating' || field === 'priceRating') {
-                        const q = field === 'qualityRating' ? value : (d.qualityRating || 0);
-                        const p = field === 'priceRating' ? value : (d.priceRating || 0);
-                        updated.overallScore = (parseInt(q) + parseInt(p)) / 2;
-                    }
-                    return updated;
+                    return { ...d, [field]: value };
                 }
                 return d;
-            })
+            }) || [];
+
+            // If we updated a value that affects ratings, recalculate everything
+            const finalDetails = (field === 'deliveryDays' || field === 'unitPrice')
+                ? calculateRatings(updatedDetails)
+                : updatedDetails;
+
+            return {
+                ...prev,
+                details: finalDetails
+            };
+        });
+    };
+
+    const selectLowestPrice = () => {
+        if (!formData.details || formData.details.length === 0) return;
+        const sorted = [...formData.details].sort((a, b) => (a.totalPrice || 0) - (b.totalPrice || 0));
+        setFormData(prev => ({
+            ...prev,
+            selectedQuotationId: sorted[0].quotationId,
+            selectionReason: 'أقل سعر متاح'
         }));
+        toast.success('تم تحديد العرض صاحب أقل سعر');
+    };
+
+    const selectFastestDelivery = () => {
+        if (!formData.details || formData.details.length === 0) return;
+        const sorted = [...formData.details].sort((a, b) => (a.deliveryDays || 1000) - (b.deliveryDays || 1000));
+        setFormData(prev => ({
+            ...prev,
+            selectedQuotationId: sorted[0].quotationId,
+            selectionReason: 'أسرع مدة توريد'
+        }));
+        toast.success('تم تحديد العرض صاحب أسرع توريد');
+    };
+
+    const selectHighestScore = () => {
+        if (!formData.details || formData.details.length === 0) return;
+        const sorted = [...formData.details].sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0));
+        setFormData(prev => ({
+            ...prev,
+            selectedQuotationId: sorted[0].quotationId,
+            selectionReason: 'أفضل تقييم فني ومالي'
+        }));
+        toast.success('تم تحديد العرض صاحب أعلى تقييم');
     };
 
     const handleSave = async () => {
         try {
-            if (quotations.length < 3) {
-                toast.error('يجب توفر 3 عروض أسعار صالحة على الأقل للمقارنة والترسية');
+            if (requireThreeQuotations && quotations.length < 3) {
+                toast.error('يجب توفر 3 عروض أسعار صالحة على الأقل للمقارنة والترسية حسب إعدادات النظام');
                 return;
             }
             if (!formData.selectedQuotationId) {
@@ -357,13 +428,13 @@ const QuotationComparisonFormPage: React.FC = () => {
                         )}
 
                         {selectedPr && (
-                            <div className={`p-5 rounded-2xl border-2 ${quotations.length < 3
+                            <div className={`p - 5 rounded - 2xl border - 2 ${quotations.length < 3
                                 ? 'bg-gradient-to-br from-rose-50 to-orange-50 border-rose-200'
                                 : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'
-                                }`}>
+                                } `}>
                                 <div className="flex items-start gap-3">
-                                    <div className={`p-3 rounded-xl ${quotations.length < 3 ? 'bg-rose-100' : 'bg-emerald-100'
-                                        }`}>
+                                    <div className={`p - 3 rounded - xl ${quotations.length < 3 ? 'bg-rose-100' : 'bg-emerald-100'
+                                        } `}>
                                         {quotations.length < 3 ? (
                                             <AlertCircle className="w-6 h-6 text-rose-600" />
                                         ) : (
@@ -371,14 +442,14 @@ const QuotationComparisonFormPage: React.FC = () => {
                                         )}
                                     </div>
                                     <div>
-                                        <h4 className={`font-bold mb-1 ${quotations.length < 3 ? 'text-rose-800' : 'text-emerald-800'
-                                            }`}>
+                                        <h4 className={`font - bold mb - 1 ${quotations.length < 3 ? 'text-rose-800' : 'text-emerald-800'
+                                            } `}>
                                             {quotations.length < 3 ? 'عدد العروض غير كافٍ' : 'جاهز للمقارنة'}
                                         </h4>
-                                        <p className={`text-sm leading-relaxed ${quotations.length < 3 ? 'text-rose-700' : 'text-emerald-700'
-                                            }`}>
+                                        <p className={`text - sm leading - relaxed ${quotations.length < 3 ? 'text-rose-700' : 'text-emerald-700'
+                                            } `}>
                                             تم العثور على <strong>{quotations.length}</strong> عروض سعر صالحة وغير منتهية
-                                            {quotations.length < 3 && (
+                                            {requireThreeQuotations && quotations.length < 3 && (
                                                 <> - يتطلب النظام <strong>3 عروض على الأقل</strong> لبدء الترسية</>
                                             )}
                                         </p>
@@ -395,20 +466,46 @@ const QuotationComparisonFormPage: React.FC = () => {
                     <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                         <div className="flex items-center gap-3">
                             <div className="p-3 bg-emerald-100 rounded-xl">
-                                <Award className="w-5 h-5 text-emerald-600" />
+                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                             </div>
                             <div>
                                 <h3 className="font-bold text-slate-800 text-lg">قرار الترسية</h3>
                                 <p className="text-slate-500 text-sm">اختر العرض الأفضل وحدد سبب الاختيار</p>
                             </div>
                         </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={selectLowestPrice}
+                                className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                title="اختيار أقل سعر"
+                            >
+                                <DollarSign className="w-3.5 h-3.5 inline ml-1" />
+                                الأرخص
+                            </button>
+                            <button
+                                onClick={selectFastestDelivery}
+                                className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+                                title="اختيار أسرع توريد"
+                            >
+                                <Clock className="w-3.5 h-3.5 inline ml-1" />
+                                الأسرع
+                            </button>
+                            <button
+                                onClick={selectHighestScore}
+                                className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold border border-purple-100 hover:bg-purple-100 transition-colors"
+                                title="اختيار أعلى تقييم"
+                            >
+                                <Star className="w-3.5 h-3.5 inline ml-1" />
+                                الأفضل تقييماً
+                            </button>
+                        </div>
                     </div>
 
                     <div className="p-6 space-y-6">
                         <div className="space-y-2">
                             <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                <Trophy className="w-4 h-4 text-emerald-600" />
-                                العرض الفائز
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                العرض الأفضل
                             </label>
                             <select
                                 value={formData.selectedQuotationId || ''}
@@ -416,7 +513,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
                                     focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
                             >
-                                <option value="">حدد العرض الفائز...</option>
+                                <option value="">حدد العرض الأفضل...</option>
                                 {formData.details?.map(d => (
                                     <option key={d.quotationId} value={d.quotationId}>
                                         {d.supplierNameAr} - {d.totalPrice?.toLocaleString('ar-EG')} ج.م
@@ -448,7 +545,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-emerald-800">
-                                            تم تحديد العرض الفائز
+                                            تم تحديد العرض الأفضل
                                         </p>
                                         <p className="text-xs text-emerald-700 mt-1">
                                             {formData.details?.find(d => d.quotationId === formData.selectedQuotationId)?.supplierNameAr}
@@ -497,22 +594,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <Star className="w-4 h-4 text-amber-500" />
-                                            تقييم السعر
-                                        </div>
-                                    </th>
-                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <Shield className="w-4 h-4 text-blue-600" />
-                                            تقييم الجودة
-                                        </div>
-                                    </th>
-                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <Trophy className="w-4 h-4 text-purple-600" />
-                                            الدرجة النهائية
-                                        </div>
+                                        تحليل الأداء (سعر / توريد / نهائي)
                                     </th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
                                         <div className="flex items-center justify-center gap-2">
@@ -527,6 +609,9 @@ const QuotationComparisonFormPage: React.FC = () => {
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
+                                        درجة البوليمر
+                                    </th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
                                         الإجراء
                                     </th>
                                 </tr>
@@ -537,17 +622,15 @@ const QuotationComparisonFormPage: React.FC = () => {
                                     return (
                                         <tr
                                             key={detail.quotationId}
-                                            className={`transition-all ${isWinner
+                                            className={`transition - all ${isWinner
                                                 ? 'bg-gradient-to-l from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100'
                                                 : 'hover:bg-slate-50/80'
-                                                }`}
+                                                } `}
                                         >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`p-3 rounded-xl ${isWinner ? 'bg-emerald-100' : 'bg-brand-primary/10'
-                                                        }`}>
-                                                        <Trophy className={`w-5 h-5 ${isWinner ? 'text-emerald-600' : 'text-brand-primary'
-                                                            }`} />
+                                                    <div className={`p-3 rounded-xl ${isWinner ? 'bg-emerald-100' : 'bg-brand-primary/10'}`}>
+                                                        <CheckCircle2 className={`w-5 h-5 ${isWinner ? 'text-emerald-600' : 'text-brand-primary'}`} />
                                                     </div>
                                                     <div>
                                                         <div className="font-bold text-slate-800">
@@ -579,42 +662,42 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max="10"
-                                                    value={detail.priceRating || 0}
-                                                    onChange={(e) => updateDetail(detail.quotationId, 'priceRating', e.target.value)}
-                                                    className="w-16 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-center font-bold text-amber-600 focus:border-brand-primary 
-                                                        outline-none transition-all"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max="10"
-                                                    value={detail.qualityRating || 0}
-                                                    onChange={(e) => updateDetail(detail.quotationId, 'qualityRating', e.target.value)}
-                                                    className="w-16 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-center font-bold text-blue-600 focus:border-brand-primary 
-                                                        outline-none transition-all"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-black text-sm ${(detail.overallScore || 0) >= 7
-                                                    ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-200'
-                                                    : (detail.overallScore || 0) >= 5
-                                                        ? 'bg-amber-100 text-amber-700 border-2 border-amber-200'
-                                                        : 'bg-rose-100 text-rose-700 border-2 border-rose-200'
-                                                    }`}>
-                                                    <Star className="w-4 h-4" />
-                                                    {detail.overallScore?.toFixed(1) || '0.0'}
-                                                </span>
-                                            </td>
                                             <td className="px-6 py-4">
+                                                <div className="flex flex-col items-center gap-2 py-2">
+                                                    {/* Price Rating */}
+                                                    <div className={`flex items-center justify-between gap-3 w-32 px-3 py-1.5 rounded-lg border-2 ${detail.priceRating! >= 7 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                                        }`}>
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <TrendingUp className="w-3.5 h-3.5 flex-shrink-0" />
+                                                            <span className="text-[10px] font-bold truncate">السعر</span>
+                                                        </div>
+                                                        <span className="font-black text-xs">{detail.priceRating?.toFixed(1) || '0.0'}</span>
+                                                    </div>
+
+                                                    {/* Delivery Rating */}
+                                                    <div className={`flex items-center justify-between gap-3 w-32 px-3 py-1.5 rounded-lg border-2 ${detail.qualityRating! >= 7 ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                                        }`}>
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                                                            <span className="text-[10px] font-bold truncate">التوريد</span>
+                                                        </div>
+                                                        <span className="font-black text-xs">{detail.qualityRating?.toFixed(1) || '0.0'}</span>
+                                                    </div>
+
+                                                    {/* Final Score */}
+                                                    <div className={`flex items-center justify-between gap-3 w-32 px-3 py-1.5 rounded-lg border-2 shadow-sm ${(detail.overallScore || 0) >= 7 ? 'bg-emerald-50 border-emerald-300 text-emerald-700' :
+                                                        (detail.overallScore || 0) >= 5 ? 'bg-amber-50 border-amber-300 text-amber-700' :
+                                                            'bg-rose-50 border-rose-300 text-rose-700'
+                                                        }`}>
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <Target className="w-3.5 h-3.5 flex-shrink-0" />
+                                                            <span className="text-[10px] font-black truncate">الإجمالي</span>
+                                                        </div>
+                                                        <span className="font-black text-xs">{detail.overallScore?.toFixed(1) || '0.0'}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
                                                 <div className={`flex flex-col items-center gap-1 ${new Date(detail.validUntilDate!) < new Date()
                                                     ? 'text-rose-500'
                                                     : 'text-slate-600'
@@ -629,18 +712,28 @@ const QuotationComparisonFormPage: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col items-center gap-1 text-slate-600">
-                                                    <Clock className="w-4 h-4" />
-                                                    <span className="text-sm font-bold">
-                                                        {detail.deliveryDays} يوم
-                                                    </span>
+                                                    <input
+                                                        type="number"
+                                                        value={detail.deliveryDays}
+                                                        onChange={(e) => updateDetail(detail.quotationId, 'deliveryDays', parseInt(e.target.value))}
+                                                        className="w-16 px-2 py-1.5 bg-white border border-slate-200 rounded-lg 
+                                                            text-center font-bold text-slate-700 focus:border-brand-primary 
+                                                            outline-none transition-all text-sm"
+                                                    />
+                                                    <span className="text-[10px] font-bold text-slate-400">يوم</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="text-sm font-bold text-slate-700">
+                                                    {detail.polymerGrade || '-'}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 {isWinner ? (
                                                     <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 
                                                         text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20">
-                                                        <Trophy className="w-4 h-4" />
-                                                        <span>الفائز</span>
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                        <span>الأفضل</span>
                                                     </div>
                                                 ) : (
                                                     <button
@@ -648,8 +741,8 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                             ...prev,
                                                             selectedQuotationId: detail.quotationId
                                                         }))}
-                                                        disabled={quotations.length < 3}
-                                                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${quotations.length < 3
+                                                        disabled={requireThreeQuotations && quotations.length < 3}
+                                                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${requireThreeQuotations && quotations.length < 3
                                                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                                             : 'bg-brand-primary text-white hover:bg-brand-primary/90 hover:scale-105 active:scale-95 shadow-lg shadow-brand-primary/20'
                                                             }`}

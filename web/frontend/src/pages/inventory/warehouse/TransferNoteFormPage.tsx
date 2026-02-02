@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronRight, Save, Package, Plus, Trash2, RefreshCw, AlertCircle, CheckCircle, Info, ArrowRightLeft } from 'lucide-react';
+import { ChevronRight, Save, Package, Plus, Trash2, RefreshCw, CheckCircle } from 'lucide-react';
 import transferNoteService, { type TransferNoteDto, type TransferItemDto, type TransferReason } from '../../../services/transferNoteService';
 import warehouseService from '../../../services/warehouseService';
 import type { WarehouseDto } from '../../../services/warehouseService';
@@ -150,6 +150,27 @@ const TransferNoteFormPage: React.FC = () => {
         }
     };
 
+    const handleFinalize = async () => {
+        if (!id || isNew) return;
+        const confirm = window.confirm('هل أنت متأكد من إتمام التحويل وتحديث المخزون؟ لا يمكن التراجع بعد هذه الخطوة.');
+        if (!confirm) return;
+
+        setFinalizing(true);
+        try {
+            const userStr = localStorage.getItem('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+            const resUserId = user?.id || user?.userId;
+
+            await transferNoteService.finalize(parseInt(id), resUserId);
+            toast.success('تم إتمام التحويل وتحديث المخزون بنجاح');
+            navigate('/dashboard/inventory/warehouse/transfer');
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'فشل إتمام التحويل');
+        } finally {
+            setFinalizing(false);
+        }
+    };
+
     const getStockStatus = (itemId: number, requestedQty: number) => {
         const available = stockLevels[itemId] || 0;
         if (available === 0) return { status: 'none', text: 'غير متوفر', color: 'text-rose-600 bg-rose-50' };
@@ -277,8 +298,8 @@ const TransferNoteFormPage: React.FC = () => {
                                                     value={it.quantity || ''}
                                                     onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
                                                     className={`w-24 px-2 py-1.5 border rounded-lg focus:ring-1 outline-none ${stockStatus?.status === 'none' || (it.quantity > (stockLevels[it.itemId] || 0))
-                                                            ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
-                                                            : 'border-slate-300 focus:border-violet-500 focus:ring-violet-500'
+                                                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
+                                                        : 'border-slate-300 focus:border-violet-500 focus:ring-violet-500'
                                                         }`}
                                                     required
                                                 />

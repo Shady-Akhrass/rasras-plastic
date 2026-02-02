@@ -2,7 +2,7 @@ import axios from 'axios';
 import { clearSession } from './authUtils';
 
 const apiClient = axios.create({
-    baseURL: 'http://localhost:8080/api',
+    baseURL: 'https://168.231.77.182/api',
     headers: {
         'Content-Type': 'application/json',
     },

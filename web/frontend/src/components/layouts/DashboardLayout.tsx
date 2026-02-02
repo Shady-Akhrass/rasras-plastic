@@ -20,6 +20,7 @@ const SidebarLink = ({
     active,
     collapsed,
     badge,
+    blink,
     search
 }: {
     to: string;
@@ -28,6 +29,7 @@ const SidebarLink = ({
     active: boolean;
     collapsed: boolean;
     badge?: number;
+    blink?: boolean;
     search?: string;
 }) => (
     <Link
@@ -39,15 +41,24 @@ const SidebarLink = ({
             }
             ${collapsed ? 'justify-center px-3' : ''}`}
     >
-        <Icon className={`w-5 h-5 transition-transform duration-300 ${active ? '' : 'group-hover:scale-110'}`} />
+        <div className="relative">
+            <Icon className={`w-5 h-5 transition-transform duration-300 ${active ? '' : 'group-hover:scale-110'}`} />
+            {badge && collapsed && (
+                <span className={`absolute -top-2 -right-2 w-4 h-4 text-[10px] font-bold rounded-full flex items-center justify-center
+                    border border-white animate-blink-red bg-rose-500 text-white shadow-sm`}>
+                    {badge}
+                </span>
+            )}
+        </div>
 
         {!collapsed && (
             <span className="font-medium flex-1">{label}</span>
         )}
 
         {badge && !collapsed && (
-            <span className={`px-2 py-0.5 text-xs font-bold rounded-full
-                ${active ? 'bg-white/20 text-white' : 'bg-brand-primary/10 text-brand-primary'}`}>
+            <span className={`px-2 py-0.5 text-xs font-bold rounded-full transition-all duration-300
+                ${active ? 'bg-white/20 text-white' : 'bg-brand-primary/10 text-brand-primary'}
+                ${blink ? 'animate-blink-red !bg-rose-500 !text-white shadow-sm' : ''}`}>
                 {badge}
             </span>
         )}
@@ -79,17 +90,6 @@ const SidebarSubGroupTitle = ({ title, collapsed }: { title: string; collapsed: 
     )
 );
 
-// Section Header for Sidebar (plain, non-dropdown)
-const SidebarSection = ({ title, collapsed }: { title: string; collapsed: boolean }) => (
-    !collapsed ? (
-        <div className="px-4 py-2 mt-6 mb-2">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{title}</span>
-        </div>
-    ) : (
-        <div className="my-4 mx-3 border-t border-slate-200" />
-    )
-);
-
 // Collapsible Dropdown Section for Sidebar
 const SidebarDropdownSection = ({
     id: _id,
@@ -99,6 +99,8 @@ const SidebarDropdownSection = ({
     isOpen,
     onToggle,
     hasActiveChild,
+    badge,
+    blink,
     children
 }: {
     id: string;
@@ -108,6 +110,8 @@ const SidebarDropdownSection = ({
     isOpen: boolean;
     onToggle: () => void;
     hasActiveChild: boolean;
+    badge?: number;
+    blink?: boolean;
     children: React.ReactNode;
 }) => {
     if (collapsed) {
@@ -136,11 +140,20 @@ const SidebarDropdownSection = ({
                     <Icon className="w-5 h-5" />
                     <span className="font-semibold text-sm">{title}</span>
                 </div>
-                <span
-                    className={`inline-flex text-slate-400 flex-shrink-0 transition-transform duration-300 ease-out ${isOpen ? 'rotate-180' : ''}`}
-                >
-                    <ChevronDown className="w-4 h-4" />
-                </span>
+                <div className="flex items-center gap-2">
+                    {badge && !isOpen && (
+                        <span className={`px-2 py-0.5 text-xs font-bold rounded-full transition-all duration-300
+                            ${hasActiveChild ? 'bg-white/20 text-white' : 'bg-brand-primary/10 text-brand-primary'}
+                            ${blink ? 'animate-blink-red !bg-rose-500 !text-white shadow-sm' : ''}`}>
+                            {badge}
+                        </span>
+                    )}
+                    {isOpen ? (
+                        <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    )}
+                </div>
             </button>
             <div
                 className="grid transition-[grid-template-rows] duration-300 ease-out"
@@ -207,6 +220,7 @@ const DashboardLayout: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+    const [pendingInspectionsCount, setPendingInspectionsCount] = useState(0);
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
@@ -233,7 +247,23 @@ const DashboardLayout: React.FC = () => {
             }
         };
         fetchPendingCount();
-        const interval = setInterval(fetchPendingCount, 60000); // Refresh every minute
+        const interval = setInterval(fetchPendingCount, 10000); // Faster refresh (10s)
+        return () => clearInterval(interval);
+    }, []);
+
+    // Fetch pending inspections count
+    useEffect(() => {
+        const fetchInspectionsCount = async () => {
+            try {
+                const grns = await grnService.getAllGRNs();
+                const count = grns.filter(g => g.status === 'Pending Inspection').length;
+                setPendingInspectionsCount(count);
+            } catch (error) {
+                console.error('Failed to fetch inspections count', error);
+            }
+        };
+        fetchInspectionsCount();
+        const interval = setInterval(fetchInspectionsCount, 10000); // Faster refresh (10s)
         return () => clearInterval(interval);
     }, []);
 
@@ -301,20 +331,18 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales' },
         { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
         { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
+        { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement' },
         { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement' },
+        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement', badge: pendingInspectionsCount || undefined },
         { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement' },
         { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement' },
-        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement' },
-        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement' },
-        { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement' },
         { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement' },
+        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement' },
+        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement' },
         { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
-        // { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system' },
-        // { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system' },
         { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات العامة', section: 'system' },
     ];
 
@@ -370,6 +398,15 @@ const DashboardLayout: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50/50 flex" dir="rtl">
+            <style>{`
+                @keyframes blink-red {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.7; transform: scale(1.05); background-color: #ef4444; }
+                }
+                .animate-blink-red {
+                    animation: blink-red 1s infinite;
+                }
+            `}</style>
             {/* Mobile Menu Overlay */}
             {mobileMenuOpen && (
                 <div
@@ -427,6 +464,8 @@ const DashboardLayout: React.FC = () => {
                         hasActiveChild={filteredNavItems.filter(i => i.section === 'main').some(item =>
                             location.pathname === item.to || (item.to !== '/dashboard' && location.pathname.startsWith(item.to))
                         )}
+                        badge={pendingApprovalsCount || undefined}
+                        blink={pendingApprovalsCount > 0}
                     >
                         {filteredNavItems.filter(i => i.section === 'main').map((item) => (
                             <SidebarLink
@@ -438,24 +477,26 @@ const DashboardLayout: React.FC = () => {
                                     (item.to !== '/dashboard' && location.pathname.startsWith(item.to))}
                                 collapsed={sidebarCollapsed}
                                 badge={(item as { badge?: number }).badge}
+                                blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
                             />
                         ))}
                     </SidebarDropdownSection>
-
-                    {/* العمليات */}
-                    {filteredNavItems.some(i => i.section === 'operations') && (
+                    {/* قسم المشتريات */}
+                    {filteredNavItems.some(i => i.section === 'procurement') && (
                         <SidebarDropdownSection
-                            id="operations"
-                            title="العمليات"
-                            icon={Package}
+                            id="procurement"
+                            title="قسم المشتريات"
+                            icon={Truck}
                             collapsed={sidebarCollapsed}
-                            isOpen={openSections.operations ?? false}
-                            onToggle={() => toggleSection('operations')}
-                            hasActiveChild={filteredNavItems.filter(i => i.section === 'operations').some(item =>
+                            isOpen={openSections.procurement ?? false}
+                            onToggle={() => toggleSection('procurement')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'procurement').some(item =>
                                 location.pathname.startsWith(item.to)
                             )}
+                            badge={pendingInspectionsCount || undefined}
+                            blink={pendingInspectionsCount > 0}
                         >
-                            {filteredNavItems.filter(i => i.section === 'operations').map((item) => (
+                            {filteredNavItems.filter(i => i.section === 'procurement').map((item) => (
                                 <SidebarLink
                                     key={item.to}
                                     to={item.to}
@@ -464,12 +505,12 @@ const DashboardLayout: React.FC = () => {
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
                                     badge={(item as { badge?: number }).badge}
+                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
                                 />
                             ))}
                         </SidebarDropdownSection>
                     )}
-
-                    {/* قسم المخازن - عناوين رئيسة: وحدة إدارة الأصناف والمخزون، دورة المخزن، التقارير والجرد */}
+                    {/* قسم المخازن */}
                     {filteredNavItems.some(i => i.section === 'warehouse') && (
                         <SidebarDropdownSection
                             id="warehouse"
@@ -523,6 +564,7 @@ const DashboardLayout: React.FC = () => {
                                         active={location.pathname.startsWith(item.to)}
                                         collapsed={sidebarCollapsed}
                                         search={(item as { search?: string }).search}
+                                        blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
                                     />
                                 ))}
                         </SidebarDropdownSection>
@@ -549,6 +591,40 @@ const DashboardLayout: React.FC = () => {
                                     label={item.label}
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
+                                    badge={(item as { badge?: number }).badge}
+                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
+                                />
+                            ))}
+                        </SidebarDropdownSection>
+                    )}
+
+
+
+                    {/* العمليات */}
+                    {filteredNavItems.some(i => i.section === 'operations') && (
+                        <SidebarDropdownSection
+                            id="operations"
+                            title="العمليات"
+                            icon={Package}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.operations ?? false}
+                            onToggle={() => toggleSection('operations')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'operations').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                            badge={pendingInspectionsCount || undefined}
+                            blink={pendingInspectionsCount > 0}
+                        >
+                            {filteredNavItems.filter(i => i.section === 'operations').map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
+                                    badge={(item as { badge?: number }).badge}
+                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
                                 />
                             ))}
                         </SidebarDropdownSection>
@@ -576,33 +652,7 @@ const DashboardLayout: React.FC = () => {
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
                                     badge={(item as { badge?: number }).badge}
-                                />
-                            ))}
-                        </SidebarDropdownSection>
-                    )}
-
-                    {/* قسم المشتريات */}
-                    {filteredNavItems.some(i => i.section === 'procurement') && (
-                        <SidebarDropdownSection
-                            id="procurement"
-                            title="قسم المشتريات"
-                            icon={Truck}
-                            collapsed={sidebarCollapsed}
-                            isOpen={openSections.procurement ?? false}
-                            onToggle={() => toggleSection('procurement')}
-                            hasActiveChild={filteredNavItems.filter(i => i.section === 'procurement').some(item =>
-                                location.pathname.startsWith(item.to)
-                            )}
-                        >
-                            {filteredNavItems.filter(i => i.section === 'procurement').map((item) => (
-                                <SidebarLink
-                                    key={item.to}
-                                    to={item.to}
-                                    icon={item.icon}
-                                    label={item.label}
-                                    active={location.pathname.startsWith(item.to)}
-                                    collapsed={sidebarCollapsed}
-                                    badge={(item as { badge?: number }).badge}
+                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
                                 />
                             ))}
                         </SidebarDropdownSection>
@@ -627,8 +677,9 @@ const DashboardLayout: React.FC = () => {
                                 icon={item.icon}
                                 label={item.label}
                                 active={location.pathname.startsWith(item.to)}
-                                    collapsed={sidebarCollapsed}
+                                collapsed={sidebarCollapsed}
                                 badge={(item as { badge?: number }).badge}
+                                blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
                             />
                         ))}
                     </SidebarDropdownSection>

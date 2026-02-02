@@ -8,6 +8,7 @@ export interface SupplierInvoiceDto {
     dueDate: string;
     poId?: number;
     grnId?: number;
+    grnNumber?: string;
     supplierId: number;
     supplierNameAr?: string;
     currency: string;

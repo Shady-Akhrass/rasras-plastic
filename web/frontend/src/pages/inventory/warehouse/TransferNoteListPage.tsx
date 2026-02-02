@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Package, FileText, RefreshCw, Eye, AlertCircle } from 'lucide-react';
 import transferNoteService, { type TransferNoteDto } from '../../../services/transferNoteService';
 import Pagination from '../../../components/common/Pagination';
-import { toast } from 'react-hot-toast';
 
 const TransferNoteListPage: React.FC = () => {
     const navigate = useNavigate();
@@ -41,10 +40,7 @@ const TransferNoteListPage: React.FC = () => {
         });
     }, [list]);
 
-    const paginated = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return filtered.slice(start, start + pageSize);
-    }, [filtered, currentPage, pageSize]);
+    const paginated = filtered.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize);
 
     return (
         <div className="space-y-6">
@@ -95,7 +91,7 @@ const TransferNoteListPage: React.FC = () => {
                                     <button onClick={() => navigate('/dashboard/inventory/warehouse/transfer/new')} className="mt-4 text-violet-600 font-medium hover:underline">إنشاء إذن تحويل</button>
                                 </td></tr>
                             ) : (
-                                list.map((t) => (
+                                paginated.map((t) => (
                                     <tr key={t.id} className="border-b hover:bg-violet-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-violet-700">{t.transferNumber || '—'}</td>
                                         <td className="px-6 py-4">{t.fromWarehouseNameAr || '—'}</td>

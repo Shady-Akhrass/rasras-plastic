@@ -10,11 +10,8 @@ import warehouseService from '../../../services/warehouseService';
 import type { WarehouseDto, WarehouseLocationDto } from '../../../services/warehouseService';
 import { toast } from 'react-hot-toast';
 
-/**
- * تم دمج هذه الصفحة مع صفحة GRN الموحدة في قسم المشتريات
- * يتم إعادة التوجيه تلقائياً إلى /dashboard/procurement/grn
- */
 const GRNFormPage: React.FC = () => {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const isNew = !id || id === 'new';
 

@@ -116,7 +116,7 @@ const QuotationListPage: React.FC = () => {
                                         <td className="px-6 py-4 font-mono font-bold text-blue-700">{q.quotationNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{q.quotationDate ? new Date(q.quotationDate).toLocaleDateString('ar-EG') : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{q.customerNameAr || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{q.validUntil ? new Date(q.validUntil).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{q.validUntilDate ? new Date(q.validUntilDate).toLocaleDateString('ar-EG') : '—'}</td>
                                         <td className="px-6 py-4">{(q.totalAmount ?? 0).toLocaleString('ar-EG')} {q.currency || ''}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/quotations/${q.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>

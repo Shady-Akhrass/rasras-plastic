@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Package, FileText, RefreshCw, Eye, AlertCircle } from 'lucide-react';
 import materialIssueService, { type MaterialIssueDto } from '../../../services/materialIssueService';
 import Pagination from '../../../components/common/Pagination';
-import { toast } from 'react-hot-toast';
 
 const MaterialIssueListPage: React.FC = () => {
     const navigate = useNavigate();
@@ -37,10 +36,7 @@ const MaterialIssueListPage: React.FC = () => {
         return [...list].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [list]);
 
-    const paginated = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return filtered.slice(start, start + pageSize);
-    }, [filtered, currentPage, pageSize]);
+    const paginated = filtered.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize);
 
     return (
         <div className="space-y-6">
@@ -85,7 +81,7 @@ const MaterialIssueListPage: React.FC = () => {
                                     <button onClick={() => navigate('/dashboard/inventory/warehouse/issue/new')} className="mt-4 text-amber-600 font-medium hover:underline">إنشاء إذن صرف</button>
                                 </td></tr>
                             ) : (
-                                list.map((m) => (
+                                paginated.map((m) => (
                                     <tr key={m.id} className="border-b hover:bg-amber-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-amber-700">{(m as any).issueNoteNumber || m.issueNumber || '—'}</td>
                                         <td className="px-6 py-4">{typeLabel[((m as any).salesOrderId ? 'SALE_ORDER' : m.issueType) as string] || m.issueType || '—'}</td>

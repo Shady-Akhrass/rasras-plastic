@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
     Plus, Search, Edit2, Trash2, X, RefreshCw, CheckCircle2, XCircle,
     DollarSign, Package, Tag, Save, ChevronRight, Calendar, Coins,
-    TrendingUp, TrendingDown, ShoppingCart, FileText, Layers
+    TrendingUp, TrendingDown, ShoppingCart, Layers
 } from 'lucide-react';
 import { priceListService, type PriceListDto, type PriceListItemDto } from '../../services/priceListService';
 import { itemService, type ItemDto } from '../../services/itemService';

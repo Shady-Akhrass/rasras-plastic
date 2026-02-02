@@ -24,12 +24,12 @@ const SalesInvoiceFormPage: React.FC = () => {
         invoiceDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         customerId: 0,
-        saleOrderId: 0,
+        salesOrderId: 0,
         currency: 'EGP',
         exchangeRate: 1,
         paymentTerms: '',
-        discountPercent: 0,
-        taxPercent: 0,
+        discountPercentage: 0,
+        taxAmount: 0,
         paidAmount: 0,
         notes: '',
         items: []
@@ -52,7 +52,7 @@ const SalesInvoiceFormPage: React.FC = () => {
 
     const loadFromSaleOrder = async (soId: number) => {
         if (!soId) {
-            setForm((f) => ({ ...f, saleOrderId: 0, saleOrderNumber: undefined, customerId: 0, customerNameAr: undefined, items: [] }));
+            setForm((f) => ({ ...f, salesOrderId: 0, soNumber: undefined, customerId: 0, customerNameAr: undefined, items: [] }));
             return;
         }
         try {
@@ -60,22 +60,23 @@ const SalesInvoiceFormPage: React.FC = () => {
             if (so) {
                 setForm((f) => ({
                     ...f,
-                    saleOrderId: so.id!,
-                    saleOrderNumber: so.orderNumber,
+                    salesOrderId: so.id!,
+                    soNumber: so.soNumber,
                     customerId: so.customerId,
                     customerNameAr: so.customerNameAr,
                     paymentTerms: so.paymentTerms ?? f.paymentTerms,
-                    discountPercent: so.discountPercent ?? 0,
-                    taxPercent: so.taxPercent ?? 0,
+                    discountPercentage: so.discountPercentage ?? 0,
+                    taxAmount: so.taxAmount ?? 0,
                     items: (so.items || []).map((i) => ({
                         itemId: i.itemId,
                         itemNameAr: i.itemNameAr,
                         itemCode: i.itemCode,
-                        qty: i.qty,
+                        quantity: i.orderedQty,
                         unitId: i.unitId,
                         unitNameAr: i.unitNameAr,
                         unitPrice: i.unitPrice,
-                        discountPercent: i.discountPercent
+                        discountPercentage: i.discountPercentage,
+                        totalPrice: i.totalPrice
                     }))
                 }));
             }
@@ -100,7 +101,7 @@ const SalesInvoiceFormPage: React.FC = () => {
         }
     }, [id, isNew, navigate]);
 
-    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, qty: 1, unitId: 0, unitPrice: 0, discountPercent: 0 }] })); };
+    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, quantity: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, totalPrice: 0 }] })); };
     const removeItem = (idx: number) => { setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
     const updateItem = (idx: number, u: Partial<SalesInvoiceItemDto>) => {
         setForm((f) => {
@@ -112,10 +113,10 @@ const SalesInvoiceFormPage: React.FC = () => {
         });
     };
 
-    const subtotal = form.items.reduce((s, i) => s + (i.qty || 0) * (i.unitPrice || 0) * (1 - (i.discountPercent || 0) / 100), 0);
-    const disc = subtotal * ((form.discountPercent || 0) / 100);
+    const subtotal = form.items.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0) * (1 - (i.discountPercentage || 0) / 100), 0);
+    const disc = subtotal * ((form.discountPercentage || 0) / 100);
     const afterDisc = subtotal - disc;
-    const tax = afterDisc * ((form.taxPercent || 0) / 100);
+    const tax = form.taxAmount || 0;
     const total = afterDisc + tax;
     const paid = form.paidAmount ?? 0;
     const balance = total - paid;
@@ -126,7 +127,7 @@ const SalesInvoiceFormPage: React.FC = () => {
         if (form.items.length === 0) { toast.error('أضف بنداً واحداً على الأقل'); return; }
         setSaving(true);
         try {
-            const payload: SalesInvoiceDto = { ...form, subTotal: subtotal, discountAmount: disc, taxAmount: tax, totalAmount: total, balanceAmount: balance, items: form.items };
+            const payload: SalesInvoiceDto = { ...form, subTotal: subtotal, discountAmount: disc, taxAmount: tax, totalAmount: total, remainingAmount: balance, items: form.items };
             await salesInvoiceService.create(payload);
             toast.success('تم إنشاء الفاتورة');
             navigate('/dashboard/sales/invoices');
@@ -151,9 +152,9 @@ const SalesInvoiceFormPage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">أمر البيع (تحميل منه)</label>
-                            <select value={form.saleOrderId || ''} onChange={(e) => loadFromSaleOrder(parseInt(e.target.value) || 0)} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none">
+                            <select value={form.salesOrderId || ''} onChange={(e) => loadFromSaleOrder(parseInt(e.target.value) || 0)} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none">
                                 <option value="">—</option>
-                                {saleOrders.map((o) => <option key={o.id} value={o.id}>{o.orderNumber} — {o.customerNameAr}</option>)}
+                                {saleOrders.map((o) => <option key={o.id} value={o.id}>{o.soNumber} — {o.customerNameAr}</option>)}
                             </select>
                         </div>
                         <div>
@@ -177,11 +178,11 @@ const SalesInvoiceFormPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">خصم %</label>
-                            <input type="number" min={0} max={100} step={0.01} value={form.discountPercent || ''} onChange={(e) => setForm((f) => ({ ...f, discountPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <input type="number" min={0} max={100} step={0.01} value={form.discountPercentage || ''} onChange={(e) => setForm((f) => ({ ...f, discountPercentage: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">ضريبة %</label>
-                            <input type="number" min={0} step={0.01} value={form.taxPercent || ''} onChange={(e) => setForm((f) => ({ ...f, taxPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">ضريبة القيمة</label>
+                            <input type="number" min={0} step={0.01} value={form.taxAmount || ''} onChange={(e) => setForm((f) => ({ ...f, taxAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">المدفوع مسبقاً</label>
@@ -213,9 +214,9 @@ const SalesInvoiceFormPage: React.FC = () => {
                                                 {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr || i.itemCode}</option>)}
                                             </select>
                                         </td>
-                                        <td className="px-2 py-2"><input type="number" min={0.001} value={it.qty || ''} onChange={(e) => updateItem(idx, { qty: parseFloat(e.target.value) || 0 })} className="w-20 px-2 py-1 border rounded" /></td>
+                                        <td className="px-2 py-2"><input type="number" min={0.001} value={it.quantity || ''} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} className="w-20 px-2 py-1 border rounded" /></td>
                                         <td className="px-2 py-2"><input type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-1 border rounded" /></td>
-                                        <td className="px-2 py-2"><input type="number" min={0} max={100} step={0.01} value={it.discountPercent || ''} onChange={(e) => updateItem(idx, { discountPercent: parseFloat(e.target.value) || 0 })} className="w-16 px-2 py-1 border rounded" /></td>
+                                        <td className="px-2 py-2"><input type="number" min={0} max={100} step={0.01} value={it.discountPercentage || ''} onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })} className="w-16 px-2 py-1 border rounded" /></td>
                                         <td className="px-2 py-2"><button type="button" onClick={() => removeItem(idx)} className="p-1 text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
                                     </tr>
                                 ))}

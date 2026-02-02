@@ -26,4 +26,13 @@ public class QuotationComparisonDetailDto {
     private Integer priceRating;
     private BigDecimal overallScore;
     private String comments;
+    private String polymerGrade;
+
+    public String getPolymerGrade() {
+        return polymerGrade;
+    }
+
+    public void setPolymerGrade(String polymerGrade) {
+        this.polymerGrade = polymerGrade;
+    }
 }

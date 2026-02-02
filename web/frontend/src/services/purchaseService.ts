@@ -84,6 +84,7 @@ export interface SupplierQuotationItem {
     taxAmount?: number;
     totalPrice: number;
     deliveryDays?: number;
+    polymerGrade?: string;
     notes?: string;
 }
 
@@ -123,6 +124,7 @@ export interface QuotationComparisonDetail {
     priceRating?: number;
     overallScore?: number;
     comments?: string;
+    polymerGrade?: string;
 }
 
 export interface QuotationComparison {

@@ -161,7 +161,8 @@ const SupplierQuotationFormPage: React.FC = () => {
             unitPrice: 0,
             discountPercentage: 0,
             taxPercentage: 14,
-            totalPrice: 0
+            totalPrice: 0,
+            polymerGrade: ''
         };
         setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
     };
@@ -223,7 +224,8 @@ const SupplierQuotationFormPage: React.FC = () => {
                     unitPrice: catalogPrice,
                     discountPercentage: 0,
                     taxPercentage: 14,
-                    totalPrice: gross + taxAmount
+                    totalPrice: gross + taxAmount,
+                    polymerGrade: ''
                 };
             });
             const total = rfqItems.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -517,6 +519,21 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
                                 />
                             </div>
+
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <DollarSign className="w-4 h-4 text-brand-primary" />
+                                    طريقة الدفع
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.paymentTerms || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    placeholder="مثلاً: كاش، 50% مقدم، ..."
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -559,6 +576,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         <th className="py-4 px-4 text-center">
                                             السعر <span className="text-rose-500">*</span>
                                         </th>
+                                        <th className="py-4 px-4 text-center">درجة البوليمر</th>
                                         <th className="py-4 px-4 text-center">خصم %</th>
                                         <th className="py-4 px-4 text-center">الضريبة %</th>
                                         <th className="py-4 px-4 text-center">الإجمالي</th>
@@ -606,6 +624,17 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-emerald-600 outline-none 
                                                         focus:border-brand-primary transition-all"
+                                                />
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="text"
+                                                    value={item.polymerGrade || ''}
+                                                    onChange={(e) => updateItem(index, 'polymerGrade', e.target.value)}
+                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-semibold outline-none 
+                                                        focus:border-brand-primary transition-all"
+                                                    placeholder="Grade"
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
