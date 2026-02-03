@@ -15,7 +15,6 @@ import {
     ShoppingCart,
     X,
     XCircle,
-    Eye,
     AlertCircle
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation } from '../../services/purchaseService';

@@ -54,6 +54,7 @@ Thumbs.db
 # Environment
 .env
 .env.*
+web/backend/src/main/resources/application.properties
 
 # Uploads / built artifacts
 /uploads/

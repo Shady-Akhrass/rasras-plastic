@@ -21,7 +21,6 @@ const SupplierItemFormPage: React.FC = () => {
     const isEdit = !!id;
 
     // State
-    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);

@@ -57,4 +57,14 @@ public class QuotationComparisonDetail {
 
     @Column(name = "Comments", length = 500)
     private String comments;
+
+    @Column(name = "DeliveryCost", precision = 18, scale = 2)
+    private BigDecimal deliveryCost;
+
+    @Column(name = "PolymerGrade", length = 100)
+    private String polymerGrade;
+
+    public String getPolymerGrade() {
+        return polymerGrade;
+    }
 }

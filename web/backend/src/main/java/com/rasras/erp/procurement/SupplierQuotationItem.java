@@ -62,7 +62,12 @@ public class SupplierQuotationItem {
 
     @Column(name = "DeliveryDays")
     private Integer deliveryDays;
-
     @Column(name = "Notes", length = 500)
     private String notes;
+    @Column(name = "PolymerGrade", length = 100)
+    private String polymerGrade;
+
+    public String getPolymerGrade() {
+        return polymerGrade;
+    }
 }

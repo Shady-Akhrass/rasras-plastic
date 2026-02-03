@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-    Building2, Settings, Ruler, FileText, ChevronLeft,
+    Building2, Settings, Ruler, FileText,
     Sparkles, Shield, Bell, Database, Users, Lock,
     Palette, Globe, CreditCard, Layers, ArrowRight,
     CheckCircle2, Clock, TrendingUp, Zap

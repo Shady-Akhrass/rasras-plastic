@@ -118,7 +118,7 @@ const SalesInvoiceListPage: React.FC = () => {
                                         <td className="px-6 py-4 text-slate-700">{inv.customerNameAr || '—'}</td>
                                         <td className="px-6 py-4">{(inv.totalAmount ?? 0).toLocaleString('ar-EG')} {inv.currency || ''}</td>
                                         <td className="px-6 py-4 text-emerald-600">{(inv.paidAmount ?? 0).toLocaleString('ar-EG')}</td>
-                                        <td className="px-6 py-4">{(inv.balanceAmount ?? 0).toLocaleString('ar-EG')}</td>
+                                        <td className="px-6 py-4">{(inv.remainingAmount ?? 0).toLocaleString('ar-EG')}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/invoices/${inv.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
                                         </td>

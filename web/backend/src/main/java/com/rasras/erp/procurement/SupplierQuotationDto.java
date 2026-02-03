@@ -29,6 +29,7 @@ public class SupplierQuotationDto {
     private String deliveryTerms;
     private Integer deliveryDays;
     private BigDecimal totalAmount;
+    private BigDecimal deliveryCost;
     private String status;
     private String attachmentPath;
     private String notes;

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { supplierService, type SupplierOutstandingDto } from '../../services/supplierService';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
+import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -61,66 +62,128 @@ const BalanceTableRow: React.FC<{
     summary: SupplierOutstandingDto;
     index: number;
     onView: (id: number) => void;
-}> = ({ summary, index, onView }) => (
-    <tr
-        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
-        style={{
-            animationDelay: `${index * 30}ms`,
-            animation: 'fadeInUp 0.3s ease-out forwards'
-        }}
-    >
-        <td className="px-6 py-4">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
-                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Building2 className="w-5 h-5 text-brand-primary" />
-                </div>
-                <div>
-                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                        {summary.supplierNameAr}
+    isExpanded: boolean;
+    onToggleExpand: (id: number) => void;
+    invoices: SupplierInvoiceDto[];
+}> = ({ summary, index, onView, isExpanded, onToggleExpand, invoices }) => (
+    <>
+        <tr
+            className={`hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer ${isExpanded ? 'bg-brand-primary/5' : ''}`}
+            onClick={() => onToggleExpand(summary.id)}
+            style={{
+                animationDelay: `${index * 30}ms`,
+                animation: 'fadeInUp 0.3s ease-out forwards'
+            }}
+        >
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                        rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Building2 className="w-5 h-5 text-brand-primary" />
                     </div>
-                    <div className="text-xs text-slate-400 font-mono">#{summary.supplierCode}</div>
+                    <div>
+                        <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                            {summary.supplierNameAr}
+                        </div>
+                        <div className="text-xs text-slate-400 font-mono">#{summary.supplierCode}</div>
+                    </div>
                 </div>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="font-medium text-slate-600">
-                {(summary.totalInvoiced || 0).toLocaleString()} {summary.currency || 'EGP'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="font-medium text-amber-600">
-                {(summary.totalReturned || 0).toLocaleString()} {summary.currency || 'EGP'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="font-medium text-emerald-600">
-                {(summary.totalPaid || 0).toLocaleString()} {summary.currency || 'EGP'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className={`font-bold ${(summary.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {Math.abs(summary.currentBalance || 0).toLocaleString()} {summary.currency || 'EGP'}
-                {(summary.currentBalance || 0) > 0 ? ' (لم يسدد)' : (summary.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
-                <CreditCard className="w-3 h-3" />
-                {(summary.creditLimit || 0).toLocaleString()}
-            </div>
-        </td>
-        <td className="px-6 py-4">
-            <button
-                onClick={() => onView(summary.id)}
-                className="p-2 text-brand-primary bg-brand-primary/5 rounded-lg hover:bg-brand-primary 
-                    hover:text-white transition-all"
-                title="عرض التفاصيل"
-            >
-                <Eye className="w-4 h-4" />
-            </button>
-        </td>
-    </tr>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className="font-medium text-slate-600">
+                    {(summary.totalInvoiced || 0).toLocaleString()} {summary.currency || 'EGP'}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className="font-medium text-amber-600">
+                    {(summary.totalReturned || 0).toLocaleString()} {summary.currency || 'EGP'}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className="font-medium text-emerald-600">
+                    {(summary.totalPaid || 0).toLocaleString()} {summary.currency || 'EGP'}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className={`font-bold ${(summary.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    {Math.abs(summary.currentBalance || 0).toLocaleString()} {summary.currency || 'EGP'}
+                    {(summary.currentBalance || 0) > 0 ? ' (لم يسدد)' : (summary.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
+                    <CreditCard className="w-3 h-3" />
+                    {(summary.creditLimit || 0).toLocaleString()}
+                </div>
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onView(summary.id); }}
+                        className="p-2 text-brand-primary bg-brand-primary/5 rounded-lg hover:bg-brand-primary 
+                        hover:text-white transition-all"
+                        title="عرض الملف"
+                    >
+                        <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                        className={`p-2 rounded-lg transition-all ${isExpanded ? 'bg-slate-200 text-slate-600' : 'hover:bg-slate-100 text-slate-400'}`}
+                    >
+                        {isExpanded ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {isExpanded && (
+            <tr className="bg-slate-50/50">
+                <td colSpan={7} className="px-6 py-4">
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-slate-500" />
+                            <span className="font-bold text-slate-700 text-sm">تفاصيل الفواتير ({invoices.length})</span>
+                        </div>
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-slate-50 text-slate-500">
+                                    <th className="px-4 py-2 text-right">رقم الفاتورة</th>
+                                    <th className="px-4 py-2 text-right">التاريخ</th>
+                                    <th className="px-4 py-2 text-right">المبلغ الكلي</th>
+                                    <th className="px-4 py-2 text-right">المدفوع</th>
+                                    <th className="px-4 py-2 text-right">المتبقي</th>
+                                    <th className="px-4 py-2 text-center">الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {invoices.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400">لا توجد فواتير مسجلة</td>
+                                    </tr>
+                                ) : (
+                                    invoices.map(inv => (
+                                        <tr key={inv.id} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 font-mono text-brand-primary">{inv.invoiceNumber}</td>
+                                            <td className="px-4 py-3 text-slate-600">{new Date(inv.invoiceDate).toLocaleDateString('ar-EG')}</td>
+                                            <td className="px-4 py-3 font-medium">{inv.totalAmount.toLocaleString()}</td>
+                                            <td className="px-4 py-3 text-emerald-600">{inv.paidAmount?.toLocaleString() || 0}</td>
+                                            <td className="px-4 py-3 text-rose-600">{inv.remainingAmount?.toLocaleString() || 0}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' :
+                                                        inv.status === 'Partial' ? 'bg-amber-100 text-amber-700' :
+                                                            'bg-rose-100 text-rose-700'
+                                                    }`}>
+                                                    {inv.status === 'Paid' ? 'مدفوعة' : inv.status === 'Partial' ? 'جزئي' : 'غير مدفوعة'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        )}
+    </>
 );
 
 // Order Table Row Component
@@ -215,6 +278,9 @@ const SupplierOutstandingPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'balances' | 'orders'>('balances');
     const [summaries, setSummaries] = useState<SupplierOutstandingDto[]>([]);
     const [orders, setOrders] = useState<PurchaseOrderDto[]>([]);
+    const [allInvoices, setAllInvoices] = useState<SupplierInvoiceDto[]>([]);
+    const [expandedSupplierId, setExpandedSupplierId] = useState<number | null>(null);
+
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'All' | 'Debit' | 'Credit'>('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -226,12 +292,14 @@ const SupplierOutstandingPage: React.FC = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [suppliersRes, posRes] = await Promise.all([
+            const [suppliersRes, posRes, invoicesRes] = await Promise.all([
                 supplierService.getOutstandingSummary(),
-                purchaseOrderService.getAllPOs()
+                purchaseOrderService.getAllPOs(),
+                supplierInvoiceService.getAllInvoices()
             ]);
             setSummaries(suppliersRes.data || []);
             setOrders(posRes || []);
+            setAllInvoices(invoicesRes.data || []);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
@@ -286,6 +354,10 @@ const SupplierOutstandingPage: React.FC = () => {
 
     const handleViewOrder = (id: number) => {
         navigate(`/dashboard/procurement/po/${id}`);
+    };
+
+    const handleToggleExpand = (id: number) => {
+        setExpandedSupplierId(prev => (prev === id ? null : id));
     };
 
     return (
@@ -512,6 +584,9 @@ const SupplierOutstandingPage: React.FC = () => {
                                             summary={summary}
                                             index={index}
                                             onView={handleViewSupplier}
+                                            isExpanded={expandedSupplierId === summary.id}
+                                            onToggleExpand={handleToggleExpand}
+                                            invoices={allInvoices.filter(inv => inv.supplierId === summary.id)}
                                         />
                                     ))
                                 )}

@@ -49,6 +49,17 @@ public class QuotationComparisonService {
                                         .orElseThrow(() -> new RuntimeException("PR not found")));
                 }
 
+                if (dto.getSelectedQuotationId() != null) {
+                        comparison.setSelectedQuotation(quotationRepository.findById(dto.getSelectedQuotationId())
+                                        .orElse(null));
+                }
+
+                if (dto.getSelectedSupplierId() != null) {
+                        comparison.setSelectedSupplier(supplierRepository.findById(dto.getSelectedSupplierId())
+                                        .orElse(null));
+                }
+
+                comparison.setSelectionReason(dto.getSelectionReason());
                 comparison.setStatus("Draft");
                 comparison.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy() : 1);
 
@@ -160,6 +171,10 @@ public class QuotationComparisonService {
                 QuotationComparison comparison = comparisonRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Comparison not found"));
 
+                if (comparison.getSelectedQuotation() == null) {
+                        throw new RuntimeException("Cannot submit for approval without selecting a winning quotation");
+                }
+
                 comparison.setStatus("Pending Approval");
                 comparison.setApprovalStatus("Pending");
 
@@ -235,6 +250,8 @@ public class QuotationComparisonService {
                                 .priceRating(detail.getPriceRating())
                                 .overallScore(detail.getOverallScore())
                                 .comments(detail.getComments())
+                                .deliveryCost(detail.getDeliveryCost())
+                                .polymerGrade(detail.getPolymerGrade())
                                 .build();
         }
 
@@ -254,6 +271,8 @@ public class QuotationComparisonService {
                                 .priceRating(dto.getPriceRating())
                                 .overallScore(dto.getOverallScore())
                                 .comments(dto.getComments())
+                                .deliveryCost(dto.getDeliveryCost())
+                                .polymerGrade(dto.getPolymerGrade())
                                 .build();
         }
 }

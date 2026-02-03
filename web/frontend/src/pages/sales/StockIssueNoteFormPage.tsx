@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronRight, Save, Trash2, AlertTriangle, X } from 'lucide-react';
-import { stockIssueNoteService, type StockIssueNoteDto, type StockIssueNoteItemDto, type StockAvailabilityWarningDto } from '../../services/stockIssueNoteService';
+import { stockIssueNoteService, type StockIssueNoteDto, type StockAvailabilityWarningDto } from '../../services/stockIssueNoteService';
 import { saleOrderService } from '../../services/saleOrderService';
 import warehouseService from '../../services/warehouseService';
 import { toast } from 'react-hot-toast';

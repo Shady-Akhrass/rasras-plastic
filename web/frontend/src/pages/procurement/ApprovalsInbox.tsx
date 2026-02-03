@@ -287,7 +287,6 @@ const ApprovalsInbox: React.FC = () => {
 
     const [loading, setLoading] = useState(true);
     const [requests, setRequests] = useState<ApprovalRequestDto[]>([]);
-    const [processingId, setProcessingId] = useState<number | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>(initialType);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -313,15 +312,20 @@ const ApprovalsInbox: React.FC = () => {
     };
 
     const handleAction = async (requestId: number, action: 'Approved' | 'Rejected') => {
+        // Optimistic Update
+        const originalRequests = [...requests];
+        setRequests(prev => prev.filter(r => r.id !== requestId));
+        const toastId = toast.loading('جاري تنفيذ الإجراء...');
+
         try {
-            setProcessingId(requestId);
+            // We don't really need a loading state for the specific card since it's removed
+            // setProcessingId(requestId); 
             await approvalService.takeAction(requestId, currentUserId, action);
-            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح ✅' : 'تم رفض الطلب');
-            setRequests(prev => prev.filter(r => r.id !== requestId));
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح ✅' : 'تم رفض الطلب', { id: toastId });
         } catch (error) {
-            toast.error('فشل تنفيذ الإجراء');
-        } finally {
-            setProcessingId(null);
+            // Revert on failure
+            setRequests(originalRequests);
+            toast.error('فشل تنفيذ الإجراء', { id: toastId });
         }
     };
 
@@ -524,7 +528,7 @@ const ApprovalsInbox: React.FC = () => {
                             index={index}
                             onApprove={() => handleAction(req.id, 'Approved')}
                             onReject={() => handleAction(req.id, 'Rejected')}
-                            processing={processingId === req.id}
+                            processing={false}
                         />
                     ))
                 )}

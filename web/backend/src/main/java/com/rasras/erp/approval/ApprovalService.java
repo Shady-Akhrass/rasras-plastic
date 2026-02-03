@@ -193,6 +193,8 @@ public class ApprovalService {
                 po.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     po.setStatus("Confirmed");
+                    // NEW: Automatically create GRN for Inspection
+                    createGRNFromPO(po, userId);
                 }
                 poRepo.save(po);
             });
@@ -256,11 +258,52 @@ public class ApprovalService {
         }
     }
 
+    private void createGRNFromPO(PurchaseOrder po, Integer userId) {
+        // Create GRN with status "Pending Inspection"
+        com.rasras.erp.inventory.GoodsReceiptNote grn = new com.rasras.erp.inventory.GoodsReceiptNote();
+        grn.setGrnNumber("GRN-" + System.currentTimeMillis()); // simplified generation
+        grn.setGrnDate(LocalDateTime.now());
+        grn.setPurchaseOrder(po);
+        grn.setSupplier(po.getSupplier());
+        grn.setStatus("Pending Inspection");
+        grn.setApprovalStatus("Pending");
+        grn.setCreatedBy(userId);
+        grn.setReceivedByUserId(userId);
+
+        // Assume default warehouse (e.g. ID 1) or logic to fetch it
+        grn.setWarehouseId(1);
+
+        if (po.getItems() != null) {
+            List<GRNItem> grnItems = po.getItems().stream().map(poItem -> {
+                GRNItem item = new GRNItem();
+                item.setGrn(grn);
+                item.setPoItemId(poItem.getId());
+                item.setItem(poItem.getItem());
+                item.setUnit(poItem.getUnit());
+                item.setOrderedQty(poItem.getOrderedQty());
+                item.setReceivedQty(poItem.getOrderedQty()); // Default to ordered
+                item.setAcceptedQty(java.math.BigDecimal.ZERO);
+                item.setRejectedQty(java.math.BigDecimal.ZERO);
+                item.setUnitCost(poItem.getUnitPrice());
+                return item;
+            }).collect(Collectors.toList());
+            grn.setItems(grnItems);
+        }
+
+        grnRepo.save(grn);
+    }
+
     private void createPOFromComparison(com.rasras.erp.procurement.QuotationComparison qc, Integer userId) {
-        if (qc.getSelectedQuotation() == null)
+        if (qc.getSelectedQuotation() == null) {
+            System.err.println(
+                    "Cannot create PO from Comparison " + qc.getComparisonNumber() + ": No quotation selected.");
             return;
+        }
 
         SupplierQuotation quoted = qc.getSelectedQuotation();
+        if (quoted.getSupplier() == null) {
+            throw new RuntimeException("Cannot create PO: Selected quotation has no supplier.");
+        }
 
         // 1. Create the PO record
         PurchaseOrder po = PurchaseOrder.builder()
@@ -303,13 +346,23 @@ public class ApprovalService {
         PurchaseOrder savedPo = poRepo.save(po);
 
         // 3. Initiate PO Approval Workflow
-        initiateApproval(
-                "PO_APPROVAL",
-                "PurchaseOrder",
-                savedPo.getId(),
-                savedPo.getPoNumber(),
-                userId,
-                savedPo.getTotalAmount());
+        try {
+            initiateApproval(
+                    "PO_APPROVAL",
+                    "PurchaseOrder",
+                    savedPo.getId(),
+                    savedPo.getPoNumber(),
+                    userId,
+                    savedPo.getTotalAmount());
+        } catch (Exception e) {
+            System.err.println("CRITICAL ERROR: Failed to initiate PO Approval for PO " + savedPo.getPoNumber());
+            e.printStackTrace();
+            // We rethrow to ensure the transaction rolls back and 500 triggers, forcing
+            // user attention to logs
+            // Alternatively, we could swallow it, but then the PO would exist without
+            // approval process.
+            throw e;
+        }
     }
 
     private String generatePONumber() {
