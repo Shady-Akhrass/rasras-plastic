@@ -14,7 +14,8 @@ import {
     Info,
     AlertCircle,
     Tag,
-    Calendar
+    Calendar,
+    Truck
 } from 'lucide-react';
 import purchaseService, {
     type SupplierQuotation,
@@ -79,14 +80,14 @@ const QuotationComparisonFormPage: React.FC = () => {
     const calculateRatings = (details: QuotationComparisonDetail[]) => {
         if (!details || details.length === 0) return details;
 
-        const validPrices = details.map(d => d.unitPrice || 0).filter(p => p > 0);
+        const validPrices = details.map(d => d.totalPrice || 0).filter(p => p > 0);
         const validDelivery = details.map(d => d.deliveryDays || 0).filter(d => d > 0);
 
-        const minUnitPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+        const minTotalPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
         const minDeliveryDays = validDelivery.length > 0 ? Math.min(...validDelivery) : 0;
 
         return details.map(d => {
-            const priceRate = d.unitPrice && d.unitPrice > 0 && minUnitPrice > 0 ? (minUnitPrice / d.unitPrice) * 10 : 0;
+            const priceRate = d.totalPrice && d.totalPrice > 0 && minTotalPrice > 0 ? (minTotalPrice / d.totalPrice) * 10 : 0;
             const deliveryRate = d.deliveryDays && d.deliveryDays > 0 && minDeliveryDays > 0 ? (minDeliveryDays / d.deliveryDays) * 10 : 0;
             const overallScore = (priceRate + deliveryRate) / 2;
 
@@ -153,6 +154,16 @@ const QuotationComparisonFormPage: React.FC = () => {
 
             setQuotations(relevantQuotes);
 
+            // Function to derive delivery cost if not explicitly set
+            const getFinalDeliveryCost = (q: SupplierQuotation) => {
+                if (q.deliveryCost !== undefined && q.deliveryCost !== null && q.deliveryCost > 0) {
+                    return q.deliveryCost;
+                }
+                const itemsTotal = q.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
+                const derived = q.totalAmount - itemsTotal;
+                return derived > 0 ? derived : 0;
+            };
+
             if (formData.details?.length === 0 && relevantQuotes.length > 0) {
                 const initialDetails = relevantQuotes.map(q => {
                     const firstItem = q.items && q.items.length > 0 ? q.items[0] : null;
@@ -164,6 +175,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                         unitPrice: firstItem ? firstItem.unitPrice : 0,
                         totalPrice: q.totalAmount,
                         deliveryDays: q.deliveryDays,
+                        deliveryCost: getFinalDeliveryCost(q),
                         paymentTerms: q.paymentTerms,
                         validUntilDate: q.validUntilDate,
                         qualityRating: 0,
@@ -181,6 +193,20 @@ const QuotationComparisonFormPage: React.FC = () => {
                     details: detailsWithRating,
                     selectedQuotationId: detailsWithRating.sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0))[0]?.quotationId,
                     selectionReason: 'أفضل عرض متكامل (سعر وتوريد)'
+                }));
+            } else if (formData.details && formData.details.length > 0) {
+                // Enrich existing details with delivery cost if they have 0
+                setFormData(prev => ({
+                    ...prev,
+                    details: prev.details?.map(d => {
+                        if (d.deliveryCost === undefined || d.deliveryCost === null || d.deliveryCost === 0) {
+                            const q = relevantQuotes.find(quote => quote.id === d.quotationId);
+                            if (q) {
+                                return { ...d, deliveryCost: getFinalDeliveryCost(q) };
+                            }
+                        }
+                        return d;
+                    })
                 }));
             }
         } catch (error) {
@@ -200,7 +226,7 @@ const QuotationComparisonFormPage: React.FC = () => {
             }) || [];
 
             // If we updated a value that affects ratings, recalculate everything
-            const finalDetails = (field === 'deliveryDays' || field === 'unitPrice')
+            const finalDetails = (field === 'deliveryDays' || field === 'unitPrice' || field === 'totalPrice')
                 ? calculateRatings(updatedDetails)
                 : updatedDetails;
 
@@ -604,6 +630,12 @@ const QuotationComparisonFormPage: React.FC = () => {
                                     </th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
                                         <div className="flex items-center justify-center gap-2">
+                                            <Truck className="w-4 h-4 text-blue-500" />
+                                            مصاريف الشحن
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
+                                        <div className="flex items-center justify-center gap-2">
                                             <Clock className="w-4 h-4" />
                                             مدة التوريد
                                         </div>
@@ -708,6 +740,16 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                             ? new Date(detail.validUntilDate).toLocaleDateString('ar-EG')
                                                             : '-'}
                                                     </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-center">
+                                                    <div className="font-bold text-slate-700">
+                                                        {(detail.deliveryCost || 0).toLocaleString()}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 font-semibold">
+                                                        جنيه مصري
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">

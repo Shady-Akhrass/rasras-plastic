@@ -46,6 +46,7 @@ public class SupplierQuotationService {
                 quotation.setPaymentTerms(dto.getPaymentTerms());
                 quotation.setDeliveryTerms(dto.getDeliveryTerms());
                 quotation.setDeliveryDays(dto.getDeliveryDays());
+                quotation.setDeliveryCost(dto.getDeliveryCost());
                 quotation.setTotalAmount(dto.getTotalAmount());
                 quotation.setStatus("Received");
                 quotation.setNotes(dto.getNotes());
@@ -84,6 +85,7 @@ public class SupplierQuotationService {
                                 .paymentTerms(quotation.getPaymentTerms())
                                 .deliveryTerms(quotation.getDeliveryTerms())
                                 .deliveryDays(quotation.getDeliveryDays())
+                                .deliveryCost(quotation.getDeliveryCost())
                                 .totalAmount(quotation.getTotalAmount())
                                 .status(quotation.getStatus())
                                 .notes(quotation.getNotes())

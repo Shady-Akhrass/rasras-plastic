@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useOptimistic, useTransition } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
@@ -33,11 +33,13 @@ const SupplierQuotationFormPage: React.FC = () => {
 
     // State
     const [loading, setLoading] = useState(false);
+    const [isPending, startTransition] = useTransition();
     const [saving, setSaving] = useState(false);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [rfqs, setRfqs] = useState<RFQ[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
+    const [rfqItems, setRfqItems] = useState<any[]>([]); // To store requested quantities for validation
     const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
 
     const [formData, setFormData] = useState<SupplierQuotation>({
@@ -50,10 +52,16 @@ const SupplierQuotationFormPage: React.FC = () => {
         paymentTerms: '',
         deliveryTerms: '',
         deliveryDays: 0,
+        deliveryCost: 0,
         totalAmount: 0,
         notes: '',
         items: []
     });
+
+    const [optimisticData, addOptimisticData] = useOptimistic(
+        formData,
+        (current, updatedField: Partial<SupplierQuotation>) => ({ ...current, ...updatedField })
+    );
 
     // Load Data
     useEffect(() => {
@@ -85,7 +93,22 @@ const SupplierQuotationFormPage: React.FC = () => {
         try {
             setLoading(true);
             const data = await purchaseService.getQuotationById(qId);
-            setFormData(data);
+
+            // Derive deliveryCost if it's not set or to ensure it's consistent
+            const itemsGrandTotal = calculateGrandTotal(data.items, 0);
+            const derivedDeliveryCost = data.totalAmount - itemsGrandTotal;
+
+            setFormData({
+                ...data,
+                deliveryCost: data.deliveryCost || derivedDeliveryCost
+            });
+
+            // If it's linked to an RFQ, load RFQ items for validation
+            if (data.rfqId) {
+                purchaseService.getRFQById(data.rfqId).then(rfq => {
+                    setRfqItems(rfq.items);
+                }).catch(err => console.error('Failed to load linked RFQ:', err));
+            }
         } catch (error) {
             console.error('Failed to load quotation:', error);
             navigate('/dashboard/procurement/quotation');
@@ -148,8 +171,9 @@ const SupplierQuotationFormPage: React.FC = () => {
     };
 
     // Calculate grand total
-    const calculateGrandTotal = (items: SupplierQuotationItem[]) => {
-        return items.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+    const calculateGrandTotal = (items: SupplierQuotationItem[], deliveryCost: number = 0) => {
+        const itemsTotal = items.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+        return itemsTotal + deliveryCost;
     };
 
     // Item Management
@@ -172,7 +196,7 @@ const SupplierQuotationFormPage: React.FC = () => {
         setFormData(prev => ({
             ...prev,
             items: newItems,
-            totalAmount: calculateGrandTotal(newItems)
+            totalAmount: calculateGrandTotal(newItems, prev.deliveryCost)
         }));
     };
 
@@ -190,13 +214,25 @@ const SupplierQuotationFormPage: React.FC = () => {
             if (catalogPrice) updatedItem.unitPrice = catalogPrice;
         }
 
+        // Quantity Validation against RFQ
+        if (field === 'offeredQty' && formData.rfqId) {
+            const rfqItem = rfqItems.find(ri => ri.itemId === updatedItem.itemId);
+            if (rfqItem && value > rfqItem.requestedQty) {
+                toast.error(`الكمية المطلوبة لهذا الصنف في طلب السعر هي ${rfqItem.requestedQty}. لا يمكن تجاوزها.`, {
+                    icon: '⚠️',
+                    duration: 4000
+                });
+                return;
+            }
+        }
+
         updatedItem.totalPrice = calculateItemTotal(updatedItem);
         newItems[index] = updatedItem;
 
         setFormData(prev => ({
             ...prev,
             items: newItems,
-            totalAmount: calculateGrandTotal(newItems)
+            totalAmount: calculateGrandTotal(newItems, prev.deliveryCost)
         }));
     };
 
@@ -205,6 +241,7 @@ const SupplierQuotationFormPage: React.FC = () => {
         if (rfqId === 0) return;
         try {
             const rfq = await purchaseService.getRFQById(rfqId);
+            setRfqItems(rfq.items);
 
             // Load supplier items to get catalog prices
             const result = await supplierService.getSupplierItems(rfq.supplierId);
@@ -228,14 +265,18 @@ const SupplierQuotationFormPage: React.FC = () => {
                     polymerGrade: ''
                 };
             });
-            const total = rfqItems.reduce((sum, item) => sum + item.totalPrice, 0);
-            setFormData(prev => ({
-                ...prev,
-                rfqId: rfqId,
-                supplierId: rfq.supplierId,
-                items: rfqItems,
-                totalAmount: total
-            }));
+            setFormData(prev => {
+                const updatedItemsTotal = rfqItems.reduce((sum, item) => sum + item.totalPrice, 0);
+                // If it's a new quotation from RFQ, we might want to keep the existing deliveryCost or default to 0
+                const currentDeliveryCost = prev.deliveryCost || 0;
+                return {
+                    ...prev,
+                    rfqId: rfqId,
+                    supplierId: rfq.supplierId,
+                    items: rfqItems,
+                    totalAmount: updatedItemsTotal + currentDeliveryCost
+                };
+            });
         } catch (error) {
             console.error('Failed to link RFQ:', error);
         }
@@ -279,6 +320,15 @@ const SupplierQuotationFormPage: React.FC = () => {
             if (item.unitPrice <= 0) {
                 toast.error(`يرجى إدخال سعر صحيح في السطر ${i + 1}`);
                 return;
+            }
+
+            // Final check for RFQ quantity
+            if (formData.rfqId) {
+                const rfqItem = rfqItems.find(ri => ri.itemId === item.itemId);
+                if (rfqItem && item.offeredQty > rfqItem.requestedQty) {
+                    toast.error(`الكمية في السطر ${i + 1} تتجاوز الكمية المطلوبة في طلب السعر (${rfqItem.requestedQty})`);
+                    return;
+                }
             }
         }
 
@@ -688,6 +738,43 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                        <div className="p-6 bg-slate-50/50 border-t border-slate-100">
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                        <Truck className="w-5 h-5 text-brand-primary" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 tracking-tight">اسعار التوصيل</h4>
+                                        <p className="text-slate-500 text-xs font-medium">تكلفة الشحن والتوصيل لهذا العرض</p>
+                                    </div>
+                                </div>
+                                <div className="relative w-full md:w-56">
+                                    <input
+                                        type="number"
+                                        value={optimisticData.deliveryCost || 0}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            const updates = {
+                                                deliveryCost: val,
+                                                totalAmount: calculateGrandTotal(optimisticData.items, val)
+                                            };
+                                            addOptimisticData(updates);
+                                            startTransition(() => {
+                                                setFormData(prev => ({ ...prev, ...updates }));
+                                            });
+                                        }}
+                                        className="w-full px-5 py-3 bg-white border-2 border-slate-200 rounded-2xl 
+                                            text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
+                                            transition-all shadow-sm"
+                                        placeholder="0.00"
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
+                                        {optimisticData.currency}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -721,52 +808,79 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     }, 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
-                            <div className="pt-6 border-t border-white/10">
-                                <div className="text-xs text-white/40 mb-2">الإجمالي النهائي</div>
-                                <div className="text-4xl font-black text-emerald-400">
-                                    {formData.totalAmount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    <span className="text-sm font-bold mr-2">{formData.currency}</span>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">اسعار التوصيل</span>
+                                <span className="font-bold text-lg text-white">
+                                    {(optimisticData.deliveryCost || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="pt-6 border-t border-white/10">
+                            <div className="text-xs text-white/40 mb-2">الإجمالي النهائي</div>
+                            <div className="flex items-center justify-between">
+                                <div className="relative flex-1 max-w-[200px]">
+                                    <input
+                                        type="number"
+                                        value={optimisticData.totalAmount || 0}
+                                        onChange={(e) => {
+                                            const totalVal = parseFloat(e.target.value) || 0;
+                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0);
+                                            const derivedDeliveryCost = totalVal - itemsGrandTotal;
+
+                                            const updates = {
+                                                totalAmount: totalVal,
+                                                deliveryCost: derivedDeliveryCost
+                                            };
+
+                                            addOptimisticData(updates);
+                                            startTransition(() => {
+                                                setFormData(prev => ({ ...prev, ...updates }));
+                                            });
+                                        }}
+                                        className="w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl px-4 py-2 text-2xl font-black text-emerald-400 outline-none focus:border-emerald-400 transition-all text-right"
+                                    />
                                 </div>
+                                <span className="text-sm font-bold mr-2 text-emerald-400/60">{optimisticData.currency}</span>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Notes */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
-                        style={{ animationDelay: '300ms' }}>
-                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-blue-100 rounded-xl">
-                                    <FileText className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
+                {/* Notes */}
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                    style={{ animationDelay: '300ms' }}>
+                    <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-blue-100 rounded-xl">
+                                <FileText className="w-5 h-5 text-blue-600" />
                             </div>
+                            <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
                         </div>
-                        <div className="p-6">
-                            <textarea
-                                value={formData.notes || ''}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
+                    </div>
+                    <div className="p-6">
+                        <textarea
+                            value={formData.notes || ''}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
                                     focus:border-brand-primary focus:bg-white outline-none transition-all 
                                     text-sm leading-relaxed h-40 resize-none"
-                                placeholder="أي ملاحظات حول العرض أو شروط خاصة..."
-                            />
-                        </div>
+                            placeholder="أي ملاحظات حول العرض أو شروط خاصة..."
+                        />
                     </div>
+                </div>
 
-                    {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
+                {/* Info Alert */}
+                <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
                         flex gap-4 animate-slide-in shadow-lg"
-                        style={{ animationDelay: '400ms' }}>
-                        <div className="p-3 bg-blue-100 rounded-xl h-fit">
-                            <AlertCircle className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
-                            <p className="text-sm leading-relaxed text-blue-700">
-                                سيتم حفظ أسعار الأصناف تلقائياً في <strong>كتالوج المورد</strong> لاستخدامها في الطلبات المستقبلية.
-                            </p>
-                        </div>
+                    style={{ animationDelay: '400ms' }}>
+                    <div className="p-3 bg-blue-100 rounded-xl h-fit">
+                        <AlertCircle className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
+                        <p className="text-sm leading-relaxed text-blue-700">
+                            سيتم حفظ أسعار الأصناف تلقائياً في <strong>كتالوج المورد</strong> لاستخدامها في الطلبات المستقبلية.
+                        </p>
                     </div>
                 </div>
             </form>
