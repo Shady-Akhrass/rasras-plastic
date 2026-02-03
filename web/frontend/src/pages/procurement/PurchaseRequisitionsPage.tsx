@@ -15,10 +15,12 @@ import {
     AlertCircle,
     RefreshCw,
     ShoppingCart,
-    Package
+    Package,
+    Trash2
 } from 'lucide-react';
 import purchaseService, { type PurchaseRequisition } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -121,7 +123,8 @@ const PRTableRow: React.FC<{
     onView: (id: number) => void;
     onSubmit: (id: number) => void;
     onViewPOs: (id: number) => void;
-}> = ({ pr, index, onView, onSubmit, onViewPOs }) => (
+    onDelete: (pr: PurchaseRequisition) => void;
+}> = ({ pr, index, onView, onSubmit, onViewPOs, onDelete }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -194,6 +197,16 @@ const PRTableRow: React.FC<{
                 >
                     <Edit3 className="w-5 h-5" />
                 </button>
+                {pr.status === 'Draft' && (
+                    <button
+                        onClick={() => onDelete(pr)}
+                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
+                            rounded-lg transition-all duration-200"
+                        title="حذف"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                    </button>
+                )}
             </div>
         </td>
     </tr>
@@ -271,6 +284,9 @@ const PurchaseRequisitionsPage: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
     const [successMessage, setSuccessMessage] = useState('');
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [prToDelete, setPrToDelete] = useState<{ id: number; prNumber: string } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchPRs();
@@ -346,6 +362,28 @@ const PurchaseRequisitionsPage: React.FC = () => {
         navigate(`/dashboard/procurement/pr/${id}`);
     };
 
+    const handleDeleteClick = (pr: PurchaseRequisition) => {
+        if (!pr.id) return;
+        setPrToDelete({ id: pr.id, prNumber: pr.prNumber || '' });
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!prToDelete) return;
+        const idToDelete = prToDelete.id;
+        setIsDeleting(true);
+        try {
+            await purchaseService.deletePR(idToDelete);
+            setPrs(prev => prev.filter(p => p.id !== idToDelete));
+            setIsDeleteModalOpen(false);
+            setPrToDelete(null);
+            toast.success('تم حذف عرض الشراء');
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'فشل حذف عرض الشراء');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -560,6 +598,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                         onView={handleViewPR}
                                         onSubmit={handleSubmit}
                                         onViewPOs={(id) => navigate(`/dashboard/procurement/po?prId=${id}`)}
+                                        onDelete={handleDeleteClick}
                                     />
                                 ))
                             )}
@@ -576,6 +615,21 @@ const PurchaseRequisitionsPage: React.FC = () => {
                     />
                 )}
             </div>
+
+            {/* Delete Confirmation */}
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف عرض الشراء"
+                message={prToDelete
+                    ? `هل أنت متأكد من حذف عرض الشراء رقم ${prToDelete.prNumber}؟ سيتم حذفه نهائياً.`
+                    : ''}
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setPrToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

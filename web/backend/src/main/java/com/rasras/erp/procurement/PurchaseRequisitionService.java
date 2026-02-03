@@ -5,7 +5,9 @@ import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.user.User;
 import com.rasras.erp.user.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -116,6 +118,17 @@ public class PurchaseRequisitionService {
                 saved.getTotalEstimatedAmount());
 
         return mapToDto(saved);
+    }
+
+    @Transactional
+    public void deletePurchaseRequisition(Integer id) {
+        PurchaseRequisition pr = prRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "عرض الشراء غير موجود"));
+        if (!"Draft".equals(pr.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "لا يمكن حذف عرض الشراء إلا إذا كان بحالة مسودة. الحالة الحالية: " + pr.getStatus());
+        }
+        prRepository.delete(pr);
     }
 
     private void updatePrFromDto(PurchaseRequisition pr, PurchaseRequisitionDto dto) {

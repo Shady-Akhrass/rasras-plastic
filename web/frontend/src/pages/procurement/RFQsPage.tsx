@@ -13,10 +13,13 @@ import {
     RefreshCw,
     Truck,
     Package,
-    Tag
+    Tag,
+    Trash2
 } from 'lucide-react';
 import purchaseService, { type RFQ } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import toast from 'react-hot-toast';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -92,7 +95,8 @@ const RFQTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onCreateQuotation: (id: number) => void;
-}> = ({ rfq, index, onView, onCreateQuotation }) => (
+    onDelete: (rfq: RFQ) => void;
+}> = ({ rfq, index, onView, onCreateQuotation, onDelete }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -164,6 +168,14 @@ const RFQTableRow: React.FC<{
                 >
                     <Edit3 className="w-5 h-5" />
                 </button>
+                <button
+                    onClick={() => onDelete(rfq)}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
+                        rounded-lg transition-all duration-200"
+                    title="حذف"
+                >
+                    <Trash2 className="w-5 h-5" />
+                </button>
             </div>
         </td>
     </tr>
@@ -180,6 +192,9 @@ const RFQsPage: React.FC = () => {
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [rfqToDelete, setRfqToDelete] = useState<{ id: number; rfqNumber: string } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (activeTab === 'rfqs') {
@@ -215,6 +230,29 @@ const RFQsPage: React.FC = () => {
             console.error('Failed to fetch PRs:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteClick = (rfq: RFQ) => {
+        if (!rfq.id) return;
+        setRfqToDelete({ id: rfq.id, rfqNumber: rfq.rfqNumber || '' });
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!rfqToDelete) return;
+        const idToDelete = rfqToDelete.id;
+        setIsDeleting(true);
+        try {
+            await purchaseService.deleteRFQ(idToDelete);
+            setRfqs(prev => prev.filter(r => r.id !== idToDelete));
+            setIsDeleteModalOpen(false);
+            setRfqToDelete(null);
+            toast.success('تم حذف طلب عرض السعر');
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'فشل حذف طلب عرض السعر');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -427,6 +465,7 @@ const RFQsPage: React.FC = () => {
                                         index={index}
                                         onView={(id) => navigate(`/dashboard/procurement/rfq/${id}`)}
                                         onCreateQuotation={handleCreateQuotation}
+                                        onDelete={handleDeleteClick}
                                     />
                                 ))
                             ) : (
@@ -467,6 +506,21 @@ const RFQsPage: React.FC = () => {
                     />
                 )}
             </div>
+
+            {/* Delete Confirmation */}
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف طلب عرض السعر"
+                message={rfqToDelete
+                    ? `هل أنت متأكد من حذف طلب عرض السعر رقم ${rfqToDelete.rfqNumber}؟ سيتم حذفه نهائياً.`
+                    : ''}
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setRfqToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

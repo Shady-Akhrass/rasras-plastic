@@ -41,4 +41,16 @@ public class PurchaseRequisitionController {
     public ResponseEntity<ApiResponse<PurchaseRequisitionDto>> submitForApproval(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(prService.submitForApproval(id)));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deletePurchaseRequisition(@PathVariable Integer id) {
+        prService.deletePurchaseRequisition(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<ApiResponse<Void>> deletePurchaseRequisitionPost(@PathVariable Integer id) {
+        prService.deletePurchaseRequisition(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }

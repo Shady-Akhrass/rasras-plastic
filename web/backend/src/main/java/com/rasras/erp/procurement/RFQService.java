@@ -36,6 +36,13 @@ public class RFQService {
         }
 
         @Transactional
+        public void deleteRFQ(Integer id) {
+                RequestForQuotation rfq = rfqRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("RFQ not found"));
+                rfqRepository.delete(rfq);
+        }
+
+        @Transactional
         public RFQDto createRFQ(RFQDto dto) {
                 RequestForQuotation rfq = new RequestForQuotation();
                 rfq.setRfqNumber(generateRFQNumber());

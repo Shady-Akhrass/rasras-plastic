@@ -174,6 +174,9 @@ const purchaseService = {
         const response = await apiClient.post<{ data: PurchaseRequisition }>(`/procurement/pr/${id}/submit`);
         return response.data.data;
     },
+    deletePR: async (id: number) => {
+        await apiClient.post(`/procurement/pr/${id}/delete`);
+    },
 
     // RFQs
     getAllRFQs: async () => {
@@ -187,6 +190,9 @@ const purchaseService = {
     createRFQ: async (rfq: RFQ) => {
         const response = await apiClient.post<{ data: RFQ }>('/procurement/rfq', rfq);
         return response.data.data;
+    },
+    deleteRFQ: async (id: number) => {
+        await apiClient.post(`/procurement/rfq/${id}/delete`);
     },
 
     // Quotations
