@@ -250,6 +250,7 @@ public class QuotationComparisonService {
                                 .priceRating(detail.getPriceRating())
                                 .overallScore(detail.getOverallScore())
                                 .comments(detail.getComments())
+                                .deliveryCost(detail.getDeliveryCost())
                                 .polymerGrade(detail.getPolymerGrade())
                                 .build();
         }
@@ -270,6 +271,7 @@ public class QuotationComparisonService {
                                 .priceRating(dto.getPriceRating())
                                 .overallScore(dto.getOverallScore())
                                 .comments(dto.getComments())
+                                .deliveryCost(dto.getDeliveryCost())
                                 .polymerGrade(dto.getPolymerGrade())
                                 .build();
         }

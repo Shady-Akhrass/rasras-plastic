@@ -26,6 +26,7 @@ public class QuotationComparisonDetailDto {
     private Integer priceRating;
     private BigDecimal overallScore;
     private String comments;
+    private BigDecimal deliveryCost;
     private String polymerGrade;
 
     public String getPolymerGrade() {
