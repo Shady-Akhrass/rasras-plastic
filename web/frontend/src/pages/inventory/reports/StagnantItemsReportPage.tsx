@@ -88,7 +88,7 @@ const StagnantItemsReportPage: React.FC = () => {
                     <table className="w-full">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">كود الصنف</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">العلامة التجارية / Grade</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">اسم الصنف</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الرصيد</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">متوسط الاستهلاك الشهري</th>
@@ -116,7 +116,7 @@ const StagnantItemsReportPage: React.FC = () => {
                             ) : (
                                 stagnant.map((i) => (
                                     <tr key={i.id} className="border-b border-slate-100 hover:bg-amber-50/50">
-                                        <td className="px-6 py-4 font-mono font-semibold text-brand-primary">{i.itemCode}</td>
+                                        <td className="px-6 py-4 font-mono font-semibold text-brand-primary">{i.grade || i.itemCode}</td>
                                         <td className="px-6 py-4 font-medium text-slate-800">{i.itemNameAr}</td>
                                         <td className="px-6 py-4">{(i as any).currentStock?.toLocaleString() ?? '0'}</td>
                                         <td className="px-6 py-4 text-slate-600">{(Number(i.avgMonthlyConsumption) || 0).toLocaleString()}</td>

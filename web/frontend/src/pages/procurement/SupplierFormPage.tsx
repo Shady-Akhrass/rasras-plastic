@@ -4,7 +4,7 @@ import {
     Save, ArrowRight, Building2, DollarSign, MapPin, Phone, Mail,
     FileText, Globe, CreditCard, ShieldCheck, Package, Trash2, Plus,
     X, RefreshCw, CheckCircle2, User, Clock, Star, Tag, Layers,
-    ChevronRight, Send, Hash, Calendar, Landmark,
+    ChevronRight, AlertTriangle, Send, Hash, Calendar, Landmark,
     BadgeCheck, XCircle, Info
 } from 'lucide-react';
 import { supplierService, type SupplierDto, type SupplierItemDto, type SupplierBankDto } from '../../services/supplierService';
@@ -689,13 +689,12 @@ const SupplierFormPage: React.FC = () => {
     const supplierTypeOptions = [
         { value: 'Local', label: 'محلـي' },
         { value: 'International', label: 'دولـي' },
-        { value: 'Service', label: 'خدمي' },
     ];
 
     const currencyOptions = [
         { value: 'EGP', label: 'EGP - جنيه مصري' },
         { value: 'USD', label: 'USD - دولار أمريكي' },
-        { value: 'EUR', label: 'EUR - يورو' },
+        { value: 'EUR', label: 'EUR - ريال سعودي ' },
     ];
 
     const ratingOptions = [
@@ -707,7 +706,7 @@ const SupplierFormPage: React.FC = () => {
 
     const itemOptions = availableItems.map(i => ({
         value: i.id!,
-        label: `${i.itemNameAr} (${i.itemCode})`
+        label: `${i.itemNameAr} (${i.grade || i.itemCode || ''})`
     }));
 
     if (loading) return <FormSkeleton />;
@@ -977,13 +976,6 @@ const SupplierFormPage: React.FC = () => {
                                     icon={Calendar}
                                     type="number"
                                     hint="عدد أيام السماح للدفع"
-                                />
-                                <FormInput
-                                    label="حد الائتمان"
-                                    value={formData.creditLimit || 0}
-                                    onChange={(v) => handleChange('creditLimit', parseFloat(v) || 0)}
-                                    icon={CreditCard}
-                                    type="number"
                                 />
                                 <FormSelect
                                     label="تصنيف المورد"

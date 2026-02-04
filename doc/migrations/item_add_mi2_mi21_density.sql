@@ -1,0 +1,4 @@
+-- إضافة أعمدة MI2, MI21, Density للصنف (اختيارية)
+ALTER TABLE items ADD COLUMN mi2 VARCHAR(50) NULL COMMENT 'MI2' AFTER GradeName;
+ALTER TABLE items ADD COLUMN mi21 VARCHAR(50) NULL COMMENT 'MI21' AFTER mi2;
+ALTER TABLE items ADD COLUMN density VARCHAR(50) NULL COMMENT 'Density - الكثافة' AFTER mi21;

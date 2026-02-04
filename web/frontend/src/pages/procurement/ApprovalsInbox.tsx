@@ -40,20 +40,55 @@ const StatCard: React.FC<{
     };
 
     return (
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
+        <div className="bg-white p-3 rounded-xl border border-slate-100 hover:shadow-md 
             hover:border-brand-primary/20 transition-all duration-300 group">
-            <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${colorClasses[color]} 
-                    group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon className="w-5 h-5" />
+            <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${colorClasses[color]} 
+                    group-hover:scale-105 transition-transform duration-300`}>
+                    <Icon className="w-4 h-4" />
                 </div>
                 <div>
-                    <div className="text-2xl font-bold text-slate-800">{value}</div>
-                    <div className="text-sm text-slate-500">{label}</div>
+                    <div className="text-lg font-bold text-slate-800">{value}</div>
+                    <div className="text-xs text-slate-500">{label}</div>
                 </div>
             </div>
         </div>
     );
+};
+
+// Arabic labels for document types
+const DOC_TYPE_LABELS: Record<string, string> = {
+    PurchaseRequisition: 'طلب شراء',
+    PR: 'طلب شراء',
+    RFQ: 'طلب عرض أسعار',
+    SupplierQuotation: 'عرض مورد',
+    SQ: 'عرض مورد',
+    QuotationComparison: 'مقارنة عروض',
+    QC: 'مقارنة عروض',
+    PurchaseOrder: 'أمر شراء',
+    PO: 'أمر شراء',
+    GoodsReceiptNote: 'إشعار استلام',
+    GRN: 'إشعار استلام',
+    SupplierInvoice: 'فاتورة مورد',
+    SINV: 'فاتورة مورد',
+    SalesOrder: 'أمر بيع',
+    SO: 'أمر بيع',
+    PaymentVoucher: 'سند صرف',
+    PV: 'سند صرف',
+    ReceiptVoucher: 'سند قبض',
+    RV: 'سند قبض',
+    Supplier: 'مورد',
+};
+
+// Arabic labels for workflow/step names
+const getWorkflowLabelAr = (name: string): string => {
+    const labels: Record<string, string> = {
+        'Supplier Approval': 'اعتماد المورد',
+        'General Manager Approval': 'اعتماد المدير العام',
+        'Purchase Requisition Approval': 'اعتماد طلب الشراء',
+        'PR Approval': 'اعتماد طلب الشراء',
+    };
+    return labels[name] || name;
 };
 
 // Request Card Component
@@ -62,13 +97,15 @@ const RequestCard: React.FC<{
     index: number;
     onApprove: (id: number) => void;
     onReject: (id: number) => void;
+    onView: (request: ApprovalRequestDto) => void;
     processing: boolean;
-}> = ({ request, index, onApprove, onReject, processing }) => {
+}> = ({ request, index, onApprove, onReject, onView, processing }) => {
     const getDocTypeConfig = (type: string) => {
         const configs: Record<string, { label?: string; shortLabel?: string; bg: string; text: string; border?: string; icon: React.ElementType }> = {
             'PurchaseRequisition': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
             'PR': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
             'RFQ': { bg: 'bg-amber-50', text: 'text-amber-600', icon: FileText },
+            'Supplier': { bg: 'bg-amber-50', text: 'text-amber-600', icon: Tag },
             'SupplierQuotation': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
             'SQ': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
             'QuotationComparison': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
@@ -154,7 +191,7 @@ const RequestCard: React.FC<{
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-600 
                                 rounded-lg text-xs font-bold">
-                                {request.documentType}
+                                {docTypeAr}
                             </span>
                             <span className="text-xs font-mono text-slate-400">#{request.documentNumber}</span>
                             {request.priority === 'High' && (
@@ -167,7 +204,7 @@ const RequestCard: React.FC<{
                         </div>
                         <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-bold text-slate-800 text-lg group-hover:text-brand-primary transition-colors">
-                                {request.workflowName}
+                                {workflowAr}
                             </h3>
                             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">
                                 {request.documentNumber}
@@ -184,7 +221,7 @@ const RequestCard: React.FC<{
                             </div>
                             <div className="flex items-center gap-2 text-brand-primary font-bold">
                                 <Clock className="w-4 h-4" />
-                                <span>{request.currentStepName}</span>
+                                <span>{stepAr}</span>
                             </div>
                         </div>
                     </div>
@@ -203,7 +240,7 @@ const RequestCard: React.FC<{
                 {/* Right: Actions */}
                 <div className="flex flex-row lg:flex-col justify-center gap-3 min-w-[140px]">
                     <button
-                        onClick={handleViewDocument}
+                        onClick={() => onView(request)}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 
                             bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 
                             transition-all hover:scale-105"
@@ -233,6 +270,120 @@ const RequestCard: React.FC<{
                         <XCircle className="w-4 h-4" />
                         <span>رفض</span>
                     </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// View Modal Component
+const ViewModal: React.FC<{
+    request: ApprovalRequestDto | null;
+    onClose: () => void;
+    onOpenDocument: (request: ApprovalRequestDto) => void;
+}> = ({ request, onClose, onOpenDocument }) => {
+    if (!request) return null;
+
+    const docTypeAr = DOC_TYPE_LABELS[request.documentType] || request.documentType;
+    const workflowAr = getWorkflowLabelAr(request.workflowName);
+    const stepAr = getWorkflowLabelAr(request.currentStepName);
+
+    const getDocTypeConfig = (type: string) => {
+        const configs: Record<string, { bg: string; text: string; icon: React.ElementType }> = {
+            PurchaseRequisition: { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
+            PR: { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
+            Supplier: { bg: 'bg-amber-50', text: 'text-amber-600', icon: Tag },
+            PurchaseOrder: { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            PO: { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            GoodsReceiptNote: { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
+            GRN: { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
+        };
+        return configs[type] || { bg: 'bg-slate-50', text: 'text-slate-600', icon: FileText };
+    };
+    const config = getDocTypeConfig(request.documentType);
+    const DocIcon = config.icon;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+                style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+                {/* Header */}
+                <div className="bg-gradient-to-l from-brand-primary to-brand-primary/90 p-6 text-white">
+                    <button
+                        onClick={onClose}
+                        className="absolute top-4 left-4 p-2 hover:bg-white/20 rounded-xl transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-2xl bg-white/20`}>
+                            <DocIcon className="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold">{workflowAr}</h2>
+                            <p className="text-white/80 text-sm mt-0.5">تفاصيل طلب الاعتماد</p>
+                        </div>
+                    </div>
+                </div>
+                {/* Body */}
+                <div className="p-6 space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-50 rounded-2xl p-4">
+                            <div className="text-xs text-slate-400 font-medium mb-1">نوع المستند</div>
+                            <div className="font-bold text-slate-800">{docTypeAr}</div>
+                        </div>
+                        <div className="bg-slate-50 rounded-2xl p-4">
+                            <div className="text-xs text-slate-400 font-medium mb-1">رقم المستند</div>
+                            <div className="font-mono font-bold text-slate-800">#{request.documentNumber}</div>
+                        </div>
+                        <div className="bg-slate-50 rounded-2xl p-4 col-span-2">
+                            <div className="text-xs text-slate-400 font-medium mb-1">الخطوة الحالية</div>
+                            <div className="flex items-center gap-2 font-bold text-brand-primary">
+                                <Clock className="w-4 h-4" />
+                                {stepAr}
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 rounded-2xl p-4">
+                            <div className="text-xs text-slate-400 font-medium mb-1">مقدم الطلب</div>
+                            <div className="flex items-center gap-2 font-bold text-slate-800">
+                                <User className="w-4 h-4 text-slate-400" />
+                                {request.requestedByName || 'غير محدد'}
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 rounded-2xl p-4">
+                            <div className="text-xs text-slate-400 font-medium mb-1">التاريخ</div>
+                            <div className="flex items-center gap-2 font-bold text-slate-800">
+                                <Calendar className="w-4 h-4 text-slate-400" />
+                                {new Date(request.requestedDate).toLocaleDateString('ar-EG', {
+                                    year: 'numeric', month: 'long', day: 'numeric'
+                                })}
+                            </div>
+                        </div>
+                        <div className="bg-emerald-50 rounded-2xl p-4 col-span-2 border border-emerald-100">
+                            <div className="text-xs text-emerald-600 font-medium mb-1">إجمالي القيمة</div>
+                            <div className="text-2xl font-bold text-emerald-700">
+                                {(request.totalAmount || 0).toLocaleString()} ج.م
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            onClick={() => { onOpenDocument(request); onClose(); }}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-primary text-white 
+                                rounded-xl font-bold hover:bg-brand-primary/90 transition-all"
+                        >
+                            <ExternalLink className="w-5 h-5" />
+                            فتح المستند
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold 
+                                hover:bg-slate-200 transition-all"
+                        >
+                            إغلاق
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -306,9 +457,36 @@ const ApprovalsInbox: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>(initialType);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [viewRequest, setViewRequest] = useState<ApprovalRequestDto | null>(null);
 
     // Mock User ID (from auth context in production)
     const currentUserId = 1;
+
+    const navigate = useNavigate();
+    const handleOpenDocument = (request: ApprovalRequestDto) => {
+        const typeRoutes: Record<string, string> = {
+            'PR': '/dashboard/procurement/pr',
+            'PurchaseRequisition': '/dashboard/procurement/pr',
+            'RFQ': '/dashboard/procurement/rfq',
+            'SQ': '/dashboard/procurement/quotation',
+            'SupplierQuotation': '/dashboard/procurement/quotation',
+            'QC': '/dashboard/procurement/comparison',
+            'QuotationComparison': '/dashboard/procurement/comparison',
+            'PO': '/dashboard/procurement/po',
+            'PurchaseOrder': '/dashboard/procurement/po',
+            'GRN': '/dashboard/procurement/grn',
+            'GoodsReceiptNote': '/dashboard/procurement/grn',
+            'SINV': '/dashboard/procurement/invoices',
+            'SupplierInvoice': '/dashboard/procurement/invoices',
+            'Supplier': '/dashboard/procurement/suppliers',
+        };
+        const route = typeRoutes[request.documentType];
+        if (route) {
+            navigate(`${route}/${request.documentId}`);
+        } else {
+            toast.error('لم يتم تحديد مسار لهذا المستند');
+        }
+    };
 
     useEffect(() => {
         fetchRequests();
@@ -430,7 +608,7 @@ const ApprovalsInbox: React.FC = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <StatCard
                     icon={Bell}
                     value={stats.total}
@@ -503,6 +681,8 @@ const ApprovalsInbox: React.FC = () => {
                                 onChange={(e) => setTypeFilter(e.target.value)}
                                 className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
                             >
+                                <option value="All">الكل</option>
+                                <option value="Supplier">موردين</option>
                                 <option value="PR">طلبات شراء</option>
                                 <option value="RFQ">طلبات عروض أسعار</option>
                                 <option value="SQ">عروض موردين</option>
@@ -544,11 +724,19 @@ const ApprovalsInbox: React.FC = () => {
                             index={index}
                             onApprove={() => handleAction(req.id, 'Approved')}
                             onReject={() => handleAction(req.id, 'Rejected')}
+                            onView={(r) => setViewRequest(r)}
                             processing={false}
                         />
                     ))
                 )}
             </div>
+            {/* View Modal */}
+            <ViewModal
+                request={viewRequest}
+                onClose={() => setViewRequest(null)}
+                onOpenDocument={handleOpenDocument}
+            />
+
             {!loading && filteredRequests.length > 0 && (
                 <Pagination
                     currentPage={currentPage}

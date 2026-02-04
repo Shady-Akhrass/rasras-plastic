@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
     Settings, User, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-    HelpCircle, Shield, Sparkles, Building2,
+    HelpCircle, Shield, Sparkles, Building2, Lock, Ruler,
     Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart,
     ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine,
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity, ClipboardCheck, GitCompare,
@@ -12,6 +12,8 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { approvalService } from '../../services/approvalService';
 import { grnService } from '../../services/grnService';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
+import { grnService } from '../../services/grnService';
+import { canAccessPath } from '../../utils/permissionUtils';
 
 // Sidebar Link Component
 const SidebarLink = ({
@@ -217,6 +219,7 @@ const DashboardLayout: React.FC = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const [notificationsOpen, setNotificationsOpen] = useState(false);
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -281,6 +284,13 @@ const DashboardLayout: React.FC = () => {
         return () => clearTimeout(timeoutId);
     }, []);
 
+    // حماية المسارات حسب الصلاحيات: إعادة توجيه من لا يملك الصلاحية إلى لوحة القيادة
+    useEffect(() => {
+        if (!canAccessPath(location.pathname, userRole)) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [location.pathname, userRole, navigate]);
+
     const handleLogout = () => {
         clearSession();
     };
@@ -299,87 +309,137 @@ const DashboardLayout: React.FC = () => {
         return name.split(' ').map(n => n[0]).join('').slice(0, 2);
     };
 
+    // أدوار الأقسام: كل قسم يظهر فقط للأدوار المذكورة (بدون roles = يظهر للجميع)
+    const ROLES_PROCUREMENT = ['PM', 'BUYER', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
+    const ROLES_SALES = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
+    const ROLES_WAREHOUSE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
+    const ROLES_OPERATIONS = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'SM'];
+    const ROLES_CRM = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
+    const ROLES_SYSTEM = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN'];
+
     const navItems = [
-        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations' },
+        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations', roles: ROLES_OPERATIONS },
         { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
         { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
         { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations' },
-        { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations' },
-        { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations' },
-        { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management' },
-        { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'warehouse', warehouseGroup: 'management' },
-        { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management' },
-        { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management' },
-        { to: '/dashboard/inventory/stocks', icon: Package, label: 'أرصدة المخزون', section: 'warehouse', warehouseGroup: 'management' },
-        { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle' },
-        { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle' },
-        { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle' },
-        { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports' },
-        { to: '/dashboard/inventory/reports/stagnant', icon: Clock, label: 'الأصناف الراكدة', section: 'warehouse', warehouseGroup: 'reports' },
-        { to: '/dashboard/inventory/reports/movement', icon: Activity, label: 'حركة الصنف التفصيلية', section: 'warehouse', warehouseGroup: 'reports' },
-        { to: '/dashboard/inventory/count', icon: ClipboardCheck, label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports' },
-        { to: '/dashboard/inventory/count', icon: AlertTriangle, label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports', search: '?mode=surprise' },
-        { to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2, label: 'تقرير المخزون الدوري', section: 'warehouse', warehouseGroup: 'reports' },
-        { to: '/dashboard/inventory/reports/variance', icon: GitCompare, label: 'تقرير الفروقات', section: 'warehouse', warehouseGroup: 'reports' },
-        { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales' },
-        { to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار', section: 'sales' },
-        { to: '/dashboard/sales/orders', icon: ClipboardList, label: 'أوامر البيع', section: 'sales' },
-        { to: '/dashboard/sales/issue-notes', icon: Package, label: 'إذونات الصرف', section: 'sales' },
-        { to: '/dashboard/sales/delivery-orders', icon: Truck, label: 'أوامر التوصيل', section: 'sales' },
-        { to: '/dashboard/sales/invoices', icon: FileText, label: 'فواتير المبيعات', section: 'sales' },
-        { to: '/dashboard/sales/receipts', icon: Receipt, label: 'إيصالات الدفع', section: 'sales' },
-        { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales' },
-        { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
-        { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
-        { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement' },
-        { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement' },
-        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement', badge: pendingInspectionsCount || undefined },
-        { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement' },
-        { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement' },
-        { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement' },
-        { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement' },
-        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement' },
+        { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations', roles: ROLES_OPERATIONS },
+        { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations', roles: ROLES_OPERATIONS },
+        { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations', roles: ROLES_OPERATIONS },
+        { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/stocks', icon: Package, label: 'أرصدة المخزون', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/reports/stagnant', icon: Clock, label: 'الأصناف الراكدة', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/reports/movement', icon: Activity, label: 'حركة الصنف التفصيلية', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/count', icon: ClipboardCheck, label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/count', icon: AlertTriangle, label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports', search: '?mode=surprise', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2, label: 'تقرير المخزون الدوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/inventory/reports/variance', icon: GitCompare, label: 'تقرير الفروقات', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
+        { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/sales/orders', icon: ClipboardList, label: 'أوامر البيع', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/sales/issue-notes', icon: Package, label: 'إذونات الصرف', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/sales/delivery-orders', icon: Truck, label: 'أوامر التوصيل', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/sales/invoices', icon: FileText, label: 'فواتير المبيعات', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/sales/receipts', icon: Receipt, label: 'إيصالات الدفع', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales', roles: ROLES_SALES },
+        { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm', roles: ROLES_CRM },
+        { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement', badge: pendingInspectionsCount || undefined, roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
+        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT },
         { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
-        { to: '/dashboard/settings', icon: Settings, label: 'الإعدادات العامة', section: 'system' },
+        // أقسام الإعدادات (النظام)
+        { to: '/dashboard/settings', icon: Settings, label: 'رئيسية الإعدادات', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/units', icon: Ruler, label: 'وحدات القياس', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/users', icon: User, label: 'إدارة المستخدمين', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/roles', icon: Shield, label: 'الأدوار والصلاحيات', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/permissions', icon: Lock, label: 'سجل الصلاحيات', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/security', icon: Shield, label: 'الأمان والخصوصية', section: 'system', roles: ROLES_SYSTEM },
+        { to: '/dashboard/settings/notifications', icon: Bell, label: 'الإشعارات', section: 'system', roles: ROLES_SYSTEM },
     ];
 
+    // تحديث عنوان التبويب حسب الصفحة الحالية
+    useEffect(() => {
+        const path = location.pathname;
+        const match = navItems
+            .filter(item => path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to)))
+            .sort((a, b) => b.to.length - a.to.length)[0];
+        document.title = match ? `${match.label} | نظام RasRas` : 'نظام RasRas';
+    }, [location.pathname]);
+
     const filteredNavItems = navItems.filter(item =>
-        !item.roles || item.roles.includes(userRole.toUpperCase())
+        !item.roles || item.roles.length === 0 || item.roles.includes(userRole.toUpperCase())
     );
 
-    // قوائم منسدلة: أي الأقسام مفتوحة (مفتوح افتراضياً إذا كان المسار الحالي داخل القسم)
+    // أدوار المدير: عندهم قائمة منسدلة (ينقرون لفتح كل قسم). غير المدير: القوائم الفرعية تظهر مباشرة
+    const MANAGER_ROLES = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'MANAGER'];
+    const isManagerRole = MANAGER_ROLES.includes(userRole.toUpperCase());
+
     const sectionIds = ['main', 'operations', 'sales', 'crm', 'warehouse', 'procurement', 'system'] as const;
     const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
         const path = location.pathname;
         const initial: Record<string, boolean> = {};
-        sectionIds.forEach(id => {
-            const itemsInSection = navItems.filter(i => i.section === id);
-            initial[id] = itemsInSection.some(item =>
-                path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
-            );
-        });
+        if (isManagerRole) {
+            sectionIds.forEach(id => {
+                const itemsInSection = navItems.filter(i => i.section === id);
+                initial[id] = itemsInSection.some(item =>
+                    path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
+                );
+            });
+        } else {
+            sectionIds.forEach(id => { initial[id] = true; });
+        }
         return initial;
     });
 
     useEffect(() => {
         const path = location.pathname;
-        setOpenSections(() => {
-            const next: Record<string, boolean> = {};
-            for (const id of sectionIds) {
-                const itemsInSection = navItems.filter(i => i.section === id);
-                next[id] = itemsInSection.some(item =>
-                    path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
-                );
-            }
-            return next;
-        });
-    }, [location.pathname]);
+        if (isManagerRole) {
+            setOpenSections(() => {
+                const next: Record<string, boolean> = {};
+                for (const id of sectionIds) {
+                    const itemsInSection = navItems.filter(i => i.section === id);
+                    next[id] = itemsInSection.some(item =>
+                        path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
+                    );
+                }
+                return next;
+            });
+        } else {
+            setOpenSections(prev => {
+                const next = { ...prev };
+                for (const id of sectionIds) {
+                    const itemsInSection = navItems.filter(i => i.section === id);
+                    if (itemsInSection.some(item =>
+                        path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
+                    )) {
+                        next[id] = true;
+                        break;
+                    }
+                }
+                return next;
+            });
+        }
+    }, [location.pathname, isManagerRole]);
 
     const toggleSection = (id: string) => {
+        if (!isManagerRole) return; // غير المدير: لا إغلاق للأقسام
         setOpenSections(prev => {
             const willBeOpen = !prev[id];
             if (willBeOpen) {
@@ -857,23 +917,66 @@ const DashboardLayout: React.FC = () => {
                         {/* Divider */}
                         <div className="hidden md:block h-8 w-px bg-slate-200" />
 
-                        {/* User Profile */}
-                        <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl 
-                            transition-colors cursor-pointer group">
-                            <div className="text-left hidden md:block">
-                                <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary 
-                                    transition-colors">
-                                    {userName}
-                                </p>
-                                <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">
-                                    {userRole}
-                                </p>
-                            </div>
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary to-brand-primary/80 
-                                flex items-center justify-center text-white font-bold shadow-md 
-                                group-hover:shadow-lg group-hover:scale-105 transition-all duration-200">
-                                {getInitials(userName)}
-                            </div>
+                        {/* User Profile - قائمة عند النقر */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => { setUserMenuOpen(!userMenuOpen); setNotificationsOpen(false); }}
+                                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl 
+                                    transition-colors cursor-pointer group w-full md:w-auto"
+                            >
+                                <div className="text-left hidden md:block">
+                                    <p className="text-sm font-semibold text-slate-900 group-hover:text-brand-primary 
+                                        transition-colors">
+                                        {userName}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">
+                                        {userRole}
+                                    </p>
+                                </div>
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary to-brand-primary/80 
+                                    flex items-center justify-center text-white font-bold shadow-md 
+                                    group-hover:shadow-lg group-hover:scale-105 transition-all duration-200 shrink-0">
+                                    {getInitials(userName)}
+                                </div>
+                                <ChevronDown className={`w-4 h-4 text-slate-400 hidden md:block transition-transform
+                                    ${userMenuOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {/* قائمة المستخدم */}
+                            {userMenuOpen && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setUserMenuOpen(false)}
+                                        aria-hidden="true"
+                                    />
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl 
+                                        shadow-xl border border-slate-100 z-50 overflow-hidden
+                                        animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="p-2">
+                                            <Link
+                                                to={user?.employeeId ? `/dashboard/employees/${user.employeeId}` : '/dashboard/employees'}
+                                                onClick={() => setUserMenuOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-700 
+                                                    hover:bg-slate-50 transition-colors"
+                                            >
+                                                <User className="w-5 h-5 text-slate-500" />
+                                                <span className="font-medium">بيانات الموظف</span>
+                                            </Link>
+                                            <button
+                                                type="button"
+                                                onClick={() => { handleLogout(); setUserMenuOpen(false); }}
+                                                className="flex items-center gap-3 px-4 py-3 rounded-xl text-rose-600 
+                                                    hover:bg-rose-50 transition-colors w-full"
+                                            >
+                                                <LogOut className="w-5 h-5" />
+                                                <span className="font-medium">تسجيل خروج</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </header>

@@ -11,6 +11,7 @@ export interface StockBalanceDto {
     id?: number;
     itemId: number;
     itemCode?: string;
+    grade?: string;
     itemNameAr?: string;
     warehouseId: number;
     warehouseNameAr?: string;

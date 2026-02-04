@@ -53,13 +53,40 @@ public class ItemService {
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
         }
 
+        private String generateItemCode() {
+                try {
+                        Integer maxSeq = itemRepository.findMaxItemCodeSequence();
+                        int next = (maxSeq != null ? maxSeq : 0) + 1;
+                        return String.format("ITEM-%05d", next);
+                } catch (Exception e) {
+                        long n = itemRepository.count() + 1;
+                        return String.format("ITEM-%05d", n);
+                }
+        }
+
         @Transactional
         public ItemDto createItem(ItemDto dto) {
+                if (dto.getCategoryId() == null || dto.getCategoryId() <= 0) {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.BAD_REQUEST, "يرجى اختيار التصنيف");
+                }
+                if (dto.getUnitId() == null || dto.getUnitId() <= 0) {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.BAD_REQUEST, "يرجى اختيار وحدة القياس");
+                }
+                if (dto.getItemNameAr() == null || dto.getItemNameAr().trim().isEmpty()) {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.BAD_REQUEST, "الاسم العربي مطلوب");
+                }
                 Item item = Item.builder()
-                                .itemCode(dto.getItemCode())
+                                .itemCode(generateItemCode())
                                 .itemNameAr(dto.getItemNameAr())
                                 .itemNameEn(dto.getItemNameEn())
+                                .grade(dto.getGrade())
                                 .gradeName(dto.getGradeName())
+                                .mi2(dto.getMi2())
+                                .mi21(dto.getMi21())
+                                .density(dto.getDensity())
                                 .categoryId(dto.getCategoryId())
                                 .unitId(dto.getUnitId())
                                 .barcode(dto.getBarcode())
@@ -88,10 +115,13 @@ public class ItemService {
                 Item item = itemRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
 
-                item.setItemCode(dto.getItemCode());
                 item.setItemNameAr(dto.getItemNameAr());
                 item.setItemNameEn(dto.getItemNameEn());
+                item.setGrade(dto.getGrade());
                 item.setGradeName(dto.getGradeName());
+                item.setMi2(dto.getMi2());
+                item.setMi21(dto.getMi21());
+                item.setDensity(dto.getDensity());
                 item.setCategoryId(dto.getCategoryId());
                 item.setUnitId(dto.getUnitId());
                 item.setBarcode(dto.getBarcode());
@@ -170,7 +200,11 @@ public class ItemService {
                                 .itemCode(entity.getItemCode())
                                 .itemNameAr(entity.getItemNameAr())
                                 .itemNameEn(entity.getItemNameEn())
+                                .grade(entity.getGrade())
                                 .gradeName(entity.getGradeName())
+                                .mi2(entity.getMi2())
+                                .mi21(entity.getMi21())
+                                .density(entity.getDensity())
                                 .categoryId(entity.getCategoryId())
                                 .categoryName(categoryName)
                                 .unitId(entity.getUnitId())

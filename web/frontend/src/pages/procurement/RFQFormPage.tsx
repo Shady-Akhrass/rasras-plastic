@@ -367,7 +367,27 @@ const ItemRow: React.FC<{
 
             <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
             flex items-center justify-center text-sm font-bold shadow-lg">
-                {index + 1}
+            {index + 1}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
+            {/* Item Select */}
+            <div className="md:col-span-4 space-y-2">
+                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                    <Package className="w-3.5 h-3.5" />
+                    الصنف
+                </label>
+                <select
+                    value={item.itemId}
+                    onChange={(e) => onUpdate('itemId', parseInt(e.target.value))}
+                    className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
+                        focus:border-brand-primary outline-none bg-white font-medium transition-all"
+                >
+                    <option value={0}>اختر صنف...</option>
+                    {items.map(i => (
+                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>
+                    ))}
+                </select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
