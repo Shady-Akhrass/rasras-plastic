@@ -9,6 +9,7 @@ public class QualityInspectionRequestDto {
     private Integer inspectedByUserId;
     private String overallResult;
     private String notes;
+    private boolean submit;
     private List<ItemInspectionRequest> items;
 
     @Data

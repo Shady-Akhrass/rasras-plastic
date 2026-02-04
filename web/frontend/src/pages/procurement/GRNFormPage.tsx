@@ -3,8 +3,9 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save, ArrowRight, Package, Info, Hash, FileText,
     Truck, ClipboardCheck, AlertCircle, Building2, CheckCircle2,
-    RefreshCw, Layers, CheckCircle
+    RefreshCw, Layers, CheckCircle, Eye, XCircle
 } from 'lucide-react';
+import { approvalService } from '../../services/approvalService';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../services/grnService';
 import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto } from '../../services/purchaseOrderService';
 import warehouseService from '../../services/warehouseService';
@@ -27,12 +28,15 @@ const GRNFormPage: React.FC = () => {
     const isNew = !id || id === 'new';
     const queryParams = new URLSearchParams(location.search);
     const preselectedPoId = queryParams.get('poId');
+    const isView = queryParams.get('mode') === 'view';
+    const approvalId = queryParams.get('approvalId');
 
     // Data State
     const [saving, setSaving] = useState(false);
     const [pos, setPos] = useState<PurchaseOrderDto[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [locations, setLocations] = useState<WarehouseLocationDto[]>([]);
+    const [processing, setProcessing] = useState(false);
     const [selectedPo, setSelectedPo] = useState<PurchaseOrderDto | null>(null);
 
     // Form State
@@ -327,6 +331,22 @@ const GRNFormPage: React.FC = () => {
         }
     };
 
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/procurement/approvals');
+        } catch (error) {
+            console.error('Failed to take action:', error);
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     // View mode for existing GRN
     if (!isNew && id) {
         const g = form as GoodsReceiptNoteDto;
@@ -351,6 +371,38 @@ const GRNFormPage: React.FC = () => {
                             <p className="text-white/80 text-lg">عرض تفاصيل إذن الاستلام</p>
                         </div>
                     </div>
+                    {isView && (
+                        <div className="flex items-center gap-3">
+                            {approvalId && (
+                                <>
+                                    <button
+                                        onClick={() => handleApprovalAction('Approved')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                        <span>اعتماد</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprovalAction('Rejected')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                        <span>رفض</span>
+                                    </button>
+                                </>
+                            )}
+                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
+                                <Eye className="w-5 h-5" />
+                                <span className="font-bold">وضع العرض فقط</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Details Card */}
@@ -374,6 +426,18 @@ const GRNFormPage: React.FC = () => {
                         <div>
                             <p className="text-xs text-slate-500 mb-1">المورد</p>
                             <p className="font-semibold">{g.supplierNameAr}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-500 mb-1">رقم بوليصة الشحن</p>
+                            <p className="font-semibold">{g.deliveryNoteNo || '—'}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-500 mb-1">رقم فاتورة المورد</p>
+                            <p className="font-semibold">{g.supplierInvoiceNo || '—'}</p>
+                        </div>
+                        <div className="col-span-2">
+                            <p className="text-xs text-slate-500 mb-1">ملاحظات</p>
+                            <p className="font-semibold">{g.notes || '—'}</p>
                         </div>
                     </div>
                 </div>
@@ -435,7 +499,7 @@ const GRNFormPage: React.FC = () => {
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate('/dashboard/procurement/grn')}
                             className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
                                 hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
                         >
@@ -449,20 +513,54 @@ const GRNFormPage: React.FC = () => {
                             <p className="text-white/80 text-lg">استلام المواد من المورد وتحديث أرصدة المخزون</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={saving || totals.itemCount === 0}
-                        className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-700 rounded-2xl 
-                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                        {saving ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <Save className="w-5 h-5" />
-                        )}
-                        <span>{saving ? 'جاري الحفظ...' : 'حفظ إذن الإضافة'}</span>
-                    </button>
+                    {!isView && (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={saving || totals.itemCount === 0}
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-700 rounded-2xl 
+                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                            {saving ? (
+                                <RefreshCw className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Save className="w-5 h-5" />
+                            )}
+                            <span>{saving ? 'جاري الحفظ...' : 'حفظ إذن الإضافة'}</span>
+                        </button>
+                    )}
+                    {isView && (
+                        <div className="flex items-center gap-3">
+                            {approvalId && (
+                                <>
+                                    <button
+                                        onClick={() => handleApprovalAction('Approved')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                        <span>اعتماد</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprovalAction('Rejected')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                        <span>رفض</span>
+                                    </button>
+                                </>
+                            )}
+                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
+                                <Eye className="w-5 h-5" />
+                                <span className="font-bold">وضع العرض فقط</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -491,8 +589,10 @@ const GRNFormPage: React.FC = () => {
                                 <select
                                     value={form.poId || ''}
                                     onChange={(e) => handleSelectPo(parseInt(e.target.value) || 0)}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-emerald-500 focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-emerald-500 outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                     required
                                 >
                                     <option value="">اختر أمر الشراء...</option>
@@ -509,8 +609,10 @@ const GRNFormPage: React.FC = () => {
                                 <select
                                     value={form.warehouseId || ''}
                                     onChange={(e) => setForm((f) => ({ ...f, warehouseId: parseInt(e.target.value) || 0 }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-emerald-500 focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-emerald-500 outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                     required
                                 >
                                     <option value="">اختر المستودع...</option>
@@ -528,9 +630,11 @@ const GRNFormPage: React.FC = () => {
                                     type="text"
                                     value={form.deliveryNoteNo || ''}
                                     onChange={(e) => setForm((f) => ({ ...f, deliveryNoteNo: e.target.value }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-emerald-500 focus:bg-white outline-none transition-all font-semibold"
-                                    placeholder="DN-XXX"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-emerald-500 outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                    placeholder={isView ? '' : "DN-XXX"}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -542,9 +646,11 @@ const GRNFormPage: React.FC = () => {
                                     type="text"
                                     value={form.supplierInvoiceNo || ''}
                                     onChange={(e) => setForm((f) => ({ ...f, supplierInvoiceNo: e.target.value }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-emerald-500 focus:bg-white outline-none transition-all font-semibold"
-                                    placeholder="INV-XXX"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-emerald-500 outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                    placeholder={isView ? '' : "INV-XXX"}
                                 />
                             </div>
                             <div className="md:col-span-2 space-y-2">
@@ -556,9 +662,11 @@ const GRNFormPage: React.FC = () => {
                                     value={form.notes || ''}
                                     onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                                     rows={2}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-emerald-500 focus:bg-white outline-none transition-all font-semibold resize-none"
-                                    placeholder="أي ملاحظات إضافية..."
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-emerald-500 outline-none transition-all font-semibold resize-none
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                    placeholder={isView ? '' : "أي ملاحظات إضافية..."}
                                 />
                             </div>
                         </div>
@@ -664,9 +772,11 @@ const GRNFormPage: React.FC = () => {
                                                                 const val = parseFloat(e.target.value) || 0;
                                                                 updateRow(i.id!, { receivedQty: val, acceptedQty: val }, i);
                                                             }}
-                                                            className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                            disabled={isView}
+                                                            className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold text-emerald-600 outline-none 
-                                                                focus:border-emerald-500 transition-all"
+                                                                focus:border-emerald-500 transition-all
+                                                                ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                         />
                                                     </td>
                                                     <td className="py-4 px-3">
@@ -677,9 +787,11 @@ const GRNFormPage: React.FC = () => {
                                                             step="0.001"
                                                             value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
                                                             onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 }, i)}
-                                                            className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                            disabled={isView}
+                                                            className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold outline-none 
-                                                                focus:border-emerald-500 transition-all"
+                                                                focus:border-emerald-500 transition-all
+                                                                ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                         />
                                                     </td>
                                                     <td className="py-4 px-3">
@@ -687,9 +799,11 @@ const GRNFormPage: React.FC = () => {
                                                             type="text"
                                                             value={rows[i.id!]?.lotNumber || ''}
                                                             onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
-                                                            placeholder="LOT-XXX"
-                                                            className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm text-center outline-none focus:border-emerald-500 transition-all"
+                                                            placeholder={isView ? '' : "LOT-XXX"}
+                                                            disabled={isView}
+                                                            className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                                text-sm text-center outline-none focus:border-emerald-500 transition-all
+                                                                ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                         />
                                                     </td>
                                                     <td className="py-4 px-3">
@@ -697,8 +811,10 @@ const GRNFormPage: React.FC = () => {
                                                             type="date"
                                                             value={rows[i.id!]?.manufactureDate || ''}
                                                             onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
-                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm outline-none focus:border-emerald-500 transition-all"
+                                                            disabled={isView}
+                                                            className={`w-36 px-2 py-2 border-2 border-slate-200 rounded-xl 
+                                                                text-sm outline-none focus:border-emerald-500 transition-all
+                                                                ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                         />
                                                     </td>
                                                     <td className="py-4 px-3">
@@ -706,16 +822,20 @@ const GRNFormPage: React.FC = () => {
                                                             type="date"
                                                             value={rows[i.id!]?.expiryDate || ''}
                                                             onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined }, i)}
-                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm outline-none focus:border-emerald-500 transition-all"
+                                                            disabled={isView}
+                                                            className={`w-36 px-2 py-2 border-2 border-slate-200 rounded-xl 
+                                                                text-sm outline-none focus:border-emerald-500 transition-all
+                                                                ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                         />
                                                     </td>
                                                     <td className="py-4 pl-6">
                                                         <select
                                                             value={rows[i.id!]?.locationId || ''}
                                                             onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
-                                                            className="w-32 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm outline-none focus:border-emerald-500 transition-all"
+                                                            disabled={isView}
+                                                            className={`w-32 px-2 py-2 border-2 border-slate-200 rounded-xl 
+                                                                text-sm outline-none focus:border-emerald-500 transition-all
+                                                                ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                         >
                                                             <option value="">اختر الموقع</option>
                                                             {locations.map((l) => (

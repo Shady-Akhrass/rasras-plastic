@@ -7,11 +7,13 @@ import {
     Save,
     RotateCcw,
     Clock,
-    X
+    X,
+    Info
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
 import { qualityService } from '../../services/qualityService';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -150,6 +152,7 @@ const QualityInspectionPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
     useEffect(() => {
         fetchPendingGRNs();
@@ -181,13 +184,14 @@ const QualityInspectionPage: React.FC = () => {
         setSelectedGrn(grnWithDetails);
     };
 
-    const handleSaveInspection = async () => {
+    const handleSaveInspection = async (submit: boolean = false) => {
         if (!selectedGrn) return;
 
         try {
             setSaving(true);
             const inspectionData = {
                 inspectedByUserId: 1,
+                submit: submit,
                 overallResult: selectedGrn.items.every(i => i.rejectedQty === 0) ? 'Passed' : 'Failed',
                 items: selectedGrn.items.map(item => ({
                     itemId: item.itemId,
@@ -199,15 +203,26 @@ const QualityInspectionPage: React.FC = () => {
             };
 
             await qualityService.recordInspection(selectedGrn.id!, inspectionData);
-            toast.success('تم حفظ تقرير الفحص بنجاح');
+
+            if (submit) {
+                toast.success('تم إرسال الفحص للاعتماد بنجاح');
+                setShowSubmitConfirm(false);
+            } else {
+                toast.success('تم حفظ تقرير الفحص بنجاح');
+            }
+
             setSelectedGrn(null);
             fetchPendingGRNs();
         } catch (error) {
             console.error('Error saving inspection:', error);
-            toast.error('فشل حفظ تقرير الفحص');
+            toast.error(submit ? 'فشل إرسال الفحص للاعتماد' : 'فشل حفظ تقرير الفحص');
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSubmitForApproval = async () => {
+        await handleSaveInspection(true);
     };
 
     const filteredGRNs = useMemo(() => {
@@ -383,8 +398,10 @@ const QualityInspectionPage: React.FC = () => {
                                             <input
                                                 type="number"
                                                 value={item.acceptedQty}
+                                                max={item.receivedQty}
+                                                min={0}
                                                 onChange={(e) => {
-                                                    const val = parseFloat(e.target.value) || 0;
+                                                    const val = Math.min(item.receivedQty, Math.max(0, parseFloat(e.target.value) || 0));
                                                     const newItems = [...selectedGrn.items];
                                                     newItems[idx].acceptedQty = val;
                                                     newItems[idx].rejectedQty = item.receivedQty - val;
@@ -392,16 +409,25 @@ const QualityInspectionPage: React.FC = () => {
                                                 }}
                                                 className="w-28 px-3 py-2 rounded-lg border-2 border-emerald-200 
                                                     focus:border-emerald-500 outline-none text-emerald-600 font-bold text-center
-                                                    bg-emerald-50"
+                                                    bg-emerald-50 transition-all focus:ring-4 focus:ring-emerald-500/10"
                                             />
                                         </td>
                                         <td className="py-4 px-4 text-center">
                                             <input
                                                 type="number"
                                                 value={item.rejectedQty}
-                                                readOnly
-                                                className="w-28 px-3 py-2 rounded-lg bg-rose-50 border-2 border-rose-200 
-                                                    text-rose-600 font-bold outline-none text-center"
+                                                max={item.receivedQty}
+                                                min={0}
+                                                onChange={(e) => {
+                                                    const val = Math.min(item.receivedQty, Math.max(0, parseFloat(e.target.value) || 0));
+                                                    const newItems = [...selectedGrn.items];
+                                                    newItems[idx].rejectedQty = val;
+                                                    newItems[idx].acceptedQty = item.receivedQty - val;
+                                                    setSelectedGrn({ ...selectedGrn, items: newItems });
+                                                }}
+                                                className="w-28 px-3 py-2 rounded-lg border-2 border-rose-200 
+                                                    focus:border-rose-500 outline-none text-rose-600 font-bold text-center
+                                                    bg-rose-50 transition-all focus:ring-4 focus:ring-rose-500/10"
                                             />
                                         </td>
                                         <td className="py-4 pl-4">
@@ -418,6 +444,23 @@ const QualityInspectionPage: React.FC = () => {
                         </table>
                     </div>
 
+                    {/* Purchase Return Notice */}
+                    {selectedGrn.items.some(item => (item.rejectedQty || 0) > 0) && (
+                        <div className="mx-6 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="mt-1 p-2 bg-amber-100 rounded-lg shrink-0">
+                                <Info className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-amber-900 leading-none">سيتم إنشاء مرتجع مشتريات تلقائي</h4>
+                                <p className="text-amber-700 text-sm mt-2">
+                                    تم تحديد كميات مرفوضة. سيقوم النظام بإنشاء طلب مرتجع مشتريات بـ {
+                                        selectedGrn.items.reduce((sum, item) => sum + (item.rejectedQty || 0), 0)
+                                    } وحدة وتحويله للاعتماد تلقائياً عند إرسال الفحص.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                         <button
                             onClick={() => setSelectedGrn(null)}
@@ -428,7 +471,7 @@ const QualityInspectionPage: React.FC = () => {
                             إلغاء
                         </button>
                         <button
-                            onClick={handleSaveInspection}
+                            onClick={() => handleSaveInspection(false)}
                             disabled={saving}
                             className="flex items-center gap-2 px-6 py-3 bg-white border border-brand-primary text-brand-primary 
                                 rounded-xl font-bold hover:bg-brand-primary/5 transition-all
@@ -438,22 +481,9 @@ const QualityInspectionPage: React.FC = () => {
                             <span>{saving ? 'جاري الحفظ...' : 'حفظ مسودة'}</span>
                         </button>
                         <button
-                            onClick={async () => {
-                                await handleSaveInspection();
+                            onClick={() => {
                                 if (selectedGrn?.id) {
-                                    if (window.confirm('هل أنت متأكد من إرسال نتيجة الفحص للاعتماد؟')) {
-                                        try {
-                                            setSaving(true);
-                                            await grnService.submitGRN(selectedGrn.id, 1);
-                                            toast.success('تم إرسال الفحص للاعتماد');
-                                            setSelectedGrn(null);
-                                            fetchPendingGRNs();
-                                        } catch (e) {
-                                            toast.error('فشل الإرسال للاعتماد');
-                                        } finally {
-                                            setSaving(false);
-                                        }
-                                    }
+                                    setShowSubmitConfirm(true);
                                 }
                             }}
                             disabled={saving}
@@ -467,6 +497,19 @@ const QualityInspectionPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Submit for Approval Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showSubmitConfirm}
+                title="تأكيد إرسال الفحص للاعتماد"
+                message="هل أنت متأكد من إرسال نتيجة فحص الجودة للاعتماد؟ لن تتمكن من التعديل بعد الإرسال."
+                confirmText="إرسال للاعتماد"
+                cancelText="إلغاء"
+                onConfirm={handleSubmitForApproval}
+                onCancel={() => setShowSubmitConfirm(false)}
+                isLoading={saving}
+                variant="info"
+            />
         </div>
     );
 };

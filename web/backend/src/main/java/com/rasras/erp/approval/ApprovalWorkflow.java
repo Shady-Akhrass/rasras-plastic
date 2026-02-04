@@ -20,7 +20,7 @@ public class ApprovalWorkflow {
     @Column(name = "WorkflowID")
     private Integer workflowId;
 
-    @Column(name = "WorkflowCode", nullable = false, unique = true, length = 20)
+    @Column(name = "WorkflowCode", nullable = false, unique = true, length = 50)
     private String workflowCode;
 
     @Column(name = "WorkflowName", nullable = false, length = 100)

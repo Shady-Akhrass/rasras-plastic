@@ -13,7 +13,6 @@ import {
     RefreshCw,
     Truck,
     Package,
-    Tag,
     Trash2
 } from 'lucide-react';
 import purchaseService, { type RFQ } from '../../services/purchaseService';
@@ -94,9 +93,8 @@ const RFQTableRow: React.FC<{
     rfq: RFQ;
     index: number;
     onView: (id: number) => void;
-    onCreateQuotation: (id: number) => void;
     onDelete: (rfq: RFQ) => void;
-}> = ({ rfq, index, onView, onCreateQuotation, onDelete }) => (
+}> = ({ rfq, index, onView, onDelete }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -150,16 +148,6 @@ const RFQTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-left">
             <div className="flex items-center justify-end gap-2">
-                {rfq.status === 'Sent' && (
-                    <button
-                        onClick={() => onCreateQuotation(rfq.id!)}
-                        className="p-2 text-indigo-500 hover:bg-indigo-50 
-                            rounded-lg transition-all duration-200"
-                        title="تسجيل عرض سعر"
-                    >
-                        <Tag className="w-5 h-5" />
-                    </button>
-                )}
                 <button
                     onClick={() => onView(rfq.id!)}
                     className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
@@ -185,8 +173,6 @@ const RFQsPage: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [rfqs, setRfqs] = useState<RFQ[]>([]);
-    const [pendingPRs, setPendingPRs] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'rfqs' | 'pending'>('rfqs');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -197,16 +183,12 @@ const RFQsPage: React.FC = () => {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        if (activeTab === 'rfqs') {
-            fetchRFQs();
-        } else {
-            fetchPendingPRs();
-        }
-    }, [activeTab]);
+        fetchRFQs();
+    }, []);
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [activeTab, searchTerm, statusFilter]);
+    }, [searchTerm, statusFilter]);
 
     const fetchRFQs = async () => {
         try {
@@ -215,19 +197,6 @@ const RFQsPage: React.FC = () => {
             setRfqs(data);
         } catch (error) {
             console.error('Failed to fetch RFQs:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchPendingPRs = async () => {
-        try {
-            setLoading(true);
-            const data = await purchaseService.getAllPRs();
-            // Filter only approved PRs that haven't been fully turned into RFQs (simplified logic)
-            setPendingPRs(data.filter((pr: any) => pr.status === 'Approved'));
-        } catch (error) {
-            console.error('Failed to fetch PRs:', error);
         } finally {
             setLoading(false);
         }
@@ -265,7 +234,6 @@ const RFQsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || rfq.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        // الأحدث فوق والأقدم تحت
         return [...filtered].sort((a, b) => {
             const dateA = a.rfqDate ? new Date(a.rfqDate).getTime() : (a.id ?? 0);
             const dateB = b.rfqDate ? new Date(b.rfqDate).getTime() : (b.id ?? 0);
@@ -273,29 +241,10 @@ const RFQsPage: React.FC = () => {
         });
     }, [rfqs, searchTerm, statusFilter]);
 
-    const filteredPRs = useMemo(() => {
-        const filtered = pendingPRs.filter(pr =>
-            pr.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            pr.requestedByDeptName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            pr.requestedByUserName?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        // الأحدث فوق والأقدم تحت
-        return [...filtered].sort((a, b) => {
-            const dateA = a.prDate ? new Date(a.prDate).getTime() : (a.id ?? 0);
-            const dateB = b.prDate ? new Date(b.prDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
-        });
-    }, [pendingPRs, searchTerm]);
-
     const paginatedRFQs = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
         return filteredRFQs.slice(start, start + pageSize);
     }, [filteredRFQs, currentPage, pageSize]);
-
-    const paginatedPRs = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return filteredPRs.slice(start, start + pageSize);
-    }, [filteredPRs, currentPage, pageSize]);
 
     const stats = useMemo(() => ({
         total: rfqs.length,
@@ -303,10 +252,6 @@ const RFQsPage: React.FC = () => {
         pending: rfqs.filter(r => r.status === 'Pending').length,
         completed: rfqs.filter(r => r.status === 'Completed').length,
     }), [rfqs]);
-
-    const handleCreateQuotation = (id: number) => {
-        navigate(`/dashboard/procurement/quotation/new?rfqId=${id}`);
-    };
 
     return (
         <div className="space-y-6">
@@ -341,42 +286,13 @@ const RFQsPage: React.FC = () => {
                             <span>طلب عرض سعر جديد</span>
                         </button>
                         <button
-                            onClick={activeTab === 'rfqs' ? fetchRFQs : fetchPendingPRs}
+                            onClick={fetchRFQs}
                             className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-xl hover:bg-white/20 transition-all"
                         >
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
                 </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-2 p-1 bg-white w-fit rounded-2xl border border-slate-100 shadow-sm">
-                <button
-                    onClick={() => setActiveTab('rfqs')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'rfqs'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <FileText className="w-4 h-4" />
-                    <span>طلبات عروض الأسعار</span>
-                </button>
-                <button
-                    onClick={() => setActiveTab('pending')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'pending'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <Package className="w-4 h-4" />
-                    <span>طلبات شراء معتمدة (PR)</span>
-                    {pendingPRs.length > 0 && (
-                        <span className={`${activeTab === 'pending' ? 'bg-white text-brand-primary' : 'bg-brand-primary text-white'} text-[10px] px-2 py-0.5 rounded-full font-bold ml-1 transition-colors`}>
-                            {pendingPRs.length}
-                        </span>
-                    )}
-                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -392,7 +308,7 @@ const RFQsPage: React.FC = () => {
                         ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                     <input
                         type="text"
-                        placeholder={activeTab === 'rfqs' ? "بحث برقم الطلب، اسم المورد، أو رقم طلب الشراء..." : "بحث برقم طلب الشراء، القسم، أو الطالب..."}
+                        placeholder="بحث برقم الطلب، اسم المورد، أو رقم طلب الشراء..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onFocus={() => setIsSearchFocused(true)}
@@ -401,22 +317,20 @@ const RFQsPage: React.FC = () => {
                             ${isSearchFocused ? 'border-brand-primary bg-white shadow-lg' : 'border-transparent'}`}
                     />
                 </div>
-                {activeTab === 'rfqs' && (
-                    <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent">
-                        <Filter className="text-slate-400 w-5 h-5" />
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
-                        >
-                            <option value="All">جميع الحالات</option>
-                            <option value="Sent">تم الإرسال</option>
-                            <option value="Pending">قيد الانتظار</option>
-                            <option value="Completed">مكتمل</option>
-                            <option value="Cancelled">ملغي</option>
-                        </select>
-                    </div>
-                )}
+                <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent">
+                    <Filter className="text-slate-400 w-5 h-5" />
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                    >
+                        <option value="All">جميع الحالات</option>
+                        <option value="Sent">تم الإرسال</option>
+                        <option value="Pending">قيد الانتظار</option>
+                        <option value="Completed">مكتمل</option>
+                        <option value="Cancelled">ملغي</option>
+                    </select>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -424,82 +338,43 @@ const RFQsPage: React.FC = () => {
                     <table className="w-full text-right">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                {activeTab === 'rfqs' ? (
-                                    <>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">رقم الطلب</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الطلب</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">المورد</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">طلب الشراء</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الاستحقاق</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">الحالة</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">إجراءات</th>
-                                    </>
-                                ) : (
-                                    <>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">رقم طلب الشراء (PR)</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الطلب</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">القسم الطالب</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">الطالب</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">المبلغ التقديري</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700 text-center">الأصناف</th>
-                                        <th className="px-6 py-4 text-sm font-bold text-slate-700">إجراءات</th>
-                                    </>
-                                )}
+                                <th className="px-6 py-4 text-sm font-bold text-slate-700">رقم الطلب</th>
+                                <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الطلب</th>
+                                <th className="px-6 py-4 text-sm font-bold text-slate-700">المورد</th>
+                                <th className="px-6 py-4 text-sm font-bold text-slate-700">طلب الشراء</th>
+                                <th className="px-6 py-4 text-sm font-bold text-slate-700">تاريخ الاستحقاق</th>
+                                <th className="px-6 py-4 text-sm font-bold text-slate-700">الحالة</th>
+                                <th className="px-6 py-4 text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan={7} className="text-center py-10">جاري التحميل...</td></tr>
-                            ) : (activeTab === 'rfqs' ? filteredRFQs : filteredPRs).length === 0 ? (
+                            ) : filteredRFQs.length === 0 ? (
                                 <tr><td colSpan={7} className="text-center py-20">
                                     <div className="flex flex-col items-center gap-3 text-slate-400">
                                         <Package className="w-12 h-12 opacity-20" />
-                                        <span>{activeTab === 'rfqs' ? 'لا توجد طلبات عروض أسعار' : 'لا توجد طلبات شراء معتمدة بانتظار عروض الأسعار'}</span>
+                                        <span>لا توجد طلبات عروض أسعار</span>
                                     </div>
                                 </td></tr>
-                            ) : activeTab === 'rfqs' ? (
+                            ) : (
                                 paginatedRFQs.map((rfq, index) => (
                                     <RFQTableRow
                                         key={rfq.id}
                                         rfq={rfq}
                                         index={index}
                                         onView={(id) => navigate(`/dashboard/procurement/rfq/${id}`)}
-                                        onCreateQuotation={handleCreateQuotation}
                                         onDelete={handleDeleteClick}
                                     />
-                                ))
-                            ) : (
-                                paginatedPRs.map((pr) => (
-                                    <tr key={pr.id} className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0">
-                                        <td className="px-6 py-4 font-bold text-slate-800">#{pr.prNumber}</td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">{new Date(pr.prDate).toLocaleDateString('ar-EG')}</td>
-                                        <td className="px-6 py-4 text-sm text-slate-600 font-bold">{pr.requestedByDeptName}</td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">{pr.requestedByUserName}</td>
-                                        <td className="px-6 py-4 text-sm font-black text-brand-primary">{pr.totalEstimatedAmount?.toLocaleString()} EGP</td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="px-2 py-1 bg-slate-100 rounded text-xs font-bold text-slate-600">
-                                                {pr.items?.length || 0} صنف
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-left">
-                                            <button
-                                                onClick={() => navigate(`/dashboard/procurement/rfq/new?prId=${pr.id}`)}
-                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-all shadow-sm"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                                <span>إنشاء RFQ</span>
-                                            </button>
-                                        </td>
-                                    </tr>
                                 ))
                             )}
                         </tbody>
                     </table>
                 </div>
-                {!loading && (activeTab === 'rfqs' ? filteredRFQs.length : filteredPRs.length) > 0 && (
+                {!loading && filteredRFQs.length > 0 && (
                     <Pagination
                         currentPage={currentPage}
-                        totalItems={activeTab === 'rfqs' ? filteredRFQs.length : filteredPRs.length}
+                        totalItems={filteredRFQs.length}
                         pageSize={pageSize}
                         onPageChange={setCurrentPage}
                         onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}

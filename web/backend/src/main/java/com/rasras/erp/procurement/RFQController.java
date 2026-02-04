@@ -29,6 +29,11 @@ public class RFQController {
         return ResponseEntity.ok(ApiResponse.success(rfqService.createRFQ(dto)));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<RFQDto>> updateRFQ(@PathVariable Integer id, @RequestBody RFQDto dto) {
+        return ResponseEntity.ok(ApiResponse.success(rfqService.updateRFQ(id, dto)));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteRFQ(@PathVariable Integer id) {
         rfqService.deleteRFQ(id);
