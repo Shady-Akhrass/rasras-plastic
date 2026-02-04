@@ -205,7 +205,7 @@ const ItemRow: React.FC<{
                 >
                     <option value={0}>اختر صنف...</option>
                     {items.map(i => (
-                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.itemCode})</option>
+                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>
                     ))}
                 </select>
             </div>

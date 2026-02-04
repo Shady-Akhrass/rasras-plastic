@@ -16,6 +16,7 @@ public class StockBalanceDto {
     private Integer id;
     private Integer itemId;
     private String itemCode;
+    private String grade;
     private String itemNameAr;
     private Integer warehouseId;
     private String warehouseNameAr;

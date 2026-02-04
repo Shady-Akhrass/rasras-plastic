@@ -103,7 +103,7 @@ const DualInventoryValuationPage: React.FC = () => {
 
             result.push({
                 itemId,
-                itemCode: item?.itemCode ?? '—',
+                itemCode: (item?.grade || item?.itemCode) ?? '—',
                 itemNameAr: item?.itemNameAr ?? '—',
                 unitName: item?.unitName,
                 qty,
@@ -226,7 +226,7 @@ const DualInventoryValuationPage: React.FC = () => {
                         <thead>
                             <tr className="bg-slate-50 border-b">
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 w-10" />
-                                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">كود الصنف</th>
+                                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">العلامة التجارية / Grade</th>
                                 <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">الصنف</th>
                                 <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">الرصيد</th>
                                 <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">التكلفة التاريخية (وحدة)</th>
@@ -261,7 +261,7 @@ const DualInventoryValuationPage: React.FC = () => {
                                         <td className="px-4 py-3">
                                             {r.hasAlert && <AlertTriangle className="w-5 h-5 text-amber-600" />}
                                         </td>
-                                        <td className="px-6 py-3 font-mono text-slate-700">{r.itemCode}</td>
+                                        <td className="px-6 py-3 font-mono text-slate-700">{r.grade || r.itemCode}</td>
                                         <td className="px-6 py-3">{r.itemNameAr}</td>
                                         <td className="px-6 py-3 font-medium">{(r.qty || 0).toLocaleString()}</td>
                                         <td className="px-6 py-3">{(r.historicalCostPerUnit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>

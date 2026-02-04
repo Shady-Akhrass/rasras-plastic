@@ -12,7 +12,8 @@ import {
     CheckCircle2,
     RefreshCw,
     Edit3,
-    ExternalLink
+    ExternalLink,
+    Trash2
 } from 'lucide-react';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import toast from 'react-hot-toast';
@@ -46,6 +47,13 @@ const StatCard: React.FC<{
             </div>
         </div>
     );
+};
+
+// Supplier Type Labels (Arabic)
+const SUPPLIER_TYPE_LABELS: Record<string, string> = {
+    Local: 'محلي',
+    International: 'دولي',
+    Service: 'خدمي'
 };
 
 // Status Badge Component
@@ -107,6 +115,17 @@ const SuppliersPage: React.FC = () => {
             fetchSuppliers();
         } catch (error) {
             toast.error('فشل إرسال المورد');
+        }
+    };
+
+    const handleDelete = async (supplier: SupplierDto) => {
+        if (!window.confirm(`هل أنت متأكد من حذف المورد "${supplier.supplierNameAr}"؟`)) return;
+        try {
+            await supplierService.deleteSupplier(supplier.id!);
+            toast.success('تم حذف المورد بنجاح');
+            fetchSuppliers();
+        } catch (error) {
+            toast.error('فشل حذف المورد');
         }
     };
 
@@ -338,7 +357,7 @@ const SuppliersPage: React.FC = () => {
                                         </td>
                                         <td className="py-4 px-4">
                                             <span className="text-sm text-slate-600 font-medium">
-                                                {supplier.supplierType || 'عام'}
+                                                {SUPPLIER_TYPE_LABELS[supplier.supplierType || ''] || supplier.supplierType || 'عام'}
                                             </span>
                                         </td>
                                         <td className="py-4 px-4">
@@ -388,6 +407,13 @@ const SuppliersPage: React.FC = () => {
                                                         <CheckCircle2 className="w-4 h-4" />
                                                     </button>
                                                 )}
+                                                <button
+                                                    onClick={() => handleDelete(supplier)}
+                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                    title="حذف"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

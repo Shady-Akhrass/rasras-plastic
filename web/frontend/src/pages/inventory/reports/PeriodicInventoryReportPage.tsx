@@ -103,7 +103,7 @@ const PeriodicInventoryReportPage: React.FC = () => {
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead><tr className="bg-slate-50 border-b"><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">كود الصنف</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">الصنف</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">المستودع</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">الرصيد</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">متوسط التكلفة</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">القيمة</th></tr></thead>
+                        <thead><tr className="bg-slate-50 border-b"><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">العلامة التجارية / Grade</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">الصنف</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">المستودع</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">الرصيد</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">متوسط التكلفة</th><th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">القيمة</th></tr></thead>
                         <tbody>
                             {loading ? [...Array(5)].map((_, i) => <tr key={i} className="border-b animate-pulse"><td colSpan={6} className="px-6 py-4"><div className="h-4 bg-slate-200 rounded" /></td></tr>) :
                                 balances.length === 0 ? (
@@ -111,7 +111,7 @@ const PeriodicInventoryReportPage: React.FC = () => {
                                 ) : (
                                     balances.map((b) => (
                                         <tr key={b.id} className="border-b hover:bg-slate-50">
-                                            <td className="px-6 py-3 font-mono text-slate-700">{b.itemCode || '—'}</td>
+                                            <td className="px-6 py-3 font-mono text-slate-700">{b.grade || b.itemCode || '—'}</td>
                                             <td className="px-6 py-3">{b.itemNameAr || '—'}</td>
                                             <td className="px-6 py-3">{b.warehouseNameAr || '—'}</td>
                                             <td className="px-6 py-3">{((Number(b.quantityOnHand) || 0) * (Number(b.averageCost) || 0)).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</td>
@@ -130,11 +130,11 @@ const PeriodicInventoryReportPage: React.FC = () => {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead><tr className="bg-slate-50 border-b"><th className="px-6 py-3 text-right text-xs font-semibold">كود الصنف</th><th className="px-6 py-3 text-right text-xs font-semibold">الصنف</th><th className="px-6 py-3 text-right text-xs font-semibold">الحد الأدنى</th><th className="px-6 py-3 text-right text-xs font-semibold">الإجراء</th></tr></thead>
+                            <thead><tr className="bg-slate-50 border-b"><th className="px-6 py-3 text-right text-xs font-semibold">العلامة التجارية / Grade</th><th className="px-6 py-3 text-right text-xs font-semibold">الصنف</th><th className="px-6 py-3 text-right text-xs font-semibold">الحد الأدنى</th><th className="px-6 py-3 text-right text-xs font-semibold">الإجراء</th></tr></thead>
                             <tbody>
                                 {belowMin.map((i) => (
                                     <tr key={i.id} className="border-b">
-                                        <td className="px-6 py-3 font-mono">{i.itemCode}</td>
+                                        <td className="px-6 py-3 font-mono">{i.grade || i.itemCode}</td>
                                         <td className="px-6 py-3">{i.itemNameAr}</td>
                                         <td className="px-6 py-3">{i.minStockLevel ?? '—'}</td>
                                         <td className="px-6 py-3"><button onClick={() => navigate(`/dashboard/inventory/items/${i.id}`)} className="text-brand-primary font-medium">فتح</button></td>

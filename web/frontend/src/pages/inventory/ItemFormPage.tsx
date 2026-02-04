@@ -361,10 +361,13 @@ const ItemFormPage: React.FC = () => {
     });
 
     const [formData, setFormData] = useState<ItemDto>({
-        itemCode: '',
         itemNameAr: '',
         itemNameEn: '',
-        gradeName: '',
+        grade: '',
+        gradeName: undefined as number | undefined,
+        mi2: '',
+        mi21: '',
+        density: '',
         categoryId: 0,
         unitId: 0,
         barcode: '',
@@ -451,10 +454,8 @@ const ItemFormPage: React.FC = () => {
 
     /** فحص المدخلات قبل الحفظ */
     const validateForm = (): { valid: boolean; error?: string } => {
-        const code = (formData.itemCode || '').trim();
         const nameAr = (formData.itemNameAr || '').trim();
 
-        if (!code) return { valid: false, error: 'كود الصنف مطلوب' };
         if (!nameAr) return { valid: false, error: 'الاسم العربي مطلوب' };
         if (!formData.categoryId) return { valid: false, error: 'يرجى اختيار التصنيف' };
         if (!formData.unitId) return { valid: false, error: 'يرجى اختيار وحدة القياس' };
@@ -509,7 +510,8 @@ const ItemFormPage: React.FC = () => {
             navigate('/dashboard/inventory/items');
         } catch (error: any) {
             console.error('Error saving item:', error);
-            toast.error(error.response?.data?.message || 'فشل في حفظ الصنف');
+            const msg = error.response?.data?.message || error.message || 'فشل في حفظ الصنف';
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -580,7 +582,7 @@ const ItemFormPage: React.FC = () => {
                                     {isEdit ? 'تعديل بيانات الصنف' : 'إضافة صنف جديد'}
                                 </h1>
                                 <p className="text-white/70">
-                                    {isEdit ? `تعديل: ${formData.itemCode}` : 'أدخل التفاصيل الفنية والمالية للصنف'}
+                                    {isEdit ? `تعديل: ${formData.itemNameAr || formData.grade || formData.itemCode}` : 'أدخل التفاصيل الفنية والمالية للصنف'}
                                 </p>
                             </div>
                         </div>
@@ -642,14 +644,23 @@ const ItemFormPage: React.FC = () => {
                             description="البيانات الرئيسية للصنف"
                         >
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {isEdit && formData.itemCode && (
+                                    <FormInput
+                                        label="كود الصنف"
+                                        value={formData.itemCode || ''}
+                                        onChange={() => { }}
+                                        icon={Barcode}
+                                        disabled
+                                        hint="يُولَّد تلقائياً ولا يمكن تعديله"
+                                    />
+                                )}
                                 <FormInput
-                                    label="كود الصنف"
-                                    value={formData.itemCode}
-                                    onChange={(v) => updateForm('itemCode', v)}
+                                    label=" الجريد/ Grade"
+                                    value={formData.grade || ''}
+                                    onChange={(v) => updateForm('grade', v)}
                                     icon={Tag}
-                                    placeholder="POLY-HD-001"
-                                    required
-                                    hint="كود فريد لتعريف الصنف"
+                                    placeholder="مثال: HP1106K"
+
                                 />
                                 <div className="md:col-span-2">
                                     <FormInput
@@ -672,11 +683,34 @@ const ItemFormPage: React.FC = () => {
                                     />
                                 </div>
                                 <FormInput
-                                    label="العلامة التجارية / Grade"
-                                    value={formData.gradeName || ''}
-                                    onChange={(v) => updateForm('gradeName', v)}
+                                    label="MFR (معدل تدفق الذوبان)"
+                                    value={formData.gradeName ?? ''}
+                                    onChange={(v) => updateForm('gradeName', v ? parseFloat(v) : undefined)}
                                     icon={Layers}
-                                    placeholder="Sabic 5000S"
+                                    type="number"
+                                    placeholder="مثال: 12"
+                                    hint="مقياس لسيولة البلاستيك المصهور"
+                                />
+                                <FormInput
+                                    label="MI2"
+                                    value={formData.mi2 || ''}
+                                    onChange={(v) => updateForm('mi2', v)}
+                                    icon={Scale}
+                                    placeholder=" "
+                                />
+                                <FormInput
+                                    label="MI21"
+                                    value={formData.mi21 || ''}
+                                    onChange={(v) => updateForm('mi21', v)}
+                                    icon={Scale}
+                                    placeholder=" "
+                                />
+                                <FormInput
+                                    label="Density (الكثافة)"
+                                    value={formData.density || ''}
+                                    onChange={(v) => updateForm('density', v)}
+                                    icon={Scale}
+                                    placeholder=" "
                                 />
                             </div>
                         </FormSection>
@@ -738,7 +772,7 @@ const ItemFormPage: React.FC = () => {
                                         rows={3}
                                     />
                                     <FormTextarea
-                                        label="المواصفات الفنية"
+                                        label="التطبيقات النموذجية"
                                         value={formData.technicalSpecs || ''}
                                         onChange={(v) => updateForm('technicalSpecs', v)}
                                         icon={Settings}

@@ -35,6 +35,12 @@ public class SupplierController {
         return ResponseEntity.ok(ApiResponse.success(supplierService.updateSupplier(id, dto)));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteSupplier(@PathVariable Integer id) {
+        supplierService.deleteSupplier(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @GetMapping("/items-master")
     public ResponseEntity<ApiResponse<List<SupplierItemDto>>> getAllSupplierItems() {
         return ResponseEntity.ok(ApiResponse.success(supplierService.getAllSupplierItems()));

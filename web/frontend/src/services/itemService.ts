@@ -2,10 +2,14 @@ import apiClient from './apiClient';
 
 export interface ItemDto {
     id?: number;
-    itemCode: string;
+    itemCode?: string;
     itemNameAr: string;
     itemNameEn?: string;
-    gradeName?: string;
+    grade?: string;
+    gradeName?: number;
+    mi2?: string;
+    mi21?: string;
+    density?: string;
     categoryId: number;
     categoryName?: string;
     unitId: number;

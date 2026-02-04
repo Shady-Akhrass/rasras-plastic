@@ -77,6 +77,7 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(86400000L) // 24 hours
                 .userId(userPrincipal.getId())
+                .employeeId(user.getEmployeeId())
                 .username(userPrincipal.getUsername())
                 .roleName(user.getRole().getRoleNameEn())
                 .roleCode(user.getRole().getRoleCode())
@@ -109,6 +110,7 @@ public class AuthService {
                 .refreshToken(refreshToken) // Return same refresh token or rotate it (policy dependent)
                 .tokenType("Bearer")
                 .userId(userPrincipal.getId())
+                .employeeId(user.getEmployeeId())
                 .username(userPrincipal.getUsername())
                 .roleName(user.getRole().getRoleNameEn())
                 .roleCode(user.getRole().getRoleCode())

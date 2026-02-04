@@ -12,4 +12,8 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
     List<Item> findByCategoryId(Integer categoryId);
 
     boolean existsByCategoryId(Integer categoryId);
+
+    /** للحصول على أعلى رقم تسلسلي من أكواد ITEM-XXXXX */
+    @org.springframework.data.jpa.repository.Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(ItemCode, 6) AS UNSIGNED)), 0) FROM items WHERE ItemCode LIKE 'ITEM-%'", nativeQuery = true)
+    Integer findMaxItemCodeSequence();
 }

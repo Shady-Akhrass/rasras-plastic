@@ -74,6 +74,7 @@ public class StockBalanceService {
                 .id(balance.getId())
                 .itemId(balance.getItem().getId())
                 .itemCode(balance.getItem().getItemCode())
+                .grade(balance.getItem().getGrade())
                 .itemNameAr(balance.getItem().getItemNameAr())
                 .warehouseId(balance.getWarehouse().getId())
                 .warehouseNameAr(balance.getWarehouse().getWarehouseNameAr())
