@@ -25,6 +25,7 @@ public class PurchaseOrderItemDto {
     private BigDecimal taxPercentage;
     private BigDecimal taxAmount;
     private BigDecimal totalPrice;
+    private String polymerGrade;
     private BigDecimal receivedQty;
     private BigDecimal remainingQty;
     private String status;

@@ -6,7 +6,7 @@ import com.rasras.erp.supplier.SupplierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDate; 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -72,6 +72,45 @@ public class RFQService {
                 }
 
                 return mapToDto(savedRfq);
+        }
+
+        @Transactional
+        public RFQDto updateRFQ(Integer id, RFQDto dto) {
+                RequestForQuotation rfq = rfqRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("RFQ not found"));
+
+                rfq.setSupplier(supplierRepository.findById(dto.getSupplierId())
+                                .orElseThrow(() -> new RuntimeException("Supplier not found")));
+
+                if (dto.getPrId() != null) {
+                        rfq.setPurchaseRequisition(prRepository.findById(dto.getPrId())
+                                        .orElseThrow(() -> new RuntimeException("Purchase Requisition not found")));
+                } else {
+                        rfq.setPurchaseRequisition(null);
+                }
+
+                if (dto.getRfqDate() != null) {
+                        rfq.setRfqDate(dto.getRfqDate());
+                }
+                rfq.setResponseDueDate(dto.getResponseDueDate());
+                rfq.setNotes(dto.getNotes());
+
+                // Update items - clear existing and add new
+                if (rfq.getItems() != null) {
+                        rfq.getItems().clear();
+                }
+                if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+                        List<RFQItem> items = dto.getItems().stream()
+                                        .map(itemDto -> mapItemToEntity(itemDto, rfq))
+                                        .collect(Collectors.toList());
+                        if (rfq.getItems() == null) {
+                                rfq.setItems(items);
+                        } else {
+                                rfq.getItems().addAll(items);
+                        }
+                }
+
+                return mapToDto(rfqRepository.save(rfq));
         }
 
         private String generateRFQNumber() {

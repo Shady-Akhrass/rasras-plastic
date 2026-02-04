@@ -1,10 +1,17 @@
 package com.rasras.erp.procurement;
 
 import com.rasras.erp.employee.DepartmentRepository;
+import com.rasras.erp.user.UserRepository;
+import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
+import com.rasras.erp.inventory.QualityInspectionRepository;
+import com.rasras.erp.inventory.GoodsReceiptNote;
+import com.rasras.erp.inventory.QualityInspection;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitRepository;
-import com.rasras.erp.user.User;
-import com.rasras.erp.user.UserRepository;
+import com.rasras.erp.approval.ApprovalService;
+import com.rasras.erp.approval.ApprovalRequest;
+import com.rasras.erp.approval.ApprovalRequestRepository;
+import com.rasras.erp.approval.ApprovalWorkflowStep;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,6 +33,13 @@ public class PurchaseRequisitionService {
     private final ItemRepository itemRepository;
     private final UnitRepository unitRepository;
     private final com.rasras.erp.approval.ApprovalService approvalService;
+    private final PurchaseOrderRepository purchaseOrderRepository;
+    private final GoodsReceiptNoteRepository goodsReceiptNoteRepository;
+    private final QualityInspectionRepository qualityInspectionRepository;
+    private final RFQRepository rfqRepository;
+    private final QuotationComparisonRepository quotationComparisonRepository;
+    private final SupplierQuotationRepository supplierQuotationRepository;
+    private final ApprovalRequestRepository approvalRequestRepository;
 
     @Transactional(readOnly = true)
     public List<PurchaseRequisitionDto> getAllPurchaseRequisitions() {
@@ -129,6 +143,99 @@ public class PurchaseRequisitionService {
                     "لا يمكن حذف عرض الشراء إلا إذا كان بحالة مسودة. الحالة الحالية: " + pr.getStatus());
         }
         prRepository.delete(pr);
+    }
+
+    @Transactional(readOnly = true)
+    public PRLifecycleDto getPRLifecycle(Integer prId) {
+        PurchaseRequisition pr = prRepository.findById(prId)
+                .orElseThrow(() -> new RuntimeException("PR not found"));
+
+        PRLifecycleDto.PRLifecycleDtoBuilder builder = PRLifecycleDto.builder();
+
+        // 1. Requisition Stage
+        builder.requisition(PRLifecycleDto.RequisitionStage.builder()
+                .status(pr.getStatus())
+                .date(pr.getPrDate())
+                .prNumber(pr.getPrNumber())
+                .build());
+
+        // 2. Approval Stage
+        builder.approval(getApprovalStage(prId));
+
+        // 3. Sourcing Stage (RFQs & Comparisons)
+        builder.sourcing(getSourcingStage(prId));
+
+        // 4. Ordering Stage (POs)
+        List<PurchaseOrder> pos = purchaseOrderRepository.findByPrId(prId);
+        builder.ordering(PRLifecycleDto.OrderingStage.builder()
+                .status(pos.isEmpty() ? "None"
+                        : pos.stream().anyMatch(po -> "Approved".equals(po.getApprovalStatus())) ? "Approved"
+                                : "Pending")
+                .poNumbers(pos.stream().map(PurchaseOrder::getPoNumber).collect(Collectors.toList()))
+                .lastPoDate(pos.stream().map(PurchaseOrder::getPoDate).max(LocalDateTime::compareTo).orElse(null))
+                .build());
+
+        // 5. Receiving Stage (GRNs via POs)
+        List<GoodsReceiptNote> grns = pos.stream()
+                .flatMap(po -> goodsReceiptNoteRepository.findByPurchaseOrder_Id(po.getId()).stream())
+                .collect(Collectors.toList());
+        builder.receiving(PRLifecycleDto.ReceivingStage.builder()
+                .status(grns.isEmpty() ? "None"
+                        : grns.stream().anyMatch(g -> "Completed".equals(g.getStatus())) ? "Completed" : "In Progress")
+                .grnNumbers(grns.stream().map(GoodsReceiptNote::getGrnNumber).collect(Collectors.toList()))
+                .lastGrnDate(grns.stream().map(GoodsReceiptNote::getGrnDate).max(LocalDateTime::compareTo).orElse(null))
+                .build());
+
+        // 6. Quality Stage (Inspections via GRNs)
+        List<QualityInspection> inspections = grns.stream()
+                .flatMap(g -> qualityInspectionRepository.findByReferenceTypeAndReferenceId("GRN", g.getId()).stream())
+                .collect(Collectors.toList());
+        builder.quality(PRLifecycleDto.QualityStage.builder()
+                .status(inspections.isEmpty() ? "None"
+                        : inspections.stream().allMatch(i -> "Passed".equals(i.getOverallResult())) ? "Completed"
+                                : "Partial")
+                .result(inspections.isEmpty() ? "N/A"
+                        : inspections.stream().anyMatch(i -> "Failed".equals(i.getOverallResult())) ? "Failed"
+                                : "Passed")
+                .inspectionDate(inspections.stream().map(QualityInspection::getInspectionDate)
+                        .max(LocalDateTime::compareTo).orElse(null))
+                .build());
+
+        return builder.build();
+    }
+
+    private PRLifecycleDto.ApprovalStage getApprovalStage(Integer prId) {
+        return approvalRequestRepository.findByDocumentTypeAndDocumentId("PurchaseRequisition", prId)
+                .stream()
+                .findFirst()
+                .map(req -> PRLifecycleDto.ApprovalStage.builder()
+                        .status(req.getStatus())
+                        .currentStep(req.getCurrentStep() != null ? req.getCurrentStep().getStepName() : "N/A")
+                        .lastActionDate(req.getCompletedDate()) // Using completedDate as a fallback for last action
+                        .build())
+                .orElse(PRLifecycleDto.ApprovalStage.builder().status("Draft").build());
+    }
+
+    private PRLifecycleDto.SourcingStage getSourcingStage(Integer prId) {
+        List<RequestForQuotation> rfqs = rfqRepository.findByPurchaseRequisitionId(prId);
+        List<QuotationComparison> comparisons = quotationComparisonRepository.findByPurchaseRequisitionId(prId);
+
+        String status = "None";
+        if (!comparisons.isEmpty()) {
+            status = comparisons.stream().anyMatch(c -> "Approved".equals(c.getApprovalStatus())) ? "Completed"
+                    : "In Progress";
+        } else if (!rfqs.isEmpty()) {
+            status = "In Progress";
+        }
+
+        return PRLifecycleDto.SourcingStage.builder()
+                .status(status)
+                .rfqCount(rfqs.size())
+                .quotationCount((int) rfqs.stream()
+                        .flatMap(r -> supplierQuotationRepository.findByRfqId(r.getId()).stream())
+                        .count())
+                .comparisonStatus(comparisons.isEmpty() ? "None" : comparisons.get(0).getApprovalStatus())
+                .build();
     }
 
     private void updatePrFromDto(PurchaseRequisition pr, PurchaseRequisitionDto dto) {

@@ -1480,6 +1480,7 @@ CREATE TABLE IF NOT EXISTS `purchaseorderitems` (
   `TaxPercentage` decimal(5,2) DEFAULT 0.00,
   `TaxAmount` decimal(18,2) DEFAULT 0.00,
   `TotalPrice` decimal(18,2) NOT NULL,
+  `PolymerGrade` varchar(50) DEFAULT NULL,
   `ReceivedQty` decimal(18,3) DEFAULT 0.000,
   `RemainingQty` decimal(18,3) GENERATED ALWAYS AS (`OrderedQty` - `ReceivedQty`) STORED,
   `Status` varchar(20) DEFAULT 'Pending',

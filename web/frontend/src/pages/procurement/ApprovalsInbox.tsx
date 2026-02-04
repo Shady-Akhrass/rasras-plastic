@@ -15,8 +15,8 @@ import {
     Search,
     Filter,
     RefreshCw,
-    XCircle,
-    CheckCircle2
+    XCircle, CheckCircle2,
+    RotateCcw
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
@@ -65,7 +65,7 @@ const RequestCard: React.FC<{
     processing: boolean;
 }> = ({ request, index, onApprove, onReject, processing }) => {
     const getDocTypeConfig = (type: string) => {
-        const configs: Record<string, { bg: string; text: string; icon: React.ElementType }> = {
+        const configs: Record<string, { label?: string; shortLabel?: string; bg: string; text: string; border?: string; icon: React.ElementType }> = {
             'PurchaseRequisition': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
             'PR': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
             'RFQ': { bg: 'bg-amber-50', text: 'text-amber-600', icon: FileText },
@@ -73,8 +73,23 @@ const RequestCard: React.FC<{
             'SQ': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
             'QuotationComparison': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
             'QC': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
-            'PurchaseOrder': { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            'PurchaseOrder': {
+                label: 'أمر شراء',
+                shortLabel: 'PO',
+                bg: 'bg-blue-50',
+                text: 'text-blue-600',
+                border: 'border-blue-200',
+                icon: ShoppingCart,
+            },
             'PO': { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            'PurchaseReturn': {
+                label: 'مرتجع مشتريات',
+                shortLabel: 'PRN',
+                bg: 'bg-rose-50',
+                text: 'text-rose-600',
+                border: 'border-rose-100',
+                icon: RotateCcw,
+            },
             'GoodsReceiptNote': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
             'GRN': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
             'SupplierInvoice': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
@@ -107,12 +122,13 @@ const RequestCard: React.FC<{
             'GRN': '/dashboard/procurement/grn',
             'GoodsReceiptNote': '/dashboard/procurement/grn',
             'SINV': '/dashboard/procurement/invoices',
-            'SupplierInvoice': '/dashboard/procurement/invoices'
+            'SupplierInvoice': '/dashboard/procurement/invoices',
+            'PurchaseReturn': '/dashboard/procurement/returns'
         };
 
         const route = typeRoutes[request.documentType];
         if (route) {
-            navigate(`${route}/${request.documentId}`);
+            navigate(`${route}/${request.documentId}?mode=view&approvalId=${request.id}`);
         } else {
             toast.error('لم يتم تحديد مسار لهذا المستند');
         }

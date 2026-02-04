@@ -122,9 +122,9 @@ const PRTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onSubmit: (id: number) => void;
-    onViewPOs: (id: number) => void;
+
     onDelete: (pr: PurchaseRequisition) => void;
-}> = ({ pr, index, onView, onSubmit, onViewPOs, onDelete }) => (
+}> = ({ pr, index, onView, onSubmit, onDelete }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -167,6 +167,17 @@ const PRTableRow: React.FC<{
         <td className="px-6 py-4">
             <StatusBadge status={pr.status || 'Draft'} />
         </td>
+        <td className="px-6 py-4">
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${pr.status === 'Draft' ? 'bg-slate-50 text-slate-700 border-slate-200' :
+                pr.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    pr.status === 'Approved' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}>
+                {pr.status === 'Draft' ? 'المسودة' :
+                    pr.status === 'Pending' ? 'الاعتماد' :
+                        pr.status === 'Approved' ? 'التوريد/الطلب' : 'مكتمل'}
+            </div>
+        </td>
         <td className="px-6 py-4 text-left">
             <div className="flex items-center justify-end gap-2">
                 {pr.status === 'Draft' && (
@@ -179,16 +190,7 @@ const PRTableRow: React.FC<{
                         <CheckCircle2 className="w-5 h-5" />
                     </button>
                 )}
-                {pr.status === 'Approved' && (
-                    <button
-                        onClick={() => onViewPOs(pr.id!)}
-                        className="p-2 text-blue-500 hover:bg-blue-50 
-                            rounded-lg transition-all duration-200"
-                        title="عرض أوامر الشراء المرتبطة"
-                    >
-                        <Package className="w-5 h-5" />
-                    </button>
-                )}
+
                 <button
                     onClick={() => onView(pr.id!)}
                     className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
@@ -197,7 +199,7 @@ const PRTableRow: React.FC<{
                 >
                     <Edit3 className="w-5 h-5" />
                 </button>
-                {pr.status === 'Draft' && (
+                {(pr.status === 'Draft' || pr.status === 'Approved') && (
                     <button
                         onClick={() => onDelete(pr)}
                         className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
@@ -239,7 +241,13 @@ const TableSkeleton: React.FC = () => (
                     <div className="h-6 w-20 bg-slate-100 rounded-full" />
                 </td>
                 <td className="px-6 py-4">
-                    <div className="w-9 h-9 bg-slate-100 rounded-lg" />
+                    <div className="h-6 w-24 bg-slate-100 rounded-full" />
+                </td>
+                <td className="px-6 py-4 text-left">
+                    <div className="flex justify-end gap-2">
+                        <div className="w-9 h-9 bg-slate-100 rounded-lg" />
+                        <div className="w-9 h-9 bg-slate-100 rounded-lg" />
+                    </div>
                 </td>
             </tr>
         ))}
@@ -249,7 +257,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
-        <td colSpan={7} className="px-6 py-16">
+        <td colSpan={8} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm || statusFilter !== 'All' ? (
@@ -581,7 +589,8 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">القسم</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الأولوية</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
-                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المرحلة الحالية</th>
+                                <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 font-bold text-slate-700">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -597,7 +606,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                         index={index}
                                         onView={handleViewPR}
                                         onSubmit={handleSubmit}
-                                        onViewPOs={(id) => navigate(`/dashboard/procurement/po?prId=${id}`)}
+
                                         onDelete={handleDeleteClick}
                                     />
                                 ))

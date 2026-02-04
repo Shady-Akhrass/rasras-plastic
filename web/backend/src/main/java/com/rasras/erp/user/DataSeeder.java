@@ -218,5 +218,53 @@ public class DataSeeder implements CommandLineRunner {
                 stepRepo.save(step1);
             }
         }
+
+        // 5. Purchase Return Approval Workflow
+        if (!workflowRepo.findByWorkflowCode("RET_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow retWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("RET_APPROVAL")
+                    .workflowName("Purchase Return Approval")
+                    .documentType("PurchaseReturn")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(retWorkflow);
+
+            Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
+            if (pmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(retWorkflow)
+                        .stepNumber(1)
+                        .stepName("Procurement Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(pmRole)
+                        .build();
+                stepRepo.save(step1);
+            }
+        }
+
+        // 6. QC Approval Workflow
+        if (!workflowRepo.findByWorkflowCode("QC_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow qcWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("QC_APPROVAL")
+                    .workflowName("Quotation Comparison Approval")
+                    .documentType("QuotationComparison")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(qcWorkflow);
+
+            Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
+            if (pmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(qcWorkflow)
+                        .stepNumber(1)
+                        .stepName("Procurement Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(pmRole)
+                        .build();
+                stepRepo.save(step1);
+            }
+        }
     }
 }

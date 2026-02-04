@@ -8,7 +8,6 @@ import {
     CheckCircle2,
     Clock,
     Filter,
-    Package,
     ShoppingCart,
     X,
     Eye,
@@ -107,8 +106,7 @@ const POTableRow: React.FC<{
     order: PurchaseOrderDto;
     index: number;
     onView: (id: number) => void;
-    onReceive: (id: number) => void;
-}> = ({ order, index, onView, onReceive }) => (
+}> = ({ order, index, onView }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -153,15 +151,6 @@ const POTableRow: React.FC<{
                 >
                     <Eye className="w-4 h-4" />
                 </button>
-                {(order.status === 'Draft' || order.status === 'Pending' || order.status === 'PartiallyReceived') && (
-                    <button
-                        onClick={() => onReceive(order.id!)}
-                        className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                        title="تسجيل استلام"
-                    >
-                        <Package className="w-4 h-4" />
-                    </button>
-                )}
             </div>
         </td>
     </tr>
@@ -290,10 +279,6 @@ const PurchaseOrdersPage: React.FC = () => {
 
     const handleViewOrder = (id: number) => {
         navigate(`/dashboard/procurement/po/${id}`);
-    };
-
-    const handleReceiveOrder = (id: number) => {
-        navigate(`/dashboard/procurement/grn/new?poId=${id}`);
     };
 
     return (
@@ -485,7 +470,6 @@ const PurchaseOrdersPage: React.FC = () => {
                                         order={order}
                                         index={index}
                                         onView={handleViewOrder}
-                                        onReceive={handleReceiveOrder}
                                     />
                                 ))
                             )}

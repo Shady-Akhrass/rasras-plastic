@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { systemService } from '../../services/systemService';
 import {
     Save,
@@ -15,8 +15,12 @@ import {
     AlertCircle,
     Tag,
     Calendar,
-    Truck
+    Truck,
+    Eye,
+    XCircle,
+    RefreshCw
 } from 'lucide-react';
+import { approvalService } from '../../services/approvalService';
 import purchaseService, {
     type SupplierQuotation,
     type PurchaseRequisition,
@@ -29,11 +33,16 @@ import toast from 'react-hot-toast';
 const QuotationComparisonFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const isView = queryParams.get('mode') === 'view';
+    const approvalId = queryParams.get('approvalId');
     const isEdit = !!id;
 
     // State
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [processing, setProcessing] = useState(false);
     const [prs, setPrs] = useState<PurchaseRequisition[]>([]);
     const [selectedPrId, setSelectedPrId] = useState<number | undefined>();
     const [quotations, setQuotations] = useState<SupplierQuotation[]>([]);
@@ -312,6 +321,22 @@ const QuotationComparisonFormPage: React.FC = () => {
         }
     };
 
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/procurement/approvals');
+        } catch (error) {
+            console.error('Failed to take action:', error);
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
 
     if (loading) return (
         <div className="flex items-center justify-center h-96">
@@ -374,20 +399,54 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 <span>بانتظار الاعتماد</span>
                             </div>
                         )}
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                            {saving ? (
-                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                            ) : (
-                                <Save className="w-5 h-5" />
-                            )}
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ المقارنة'}</span>
-                        </button>
+                        {!isView && (
+                            <button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                                    font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                    disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                                {saving ? (
+                                    <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                                ) : (
+                                    <Save className="w-5 h-5" />
+                                )}
+                                <span>{saving ? 'جاري الحفظ...' : 'حفظ المقارنة'}</span>
+                            </button>
+                        )}
+                        {isView && (
+                            <div className="flex items-center gap-3">
+                                {approvalId && (
+                                    <>
+                                        <button
+                                            onClick={() => handleApprovalAction('Approved')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                                font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                                disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                            <span>اعتماد</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleApprovalAction('Rejected')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                                font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                                disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                            <span>رفض</span>
+                                        </button>
+                                    </>
+                                )}
+                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                    <Eye className="w-5 h-5" />
+                                    <span className="font-bold">وضع العرض فقط</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -420,8 +479,10 @@ const QuotationComparisonFormPage: React.FC = () => {
                                     setSelectedPrId(prId);
                                     setFormData(prev => ({ ...prev, prId: prId, itemId: undefined, details: [] }));
                                 }}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                    focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                disabled={isView}
+                                className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                    focus:border-brand-primary outline-none transition-all font-semibold
+                                    ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                             >
                                 <option value="">اختر طلب شراء معتمد...</option>
                                 {prs.map(pr => (
@@ -499,32 +560,34 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 <p className="text-slate-500 text-sm">اختر العرض الأفضل وحدد سبب الاختيار</p>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={selectLowestPrice}
-                                className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                                title="اختيار أقل سعر"
-                            >
-                                <DollarSign className="w-3.5 h-3.5 inline ml-1" />
-                                الأرخص
-                            </button>
-                            <button
-                                onClick={selectFastestDelivery}
-                                className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
-                                title="اختيار أسرع توريد"
-                            >
-                                <Clock className="w-3.5 h-3.5 inline ml-1" />
-                                الأسرع
-                            </button>
-                            <button
-                                onClick={selectHighestScore}
-                                className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold border border-purple-100 hover:bg-purple-100 transition-colors"
-                                title="اختيار أعلى تقييم"
-                            >
-                                <Star className="w-3.5 h-3.5 inline ml-1" />
-                                الأفضل تقييماً
-                            </button>
-                        </div>
+                        {!isView && (
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={selectLowestPrice}
+                                    className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                    title="اختيار أقل سعر"
+                                >
+                                    <DollarSign className="w-3.5 h-3.5 inline ml-1" />
+                                    الأرخص
+                                </button>
+                                <button
+                                    onClick={selectFastestDelivery}
+                                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+                                    title="اختيار أسرع توريد"
+                                >
+                                    <Clock className="w-3.5 h-3.5 inline ml-1" />
+                                    الأسرع
+                                </button>
+                                <button
+                                    onClick={selectHighestScore}
+                                    className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold border border-purple-100 hover:bg-purple-100 transition-colors"
+                                    title="اختيار أعلى تقييم"
+                                >
+                                    <Star className="w-3.5 h-3.5 inline ml-1" />
+                                    الأفضل تقييماً
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="p-6 space-y-6">
@@ -536,8 +599,10 @@ const QuotationComparisonFormPage: React.FC = () => {
                             <select
                                 value={formData.selectedQuotationId || ''}
                                 onChange={(e) => setFormData(prev => ({ ...prev, selectedQuotationId: parseInt(e.target.value) }))}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                    focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                disabled={isView}
+                                className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                    focus:border-brand-primary outline-none transition-all font-semibold
+                                    ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                             >
                                 <option value="">حدد العرض الأفضل...</option>
                                 {formData.details?.map(d => (
@@ -557,9 +622,11 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 value={formData.selectionReason || ''}
                                 onChange={(e) => setFormData(prev => ({ ...prev, selectionReason: e.target.value }))}
                                 rows={5}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                    focus:border-brand-primary focus:bg-white outline-none transition-all text-sm leading-relaxed resize-none"
-                                placeholder="مثلاً: السعر الأقل، سرعة التوريد، جودة الخامات، الخبرة السابقة مع المورد..."
+                                disabled={isView}
+                                className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                    focus:border-brand-primary outline-none transition-all text-sm leading-relaxed resize-none
+                                    ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                placeholder={isView ? '' : "مثلاً: السعر الأقل، سرعة التوريد، جودة الخامات، الخبرة السابقة مع المورد..."}
                             />
                         </div>
 
@@ -758,9 +825,11 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                         type="number"
                                                         value={detail.deliveryDays}
                                                         onChange={(e) => updateDetail(detail.quotationId, 'deliveryDays', parseInt(e.target.value))}
-                                                        className="w-16 px-2 py-1.5 bg-white border border-slate-200 rounded-lg 
+                                                        disabled={isView}
+                                                        className={`w-16 px-2 py-1.5 border border-slate-200 rounded-lg 
                                                             text-center font-bold text-slate-700 focus:border-brand-primary 
-                                                            outline-none transition-all text-sm"
+                                                            outline-none transition-all text-sm
+                                                            ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                     />
                                                     <span className="text-[10px] font-bold text-slate-400">يوم</span>
                                                 </div>
@@ -778,19 +847,21 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                         <span>الأفضل</span>
                                                     </div>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => setFormData(prev => ({
-                                                            ...prev,
-                                                            selectedQuotationId: detail.quotationId
-                                                        }))}
-                                                        disabled={requireThreeQuotations && quotations.length < 3}
-                                                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${requireThreeQuotations && quotations.length < 3
-                                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                            : 'bg-brand-primary text-white hover:bg-brand-primary/90 hover:scale-105 active:scale-95 shadow-lg shadow-brand-primary/20'
-                                                            }`}
-                                                    >
-                                                        اختيار
-                                                    </button>
+                                                    !isView && (
+                                                        <button
+                                                            onClick={() => setFormData(prev => ({
+                                                                ...prev,
+                                                                selectedQuotationId: detail.quotationId
+                                                            }))}
+                                                            disabled={requireThreeQuotations && quotations.length < 3}
+                                                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${requireThreeQuotations && quotations.length < 3
+                                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                                : 'bg-brand-primary text-white hover:bg-brand-primary/90 hover:scale-105 active:scale-95 shadow-lg shadow-brand-primary/20'
+                                                                }`}
+                                                        >
+                                                            اختيار
+                                                        </button>
+                                                    )
                                                 )}
                                             </td>
                                         </tr>

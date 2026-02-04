@@ -62,6 +62,9 @@ public class PurchaseOrderItem {
     @Column(name = "TotalPrice", precision = 18, scale = 2, nullable = false)
     private BigDecimal totalPrice;
 
+    @Column(name = "PolymerGrade", length = 50)
+    private String polymerGrade;
+
     @Column(name = "ReceivedQty", precision = 18, scale = 3)
     @Builder.Default
     private BigDecimal receivedQty = BigDecimal.ZERO;

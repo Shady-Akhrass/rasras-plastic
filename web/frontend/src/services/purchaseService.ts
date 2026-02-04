@@ -195,6 +195,10 @@ const purchaseService = {
         const response = await apiClient.post<{ data: RFQ }>('/procurement/rfq', rfq);
         return response.data.data;
     },
+    updateRFQ: async (id: number, rfq: RFQ) => {
+        const response = await apiClient.put<{ data: RFQ }>(`/procurement/rfq/${id}`, rfq);
+        return response.data.data;
+    },
     deleteRFQ: async (id: number) => {
         await apiClient.post(`/procurement/rfq/${id}/delete`);
     },
@@ -211,6 +215,9 @@ const purchaseService = {
     createQuotation: async (quotation: SupplierQuotation) => {
         const response = await apiClient.post<{ data: SupplierQuotation }>('/procurement/quotation', quotation);
         return response.data.data;
+    },
+    deleteQuotation: async (id: number) => {
+        await apiClient.post(`/procurement/quotation/${id}/delete`);
     },
 
     // Comparisons
@@ -246,12 +253,30 @@ const purchaseService = {
         });
         return response.data.data;
     },
+    deleteComparison: async (id: number) => {
+        await apiClient.post(`/procurement/comparison/${id}/delete`);
+    },
 
     // Suppliers
     getAllSuppliers: async () => {
         const response = await apiClient.get<{ data: Supplier[] }>('/suppliers');
         return response.data.data;
+    },
+
+    // Lifecycle
+    getPRLifecycle: async (id: number) => {
+        const response = await apiClient.get<{ data: PRLifecycle }>('/procurement/pr/' + id + '/lifecycle');
+        return response.data.data;
     }
 };
+
+export interface PRLifecycle {
+    requisition: { status: string; date: string; prNumber: string };
+    approval: { status: string; currentStep: string; lastActionDate?: string };
+    sourcing: { status: string; rfqCount: number; quotationCount: number; comparisonStatus: string };
+    ordering: { status: string; poNumbers: string[]; lastPoDate?: string };
+    receiving: { status: string; grnNumbers: string[]; lastGrnDate?: string };
+    quality: { status: string; result: string; inspectionDate?: string };
+}
 
 export default purchaseService;

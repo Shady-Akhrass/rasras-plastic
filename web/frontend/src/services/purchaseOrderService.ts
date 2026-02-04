@@ -14,6 +14,7 @@ export interface PurchaseOrderItemDto {
     taxPercentage?: number;
     taxAmount?: number;
     totalPrice: number;
+    polymerGrade?: string;
     receivedQty?: number;
     remainingQty?: number;
     status?: string;

@@ -8,8 +8,9 @@ import {
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity, ClipboardCheck, GitCompare,
     Undo2
 } from 'lucide-react';
-import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { approvalService } from '../../services/approvalService';
+import { grnService } from '../../services/grnService';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
 
 // Sidebar Link Component
@@ -210,7 +211,7 @@ const NotificationItem = ({
 };
 
 const DashboardLayout: React.FC = () => {
-    const navigate = useNavigate();
+
     const location = useLocation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
