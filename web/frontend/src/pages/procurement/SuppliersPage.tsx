@@ -122,14 +122,25 @@ const SuppliersPage: React.FC = () => {
         }
     };
 
-    const handleDelete = async (supplier: SupplierDto) => {
-        if (!window.confirm(`هل أنت متأكد من حذف المورد "${supplier.supplierNameAr}"؟`)) return;
+    const handleDeleteClick = (supplier: SupplierDto) => {
+        setSupplierToDelete(supplier);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!supplierToDelete) return;
+
         try {
-            await supplierService.deleteSupplier(supplier.id!);
+            setIsDeleting(true);
+            await supplierService.deleteSupplier(supplierToDelete.id!);
             toast.success('تم حذف المورد بنجاح');
+            setIsDeleteModalOpen(false);
+            setSupplierToDelete(null);
             fetchSuppliers();
         } catch (error) {
             toast.error('فشل حذف المورد');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -393,13 +404,6 @@ const SuppliersPage: React.FC = () => {
                                                 >
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(supplier)}
-                                                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                                    title="حذف"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
                                                 {['DRAFT', 'Draft'].includes(supplier.status || '') && (
                                                     <button
                                                         onClick={() => handleApprove(supplier.id!)}
@@ -410,7 +414,7 @@ const SuppliersPage: React.FC = () => {
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={() => handleDelete(supplier)}
+                                                    onClick={() => handleDeleteClick(supplier)}
                                                     className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
                                                     title="حذف"
                                                 >

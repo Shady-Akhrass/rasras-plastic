@@ -400,12 +400,8 @@ const SupplierItemFormPage: React.FC = () => {
                                 options={itemOptions}
                                 placeholder="اختر الصنف من المخزن..."
                                 required
-                            >
-                                <option value="0">اختر صنف من المخزن...</option>
-                                {items.map(i => (
-                                    <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>
-                                ))}
-                            </select>
+                                loading={loadingItems}
+                            />
                         </div>
                     </SectionCard>
                 </div>

@@ -30,6 +30,7 @@ interface Item {
     id: number;
     itemNameAr: string;
     itemCode: string;
+    grade?: string;
     unitId?: number;
 }
 

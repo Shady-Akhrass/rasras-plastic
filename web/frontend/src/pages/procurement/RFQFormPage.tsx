@@ -30,7 +30,7 @@ const MultiSelectDropdown: React.FC<{
     const filteredOptions = useMemo(() => {
         return options.filter(opt =>
             opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            opt.code?.toLowerCase().includes(searchTerm.toLowerCase())
+            (opt.code && opt.code.toLowerCase().includes(searchTerm.toLowerCase()))
         );
     }, [options, searchTerm]);
 
@@ -109,13 +109,10 @@ const MultiSelectDropdown: React.FC<{
                 {/* Dropdown */}
                 {isOpen && (
                     <>
-                        {/* Backdrop */}
                         <div
                             className="fixed inset-0 z-40"
                             onClick={() => setIsOpen(false)}
                         />
-
-                        {/* Dropdown Content */}
                         <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border-2 border-slate-200 
                             shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                             {/* Search */}
@@ -367,27 +364,7 @@ const ItemRow: React.FC<{
 
             <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
             flex items-center justify-center text-sm font-bold shadow-lg">
-            {index + 1}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
-            {/* Item Select */}
-            <div className="md:col-span-4 space-y-2">
-                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <Package className="w-3.5 h-3.5" />
-                    الصنف
-                </label>
-                <select
-                    value={item.itemId}
-                    onChange={(e) => onUpdate('itemId', parseInt(e.target.value))}
-                    className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
-                        focus:border-brand-primary outline-none bg-white font-medium transition-all"
-                >
-                    <option value={0}>اختر صنف...</option>
-                    {items.map(i => (
-                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>
-                    ))}
-                </select>
+                {index + 1}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
@@ -578,7 +555,7 @@ const RFQFormPage: React.FC = () => {
     useEffect(() => {
         loadDependencies();
         if (isEdit) {
-            loadRFQ(parseInt(id));
+            loadRFQ(parseInt(id!));
         } else if (prIdFromUrl) {
             loadPRData(parseInt(prIdFromUrl));
         }
@@ -743,7 +720,6 @@ const RFQFormPage: React.FC = () => {
                 toast.success('تم تحديث طلب عرض السعر بنجاح', { icon: '🎉' });
             } else {
                 // Create RFQ for each selected supplier sequentially
-                // (avoids RFQ number collision from parallel timestamp generation)
                 let successCount = 0;
                 const errors: string[] = [];
 
@@ -755,7 +731,6 @@ const RFQFormPage: React.FC = () => {
                         } as RFQ);
                         successCount++;
 
-                        // Small delay to ensure unique RFQ numbers (backend uses timestamp)
                         if (selectedSupplierIds.indexOf(supplierId) < selectedSupplierIds.length - 1) {
                             await new Promise(resolve => setTimeout(resolve, 100));
                         }
@@ -816,7 +791,6 @@ const RFQFormPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Custom Styles */}
             <style>{`
                 @keyframes fadeInUp {
                     from {
@@ -830,10 +804,8 @@ const RFQFormPage: React.FC = () => {
                 }
             `}</style>
 
-            {/* Header Section */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
                 rounded-3xl p-8 text-white">
-                {/* Decorative Elements */}
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
                 <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
@@ -931,7 +903,6 @@ const RFQFormPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Info Banner for Multiple Suppliers */}
             {!isEdit && selectedSupplierIds.length > 1 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
                     <div className="p-2 bg-amber-100 rounded-xl">
@@ -945,7 +916,6 @@ const RFQFormPage: React.FC = () => {
                 </div>
             )}
 
-            {/* PR Reference Badge */}
             {formData.prNumber && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
                     <div className="p-2 bg-emerald-100 rounded-xl">
@@ -959,7 +929,6 @@ const RFQFormPage: React.FC = () => {
             )}
 
             <form className="space-y-6" onSubmit={handleSubmit}>
-                {/* Basic Info Section */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
                         <div className="p-2 bg-brand-primary/10 rounded-xl">
@@ -969,7 +938,6 @@ const RFQFormPage: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {/* Multi-select Suppliers */}
                         <div className="lg:col-span-2">
                             <MultiSelectDropdown
                                 label={isEdit ? "المورد" : "الموردين"}
@@ -1010,7 +978,6 @@ const RFQFormPage: React.FC = () => {
                         />
                     </div>
 
-                    {/* PR Selection */}
                     <div className="mt-6">
                         <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                             <Package className="w-4 h-4 text-slate-500" />
@@ -1044,7 +1011,6 @@ const RFQFormPage: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Notes - Full Width */}
                     <div className="mt-6">
                         <FormTextarea
                             label="ملاحظات"
@@ -1058,7 +1024,6 @@ const RFQFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Items Section */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
                         <div className="flex items-center gap-3">
@@ -1106,11 +1071,9 @@ const RFQFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Summary Section */}
                 {formData.items.length > 0 && (
                     <div className="bg-gradient-to-l from-brand-primary/5 to-slate-50 p-6 rounded-2xl border border-slate-200">
                         <div className="flex flex-wrap items-center gap-6">
-                            {/* Suppliers Count */}
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-brand-primary/10 rounded-lg">
                                     <Truck className="w-5 h-5 text-brand-primary" />
@@ -1123,7 +1086,6 @@ const RFQFormPage: React.FC = () => {
 
                             <div className="w-px h-10 bg-slate-200" />
 
-                            {/* Items Count */}
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-emerald-100 rounded-lg">
                                     <Package className="w-5 h-5 text-emerald-600" />
@@ -1136,7 +1098,6 @@ const RFQFormPage: React.FC = () => {
 
                             <div className="w-px h-10 bg-slate-200" />
 
-                            {/* Total Quantity */}
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-purple-100 rounded-lg">
                                     <Hash className="w-5 h-5 text-purple-600" />
@@ -1168,7 +1129,6 @@ const RFQFormPage: React.FC = () => {
                                 </>
                             )}
 
-                            {/* RFQs to be created */}
                             {!isEdit && selectedSupplierIds.length > 1 && (
                                 <>
                                     <div className="w-px h-10 bg-slate-200" />
