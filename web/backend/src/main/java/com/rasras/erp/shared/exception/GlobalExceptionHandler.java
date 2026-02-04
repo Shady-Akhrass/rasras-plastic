@@ -1,6 +1,7 @@
 package com.rasras.erp.shared.exception;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -42,6 +43,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("Access denied"));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        String msg = "لا يمكن تنفيذ العملية - تحقق من صحة البيانات (التصنيف، الوحدة، الروابط)";
+        if (ex.getCause() != null && ex.getCause().getMessage() != null) {
+            String cause = ex.getCause().getMessage();
+            if (cause.contains("Duplicate") || cause.contains("UNIQUE")) msg = "كود الصنف مكرر - يرجى المحاولة مجدداً";
+            else if (cause.contains("foreign key") || cause.contains("ConstraintViolation")) msg = "البيانات المرتبطة غير صحيحة (التصنيف أو وحدة القياس)";
+        }
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(msg));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

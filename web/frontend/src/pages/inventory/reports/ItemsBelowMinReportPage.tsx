@@ -72,7 +72,7 @@ const ItemsBelowMinReportPage: React.FC = () => {
                     <table className="w-full">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">كود الصنف</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">العلامة التجارية / Grade</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">اسم الصنف</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الوحدة</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الرصيد الحالي</th>
@@ -111,7 +111,7 @@ const ItemsBelowMinReportPage: React.FC = () => {
                                     const diff = min - stock;
                                     return (
                                         <tr key={i.id} className="border-b border-slate-100 hover:bg-rose-50/50">
-                                            <td className="px-6 py-4 font-mono font-semibold text-brand-primary">{i.itemCode}</td>
+                                            <td className="px-6 py-4 font-mono font-semibold text-brand-primary">{i.grade || i.itemCode}</td>
                                             <td className="px-6 py-4 font-medium text-slate-800">{i.itemNameAr}</td>
                                             <td className="px-6 py-4 text-slate-600">{i.unitName || '-'}</td>
                                             <td className="px-6 py-4 font-bold text-rose-600">{stock.toLocaleString()}</td>

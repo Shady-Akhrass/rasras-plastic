@@ -687,6 +687,25 @@ const RolesPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* توزيع الأقسام على الأدوار - للمرجع */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                    <LayoutGrid className="w-4 h-4 text-brand-primary" />
+                    ربط الأقسام بالأدوار (ظهور القوائم في الشريط الجانبي)
+                </h3>
+                <p className="text-xs text-slate-600 mb-3">
+                    المستخدم يرى في القائمة الجانبية فقط الأقسام المرتبطة بدوره. رمز الدور (Role Code) هو المعتمد.
+                </p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-slate-600">
+                    <li><strong className="text-slate-800">دورة المشتريات:</strong> PM, BUYER, ADMIN, GM, SYS_ADMIN</li>
+                    <li><strong className="text-slate-800">دورة المبيعات:</strong> SM, ADMIN, GM, SYS_ADMIN</li>
+                    <li><strong className="text-slate-800">المخازن والأصناف:</strong> ADMIN, GM, SYS_ADMIN</li>
+                    <li><strong className="text-slate-800">العمليات (جودة، وحدات، أسعار):</strong> ADMIN, GM, SM, SYS_ADMIN</li>
+                    <li><strong className="text-slate-800">العملاء (CRM):</strong> SM, ADMIN, GM, SYS_ADMIN</li>
+                    <li><strong className="text-slate-800">الإعدادات:</strong> ADMIN, SYS_ADMIN</li>
+                </ul>
+            </div>
+
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard

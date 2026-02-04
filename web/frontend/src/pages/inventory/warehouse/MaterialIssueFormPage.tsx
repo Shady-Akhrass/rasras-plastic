@@ -373,7 +373,7 @@ const MaterialIssueFormPage: React.FC = () => {
                                                     required
                                                 >
                                                     <option value="">اختر الصنف...</option>
-                                                    {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr} ({i.itemCode})</option>)}
+                                                    {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>)}
                                                 </select>
                                             </td>
                                             <td className="px-3 py-2">

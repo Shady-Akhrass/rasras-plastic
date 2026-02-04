@@ -463,7 +463,7 @@ const PurchaseRequisitionFormPage = () => {
                                                     <option value={0}>اختر الصنف...</option>
                                                     {items.map(i => (
                                                         <option key={i.id} value={i.id}>
-                                                            {i.itemNameAr} ({i.itemCode})
+                                                            {i.itemNameAr} ({i.grade || i.itemCode || ''})
                                                         </option>
                                                     ))}
                                                 </select>
