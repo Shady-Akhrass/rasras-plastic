@@ -119,7 +119,7 @@ const InventorySectionsPage: React.FC = () => {
                         icon={Scale}
                         title="وحدات القياس"
                         description="كجم، طن، وغيرها"
-                        to="/dashboard/inventory/units"
+                        to="/dashboard/settings/units"
                         color="blue"
                     />
                     <SectionCard

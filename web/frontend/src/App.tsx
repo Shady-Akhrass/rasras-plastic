@@ -117,7 +117,7 @@ function App() {
             <Route index element={<Navigate to="sections" replace />} />
             <Route path="sections" element={<InventorySectionsPage />} />
             <Route path="categories" element={<ItemCategoriesPage />} />
-            <Route path="units" element={<UnitsPage />} />
+            <Route path="units" element={<Navigate to="/dashboard/settings/units" replace />} />
             <Route path="warehouses" element={<WarehousesPage />} />
             <Route path="quality-parameters" element={<QualityParametersPage />} />
             <Route path="price-lists" element={<PriceListsPage />} />
@@ -134,7 +134,7 @@ function App() {
               <Route path="dual-valuation" element={<DualInventoryValuationPage />} />
             </Route>
             <Route path="warehouse">
-                          <Route path="grn">
+              <Route path="grn">
                 <Route index element={<GRNListPageRedirect />} />
                 <Route path="new" element={<GRNFormPageRedirect />} />
                 <Route path=":id" element={<GRNFormPageRedirect />} />

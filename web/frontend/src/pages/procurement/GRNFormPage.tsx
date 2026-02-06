@@ -744,7 +744,7 @@ const GRNFormPage: React.FC = () => {
                                                             disabled={isView}
                                                             className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold outline-none 
-                                                                focus:border-brand-primary transition-all"
+                                                                focus:border-brand-primary transition-all`}
                                                         />
                                                     </td>
                                                     <td className="py-4 px-3">

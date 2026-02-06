@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Plus, Save, Trash2, Package, Truck, Calendar, FileText,
     ArrowRight, Sparkles, X, RefreshCw, ChevronRight, DollarSign,
-    Hash, Layers, ClipboardList, CheckCircle2, Check, Search, Users, Eye
+    Hash, Layers, ClipboardList, CheckCircle2, Users, Eye
 } from 'lucide-react';
 import purchaseService, { type RFQ, type RFQItem, type Supplier } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
@@ -12,224 +12,58 @@ import { unitService, type UnitDto } from '../../services/unitService';
 import { approvalService } from '../../services/approvalService';
 import toast from 'react-hot-toast';
 
-// Multi Select Dropdown Component
-const MultiSelectDropdown: React.FC<{
+// Form Select Component
+const FormSelect: React.FC<{
     label: string;
-    options: { value: number; label: string; code?: string }[];
-    selectedValues: number[];
-    onChange: (values: number[]) => void;
+    value: number | string;
+    onChange: (value: string) => void;
     icon?: React.ElementType;
+    options: { value: number | string; label: string }[];
     placeholder?: string;
     required?: boolean;
     loading?: boolean;
-    disabled?: boolean;
-}> = ({ label, options, selectedValues, onChange, icon: Icon, placeholder, required, loading, disabled }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const filteredOptions = useMemo(() => {
-        return options.filter(opt =>
-            opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (opt.code && opt.code.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-    }, [options, searchTerm]);
-
-    const toggleOption = (value: number) => {
-        if (selectedValues.includes(value)) {
-            onChange(selectedValues.filter(v => v !== value));
-        } else {
-            onChange([...selectedValues, value]);
-        }
-    };
-
-    const selectAll = () => {
-        onChange(filteredOptions.map(opt => opt.value));
-    };
-
-    const deselectAll = () => {
-        onChange([]);
-    };
-
-    const selectedLabels = options
-        .filter(opt => selectedValues.includes(opt.value))
-        .map(opt => opt.label);
+    helperText?: React.ReactNode;
+}> = ({ label, value, onChange, icon: Icon, options, placeholder, required, loading, helperText }) => {
+    const [isFocused, setIsFocused] = useState(false);
 
     return (
         <div className="space-y-2">
             <label className={`block text-sm font-semibold transition-colors duration-200
-                ${isOpen ? 'text-brand-primary' : 'text-slate-700'}`}>
+                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
                 {label}
                 {required && <span className="text-rose-500 mr-1">*</span>}
             </label>
             <div className="relative">
                 {Icon && (
-                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200 z-10
-                        ${isOpen ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200
+                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
                 )}
-
-                {/* Trigger Button */}
-                <button
-                    type="button"
-                    onClick={() => !disabled && setIsOpen(!isOpen)}
-                    disabled={disabled}
-                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none 
-                        text-right bg-white flex items-center justify-between
+                <select
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    required={required}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none
+                        appearance-none bg-white cursor-pointer
                         ${Icon ? 'pr-12' : ''}
-                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'cursor-pointer'}
-                        ${isOpen
+                        ${isFocused
                             ? 'border-brand-primary shadow-lg shadow-brand-primary/10'
                             : 'border-slate-200 hover:border-slate-300'}`}
                 >
-                    <div className="flex-1 truncate">
-                        {selectedValues.length === 0 ? (
-                            <span className="text-slate-400">{placeholder || 'اختر...'}</span>
-                        ) : selectedValues.length === 1 ? (
-                            <span className="text-slate-800">{selectedLabels[0]}</span>
-                        ) : (
-                            <span className="text-slate-800">
-                                تم اختيار {selectedValues.length} مورد
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {selectedValues.length > 0 && (
-                            <span className="px-2 py-0.5 bg-brand-primary/10 text-brand-primary text-xs font-bold rounded-full">
-                                {selectedValues.length}
-                            </span>
-                        )}
-                        {loading ? (
-                            <RefreshCw className="w-5 h-5 text-brand-primary animate-spin" />
-                        ) : (
-                            <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform duration-200
-                                ${isOpen ? '-rotate-90' : 'rotate-90'}`} />
-                        )}
-                    </div>
-                </button>
-
-                {/* Dropdown */}
-                {isOpen && (
-                    <>
-                        <div
-                            className="fixed inset-0 z-40"
-                            onClick={() => setIsOpen(false)}
-                        />
-                        <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border-2 border-slate-200 
-                            shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                            {/* Search */}
-                            <div className="p-3 border-b border-slate-100">
-                                <div className="relative">
-                                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        placeholder="بحث في الموردين..."
-                                        className="w-full pr-10 pl-4 py-2 rounded-lg border border-slate-200 
-                                            focus:border-brand-primary outline-none text-sm"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Quick Actions */}
-                            <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                <span className="text-xs text-slate-500">
-                                    {filteredOptions.length} مورد متاح
-                                </span>
-                                <div className="flex gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={selectAll}
-                                        className="px-2 py-1 text-xs font-semibold text-brand-primary 
-                                            hover:bg-brand-primary/10 rounded transition-colors"
-                                    >
-                                        تحديد الكل
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={deselectAll}
-                                        className="px-2 py-1 text-xs font-semibold text-slate-500 
-                                            hover:bg-slate-100 rounded transition-colors"
-                                    >
-                                        إلغاء الكل
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Options List */}
-                            <div className="max-h-64 overflow-y-auto">
-                                {filteredOptions.length > 0 ? (
-                                    filteredOptions.map(opt => {
-                                        const isSelected = selectedValues.includes(opt.value);
-                                        return (
-                                            <div
-                                                key={opt.value}
-                                                onClick={() => toggleOption(opt.value)}
-                                                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all
-                                                    ${isSelected
-                                                        ? 'bg-brand-primary/5 border-r-4 border-brand-primary'
-                                                        : 'hover:bg-slate-50 border-r-4 border-transparent'}`}
-                                            >
-                                                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center
-                                                    transition-all duration-200
-                                                    ${isSelected
-                                                        ? 'bg-brand-primary border-brand-primary text-white'
-                                                        : 'border-slate-300 bg-white'}`}>
-                                                    {isSelected && <Check className="w-3.5 h-3.5" />}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className={`font-medium ${isSelected ? 'text-brand-primary' : 'text-slate-800'}`}>
-                                                        {opt.label}
-                                                    </div>
-                                                    {opt.code && (
-                                                        <div className="text-xs text-slate-400 font-mono">{opt.code}</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div className="px-4 py-8 text-center text-slate-400 text-sm">
-                                        لا توجد نتائج
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </>
+                    {placeholder && <option value={0}>{placeholder}</option>}
+                    {options.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+                {loading ? (
+                    <RefreshCw className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-primary animate-spin" />
+                ) : (
+                    <ChevronRight className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 rotate-90" />
                 )}
             </div>
-
-            {/* Selected Suppliers Tags */}
-            {selectedValues.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                    {options
-                        .filter(opt => selectedValues.includes(opt.value))
-                        .slice(0, 5)
-                        .map(opt => (
-                            <span
-                                key={opt.value}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-brand-primary/10 
-                                    text-brand-primary text-xs font-semibold rounded-lg"
-                            >
-                                {opt.label}
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleOption(opt.value);
-                                    }}
-                                    className="hover:bg-brand-primary/20 rounded-full p-0.5 transition-colors"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </span>
-                        ))}
-                    {selectedValues.length > 5 && (
-                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg">
-                            +{selectedValues.length - 5} آخرين
-                        </span>
-                    )}
-                </div>
+            {helperText && (
+                <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">{helperText}</p>
             )}
         </div>
     );
@@ -435,7 +269,7 @@ const ItemRow: React.FC<{
             </button>
         )}
 
-            <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
+        <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
             flex items-center justify-center text-sm font-bold shadow-lg">
             {index + 1}
         </div>
@@ -498,50 +332,31 @@ const ItemRow: React.FC<{
                 </select>
             </div>
 
-                <div className="md:col-span-2 space-y-2">
-                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                        <Layers className="w-3.5 h-3.5" />
-                        الوحدة
-                    </label>
-                    <select
-                        value={item.unitId}
-                        disabled={disabled}
-                        onChange={(e) => onUpdate('unitId', parseInt(e.target.value))}
-                        className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
-                        focus:border-brand-primary outline-none font-medium transition-all
-                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
-                    >
-                        <option value={0}>الوحدة...</option>
-                        {units.map(u => (
-                            <option key={u.id} value={u.id}>{u.unitNameAr}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="md:col-span-2 space-y-2">
-                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                        <DollarSign className="w-3.5 h-3.5" />
-                        السعر المتوقع
-                        {supplierPrice && (
-                            <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
-                                كتالوج
-                            </span>
-                        )}
-                    </label>
-                    <input
-                        type="number"
-                        value={item.estimatedPrice || ''}
-                        disabled={disabled}
-                        onChange={(e) => onUpdate('estimatedPrice', parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                        className={`w-full px-4 py-2.5 rounded-xl border-2 outline-none font-medium transition-all
+            {/* Expected Price */}
+            <div className="md:col-span-2 space-y-2">
+                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    السعر المتوقع
+                    {supplierPrice && (
+                        <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
+                            كتالوج
+                        </span>
+                    )}
+                </label>
+                <input
+                    type="number"
+                    value={item.estimatedPrice || ''}
+                    disabled={readOnly}
+                    onChange={(e) => onUpdate('estimatedPrice', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className={`w-full px-4 py-2.5 rounded-xl border-2 outline-none font-medium transition-all
                         ${supplierPrice
-                                ? 'border-emerald-200 bg-emerald-50/50 focus:border-emerald-400'
-                                : 'border-slate-200 focus:border-brand-primary ' + (disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white')}`}
-                        min="0"
-                        step="0.01"
-                    />
-                </div>
+                            ? 'border-emerald-200 bg-emerald-50/50 focus:border-emerald-400'
+                            : 'border-slate-200 focus:border-brand-primary ' + (readOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white')}`}
+                    min="0"
+                    step="0.01"
+                />
+            </div>
 
             {/* Specifications */}
             <div className="md:col-span-2 space-y-2">
@@ -561,8 +376,8 @@ const ItemRow: React.FC<{
                 />
             </div>
         </div>
-    );
-};
+    </div>
+);
 
 // Empty Items State
 const EmptyItemsState: React.FC<{ onAdd: () => void; hideAddButton?: boolean }> = ({ onAdd, hideAddButton }) => (
@@ -637,15 +452,14 @@ const RFQFormPage: React.FC = () => {
     const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
     const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
     const [supplierIds, setSupplierIds] = useState<number[]>([]);
+    const [availablePRs, setAvailablePRs] = useState<{ id: number; prNumber: string; items: any[] }[]>([]);
 
-    // Changed to support multiple suppliers
-    const [selectedSupplierIds, setSelectedSupplierIds] = useState<number[]>([]);
-
-    const [formData, setFormData] = useState<Omit<RFQ, 'supplierId'>>({
+    const [formData, setFormData] = useState<Omit<RFQ, 'supplierId'> & { supplierId?: number }>({
         rfqDate: new Date().toISOString().split('T')[0],
         responseDueDate: '',
         notes: '',
-        items: []
+        items: [],
+        supplierId: 0
     });
 
     useEffect(() => {
@@ -718,7 +532,6 @@ const RFQFormPage: React.FC = () => {
         try {
             setLoading(true);
             const data = await purchaseService.getRFQById(rfqId);
-            setSelectedSupplierIds([data.supplierId]);
             setFormData(data);
         } catch (error) {
             console.error('Failed to load RFQ:', error);
@@ -728,27 +541,20 @@ const RFQFormPage: React.FC = () => {
         }
     };
 
-    // Handle supplier selection change
-    const handleSuppliersChange = async (supplierIds: number[]) => {
-        setSelectedSupplierIds(supplierIds);
-
-        if (supplierIds.length === 0) {
+    const handleSupplierChange = async (supplierId: number) => {
+        setFormData(prev => ({ ...prev, supplierId }));
+        if (supplierId === 0) {
             setSupplierItems([]);
             return;
         }
-
-        // Load supplier items for the first selected supplier (for suggestions)
-        if (supplierIds.length > 0) {
-            try {
-                setLoadingSupplierItems(true);
-                const result = await supplierService.getSupplierItems(supplierIds[0]);
-                const fetchedItems = result.data || [];
-                setSupplierItems(fetchedItems);
-            } catch (error) {
-                console.error('Failed to load supplier items:', error);
-            } finally {
-                setLoadingSupplierItems(false);
-            }
+        try {
+            setLoadingSupplierItems(true);
+            const result = await supplierService.getSupplierItems(supplierId);
+            setSupplierItems(result.data || []);
+        } catch (error) {
+            console.error('Failed to load supplier items:', error);
+        } finally {
+            setLoadingSupplierItems(false);
         }
     };
 
@@ -797,7 +603,7 @@ const RFQFormPage: React.FC = () => {
 
         const hasSuppliers = prIdFromUrl
             ? supplierIds.length > 0
-            : formData.supplierId > 0;
+            : (formData.supplierId ?? 0) > 0;
 
         if (!hasSuppliers) {
             toast.error(prIdFromUrl ? 'يرجى اختيار مورد واحد على الأقل' : 'يرجى اختيار مورد');
@@ -828,7 +634,10 @@ const RFQFormPage: React.FC = () => {
                 toast.success(`تم إنشاء ${created} طلب عرض سعر بنجاح`, { icon: '🎉' });
                 navigate('/dashboard/procurement/rfq');
             } else {
-                await purchaseService.createRFQ(formData);
+                await purchaseService.createRFQ({
+                    ...formData,
+                    supplierId: formData.supplierId ?? 0
+                });
                 toast.success('تم حفظ طلب عرض السعر بنجاح', { icon: '🎉' });
                 navigate('/dashboard/procurement/rfq');
             }
@@ -936,8 +745,8 @@ const RFQFormPage: React.FC = () => {
                                         ? 'جاري الحفظ...'
                                         : isEdit
                                             ? 'حفظ التعديلات'
-                                            : selectedSupplierIds.length > 1
-                                                ? `إنشاء ${selectedSupplierIds.length} طلبات`
+                                            : prIdFromUrl && supplierIds.length > 1
+                                                ? `إنشاء ${supplierIds.length} طلبات`
                                                 : 'حفظ الطلب'}
                                 </span>
                             </button>
@@ -978,14 +787,14 @@ const RFQFormPage: React.FC = () => {
                 </div>
             </div>
 
-            {!isEdit && selectedSupplierIds.length > 1 && (
+            {!isEdit && prIdFromUrl && supplierIds.length > 1 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
                     <div className="p-2 bg-amber-100 rounded-xl">
                         <Users className="w-5 h-5 text-amber-600" />
                     </div>
                     <div className="flex-1">
                         <span className="text-amber-700 font-semibold">سيتم إنشاء </span>
-                        <span className="text-amber-800 font-bold">{selectedSupplierIds.length} طلب عرض سعر</span>
+                        <span className="text-amber-800 font-bold">{supplierIds.length} طلب عرض سعر</span>
                         <span className="text-amber-700 font-semibold"> منفصل - واحد لكل مورد محدد، بنفس البنود والتفاصيل</span>
                     </div>
                 </div>
@@ -1028,8 +837,8 @@ const RFQFormPage: React.FC = () => {
                         ) : (
                             <FormSelect
                                 label="المورد"
-                                value={formData.supplierId}
-                                onChange={(v) => handleSupplierChange(parseInt(v))}
+                                value={formData.supplierId ?? 0}
+                                onChange={(v: string) => handleSupplierChange(parseInt(v) || 0)}
                                 icon={Truck}
                                 options={supplierOptions}
                                 placeholder="اختر المورد..."
@@ -1083,7 +892,7 @@ const RFQFormPage: React.FC = () => {
                                 ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : ''}`}
                         >
                             <option value="">اختر طلب شراء...</option>
-                            {availablePRs.map(pr => (
+                            {availablePRs.map((pr: { id: number; prNumber: string; items: any[] }) => (
                                 <option key={pr.id} value={pr.id}>
                                     #{pr.prNumber} ({pr.items.length} صنف)
                                 </option>
@@ -1167,7 +976,9 @@ const RFQFormPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">عدد الموردين</div>
-                                    <div className="text-lg font-bold text-slate-800">{selectedSupplierIds.length}</div>
+                                    <div className="text-lg font-bold text-slate-800">
+                                        {prIdFromUrl ? supplierIds.length : ((formData.supplierId ?? 0) ? 1 : 0)}
+                                    </div>
                                 </div>
                             </div>
 
@@ -1216,7 +1027,7 @@ const RFQFormPage: React.FC = () => {
                                 </>
                             )}
 
-                            {!isEdit && selectedSupplierIds.length > 1 && (
+                            {!isEdit && prIdFromUrl && supplierIds.length > 1 && (
                                 <>
                                     <div className="w-px h-10 bg-slate-200" />
                                     <div className="flex items-center gap-3">
@@ -1226,7 +1037,7 @@ const RFQFormPage: React.FC = () => {
                                         <div>
                                             <div className="text-xs text-slate-500 font-medium">طلبات سيتم إنشاؤها</div>
                                             <div className="text-lg font-bold text-blue-600">
-                                                {selectedSupplierIds.length} طلب
+                                                {supplierIds.length} طلب
                                             </div>
                                         </div>
                                     </div>

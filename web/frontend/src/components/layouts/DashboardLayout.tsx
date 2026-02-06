@@ -8,7 +8,7 @@ import {
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity, ClipboardCheck, GitCompare,
     Undo2
 } from 'lucide-react';
-import { Outlet, Link, useLocation,useNavigate} from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { approvalService } from '../../services/approvalService';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
 import { grnService } from '../../services/grnService';
@@ -216,7 +216,7 @@ const DashboardLayout: React.FC = () => {
     const location = useLocation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    
+
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);
@@ -329,7 +329,6 @@ const DashboardLayout: React.FC = () => {
             { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main', requiredPermission: 'SECTION_EMPLOYEES' },
             { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
             { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
-            { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
             { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
             { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
             { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
