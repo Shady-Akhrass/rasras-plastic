@@ -56,6 +56,11 @@ public class SupplierQuotationService {
                 if (dto.getRfqId() != null) {
                         quotation.setRfq(rfqRepository.findById(dto.getRfqId())
                                         .orElseThrow(() -> new RuntimeException("RFQ not found")));
+
+                        if (quotationRepository.existsByRfqId(dto.getRfqId())) {
+                                throw new RuntimeException(
+                                                "Duplicate Quotation: A quotation has already been registered for this RFQ.");
+                        }
                 }
 
                 quotation.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy() : 1);

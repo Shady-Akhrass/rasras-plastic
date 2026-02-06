@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useOptimistic } from 'react';
+import React, { useState, useEffect, useOptimistic, startTransition } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
@@ -16,15 +16,64 @@ import {
     CheckCircle2,
     Eye,
     XCircle,
-    RefreshCw
+    RefreshCw,
+    Clock
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto } from '../../services/purchaseOrderService';
-import purchaseService from '../../services/purchaseService'; // For Quotation lookup
+import purchaseService from '../../services/purchaseService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import toast from 'react-hot-toast';
+
+// --- Logic: Centralized Calculation Helper ---
+const calculateOrderTotals = (po: PurchaseOrderDto): PurchaseOrderDto => {
+    let subTotal = 0;
+    let totalDiscountAmount = 0;
+    let totalTaxAmount = 0;
+
+    const updatedItems = (po.items || []).map(item => {
+        const qty = Number(item.orderedQty) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const discountRate = (Number(item.discountPercentage) || 0) / 100;
+        const taxRate = (Number(item.taxPercentage) || 0) / 100;
+
+        // Math: Gross -> Discount -> Tax
+        const grossAmount = qty * price;
+        const discountAmount = grossAmount * discountRate;
+        const taxableAmount = grossAmount - discountAmount;
+        const taxAmount = taxableAmount * taxRate;
+        const totalPrice = taxableAmount + taxAmount;
+
+        // Accumulate Global Totals
+        subTotal += grossAmount;
+        totalDiscountAmount += discountAmount;
+        totalTaxAmount += taxAmount;
+
+        return {
+            ...item,
+            discountAmount,
+            taxAmount,
+            totalPrice
+        };
+    });
+
+    const shipping = Number(po.shippingCost) || 0;
+    const other = Number(po.otherCosts) || 0;
+
+    // Final Calculation
+    const grandTotal = (subTotal - totalDiscountAmount) + totalTaxAmount + shipping + other;
+
+    return {
+        ...po,
+        items: updatedItems,
+        subTotal,
+        discountAmount: totalDiscountAmount,
+        taxAmount: totalTaxAmount,
+        totalAmount: grandTotal
+    };
+};
 
 const PurchaseOrderFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -44,7 +93,7 @@ const PurchaseOrderFormPage: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [processing, setProcessing] = useState(false);
 
-    // Form State
+    // Initial Form State
     const [formData, setFormData] = useState<PurchaseOrderDto>({
         supplierId: 0,
         currency: 'EGP',
@@ -60,6 +109,52 @@ const PurchaseOrderFormPage: React.FC = () => {
         items: []
     });
 
+    // --- Optimistic Logic Definition ---
+    type POAction =
+        | { type: 'SET_DATA', payload: PurchaseOrderDto }
+        | { type: 'UPDATE_FIELD', field: keyof PurchaseOrderDto, value: any }
+        | { type: 'UPDATE_ITEM', index: number, item: Partial<PurchaseOrderItemDto> }
+        | { type: 'ADD_ITEM' }
+        | { type: 'REMOVE_ITEM', index: number };
+
+    const poReducer = (state: PurchaseOrderDto, action: POAction): PurchaseOrderDto => {
+        let newState = { ...state };
+        switch (action.type) {
+            case 'SET_DATA':
+                newState = action.payload;
+                break;
+            case 'UPDATE_FIELD':
+                newState = { ...newState, [action.field]: action.value };
+                break;
+            case 'UPDATE_ITEM':
+                const newItems = [...(newState.items || [])];
+                newItems[action.index] = { ...newItems[action.index], ...action.item };
+                newState.items = newItems;
+                break;
+            case 'ADD_ITEM':
+                const newItem: PurchaseOrderItemDto = {
+                    itemId: 0, unitId: 0, orderedQty: 1, unitPrice: 0,
+                    totalPrice: 0, discountPercentage: 0, taxPercentage: 0, polymerGrade: ''
+                };
+                newState.items = [...(newState.items || []), newItem];
+                break;
+            case 'REMOVE_ITEM':
+                newState.items = (newState.items || []).filter((_, i) => i !== action.index);
+                break;
+        }
+        return calculateOrderTotals(newState);
+    };
+
+    const [optimisticPO, updateOptimistic] = useOptimistic(formData, poReducer);
+
+    const handleUpdate = (action: POAction) => {
+        startTransition(() => {
+            updateOptimistic(action);
+            setFormData(prev => poReducer(prev, action));
+        });
+    };
+
+    // --- Loading & Handlers ---
     useEffect(() => {
         loadSuppliers(); loadItems(); loadUnits();
         if (isEdit) { loadPO(); }
@@ -70,13 +165,9 @@ const PurchaseOrderFormPage: React.FC = () => {
         try {
             setLoading(true);
             const data = await purchaseOrderService.getPOById(parseInt(id!));
-            setFormData(data);
-        } catch (error) {
-            console.error('Failed to load PO:', error);
-            toast.error('فشل تحميل بيانات أمر الشراء');
-        } finally {
-            setLoading(false);
-        }
+            handleUpdate({ type: 'SET_DATA', payload: data });
+        } catch (error) { toast.error('فشل تحميل بيانات أمر الشراء'); }
+        finally { setLoading(false); }
     };
 
     const loadSuppliers = async () => { const d = await supplierService.getAllSuppliers(); setSuppliers(d.data || []); };
@@ -85,181 +176,71 @@ const PurchaseOrderFormPage: React.FC = () => {
 
     const loadQuotationData = async (qId: number) => {
         try {
-            console.log('Fetching Quotation:', qId);
             const quotation = await purchaseService.getQuotationById(qId);
-            console.log('Quotation Data:', quotation);
-
             if (quotation) {
+                // Find associated comparison to get precise winner details (days and cost)
+                let comparisonDetail: any = null;
+                try {
+                    const allComparisons = await purchaseService.getAllComparisons();
+                    for (const comp of allComparisons) {
+                        const detail = comp.details?.find(d => d.quotationId === qId);
+                        if (detail) {
+                            comparisonDetail = detail;
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch comparison details:', err);
+                }
+
+                // Get delivery cost (direct or derived) 
+                const getFinalDeliveryCost = (q: any) => {
+                    const explicit = q.deliveryCost;
+                    if (explicit !== undefined && explicit !== null && Number(explicit) > 0) {
+                        return Number(explicit);
+                    }
+                    const itemsTotal = q.items?.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0) || 0;
+                    const derived = Number(q.totalAmount) - itemsTotal;
+                    return derived > 0.01 ? Math.round(derived * 100) / 100 : 0;
+                };
+
+                const finalShippingCost = (comparisonDetail && comparisonDetail.deliveryCost > 0)
+                    ? comparisonDetail.deliveryCost
+                    : getFinalDeliveryCost(quotation);
+
                 const mappedPO: PurchaseOrderDto = {
                     ...formData,
                     supplierId: quotation.supplierId,
                     quotationId: quotation.id,
                     currency: quotation.currency || 'EGP',
-                    exchangeRate: quotation.exchangeRate || 1,
-                    shippingCost: quotation.deliveryCost || 0,
+                    shippingCost: finalShippingCost,
+                    deliveryDays: comparisonDetail?.deliveryDays || quotation.deliveryDays || 0,
+                    paymentTerms: quotation.paymentTerms || '',
                     notes: `تم الإنشاء بناءً على عرض السعر: ${quotation.quotationNumber}\n${quotation.notes || ''}`,
-                    items: quotation.items.map(qi => ({
+                    items: (quotation.items || []).map(qi => ({
                         itemId: qi.itemId,
                         unitId: qi.unitId,
                         orderedQty: qi.offeredQty,
                         unitPrice: qi.unitPrice,
                         polymerGrade: qi.polymerGrade || '',
                         discountPercentage: qi.discountPercentage || 0,
-                        discountAmount: qi.discountAmount || 0,
                         taxPercentage: qi.taxPercentage || 0,
-                        taxAmount: qi.taxAmount || 0,
                         totalPrice: qi.totalPrice,
-                        status: 'Pending'
                     }))
                 };
-                updateFormData(mappedPO);
-                toast.success(`تم تحميل بيانات عرض السعر رقم ${quotation.quotationNumber}`);
+                handleUpdate({ type: 'SET_DATA', payload: calculateOrderTotals(mappedPO) });
+                toast.success(`تم تحميل بيانات عرض السعر`);
             }
         } catch (e) {
-            console.error('Error loading quotation:', e);
+            console.error('Failed to load quotation data:', e);
             toast.error('فشل تحميل بيانات عرض السعر');
         }
-    };
-
-    // Optimistic Logic for totals
-    const [optimisticPO, setOptimisticPO] = useOptimistic(
-        formData,
-        (currentPO: PurchaseOrderDto, updates: Partial<PurchaseOrderDto> | { type: 'update_item', index: number, item: Partial<PurchaseOrderItemDto> } | { type: 'add_item' } | { type: 'remove_item', index: number }) => {
-            let nextPO = { ...currentPO };
-
-            if ('type' in updates) {
-                if (updates.type === 'update_item') {
-                    const newItems = [...(nextPO.items || [])];
-                    const item = { ...newItems[updates.index], ...updates.item };
-
-                    // Calculate item total
-                    const qty = item.orderedQty || 0;
-                    const price = item.unitPrice || 0;
-                    const discountRate = (item.discountPercentage || 0) / 100;
-                    const taxRate = (item.taxPercentage || 0) / 100;
-
-                    const amountAfterDiscount = qty * price * (1 - discountRate);
-                    item.taxAmount = amountAfterDiscount * taxRate;
-                    item.totalPrice = amountAfterDiscount + item.taxAmount;
-
-                    newItems[updates.index] = item;
-                    nextPO.items = newItems;
-                } else if (updates.type === 'add_item') {
-                    const newItem: PurchaseOrderItemDto = { itemId: 0, unitId: 0, orderedQty: 1, unitPrice: 0, totalPrice: 0, discountPercentage: 0, taxPercentage: 0, polymerGrade: '' };
-                    nextPO.items = [...(nextPO.items || []), newItem];
-                } else if (updates.type === 'remove_item') {
-                    nextPO.items = (nextPO.items || []).filter((_, i) => i !== updates.index);
-                }
-            } else {
-                nextPO = { ...nextPO, ...updates };
-            }
-
-            // Recalculate Global Totals
-            const subTotal = nextPO.items?.reduce((acc: number, item: PurchaseOrderItemDto) => {
-                const qty = item.orderedQty || 0;
-                const price = item.unitPrice || 0;
-                const discountRate = (item.discountPercentage || 0) / 100;
-                return acc + (qty * price * (1 - discountRate));
-            }, 0) || 0;
-
-            const totalTax = nextPO.items?.reduce((acc: number, item: PurchaseOrderItemDto) => {
-                const qty = item.orderedQty || 0;
-                const price = item.unitPrice || 0;
-                const discountRate = (item.discountPercentage || 0) / 100;
-                const taxRate = (item.taxPercentage || 0) / 100;
-                return acc + (qty * price * (1 - discountRate) * taxRate);
-            }, 0) || 0;
-
-            nextPO.subTotal = subTotal;
-            nextPO.taxAmount = totalTax;
-            nextPO.totalAmount = subTotal + totalTax + (nextPO.shippingCost || 0) + (nextPO.otherCosts || 0);
-
-            return nextPO;
-        }
-    );
-
-    const updateFormData = (updates: any) => {
-        setOptimisticPO(updates);
-        if ('type' in updates) {
-            setFormData(prev => {
-                let next = { ...prev };
-                if (updates.type === 'update_item') {
-                    const newItems = [...(next.items || [])];
-                    const item = { ...newItems[updates.index], ...updates.item };
-                    const qty = item.orderedQty || 0;
-                    const price = item.unitPrice || 0;
-                    const discountRate = (item.discountPercentage || 0) / 100;
-                    const taxRate = (item.taxPercentage || 0) / 100;
-                    const amountAfterDiscount = qty * price * (1 - discountRate);
-                    item.taxAmount = amountAfterDiscount * taxRate;
-                    item.totalPrice = amountAfterDiscount + item.taxAmount;
-                    newItems[updates.index] = item;
-                    next.items = newItems;
-                } else if (updates.type === 'add_item') {
-                    const newItem: PurchaseOrderItemDto = { itemId: 0, unitId: 0, orderedQty: 1, unitPrice: 0, totalPrice: 0, discountPercentage: 0, taxPercentage: 0, polymerGrade: '' };
-                    next.items = [...(next.items || []), newItem];
-                } else if (updates.type === 'remove_item') {
-                    next.items = (next.items || []).filter((_, i) => i !== updates.index);
-                }
-
-                // Recalculate totals for base state too
-                const subTotal = next.items?.reduce((acc: number, item: PurchaseOrderItemDto) => {
-                    const qty = item.orderedQty || 0;
-                    const price = item.unitPrice || 0;
-                    const discountRate = (item.discountPercentage || 0) / 100;
-                    return acc + (qty * price * (1 - discountRate));
-                }, 0) || 0;
-                const totalTax = next.items?.reduce((acc: number, item: PurchaseOrderItemDto) => {
-                    const qty = item.orderedQty || 0;
-                    const price = item.unitPrice || 0;
-                    const discountRate = (item.discountPercentage || 0) / 100;
-                    const taxRate = (item.taxPercentage || 0) / 100;
-                    return acc + (qty * price * (1 - discountRate) * taxRate);
-                }, 0) || 0;
-
-                next.subTotal = subTotal;
-                next.taxAmount = totalTax;
-                next.totalAmount = subTotal + totalTax + (next.shippingCost || 0) + (next.otherCosts || 0);
-                return next;
-            });
-        } else {
-            setFormData(prev => {
-                const next = { ...prev, ...updates };
-                const subTotal = next.items?.reduce((acc: number, item: PurchaseOrderItemDto) => {
-                    const qty = item.orderedQty || 0;
-                    const price = item.unitPrice || 0;
-                    const discountRate = (item.discountPercentage || 0) / 100;
-                    return acc + (qty * price * (1 - discountRate));
-                }, 0) || 0;
-                const totalTax = next.items?.reduce((acc: number, item: PurchaseOrderItemDto) => {
-                    const qty = item.orderedQty || 0;
-                    const price = item.unitPrice || 0;
-                    const discountRate = (item.discountPercentage || 0) / 100;
-                    const taxRate = (item.taxPercentage || 0) / 100;
-                    return acc + (qty * price * (1 - discountRate) * taxRate);
-                }, 0) || 0;
-
-                next.subTotal = subTotal;
-                next.taxAmount = totalTax;
-                next.totalAmount = subTotal + totalTax + (next.shippingCost || 0) + (next.otherCosts || 0);
-                return next;
-            });
-        }
-    };
-
-    const addItem = () => {
-        updateFormData({ type: 'add_item' });
-    };
-
-    const updateItem = (index: number, updates: Partial<PurchaseOrderItemDto>) => {
-        updateFormData({ type: 'update_item', index, item: updates });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (optimisticPO.approvalStatus === 'Approved') return;
-
-        if (!optimisticPO.supplierId || !optimisticPO.items || optimisticPO.items.length === 0) {
+        if (!optimisticPO.supplierId || !optimisticPO.items?.length) {
             toast.error('يرجى التحقق من المورد والأصناف');
             return;
         }
@@ -277,15 +258,11 @@ const PurchaseOrderFormPage: React.FC = () => {
         try {
             setProcessing(true);
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
-            await approvalService.takeAction(parseInt(approvalId), 1, action); // Using 1 as currentUserId
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
             navigate('/dashboard/procurement/approvals');
-        } catch (error) {
-            console.error('Failed to take action:', error);
-            toast.error('فشل تنفيذ الإجراء');
-        } finally {
-            setProcessing(false);
-        }
+        } catch (error) { toast.error('فشل تنفيذ الإجراء'); }
+        finally { setProcessing(false); }
     };
 
     if (loading) return (
@@ -298,24 +275,15 @@ const PurchaseOrderFormPage: React.FC = () => {
         <div className="space-y-6 pb-20" dir="rtl">
             <style>{`
                 @keyframes slideInRight {
-                    from {
-                        opacity: 0;
-                        transform: translateX(-20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(0);
-                    }
+                    from { opacity: 0; transform: translateX(-20px); }
+                    to { opacity: 1; transform: translateX(0); }
                 }
-                .animate-slide-in {
-                    animation: slideInRight 0.4s ease-out;
-                }
+                .animate-slide-in { animation: slideInRight 0.4s ease-out; }
             `}</style>
 
-            {/* Enhanced Header */}
+            {/* Header Section (Same Exact Design) */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
                 rounded-3xl p-8 text-white shadow-2xl">
-                {/* Decorative Elements */}
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
                 <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
@@ -323,11 +291,7 @@ const PurchaseOrderFormPage: React.FC = () => {
 
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
-                        <button
-                            onClick={() => navigate(-1)}
-                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
-                                hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
-                        >
+                        <button onClick={() => navigate(-1)} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
                             <ArrowRight className="w-5 h-5" />
                         </button>
                         <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
@@ -335,65 +299,51 @@ const PurchaseOrderFormPage: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">
-                                {isEdit ? 'تعديل أمر شراء' : 'إنشاء أمر شراء'}
+                                {isEdit ? `أمر شراء رقم: ${optimisticPO.poNumber || ''}` : 'إنشاء أمر شراء جديد'}
                             </h1>
                             <p className="text-white/80 text-lg">إصدار طلب توريد رسمي للمورد بناءً على المواصفات والأسعار المعتمدة</p>
                         </div>
                     </div>
-                    {formData.approvalStatus !== 'Approved' && !isView && (
-                        <button
-                            onClick={handleSubmit}
-                            disabled={saving}
-                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                            {saving ? (
-                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                            ) : (
-                                <Save className="w-5 h-5" />
-                            )}
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ وإرسال للاعتماد'}</span>
-                        </button>
-                    )}
-                    {formData.approvalStatus === 'Approved' && (
-                        <div className="flex items-center gap-2 px-6 py-4 bg-emerald-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
-                            <CheckCircle2 className="w-5 h-5" />
-                            <span className="font-bold">طلب معتمد ومؤكد</span>
-                        </div>
-                    )}
-                    {isView && (
-                        <div className="flex items-center gap-3">
-                            {approvalId && (
-                                <>
-                                    <button
-                                        onClick={() => handleApprovalAction('Approved')}
-                                        disabled={processing}
-                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
-                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
-                                            disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                                        <span>اعتماد</span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleApprovalAction('Rejected')}
-                                        disabled={processing}
-                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
-                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
-                                            disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
-                                        <span>رفض</span>
-                                    </button>
-                                </>
-                            )}
-                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
-                                <Eye className="w-5 h-5" />
-                                <span className="font-bold">وضع العرض فقط</span>
+                    <div className="flex gap-3">
+                        {isEdit && optimisticPO.approvalStatus !== 'Draft' && optimisticPO.approvalStatus !== 'Approved' && !isView && (
+                            <div className="px-5 py-2.5 bg-amber-50 text-amber-600 rounded-xl font-bold flex items-center gap-2 border border-amber-100 italic">
+                                <Clock className="w-5 h-5" />
+                                <span>بانتظار الاعتماد</span>
                             </div>
-                        </div>
-                    )}
+                        )}
+                        {optimisticPO.approvalStatus !== 'Approved' && !isView && (
+                            <button onClick={handleSubmit} disabled={saving} className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                                {saving ? <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" /> : <Save className="w-5 h-5" />}
+                                <span>{saving ? 'جاري الحفظ...' : 'حفظ وإرسال للاعتماد'}</span>
+                            </button>
+                        )}
+                        {optimisticPO.approvalStatus === 'Approved' && (
+                            <div className="flex items-center gap-2 px-6 py-4 bg-emerald-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                <CheckCircle2 className="w-5 h-5" />
+                                <span className="font-bold">طلب معتمد ومؤكد</span>
+                            </div>
+                        )}
+                        {isView && (
+                            <div className="flex items-center gap-3">
+                                {approvalId && (
+                                    <>
+                                        <button onClick={() => handleApprovalAction('Approved')} disabled={processing} className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                            <span>اعتماد</span>
+                                        </button>
+                                        <button onClick={() => handleApprovalAction('Rejected')} disabled={processing} className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                            <span>رفض</span>
+                                        </button>
+                                    </>
+                                )}
+                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                    <Eye className="w-5 h-5" />
+                                    <span className="font-bold">وضع العرض فقط</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -412,19 +362,16 @@ const PurchaseOrderFormPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Truck className="w-4 h-4 text-brand-primary" />
-                                    المورد
+                                    <Truck className="w-4 h-4 text-brand-primary" /> المورد
                                 </label>
                                 <select
                                     disabled={isView}
                                     value={optimisticPO.supplierId}
-                                    onChange={(e) => updateFormData({ supplierId: parseInt(e.target.value) })}
-                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
-                                        ${isView ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierId', value: parseInt(e.target.value) })}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
                                     <option value="0">اختر المورد...</option>
                                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplierNameAr}</option>)}
@@ -432,25 +379,33 @@ const PurchaseOrderFormPage: React.FC = () => {
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-brand-primary" />
-                                    تاريخ التسليم المتوقع
+                                    <Calendar className="w-4 h-4 text-brand-primary" /> تاريخ التسليم المتوقع
                                 </label>
                                 <input
                                     type="date"
                                     disabled={isView}
                                     value={optimisticPO.expectedDeliveryDate || ''}
-                                    onChange={(e) => updateFormData({ expectedDeliveryDate: e.target.value })}
-                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
-                                        ${isView ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'expectedDeliveryDate', value: e.target.value })}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Clock className="w-4 h-4 text-brand-primary" /> مدة التوصيل (أيام)
+                                </label>
+                                <input
+                                    type="number"
+                                    disabled={isView}
+                                    value={optimisticPO.deliveryDays || 0}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'deliveryDays', value: parseInt(e.target.value) || 0 })}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
                         </div>
                     </div>
 
                     {/* Items Table */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
-                        style={{ animationDelay: '100ms' }}>
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '100ms' }}>
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -458,20 +413,17 @@ const PurchaseOrderFormPage: React.FC = () => {
                                         <Package className="w-5 h-5 text-purple-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المطلوبة</h3>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف</h3>
                                         <p className="text-slate-500 text-sm">قائمة المواد والكميات المطلوب توريدها</p>
                                     </div>
                                 </div>
                                 {!isView && (
                                     <button
                                         type="button"
-                                        onClick={addItem}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
-                                            font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
-                                            hover:scale-105 active:scale-95"
+                                        onClick={() => handleUpdate({ type: 'ADD_ITEM' })}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20 hover:scale-105 active:scale-95"
                                     >
-                                        <Plus className="w-4 h-4" />
-                                        إضافة صنف
+                                        <Plus className="w-4 h-4" /> إضافة صنف
                                     </button>
                                 )}
                             </div>
@@ -498,10 +450,8 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                 <select
                                                     disabled={isView}
                                                     value={item.itemId}
-                                                    onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) })}
-                                                    className={`w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
-                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all
-                                                        ${isView ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { itemId: parseInt(e.target.value) } })}
+                                                    className={`w-full min-w-[200px] px-3 py-2 border-2 border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all ${isView ? 'bg-slate-100 opacity-70 cursor-not-allowed' : 'bg-white'}`}
                                                 >
                                                     <option value="0">اختر صنف...</option>
                                                     {items.map(i => <option key={i.id} value={i.id}>{i.itemNameAr}</option>)}
@@ -512,21 +462,16 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                     type="number"
                                                     disabled={isView}
                                                     value={item.orderedQty}
-                                                    onChange={(e) => updateItem(idx, { orderedQty: parseFloat(e.target.value) || 0 })}
-                                                    className={`w-20 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-bold text-brand-primary outline-none 
-                                                        focus:border-brand-primary transition-all
-                                                        ${isView ? 'opacity-70 cursor-not-allowed text-brand-primary/60' : ''}`}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { orderedQty: parseFloat(e.target.value) || 0 } })}
+                                                    className={`w-20 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-bold text-brand-primary outline-none focus:border-brand-primary transition-all ${isView ? 'bg-slate-100 opacity-70 cursor-not-allowed text-brand-primary/60' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
                                                 <select
                                                     disabled={isView}
                                                     value={item.unitId}
-                                                    onChange={(e) => updateItem(idx, { unitId: parseInt(e.target.value) })}
-                                                    className={`w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm font-semibold outline-none focus:border-brand-primary transition-all
-                                                        ${isView ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitId: parseInt(e.target.value) } })}
+                                                    className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all ${isView ? 'bg-slate-100 opacity-70 cursor-not-allowed' : 'bg-white'}`}
                                                 >
                                                     <option value="0">الوحدة...</option>
                                                     {units.map(u => <option key={u.id} value={u.id}>{u.unitNameAr}</option>)}
@@ -537,11 +482,8 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                     type="number"
                                                     disabled={isView}
                                                     value={item.unitPrice}
-                                                    onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
-                                                    className={`w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-bold text-emerald-600 outline-none 
-                                                        focus:border-brand-primary transition-all
-                                                        ${isView ? 'opacity-70 cursor-not-allowed text-emerald-600/60' : ''}`}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitPrice: parseFloat(e.target.value) || 0 } })}
+                                                    className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-bold text-emerald-600 outline-none focus:border-brand-primary transition-all ${isView ? 'bg-slate-100 opacity-70 cursor-not-allowed text-emerald-600/60' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -549,10 +491,8 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                     type="text"
                                                     disabled={isView}
                                                     value={item.polymerGrade || ''}
-                                                    onChange={(e) => updateItem(idx, { polymerGrade: e.target.value })}
-                                                    className={`w-32 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-medium outline-none focus:border-brand-primary transition-all text-slate-700
-                                                        ${isView ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { polymerGrade: e.target.value } })}
+                                                    className={`w-32 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-medium outline-none focus:border-brand-primary transition-all text-slate-700 ${isView ? 'bg-slate-100 opacity-70 cursor-not-allowed' : 'bg-white'}`}
                                                     placeholder="مثلاً: Grade A"
                                                 />
                                             </td>
@@ -561,11 +501,8 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                     type="number"
                                                     disabled={isView}
                                                     value={item.discountPercentage}
-                                                    onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })}
-                                                    className={`w-16 px-3 py-2 bg-rose-50 border-2 border-rose-100 rounded-xl 
-                                                        text-sm text-center font-bold text-rose-600 outline-none 
-                                                        focus:border-rose-400 transition-all
-                                                        ${isView ? 'opacity-70 cursor-not-allowed text-rose-600/60' : ''}`}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { discountPercentage: parseFloat(e.target.value) || 0 } })}
+                                                    className={`w-16 px-3 py-2 border-2 border-rose-100 rounded-xl text-sm text-center font-bold text-rose-600 outline-none focus:border-rose-400 transition-all ${isView ? 'bg-slate-100 border-slate-200 opacity-70 cursor-not-allowed text-rose-600/60' : 'bg-rose-50'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -573,11 +510,8 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                     type="number"
                                                     disabled={isView}
                                                     value={item.taxPercentage}
-                                                    onChange={(e) => updateItem(idx, { taxPercentage: parseFloat(e.target.value) || 0 })}
-                                                    className={`w-16 px-3 py-2 bg-amber-50 border-2 border-amber-100 rounded-xl 
-                                                        text-sm text-center font-bold text-amber-600 outline-none 
-                                                        focus:border-amber-400 transition-all
-                                                        ${isView ? 'opacity-70 cursor-not-allowed text-amber-600/60' : ''}`}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { taxPercentage: parseFloat(e.target.value) || 0 } })}
+                                                    className={`w-16 px-3 py-2 border-2 border-amber-100 rounded-xl text-sm text-center font-bold text-amber-600 outline-none focus:border-amber-400 transition-all ${isView ? 'bg-slate-100 border-slate-200 opacity-70 cursor-not-allowed text-amber-600/60' : 'bg-amber-50'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
@@ -587,9 +521,8 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                 {!isView && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => updateFormData({ type: 'remove_item', index: idx })}
-                                                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
-                                                            rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                        onClick={() => handleUpdate({ type: 'REMOVE_ITEM', index: idx })}
+                                                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -597,17 +530,19 @@ const PurchaseOrderFormPage: React.FC = () => {
                                             </td>
                                         </tr>
                                     ))}
+                                    {(!optimisticPO.items || optimisticPO.items.length === 0) && (
+                                        <tr>
+                                            <td colSpan={9} className="py-20 text-center">
+                                                <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                                    <Package className="w-10 h-10 text-slate-400" />
+                                                </div>
+                                                <p className="text-slate-400 font-semibold">لا توجد أصناف مضافة</p>
+                                                <p className="text-slate-400 text-sm mt-1">انقر على "إضافة صنف" لبدء الإضافة</p>
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
-                            {optimisticPO.items.length === 0 && (
-                                <div className="py-20 text-center">
-                                    <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
-                                        <Package className="w-10 h-10 text-slate-400" />
-                                    </div>
-                                    <p className="text-slate-400 font-semibold">لا توجد أصناف مضافة</p>
-                                    <p className="text-slate-400 text-sm mt-1">انقر على "إضافة صنف" لبدء الإضافة</p>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -616,52 +551,74 @@ const PurchaseOrderFormPage: React.FC = () => {
                 <div className="space-y-6">
                     {/* Financial Summary */}
                     <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
-                        rounded-3xl p-6 text-white shadow-2xl animate-slide-in"
-                        style={{ animationDelay: '200ms' }}>
+                        rounded-3xl p-6 text-white shadow-2xl animate-slide-in" style={{ animationDelay: '200ms' }}>
                         <div className="flex items-center gap-3 pb-6 border-b border-white/10">
                             <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
                                 <DollarSign className="w-6 h-6 text-emerald-400" />
                             </div>
                             <h3 className="font-bold text-xl">الملخص المالي</h3>
                         </div>
-                        <div className="space-y-5 mt-6">
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                <span className="text-white/60">الإجمالي قبل الضريبة</span>
-                                <span className="font-bold text-lg">
-                                    {(optimisticPO.subTotal || 0).toLocaleString()} {optimisticPO.currency}
+
+                        {/* --- Added Date Display Here (Requested) --- */}
+                        <div className="mt-4 flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                            <span className="text-white/60 text-sm flex items-center gap-2">
+                                <Calendar className="w-4 h-4" /> تاريخ التسليم
+                            </span>
+                            <span className="font-bold text-sm text-white/90">
+                                {optimisticPO.expectedDeliveryDate ? optimisticPO.expectedDeliveryDate : 'غير محدد'}
+                            </span>
+                        </div>
+
+                        <div className="space-y-4 mt-6">
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                <span className="text-white/60">تكلفة الأصناف (الصافي)</span>
+                                <span className="font-bold text-lg text-white/90">
+                                    {(optimisticPO.totalAmount - (optimisticPO.shippingCost || 0)).toLocaleString()} {optimisticPO.currency}
                                 </span>
                             </div>
-                            <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                                <span className="text-emerald-400 font-semibold">ضريبة القيمة المضافة</span>
-                                <span className="font-bold text-lg text-emerald-400">
-                                    {(optimisticPO.taxAmount || 0).toLocaleString()} {optimisticPO.currency}
-                                </span>
-                            </div>
+
                             <div className="flex justify-between items-center p-4 bg-brand-primary/10 rounded-xl border border-brand-primary/20">
                                 <span className="text-brand-primary-light font-semibold">اسعار التوصيل</span>
                                 <input
                                     type="number"
                                     disabled={isView}
                                     value={optimisticPO.shippingCost}
-                                    onChange={(e) => updateFormData({ shippingCost: parseFloat(e.target.value) || 0 })}
-                                    className={`w-28 px-3 py-2 bg-brand-primary/10 border-2 border-brand-primary/30 rounded-lg 
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'shippingCost', value: parseFloat(e.target.value) || 0 })}
+                                    className={`w-28 px-3 py-2 border-2 border-brand-primary/30 rounded-lg 
                                         text-white font-bold text-right outline-none focus:border-brand-primary/50 transition-all
-                                        ${isView ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                        ${isView ? 'bg-white/5 cursor-not-allowed opacity-70' : 'bg-brand-primary/10'}`}
                                 />
                             </div>
-                            <div className="pt-6 border-t border-white/10">
-                                <div className="text-xs text-white/40 mb-2">الإجمالي النهائي</div>
-                                <div className="text-4xl font-black text-emerald-400">
-                                    {(optimisticPO.totalAmount || 0).toLocaleString()}
-                                    <span className="text-sm font-bold mr-2">{optimisticPO.currency}</span>
+
+                            <div className="pt-4 mt-2 border-t border-white/10">
+                                <div className="flex justify-between items-center p-5 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20">
+                                    <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
+                                    <span className="font-black text-2xl text-white">
+                                        {optimisticPO.totalAmount.toLocaleString()} {optimisticPO.currency}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Detailed Breakdown (Collapsed/Secondary) */}
+                            <div className="mt-4 p-4 border border-white/5 rounded-2xl bg-white/5 space-y-3">
+                                <div className="flex justify-between text-xs text-white/40">
+                                    <span>المجموع (قبل الخصم)</span>
+                                    <span>{(optimisticPO.subTotal || 0).toLocaleString()} {optimisticPO.currency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-rose-400/60">
+                                    <span>إجمالي الخصم</span>
+                                    <span>- {(optimisticPO.discountAmount || 0).toLocaleString()} {optimisticPO.currency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-emerald-400/60">
+                                    <span>إجمالي الضريبة</span>
+                                    <span>{(optimisticPO.taxAmount || 0).toLocaleString()} {optimisticPO.currency}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Notes */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
-                        style={{ animationDelay: '300ms' }}>
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '300ms' }}>
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center gap-3">
                                 <div className="p-3 bg-blue-100 rounded-xl">
@@ -674,20 +631,15 @@ const PurchaseOrderFormPage: React.FC = () => {
                             <textarea
                                 value={optimisticPO.notes || ''}
                                 disabled={isView}
-                                onChange={(e) => updateFormData({ notes: e.target.value })}
-                                className={`w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
-                                    focus:border-brand-primary focus:bg-white outline-none transition-all 
-                                    text-sm leading-relaxed h-40 resize-none
-                                    ${isView ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'notes', value: e.target.value })}
+                                className={`w-full p-4 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all text-sm leading-relaxed h-40 resize-none ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 placeholder={isView ? '' : "اكتب أي ملاحظات أو تعليمات خاصة للمورد..."}
                             />
                         </div>
                     </div>
 
                     {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
-                        flex gap-4 animate-slide-in shadow-lg"
-                        style={{ animationDelay: '400ms' }}>
+                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 flex gap-4 animate-slide-in shadow-lg" style={{ animationDelay: '400ms' }}>
                         <div className="p-3 bg-blue-100 rounded-xl h-fit">
                             <AlertCircle className="w-6 h-6 text-blue-600" />
                         </div>

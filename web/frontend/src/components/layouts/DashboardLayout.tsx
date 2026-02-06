@@ -8,7 +8,7 @@ import {
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity, ClipboardCheck, GitCompare,
     Undo2
 } from 'lucide-react';
-import { Outlet, Link, useLocation,useNavigate} from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { approvalService } from '../../services/approvalService';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
 import { grnService } from '../../services/grnService';
@@ -216,7 +216,7 @@ const DashboardLayout: React.FC = () => {
     const location = useLocation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    
+
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);
@@ -224,6 +224,7 @@ const DashboardLayout: React.FC = () => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
     const [pendingInspectionsCount, setPendingInspectionsCount] = useState(0);
+
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
@@ -258,17 +259,20 @@ const DashboardLayout: React.FC = () => {
 
     // Fetch pending inspections count
     useEffect(() => {
-        const fetchInspectionsCount = async () => {
+        const fetchCounts = async () => {
             try {
+                // Pending Inspections
                 const grns = await grnService.getAllGRNs();
-                const count = grns.filter(g => g.status === 'Pending Inspection').length;
-                setPendingInspectionsCount(count);
+                const inspections = grns.filter(g => g.status === 'Pending Inspection').length;
+                setPendingInspectionsCount(inspections);
+
+                setPendingInspectionsCount(inspections);
             } catch (error) {
-                console.error('Failed to fetch inspections count', error);
+                console.error('Failed to fetch counts', error);
             }
         };
-        fetchInspectionsCount();
-        const interval = setInterval(fetchInspectionsCount, 10000); // Faster refresh (10s)
+        fetchCounts();
+        const interval = setInterval(fetchCounts, 10000); // Faster refresh (10s)
         return () => clearInterval(interval);
     }, []);
 

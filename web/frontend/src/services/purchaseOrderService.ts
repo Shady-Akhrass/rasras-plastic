@@ -46,6 +46,7 @@ export interface PurchaseOrderDto {
     approvalStatus?: string;
     notes?: string;
     termsAndConditions?: string;
+    deliveryDays?: number; // Added
     items: PurchaseOrderItemDto[];
 }
 

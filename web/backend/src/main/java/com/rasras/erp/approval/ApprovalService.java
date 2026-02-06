@@ -17,6 +17,7 @@ import com.rasras.erp.procurement.SupplierQuotation;
 import com.rasras.erp.procurement.SupplierQuotationItem;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.inventory.ItemRepository;
+import com.rasras.erp.inventory.WarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,7 @@ public class ApprovalService {
     private final PurchaseReturnRepository returnRepo;
     private final ItemRepository itemRepo;
     private final UnitRepository unitRepo;
+    private final WarehouseRepository warehouseRepo;
 
     @Transactional
     public ApprovalRequest initiateApproval(String workflowCode, String docType, Integer docId,
@@ -329,8 +331,15 @@ public class ApprovalService {
         grn.setCreatedBy(userId);
         grn.setReceivedByUserId(userId);
 
-        // Assume default warehouse (e.g. ID 1) or logic to fetch it
-        grn.setWarehouseId(1);
+        // Fetch first available warehouse from database
+        // TODO: Implement proper warehouse selection logic (e.g., from PO or system
+        // config)
+        Integer warehouseId = warehouseRepo.findByIsActiveTrue().stream()
+                .findFirst()
+                .map(com.rasras.erp.inventory.Warehouse::getId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Cannot create GRN: No active warehouses available in the system. Please create a warehouse first."));
+        grn.setWarehouseId(warehouseId);
 
         if (po.getItems() != null) {
             List<GRNItem> grnItems = po.getItems().stream().map(poItem -> {

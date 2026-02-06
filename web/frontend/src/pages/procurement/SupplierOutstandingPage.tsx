@@ -18,7 +18,9 @@ import {
     FileText,
     X,
     AlertCircle,
-    Undo2
+    Ban,
+    Clock,
+    Truck
 } from 'lucide-react';
 import { supplierService, type SupplierOutstandingDto } from '../../services/supplierService';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
@@ -65,126 +67,176 @@ const BalanceTableRow: React.FC<{
     isExpanded: boolean;
     onToggleExpand: (id: number) => void;
     invoices: SupplierInvoiceDto[];
-}> = ({ summary, index, onView, isExpanded, onToggleExpand, invoices }) => (
-    <>
-        <tr
-            className={`hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer ${isExpanded ? 'bg-brand-primary/5' : ''}`}
-            onClick={() => onToggleExpand(summary.id)}
-            style={{
-                animationDelay: `${index * 30}ms`,
-                animation: 'fadeInUp 0.3s ease-out forwards'
-            }}
-        >
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+}> = ({ summary, index, onView, isExpanded, onToggleExpand, invoices }) => {
+    const [expandedInvoiceId, setExpandedInvoiceId] = React.useState<number | null>(null);
+
+    return (
+        <>
+            <tr
+                className={`hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer ${isExpanded ? 'bg-brand-primary/5' : ''}`}
+                onClick={() => onToggleExpand(summary.id)}
+                style={{
+                    animationDelay: `${index * 30}ms`,
+                    animation: 'fadeInUp 0.3s ease-out forwards'
+                }}
+            >
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                         rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Building2 className="w-5 h-5 text-brand-primary" />
-                    </div>
-                    <div>
-                        <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                            {summary.supplierNameAr}
+                            <Building2 className="w-5 h-5 text-brand-primary" />
                         </div>
-                        <div className="text-xs text-slate-400 font-mono">#{summary.supplierCode}</div>
+                        <div>
+                            <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                                {summary.supplierNameAr}
+                            </div>
+                            <div className="text-xs text-slate-400 font-mono">#{summary.supplierCode}</div>
+                        </div>
                     </div>
-                </div>
-            </td>
-            <td className="px-6 py-4 text-center">
-                <span className="font-medium text-slate-600">
-                    {(summary.totalInvoiced || 0).toLocaleString()} {summary.currency || 'EGP'}
-                </span>
-            </td>
-            <td className="px-6 py-4 text-center">
-                <span className="font-medium text-amber-600">
-                    {(summary.totalReturned || 0).toLocaleString()} {summary.currency || 'EGP'}
-                </span>
-            </td>
-            <td className="px-6 py-4 text-center">
-                <span className="font-medium text-emerald-600">
-                    {(summary.totalPaid || 0).toLocaleString()} {summary.currency || 'EGP'}
-                </span>
-            </td>
-            <td className="px-6 py-4 text-center">
-                <span className={`font-bold ${(summary.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {Math.abs(summary.currentBalance || 0).toLocaleString()} {summary.currency || 'EGP'}
-                    {(summary.currentBalance || 0) > 0 ? ' (لم يسدد)' : (summary.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
-                </span>
-            </td>
-            <td className="px-6 py-4 text-center">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
-                    <CreditCard className="w-3 h-3" />
-                    {(summary.creditLimit || 0).toLocaleString()}
-                </div>
-            </td>
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onView(summary.id); }}
-                        className="p-2 text-brand-primary bg-brand-primary/5 rounded-lg hover:bg-brand-primary 
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span className="font-medium text-slate-600">
+                        {(summary.totalInvoiced || 0).toLocaleString()} {summary.currency || 'EGP'}
+                    </span>
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span className="font-medium text-amber-600">
+                        {(summary.totalReturned || 0).toLocaleString()} {summary.currency || 'EGP'}
+                    </span>
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span className="font-medium text-emerald-600">
+                        {(summary.totalPaid || 0).toLocaleString()} {summary.currency || 'EGP'}
+                    </span>
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span className={`font-bold ${(summary.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        {Math.abs(summary.currentBalance || 0).toLocaleString()} {summary.currency || 'EGP'}
+                        {(summary.currentBalance || 0) > 0 ? ' (لم يسدد)' : (summary.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
+                    </span>
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
+                        <CreditCard className="w-3 h-3" />
+                        {(summary.creditLimit || 0).toLocaleString()}
+                    </div>
+                </td>
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onView(summary.id); }}
+                            className="p-2 text-brand-primary bg-brand-primary/5 rounded-lg hover:bg-brand-primary 
                         hover:text-white transition-all"
-                        title="عرض الملف"
-                    >
-                        <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                        className={`p-2 rounded-lg transition-all ${isExpanded ? 'bg-slate-200 text-slate-600' : 'hover:bg-slate-100 text-slate-400'}`}
-                    >
-                        {isExpanded ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    </button>
-                </div>
-            </td>
-        </tr>
-        {isExpanded && (
-            <tr className="bg-slate-50/50">
-                <td colSpan={7} className="px-6 py-4">
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-slate-500" />
-                            <span className="font-bold text-slate-700 text-sm">تفاصيل الفواتير ({invoices.length})</span>
-                        </div>
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-slate-50 text-slate-500">
-                                    <th className="px-4 py-2 text-right">رقم الفاتورة</th>
-                                    <th className="px-4 py-2 text-right">التاريخ</th>
-                                    <th className="px-4 py-2 text-right">المبلغ الكلي</th>
-                                    <th className="px-4 py-2 text-right">المدفوع</th>
-                                    <th className="px-4 py-2 text-right">المتبقي</th>
-                                    <th className="px-4 py-2 text-center">الحالة</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {invoices.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400">لا توجد فواتير مسجلة</td>
-                                    </tr>
-                                ) : (
-                                    invoices.map(inv => (
-                                        <tr key={inv.id} className="hover:bg-slate-50">
-                                            <td className="px-4 py-3 font-mono text-brand-primary">{inv.invoiceNumber}</td>
-                                            <td className="px-4 py-3 text-slate-600">{new Date(inv.invoiceDate).toLocaleDateString('ar-EG')}</td>
-                                            <td className="px-4 py-3 font-medium">{inv.totalAmount.toLocaleString()}</td>
-                                            <td className="px-4 py-3 text-emerald-600">{inv.paidAmount?.toLocaleString() || 0}</td>
-                                            <td className="px-4 py-3 text-rose-600">{inv.remainingAmount?.toLocaleString() || 0}</td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' :
-                                                        inv.status === 'Partial' ? 'bg-amber-100 text-amber-700' :
-                                                            'bg-rose-100 text-rose-700'
-                                                    }`}>
-                                                    {inv.status === 'Paid' ? 'مدفوعة' : inv.status === 'Partial' ? 'جزئي' : 'غير مدفوعة'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                            title="عرض الملف"
+                        >
+                            <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                            className={`p-2 rounded-lg transition-all ${isExpanded ? 'bg-slate-200 text-slate-600' : 'hover:bg-slate-100 text-slate-400'}`}
+                        >
+                            {isExpanded ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                        </button>
                     </div>
                 </td>
             </tr>
-        )}
-    </>
-);
+            {isExpanded && (
+                <tr className="bg-slate-50/50">
+                    <td colSpan={7} className="px-6 py-4">
+                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-slate-500" />
+                                <span className="font-bold text-slate-700 text-sm">تفاصيل الفواتير ({invoices.length})</span>
+                            </div>
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-500">
+                                        <th className="px-4 py-2 text-right">رقم الفاتورة</th>
+                                        <th className="px-4 py-2 text-right">التاريخ</th>
+                                        <th className="px-4 py-2 text-right">المبلغ الكلي</th>
+                                        <th className="px-4 py-2 text-right">المدفوع</th>
+                                        <th className="px-4 py-2 text-right">المتبقي</th>
+                                        <th className="px-4 py-2 text-center">الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {invoices.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-8 text-center text-slate-400">لا توجد فواتير مسجلة</td>
+                                        </tr>
+                                    ) : (
+                                        invoices.map(inv => (
+                                            <React.Fragment key={inv.id}>
+                                                <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedInvoiceId(prev => prev === inv.id ? null : (inv.id || null))}>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <button className="text-slate-400 hover:text-brand-primary transition-colors">
+                                                                {expandedInvoiceId === inv.id ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                                                            </button>
+                                                            <span className="font-mono text-brand-primary">{inv.invoiceNumber}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-600">{new Date(inv.invoiceDate).toLocaleDateString('ar-EG')}</td>
+                                                    <td className="px-4 py-3 font-medium">{inv.totalAmount.toLocaleString()}</td>
+                                                    <td className="px-4 py-3 text-emerald-600">{inv.paidAmount?.toLocaleString() || 0}</td>
+                                                    <td className="px-4 py-3 text-rose-600">{inv.remainingAmount?.toLocaleString() || 0}</td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' :
+                                                            inv.status === 'Partial' ? 'bg-amber-100 text-amber-700' :
+                                                                'bg-rose-100 text-rose-700'
+                                                            }`}>
+                                                            {inv.status === 'Paid' ? 'مدفوعة' : inv.status === 'Partial' ? 'جزئي' : 'غير مدفوعة'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {expandedInvoiceId === inv.id && inv.items && inv.items.length > 0 && (
+                                                    <tr>
+                                                        <td colSpan={6} className="px-4 py-2 bg-slate-50/50">
+                                                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                                                                <div className="px-3 py-2 bg-slate-100 border-b border-slate-200">
+                                                                    <span className="text-xs font-bold text-slate-600">أصناف الفاتورة</span>
+                                                                </div>
+                                                                <table className="w-full text-xs">
+                                                                    <thead>
+                                                                        <tr className="bg-slate-50 text-slate-500">
+                                                                            <th className="px-3 py-2 text-right">الصنف</th>
+                                                                            <th className="px-3 py-2 text-center">الكمية</th>
+                                                                            <th className="px-3 py-2 text-center">الوحدة</th>
+                                                                            <th className="px-3 py-2 text-center">السعر</th>
+                                                                            <th className="px-3 py-2 text-center">خصم %</th>
+                                                                            <th className="px-3 py-2 text-center">الضريبة %</th>
+                                                                            <th className="px-3 py-2 text-center">الإجمالي</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-slate-100">
+                                                                        {inv.items.map((item, idx) => (
+                                                                            <tr key={idx} className="hover:bg-slate-50">
+                                                                                <td className="px-3 py-2 text-slate-700">{item.itemNameAr}</td>
+                                                                                <td className="px-3 py-2 text-center font-medium text-brand-primary">{item.quantity}</td>
+                                                                                <td className="px-3 py-2 text-center text-slate-600">{item.unitNameAr}</td>
+                                                                                <td className="px-3 py-2 text-center font-medium text-emerald-600">{item.unitPrice.toLocaleString()}</td>
+                                                                                <td className="px-3 py-2 text-center text-rose-600">{item.discountPercentage || 0}%</td>
+                                                                                <td className="px-3 py-2 text-center text-amber-600">{item.taxPercentage || 0}%</td>
+                                                                                <td className="px-3 py-2 text-center font-bold text-slate-800">{item.totalPrice.toLocaleString()}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+            )}
+        </>
+    );
+};
 
 // Order Table Row Component
 const OrderTableRow: React.FC<{
@@ -339,14 +391,22 @@ const SupplierOutstandingPage: React.FC = () => {
         const totalReturned = summaries.reduce((acc, curr) => acc + (curr.totalReturned || 0), 0);
         const providersWithBalance = summaries.filter(s => (s.currentBalance || 0) > 0).length;
 
+        // Calculate breakdown from all invoices
+        const totalTax = allInvoices.reduce((sum, inv) => sum + (inv.taxAmount || 0), 0);
+        const totalDiscount = allInvoices.reduce((sum, inv) => sum + (inv.discountAmount || 0), 0);
+        const totalDelivery = allInvoices.reduce((sum, inv) => sum + (inv.deliveryCost || 0), 0);
+
         return {
             totalOutstanding: totalOutstanding.toLocaleString(),
             totalPaid: totalPaid.toLocaleString(),
             totalInvoiced: totalInvoiced.toLocaleString(),
             totalReturned: totalReturned.toLocaleString(),
+            totalTax: totalTax.toLocaleString(),
+            totalDiscount: totalDiscount.toLocaleString(),
+            totalDelivery: totalDelivery.toLocaleString(),
             providersWithBalance
         };
-    }, [summaries]);
+    }, [summaries, allInvoices]);
 
     const handleViewSupplier = (id: number) => {
         navigate(`/dashboard/procurement/suppliers/${id}`);
@@ -417,7 +477,7 @@ const SupplierOutstandingPage: React.FC = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <StatCard
                     icon={Wallet}
                     value={stats.totalOutstanding}
@@ -431,10 +491,22 @@ const SupplierOutstandingPage: React.FC = () => {
                     color="blue"
                 />
                 <StatCard
-                    icon={Undo2}
-                    value={stats.totalReturned}
-                    label="إجمالي المرتجعات"
-                    color="purple"
+                    icon={Ban}
+                    value={stats.totalDiscount}
+                    label="إجمالي الخصومات"
+                    color="rose"
+                />
+                <StatCard
+                    icon={Clock}
+                    value={stats.totalTax}
+                    label="إجمالي الضريبة"
+                    color="warning"
+                />
+                <StatCard
+                    icon={Truck}
+                    value={stats.totalDelivery}
+                    label="إجمالي التوصيل"
+                    color="blue"
                 />
                 <StatCard
                     icon={TrendingDown}
@@ -445,7 +517,7 @@ const SupplierOutstandingPage: React.FC = () => {
                 <StatCard
                     icon={AlertCircle}
                     value={stats.providersWithBalance}
-                    label="موردين لهم مديونية"
+                    label="موردين بمديونية"
                     color="warning"
                 />
             </div>

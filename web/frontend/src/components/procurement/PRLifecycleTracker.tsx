@@ -55,7 +55,7 @@ const PRLifecycleTracker: React.FC<PRLifecycleTrackerProps> = ({ lifecycle }) =>
         },
         {
             id: 'ordering',
-            label: 'التعميد',
+            label: 'أمر الشراء',
             description: lifecycle.ordering.poNumbers.length > 0 ? `${lifecycle.ordering.poNumbers.length} أمر شراء` : 'لم يتم إنشاء أمر شراء',
             icon: ShoppingCart,
             status: lifecycle.ordering.status === 'Approved' ? 'Completed' :

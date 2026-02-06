@@ -16,11 +16,16 @@ import {
     RefreshCw,
     ShoppingCart,
     Package,
-    Trash2
+    Trash2,
+    ChevronDown,
+    ChevronUp,
+    Send
 } from 'lucide-react';
-import purchaseService, { type PurchaseRequisition } from '../../services/purchaseService';
+import purchaseService, { type PurchaseRequisition, type PRLifecycle } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import PRLifecycleTracker from '../../components/procurement/PRLifecycleTracker';
+import toast from 'react-hot-toast';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -122,96 +127,130 @@ const PRTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onSubmit: (id: number) => void;
-
     onDelete: (pr: PurchaseRequisition) => void;
-}> = ({ pr, index, onView, onSubmit, onDelete }) => (
-    <tr
-        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
-        style={{
-            animationDelay: `${index * 30}ms`,
-            animation: 'fadeInUp 0.3s ease-out forwards'
-        }}
-    >
-        <td className="px-6 py-4">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
-                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <FileText className="w-5 h-5 text-brand-primary" />
+    isExpanded: boolean;
+    onToggleExpand: () => void;
+    lifecycle: PRLifecycle | null;
+    loadingLifecycle: boolean;
+}> = ({ pr, index, onView, onSubmit, onDelete, isExpanded, onToggleExpand, lifecycle, loadingLifecycle }) => (
+    <>
+        <tr
+            className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
+            style={{
+                animationDelay: `${index * 30}ms`,
+                animation: 'fadeInUp 0.3s ease-out forwards'
+            }}
+        >
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                        rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <FileText className="w-5 h-5 text-brand-primary" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                        #{pr.prNumber}
+                    </span>
                 </div>
-                <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                    #{pr.prNumber}
+            </td>
+            <td className="px-6 py-4 text-sm text-slate-600">
+                <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <span>{new Date(pr.prDate || '').toLocaleDateString('ar-EG')}</span>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-sm text-slate-600">
+                <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span>{pr.requestedByUserName}</span>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-sm text-slate-600">
+                <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-slate-400" />
+                    <span>{pr.requestedByDeptName}</span>
+                </div>
+            </td>
+            <td className="px-6 py-4">
+                <PriorityBadge priority={pr.priority || 'Normal'} />
+            </td>
+            <td className="px-6 py-4">
+                <StatusBadge status={pr.status || 'Draft'} />
+            </td>
+            {/* Added Missing Column for "Current Stage" matching header */}
+            <td className="px-6 py-4">
+                <span className="text-xs text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-md">
+                   {pr.status === 'Approved' ? 'مكتمل' : 'قيد المراجعة'}
                 </span>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-sm text-slate-600">
-            <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{new Date(pr.prDate || '').toLocaleDateString('ar-EG')}</span>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-sm text-slate-600">
-            <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-slate-400" />
-                <span>{pr.requestedByUserName}</span>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-sm text-slate-600">
-            <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-slate-400" />
-                <span>{pr.requestedByDeptName}</span>
-            </div>
-        </td>
-        <td className="px-6 py-4">
-            <PriorityBadge priority={pr.priority || 'Normal'} />
-        </td>
-        <td className="px-6 py-4">
-            <StatusBadge status={pr.status || 'Draft'} />
-        </td>
-        <td className="px-6 py-4">
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${pr.status === 'Draft' ? 'bg-slate-50 text-slate-700 border-slate-200' :
-                pr.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                    pr.status === 'Approved' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                        'bg-emerald-50 text-emerald-700 border-emerald-200'
-                }`}>
-                {pr.status === 'Draft' ? 'المسودة' :
-                    pr.status === 'Pending' ? 'الاعتماد' :
-                        pr.status === 'Approved' ? 'التوريد/الطلب' : 'مكتمل'}
-            </div>
-        </td>
-        <td className="px-6 py-4 text-left">
-            <div className="flex items-center justify-end gap-2">
-                {pr.status === 'Draft' && (
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-2">
                     <button
-                        onClick={() => onSubmit(pr.id!)}
-                        className="p-2 text-emerald-500 hover:bg-emerald-50 
-                            rounded-lg transition-all duration-200"
-                        title="إرسال للاعتماد"
+                        onClick={onToggleExpand}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold 
+                            bg-slate-50 text-slate-700 border border-slate-200 hover:bg-brand-primary/10 
+                            hover:text-brand-primary hover:border-brand-primary/20 transition-all"
                     >
-                        <CheckCircle2 className="w-5 h-5" />
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        <span>{isExpanded ? 'إخفاء' : 'تتبع'}</span>
                     </button>
-                )}
+                    
+                    {/* Actions Container */}
+                    <div className="flex items-center gap-1">
+                        {pr.status === 'Draft' && (
+                            <button
+                                onClick={() => onSubmit(pr.id!)}
+                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 
+                                    rounded-lg transition-all duration-200"
+                                title="إرسال للاعتماد"
+                            >
+                                <Send className="w-4 h-4" />
+                            </button>
+                        )}
+                        
+                        {(pr.status === 'Draft' || pr.status === 'Pending' || pr.status === 'Rejected') && (
+                            <button
+                                onClick={() => onView(pr.id!)}
+                                className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
+                                    rounded-lg transition-all duration-200"
+                                title="تعديل"
+                            >
+                                <Edit3 className="w-4 h-4" />
+                            </button>
+                        )}
 
-                <button
-                    onClick={() => onView(pr.id!)}
-                    className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
-                        rounded-lg transition-all duration-200"
-                    title="تعديل"
-                >
-                    <Edit3 className="w-5 h-5" />
-                </button>
-                {(pr.status === 'Draft' || pr.status === 'Pending') && (
-                    <button
-                        onClick={() => onDelete(pr)}
-                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
-                            rounded-lg transition-all duration-200"
-                        title="حذف (قبل الاعتماد)"
-                    >
-                        <Trash2 className="w-5 h-5" />
-                    </button>
-                )}
-            </div>
-        </td>
-    </tr>
+                        {(pr.status === 'Draft' || pr.status === 'Rejected') && (
+                            <button
+                                onClick={() => onDelete(pr)}
+                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
+                                    rounded-lg transition-all duration-200"
+                                title="حذف"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {isExpanded && (
+            <tr>
+                <td colSpan={8} className="px-6 py-4 bg-slate-50/50">
+                    {loadingLifecycle ? (
+                        <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="w-6 h-6 text-brand-primary animate-spin" />
+                            <span className="mr-3 text-slate-600">جاري تحميل بيانات التتبع...</span>
+                        </div>
+                    ) : lifecycle ? (
+                        <PRLifecycleTracker lifecycle={lifecycle} />
+                    ) : (
+                        <div className="text-center py-8 text-slate-500">
+                            لا توجد بيانات تتبع متاحة
+                        </div>
+                    )}
+                </td>
+            </tr>
+        )}
+    </>
 );
 
 // Loading Skeleton
@@ -279,8 +318,6 @@ const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ se
     </tr>
 );
 
-import toast from 'react-hot-toast';
-
 const PurchaseRequisitionsPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -295,6 +332,11 @@ const PurchaseRequisitionsPage: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [prToDelete, setPrToDelete] = useState<{ id: number; prNumber: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Lifecycle tracking state
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+    const [lifecycleData, setLifecycleData] = useState<Map<number, PRLifecycle>>(new Map());
+    const [loadingLifecycle, setLoadingLifecycle] = useState<Set<number>>(new Set());
 
     useEffect(() => {
         fetchPRs();
@@ -316,6 +358,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
             setPrs(data);
         } catch (error) {
             console.error('Failed to fetch PRs:', error);
+            toast.error('فشل تحميل قائمة الطلبات');
         } finally {
             setLoading(false);
         }
@@ -331,19 +374,55 @@ const PurchaseRequisitionsPage: React.FC = () => {
         }
     };
 
+    const handleToggleExpand = async (prId: number) => {
+        const newExpandedRows = new Set(expandedRows);
+
+        if (expandedRows.has(prId)) {
+            // Collapse
+            newExpandedRows.delete(prId);
+            setExpandedRows(newExpandedRows);
+        } else {
+            // Expand
+            newExpandedRows.add(prId);
+            setExpandedRows(newExpandedRows);
+
+            if (!lifecycleData.has(prId)) {
+                // Fetch lifecycle data
+                const newLoadingLifecycle = new Set(loadingLifecycle);
+                newLoadingLifecycle.add(prId);
+                setLoadingLifecycle(newLoadingLifecycle);
+
+                try {
+                    const lifecycle = await purchaseService.getPRLifecycle(prId);
+                    const newLifecycleData = new Map(lifecycleData);
+                    newLifecycleData.set(prId, lifecycle);
+                    setLifecycleData(newLifecycleData);
+                } catch (error) {
+                    console.error('Failed to fetch lifecycle:', error);
+                    toast.error('فشل تحميل بيانات التتبع');
+                } finally {
+                    const newLoadingLifecycle = new Set(loadingLifecycle);
+                    newLoadingLifecycle.delete(prId);
+                    setLoadingLifecycle(newLoadingLifecycle);
+                }
+            }
+        }
+    };
+
     const filteredPRs = useMemo(() => {
         const filtered = prs.filter(pr => {
             const matchesSearch =
-                pr.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                pr.requestedByUserName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                pr.requestedByDeptName?.toLowerCase().includes(searchTerm.toLowerCase());
+                (pr.prNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (pr.requestedByUserName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (pr.requestedByDeptName?.toLowerCase() || '').includes(searchTerm.toLowerCase());
             const matchesStatus = statusFilter === 'All' || pr.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        // الأحدث فوق والأقدم تحت
+        
+        // Sort: Newest first
         return [...filtered].sort((a, b) => {
-            const dateA = (a.prDate || a.createdAt) ? new Date(a.prDate || a.createdAt!).getTime() : 0;
-            const dateB = (b.prDate || b.createdAt) ? new Date(b.prDate || b.createdAt!).getTime() : 0;
+            const dateA = a.prDate ? new Date(a.prDate).getTime() : 0;
+            const dateB = b.prDate ? new Date(b.prDate).getTime() : 0;
             return dateB - dateA;
         });
     }, [prs, searchTerm, statusFilter]);
@@ -395,7 +474,6 @@ const PurchaseRequisitionsPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Custom Styles */}
             <style>{`
                 @keyframes fadeInUp {
                     from {
@@ -412,7 +490,6 @@ const PurchaseRequisitionsPage: React.FC = () => {
             {/* Header Section */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
                 rounded-3xl p-8 text-white">
-                {/* Decorative Elements */}
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
                 <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
@@ -466,42 +543,12 @@ const PurchaseRequisitionsPage: React.FC = () => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <StatCard
-                    icon={Package}
-                    value={stats.total}
-                    label="إجمالي الطلبات"
-                    color="primary"
-                />
-                <StatCard
-                    icon={FileText}
-                    value={stats.draft}
-                    label="مسودة"
-                    color="blue"
-                />
-                <StatCard
-                    icon={Clock}
-                    value={stats.pending}
-                    label="قيد الانتظار"
-                    color="warning"
-                />
-                <StatCard
-                    icon={CheckCircle2}
-                    value={stats.approved}
-                    label="معتمد"
-                    color="success"
-                />
-                <StatCard
-                    icon={XCircle}
-                    value={stats.rejected}
-                    label="مرفوض"
-                    color="rose"
-                />
-                <StatCard
-                    icon={AlertCircle}
-                    value={stats.highPriority}
-                    label="أولوية عالية"
-                    color="purple"
-                />
+                <StatCard icon={Package} value={stats.total} label="إجمالي الطلبات" color="primary" />
+                <StatCard icon={FileText} value={stats.draft} label="مسودة" color="blue" />
+                <StatCard icon={Clock} value={stats.pending} label="قيد الانتظار" color="warning" />
+                <StatCard icon={CheckCircle2} value={stats.approved} label="معتمد" color="success" />
+                <StatCard icon={XCircle} value={stats.rejected} label="مرفوض" color="rose" />
+                <StatCard icon={AlertCircle} value={stats.highPriority} label="أولوية عالية" color="purple" />
             </div>
 
             {/* Filters */}
@@ -590,7 +637,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الأولوية</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المرحلة الحالية</th>
-                                <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 font-bold text-slate-700">إجراءات</th>
+                                <th className="px-6 py-4 text-left text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -606,8 +653,11 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                         index={index}
                                         onView={handleViewPR}
                                         onSubmit={handleSubmit}
-
                                         onDelete={handleDeleteClick}
+                                        isExpanded={expandedRows.has(pr.id!)}
+                                        onToggleExpand={() => handleToggleExpand(pr.id!)}
+                                        lifecycle={lifecycleData.get(pr.id!) || null}
+                                        loadingLifecycle={loadingLifecycle.has(pr.id!)}
                                     />
                                 ))
                             )}

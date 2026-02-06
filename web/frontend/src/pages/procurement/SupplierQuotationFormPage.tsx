@@ -231,6 +231,24 @@ const SupplierQuotationFormPage: React.FC = () => {
     const handleRFQLink = async (rfqId: number) => {
         if (rfqId === 0) return;
         try {
+            // Check for existing quotation for this RFQ
+            // Note: Ideally this should be a backend check endpoint, but for now filtering all quotations
+            // or relying on backend constraint on save. Better UX to check here.
+
+            // Only perform this check if we are creating a New quotation (not editing)
+            if (!isEdit) {
+                const allQuotations = await purchaseService.getAllQuotations();
+                const existing = allQuotations.find(q => q.rfqId === rfqId);
+
+                if (existing) {
+                    toast.error('عذراً، يوجد بالفعل عرض سعر مسجل لطلب السعر هذا', { duration: 4000, icon: '⚠️' });
+                    // Reset selection if needed, or just warn
+                    // To strictly prevent, we could set rfqId back to 0 or null, but let's just warn and clear
+                    setFormData(prev => ({ ...prev, rfqId: undefined })); // Clear RFQ link
+                    return;
+                }
+            }
+
             const rfq = await purchaseService.getRFQById(rfqId);
             setRfqItems(rfq.items);
 
@@ -268,6 +286,7 @@ const SupplierQuotationFormPage: React.FC = () => {
             });
         } catch (error) {
             console.error('Failed to link RFQ:', error);
+            toast.error('حدث خطأ أثناء فحص أو تحميل بيانات طلب السعر');
         }
     };
 
@@ -275,8 +294,13 @@ const SupplierQuotationFormPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!formData.rfqId) {
+            toast.error('يرجى اختيار طلب السعر');
+            return;
+        }
+
         if (formData.supplierId === 0) {
-            toast.error('يرجى اختيار المورد');
+            toast.error('سيتم تحديد المورد تلقائياً عند اختيار طلب السعر');
             return;
         }
 
@@ -497,18 +521,19 @@ const SupplierQuotationFormPage: React.FC = () => {
                             <div className="space-y-2 md:col-span-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <FileText className="w-4 h-4 text-blue-500" />
-                                    رابط بطلب سعر (اختياري)
+                                    طلب السعر <span className="text-rose-500">*</span>
                                 </label>
                                 <select
                                     value={formData.rfqId || 0}
                                     onChange={(e) => handleRFQLink(parseInt(e.target.value))}
                                     disabled={isView}
+                                    required
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
                                         ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
-                                    <option value={0}>لا يوجد...</option>
-                                    {rfqs.map(r => (
+                                    <option value={0}>اختر طلب السعر...</option>
+                                    {rfqs.filter(r => ((!r.hasActiveOrders && !r.hasQuotation && r.prId) || r.id === formData.rfqId)).map(r => (
                                         <option key={r.id} value={r.id}>{r.rfqNumber} - {r.supplierNameAr}</option>
                                     ))}
                                 </select>
@@ -524,7 +549,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         value={formData.supplierId}
                                         onChange={(e) => handleSupplierChange(parseInt(e.target.value))}
                                         required
-                                        disabled={isView}
+                                        disabled={true} // Auto-assigned from RFQ
                                         className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                             focus:border-brand-primary outline-none transition-all font-semibold
                                             ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
@@ -576,10 +601,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     value={formData.quotationDate}
                                     onChange={(e) => setFormData(prev => ({ ...prev, quotationDate: e.target.value }))}
                                     required
-                                    disabled={isView}
+                                    disabled={true}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
-                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                        ${true ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
 
@@ -832,7 +857,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Sidebar */}
+                {/* Sidebar (1/3) */}
                 <div className="space-y-6">
                     {/* Financial Summary */}
                     <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
@@ -848,14 +873,14 @@ const SupplierQuotationFormPage: React.FC = () => {
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">الإجمالي قبل الضريبة</span>
                                 <span className="font-bold text-lg">
-                                    {formData.items.reduce((sum, i) => sum + (i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100)), 0)
+                                    {optimisticData.items.reduce((sum, i) => sum + (i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100)), 0)
                                         .toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                                 <span className="text-emerald-400 font-semibold text-sm">ضريبة القيمة المضافة</span>
                                 <span className="font-bold text-lg text-emerald-400">
-                                    {formData.items.reduce((sum, i) => {
+                                    {optimisticData.items.reduce((sum, i) => {
                                         const beforeTax = i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100);
                                         const taxAmount = beforeTax * ((i.taxPercentage || 0) / 100);
                                         return sum + taxAmount;
@@ -878,7 +903,8 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         value={optimisticData.totalAmount || 0}
                                         onChange={(e) => {
                                             const totalVal = parseFloat(e.target.value) || 0;
-                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0);
+                                            // Calculate items total + tax (without delivery)
+                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0); 
                                             const derivedDeliveryCost = totalVal - itemsGrandTotal;
 
                                             const updates = {
@@ -886,8 +912,8 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 deliveryCost: derivedDeliveryCost
                                             };
 
-                                            addOptimisticData(updates);
                                             startTransition(() => {
+                                                addOptimisticData(updates);
                                                 setFormData(prev => ({ ...prev, ...updates }));
                                             });
                                         }}
@@ -898,7 +924,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 focus:border-emerald-400'}`}
                                     />
                                 </div>
-                                <span className="text-sm font-bold mr-2 text-emerald-400/60">{optimisticData.currency}</span>
+                                <span className="text-sm font-bold mr-2 text-emerald-400/60">{optimisticData.currency || 'EGP'}</span>
                             </div>
                         </div>
                     </div>
@@ -916,8 +942,14 @@ const SupplierQuotationFormPage: React.FC = () => {
                         </div>
                         <div className="p-6">
                             <textarea
-                                value={formData.notes || ''}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                value={optimisticData.notes || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    startTransition(() => {
+                                        addOptimisticData({ notes: val });
+                                        setFormData(prev => ({ ...prev, notes: val }));
+                                    });
+                                }}
                                 disabled={isView}
                                 className={`w-full p-4 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all 
@@ -928,20 +960,21 @@ const SupplierQuotationFormPage: React.FC = () => {
                         </div>
                     </div>
 
-                {/* Info Alert */}
-                <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
-                        flex gap-4 animate-slide-in shadow-lg"
-                    style={{ animationDelay: '400ms' }}>
-                    <div className="p-3 bg-blue-100 rounded-xl h-fit">
-                        <AlertCircle className="w-6 h-6 text-blue-600" />
+                    {/* Info Alert */}
+                    <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
+                            flex gap-4 animate-slide-in shadow-lg"
+                        style={{ animationDelay: '400ms' }}>
+                        <div className="p-3 bg-blue-100 rounded-xl h-fit">
+                            <AlertCircle className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
+                            <p className="text-sm leading-relaxed text-blue-700">
+                                سيتم حفظ أسعار الأصناف تلقائياً في <strong>كتالوج المورد</strong> لاستخدامها في الطلبات المستقبلية.
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
-                        <p className="text-sm leading-relaxed text-blue-700">
-                            سيتم حفظ أسعار الأصناف تلقائياً في <strong>كتالوج المورد</strong> لاستخدامها في الطلبات المستقبلية.
-                        </p>
-                    </div>
-                </div>
+                </div> {/* End of Sidebar */}
             </form>
         </div>
     );

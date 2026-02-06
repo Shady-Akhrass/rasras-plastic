@@ -16,6 +16,7 @@ export interface SupplierInvoiceDto {
     subTotal: number;
     discountAmount?: number;
     taxAmount?: number;
+    deliveryCost?: number;
     totalAmount: number;
     paidAmount?: number;
     remainingAmount?: number;

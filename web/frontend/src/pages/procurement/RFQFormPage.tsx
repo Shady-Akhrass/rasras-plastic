@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useOptimistic, useTransition } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Plus, Save, Trash2, Package, Truck, Calendar, FileText,
@@ -11,6 +11,8 @@ import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import { approvalService } from '../../services/approvalService';
 import toast from 'react-hot-toast';
+
+// --- Components ---
 
 // Multi Select Dropdown Component
 const MultiSelectDropdown: React.FC<{
@@ -67,7 +69,6 @@ const MultiSelectDropdown: React.FC<{
                         ${isOpen ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
                 )}
 
-                {/* Trigger Button */}
                 <button
                     type="button"
                     onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -106,7 +107,6 @@ const MultiSelectDropdown: React.FC<{
                     </div>
                 </button>
 
-                {/* Dropdown */}
                 {isOpen && (
                     <>
                         <div
@@ -115,7 +115,6 @@ const MultiSelectDropdown: React.FC<{
                         />
                         <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border-2 border-slate-200 
                             shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                            {/* Search */}
                             <div className="p-3 border-b border-slate-100">
                                 <div className="relative">
                                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -131,7 +130,6 @@ const MultiSelectDropdown: React.FC<{
                                 </div>
                             </div>
 
-                            {/* Quick Actions */}
                             <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                                 <span className="text-xs text-slate-500">
                                     {filteredOptions.length} مورد متاح
@@ -156,7 +154,6 @@ const MultiSelectDropdown: React.FC<{
                                 </div>
                             </div>
 
-                            {/* Options List */}
                             <div className="max-h-64 overflow-y-auto">
                                 {filteredOptions.length > 0 ? (
                                     filteredOptions.map(opt => {
@@ -199,7 +196,6 @@ const MultiSelectDropdown: React.FC<{
                 )}
             </div>
 
-            {/* Selected Suppliers Tags */}
             {selectedValues.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                     {options
@@ -281,7 +277,71 @@ const FormInput: React.FC<{
     );
 };
 
-// Form Multi-Select Component (قائمة منسدلة بداخلها اختيار من متعدد)
+// Form Select Component (Added to fix missing component error)
+const FormSelect: React.FC<{
+    label: string;
+    value: number | string;
+    onChange: (value: string) => void;
+    options: { value: number | string; label: string; code?: string }[];
+    icon?: React.ElementType;
+    placeholder?: string;
+    required?: boolean;
+    disabled?: boolean;
+    loading?: boolean;
+    helperText?: React.ReactNode;
+}> = ({ label, value, onChange, options, icon: Icon, placeholder, required, disabled, loading, helperText }) => {
+    const [isFocused, setIsFocused] = useState(false);
+
+    return (
+        <div className="space-y-2">
+            <label className={`block text-sm font-semibold transition-colors duration-200
+                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
+                {label}
+                {required && <span className="text-rose-500 mr-1">*</span>}
+            </label>
+            <div className="relative">
+                {Icon && (
+                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200 pointer-events-none
+                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                )}
+                {loading && (
+                    <RefreshCw className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-primary animate-spin pointer-events-none" />
+                )}
+                <select
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    disabled={disabled}
+                    required={required}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none appearance-none
+                        ${Icon ? 'pr-12' : ''}
+                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                        ${isFocused
+                            ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+                >
+                    <option value="">{placeholder || 'اختر...'}</option>
+                    {options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label} {opt.code ? `(${opt.code})` : ''}
+                        </option>
+                    ))}
+                </select>
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                    {!loading && <ChevronRight className="w-5 h-5 text-slate-400 rotate-90" />}
+                </div>
+            </div>
+            {helperText && (
+                <div className="text-xs text-slate-500 flex items-center gap-1">
+                    {helperText}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Form Multi-Select Component
 const FormMultiSelect: React.FC<{
     label: string;
     value: number[];
@@ -413,7 +473,7 @@ const ItemRow: React.FC<{
     onUpdate: (field: keyof RFQItem, value: any) => void;
     onRemove: () => void;
     readOnly?: boolean;
-}> = ({ item, index, items, units, supplierPrice, onUpdate, onRemove, readOnly }) => (
+}> = ({ item, index, items, units, supplierPrice, onUpdate, onRemove, readOnly, disabled }) => (
     <div
         className="p-5 bg-white rounded-2xl border-2 border-slate-100 relative group 
             transition-all duration-300 hover:shadow-lg hover:border-brand-primary/20"
@@ -435,7 +495,7 @@ const ItemRow: React.FC<{
             </button>
         )}
 
-            <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
+        <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
             flex items-center justify-center text-sm font-bold shadow-lg">
             {index + 1}
         </div>
@@ -450,9 +510,9 @@ const ItemRow: React.FC<{
                 <select
                     value={item.itemId}
                     onChange={(e) => !readOnly && onUpdate('itemId', parseInt(e.target.value))}
-                    disabled={readOnly}
+                    disabled={readOnly || disabled}
                     className={`w-full px-4 py-2.5 rounded-xl border-2 font-medium transition-all
-                        ${readOnly ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
+                        ${readOnly || disabled ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
                 >
                     <option value={0}>اختر صنف...</option>
                     {items.map(i => (
@@ -461,7 +521,7 @@ const ItemRow: React.FC<{
                 </select>
             </div>
 
-            {/* Quantity - غير قابلة للتعديل */}
+            {/* Quantity - غير قابلة للتعديل إذا كان من طلب شراء */}
             <div className="md:col-span-2 space-y-2">
                 <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
                     <Hash className="w-3.5 h-3.5" />
@@ -470,9 +530,11 @@ const ItemRow: React.FC<{
                 <input
                     type="number"
                     value={item.requestedQty}
-                    readOnly
-                    disabled
-                    className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600 font-medium"
+                    onChange={(e) => !readOnly && onUpdate('requestedQty', parseFloat(e.target.value))}
+                    readOnly={readOnly}
+                    disabled={disabled || readOnly}
+                    className={`w-full px-4 py-2.5 rounded-xl border-2 font-medium transition-all
+                        ${readOnly || disabled ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
                     min="0"
                     step="0.01"
                 />
@@ -487,9 +549,9 @@ const ItemRow: React.FC<{
                 <select
                     value={item.unitId}
                     onChange={(e) => !readOnly && onUpdate('unitId', parseInt(e.target.value))}
-                    disabled={readOnly}
+                    disabled={readOnly || disabled}
                     className={`w-full px-4 py-2.5 rounded-xl border-2 font-medium transition-all
-                        ${readOnly ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
+                        ${readOnly || disabled ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
                 >
                     <option value={0}>الوحدة...</option>
                     {units.map(u => (
@@ -498,50 +560,31 @@ const ItemRow: React.FC<{
                 </select>
             </div>
 
-                <div className="md:col-span-2 space-y-2">
-                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                        <Layers className="w-3.5 h-3.5" />
-                        الوحدة
-                    </label>
-                    <select
-                        value={item.unitId}
-                        disabled={disabled}
-                        onChange={(e) => onUpdate('unitId', parseInt(e.target.value))}
-                        className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
-                        focus:border-brand-primary outline-none font-medium transition-all
-                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
-                    >
-                        <option value={0}>الوحدة...</option>
-                        {units.map(u => (
-                            <option key={u.id} value={u.id}>{u.unitNameAr}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="md:col-span-2 space-y-2">
-                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                        <DollarSign className="w-3.5 h-3.5" />
-                        السعر المتوقع
-                        {supplierPrice && (
-                            <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
-                                كتالوج
-                            </span>
-                        )}
-                    </label>
-                    <input
-                        type="number"
-                        value={item.estimatedPrice || ''}
-                        disabled={disabled}
-                        onChange={(e) => onUpdate('estimatedPrice', parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                        className={`w-full px-4 py-2.5 rounded-xl border-2 outline-none font-medium transition-all
-                        ${supplierPrice
-                                ? 'border-emerald-200 bg-emerald-50/50 focus:border-emerald-400'
-                                : 'border-slate-200 focus:border-brand-primary ' + (disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white')}`}
-                        min="0"
-                        step="0.01"
-                    />
-                </div>
+            {/* Estimated Price */}
+            <div className="md:col-span-2 space-y-2">
+                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    السعر المتوقع
+                    {supplierPrice && (
+                        <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
+                            كتالوج
+                        </span>
+                    )}
+                </label>
+                <input
+                    type="number"
+                    value={item.estimatedPrice || ''}
+                    disabled={disabled}
+                    onChange={(e) => onUpdate('estimatedPrice', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className={`w-full px-4 py-2.5 rounded-xl border-2 outline-none font-medium transition-all
+                    ${supplierPrice
+                            ? 'border-emerald-200 bg-emerald-50/50 focus:border-emerald-400'
+                            : 'border-slate-200 focus:border-brand-primary ' + (disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white')}`}
+                    min="0"
+                    step="0.01"
+                />
+            </div>
 
             {/* Specifications */}
             <div className="md:col-span-2 space-y-2">
@@ -554,15 +597,15 @@ const ItemRow: React.FC<{
                     value={item.specifications || ''}
                     onChange={(e) => !readOnly && onUpdate('specifications', e.target.value)}
                     readOnly={readOnly}
-                    disabled={readOnly}
+                    disabled={readOnly || disabled}
                     placeholder="اختياري..."
                     className={`w-full px-4 py-2.5 rounded-xl border-2 font-medium transition-all
-                        ${readOnly ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
+                        ${readOnly || disabled ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
                 />
             </div>
         </div>
-    );
-};
+    </div>
+);
 
 // Empty Items State
 const EmptyItemsState: React.FC<{ onAdd: () => void; hideAddButton?: boolean }> = ({ onAdd, hideAddButton }) => (
@@ -634,6 +677,7 @@ const RFQFormPage: React.FC = () => {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [units, setUnits] = useState<UnitDto[]>([]);
+    const [availablePRs, setAvailablePRs] = useState<{ id: number; prNumber: string; items: any[] }[]>([]);
     const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
     const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
     const [supplierIds, setSupplierIds] = useState<number[]>([]);
@@ -641,12 +685,102 @@ const RFQFormPage: React.FC = () => {
     // Changed to support multiple suppliers
     const [selectedSupplierIds, setSelectedSupplierIds] = useState<number[]>([]);
 
-    const [formData, setFormData] = useState<Omit<RFQ, 'supplierId'>>({
+    // Added supplierId to state definition to support single creation flow
+    const [formData, setFormData] = useState<Partial<RFQ> & { items: RFQItem[]; supplierId?: number }>({
         rfqDate: new Date().toISOString().split('T')[0],
         responseDueDate: '',
         notes: '',
+        supplierId: 0,
         items: []
     });
+
+    // --- Optimistic Logic ---
+    const [_, startTransition] = useTransition();
+
+    type RFQAction =
+        | { type: 'SET_RFQs', payload: Partial<RFQ> & { items: RFQItem[] } }
+        | { type: 'UPDATE_FIELD', field: string, value: any }
+        | { type: 'UPDATE_ITEM', index: number, field: keyof RFQItem, value: any }
+        | { type: 'ADD_ITEM' }
+        | { type: 'REMOVE_ITEM', index: number }
+        | { type: 'SET_PR_DATA', pr: any };
+
+    const rfqReducer = (state: Partial<RFQ> & { items: RFQItem[]; supplierId?: number }, action: RFQAction): Partial<RFQ> & { items: RFQItem[]; supplierId?: number } => {
+        let newState = { ...state };
+
+        switch (action.type) {
+            case 'SET_RFQs':
+                return { ...state, ...action.payload };
+
+            case 'UPDATE_FIELD':
+                return { ...newState, [action.field]: action.value };
+
+            case 'UPDATE_ITEM': {
+                const newItems = [...(newState.items || [])];
+                const updatedItem = { ...newItems[action.index], [action.field]: action.value };
+
+                if (action.field === 'itemId') {
+                    // Auto-fill unitId from main items list
+                    const selectedItem = items.find(i => i.id === action.value);
+                    if (selectedItem) {
+                        updatedItem.unitId = selectedItem.unitId;
+                    }
+
+                    // Auto-fill estimatedPrice from currently loaded supplier catalog
+                    const catalogPrice = supplierItems.find(si => si.itemId === action.value)?.lastPrice;
+                    if (catalogPrice) {
+                        updatedItem.estimatedPrice = catalogPrice;
+                    }
+                }
+
+                newItems[action.index] = updatedItem;
+                return { ...newState, items: newItems };
+            }
+
+            case 'ADD_ITEM':
+                return {
+                    ...newState,
+                    items: [...(newState.items || []), { itemId: 0, requestedQty: 1, unitId: 0, specifications: '' }]
+                };
+
+            case 'REMOVE_ITEM':
+                return {
+                    ...newState,
+                    items: (newState.items || []).filter((_, i) => i !== action.index)
+                };
+
+            case 'SET_PR_DATA':
+                return {
+                    ...newState,
+                    prId: action.pr.id,
+                    prNumber: action.pr.prNumber,
+                    notes: `تم الإنشاء بناءً على طلب شراء: ${action.pr.prNumber}`,
+                    items: action.pr.items.map((pi: any) => {
+                        // Attempt to find catalog price for PR items if we already have supplier items
+                        const catalogPrice = supplierItems.find(si => si.itemId === pi.itemId)?.lastPrice;
+                        return {
+                            itemId: pi.itemId,
+                            requestedQty: pi.requestedQty,
+                            unitId: pi.unitId,
+                            specifications: pi.specifications || '',
+                            estimatedPrice: catalogPrice || undefined
+                        };
+                    })
+                };
+
+            default:
+                return state;
+        }
+    };
+
+    const [optimisticData, addOptimisticAction] = useOptimistic(formData, rfqReducer);
+
+    const handleUpdate = (action: RFQAction) => {
+        startTransition(() => {
+            addOptimisticAction(action);
+            setFormData(prev => rfqReducer(prev, action));
+        });
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -670,9 +804,13 @@ const RFQFormPage: React.FC = () => {
             setSuppliers(suppliersData);
             setItems(itemsData.data || []);
             setUnits(unitsData.data || []);
-            // Filter only approved PRs
-            const approvedPRs = prsData.filter((pr: any) => pr.status === 'Approved');
-            setAvailablePRs(approvedPRs.map((pr: any) => ({
+            
+            // Filter enabled PRs: Approved AND No Active Orders (not fully processed)
+            const availablePRsList = prsData.filter((pr: any) =>
+                pr.status === 'Approved' && !pr.hasActiveOrders
+            );
+
+            setAvailablePRs(availablePRsList.map((pr: any) => ({
                 id: pr.id,
                 prNumber: pr.prNumber,
                 items: pr.items || []
@@ -688,18 +826,9 @@ const RFQFormPage: React.FC = () => {
             setLoading(true);
             const pr = await purchaseService.getPRById(prId);
             if (pr) {
-                setFormData(prev => ({
-                    ...prev,
-                    prId: pr.id,
-                    prNumber: pr.prNumber,
-                    notes: `تم الإنشاء بناءً على طلب شراء: ${pr.prNumber}`,
-                    items: pr.items.map(pi => ({
-                        itemId: pi.itemId,
-                        requestedQty: pi.requestedQty,
-                        unitId: pi.unitId,
-                        specifications: pi.specifications || ''
-                    }))
-                }));
+                const prDataAction: RFQAction = { type: 'SET_PR_DATA', pr };
+                handleUpdate(prDataAction);
+                
                 if (!shouldShowToast || shouldShowToast()) {
                     toast.success('تم تحميل بيانات طلب الشراء', { icon: '📋' });
                 }
@@ -719,7 +848,7 @@ const RFQFormPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getRFQById(rfqId);
             setSelectedSupplierIds([data.supplierId]);
-            setFormData(data);
+            handleUpdate({ type: 'SET_RFQs', payload: data });
         } catch (error) {
             console.error('Failed to load RFQ:', error);
             navigate('/dashboard/procurement/rfq');
@@ -728,7 +857,14 @@ const RFQFormPage: React.FC = () => {
         }
     };
 
-    // Handle supplier selection change
+    // Handle single supplier selection
+    const handleSupplierChange = async (supplierId: number) => {
+        handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierId', value: supplierId });
+        // Update selectedSupplierIds to match, triggering any necessary effects
+        handleSuppliersChange([supplierId]);
+    };
+
+    // Handle multiple supplier selection change
     const handleSuppliersChange = async (supplierIds: number[]) => {
         setSelectedSupplierIds(supplierIds);
 
@@ -744,6 +880,17 @@ const RFQFormPage: React.FC = () => {
                 const result = await supplierService.getSupplierItems(supplierIds[0]);
                 const fetchedItems = result.data || [];
                 setSupplierItems(fetchedItems);
+
+                // Update existing items in the form with new catalog prices if available
+                startTransition(() => {
+                    setFormData(prev => {
+                        const updatedItems = (prev.items || []).map(item => {
+                            const catalogPrice = fetchedItems.find(si => si.itemId === item.itemId)?.lastPrice;
+                            return catalogPrice ? { ...item, estimatedPrice: catalogPrice } : item;
+                        });
+                        return { ...prev, items: updatedItems };
+                    });
+                });
             } catch (error) {
                 console.error('Failed to load supplier items:', error);
             } finally {
@@ -753,38 +900,15 @@ const RFQFormPage: React.FC = () => {
     };
 
     const addItem = () => {
-        const newItem: RFQItem = {
-            itemId: 0,
-            requestedQty: 1,
-            unitId: 0,
-            specifications: ''
-        };
-        setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
+        handleUpdate({ type: 'ADD_ITEM' });
     };
 
     const removeItem = (index: number) => {
-        setFormData(prev => ({
-            ...prev,
-            items: prev.items.filter((_, i) => i !== index)
-        }));
+        handleUpdate({ type: 'REMOVE_ITEM', index });
     };
 
     const updateItem = (index: number, field: keyof RFQItem, value: any) => {
-        const newItems = [...formData.items];
-        newItems[index] = { ...newItems[index], [field]: value };
-
-        if (field === 'itemId') {
-            const selectedItem = items.find(i => i.id === value);
-            if (selectedItem) {
-                newItems[index].unitId = selectedItem.unitId;
-            }
-            const supplierItem = supplierItems.find(si => si.itemId === value);
-            if (supplierItem?.lastPrice) {
-                newItems[index].estimatedPrice = supplierItem.lastPrice;
-            }
-        }
-
-        setFormData(prev => ({ ...prev, items: newItems }));
+        handleUpdate({ type: 'UPDATE_ITEM', index, field, value });
     };
 
     const getSupplierPrice = (itemId: number): number | undefined => {
@@ -797,7 +921,7 @@ const RFQFormPage: React.FC = () => {
 
         const hasSuppliers = prIdFromUrl
             ? supplierIds.length > 0
-            : formData.supplierId > 0;
+            : (formData.supplierId && formData.supplierId > 0);
 
         if (!hasSuppliers) {
             toast.error(prIdFromUrl ? 'يرجى اختيار مورد واحد على الأقل' : 'يرجى اختيار مورد');
@@ -813,8 +937,10 @@ const RFQFormPage: React.FC = () => {
             setSaving(true);
 
             if (isEdit) {
-                // Update logic
+                // Update logic would go here
+                // await purchaseService.updateRFQ(parseInt(id), formData as RFQ);
             } else if (prIdFromUrl && supplierIds.length > 0) {
+                // Creating multiple RFQs from PR for multiple suppliers
                 const idsToCreate = supplierIds;
                 let created = 0;
                 for (const sid of idsToCreate) {
@@ -822,13 +948,18 @@ const RFQFormPage: React.FC = () => {
                         ...formData,
                         supplierId: sid,
                         items: formData.items
-                    });
+                    } as RFQ);
                     created++;
                 }
                 toast.success(`تم إنشاء ${created} طلب عرض سعر بنجاح`, { icon: '🎉' });
                 navigate('/dashboard/procurement/rfq');
             } else {
-                await purchaseService.createRFQ(formData);
+                // Single creation
+                if (!formData.supplierId) {
+                    toast.error('يرجى اختيار مورد');
+                    return;
+                }
+                await purchaseService.createRFQ(formData as RFQ);
                 toast.success('تم حفظ طلب عرض السعر بنجاح', { icon: '🎉' });
                 navigate('/dashboard/procurement/rfq');
             }
@@ -898,7 +1029,7 @@ const RFQFormPage: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">
-                                {isEdit ? `تعديل طلب عرض سعر #${formData.rfqNumber}` : 'إنشاء طلب عرض سعر جديد'}
+                                {isEdit ? `تعديل طلب عرض سعر #${optimisticData.rfqNumber}` : 'إنشاء طلب عرض سعر جديد'}
                             </h1>
                             <p className="text-white/70 text-lg">
                                 {isEdit
@@ -991,14 +1122,14 @@ const RFQFormPage: React.FC = () => {
                 </div>
             )}
 
-            {formData.prNumber && (
+            {optimisticData.prNumber && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
                     <div className="p-2 bg-emerald-100 rounded-xl">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
                         <span className="text-emerald-700 font-semibold">مرتبط بطلب شراء: </span>
-                        <span className="text-emerald-800 font-bold">{formData.prNumber}</span>
+                        <span className="text-emerald-800 font-bold">{optimisticData.prNumber}</span>
                     </div>
                 </div>
             )}
@@ -1028,7 +1159,7 @@ const RFQFormPage: React.FC = () => {
                         ) : (
                             <FormSelect
                                 label="المورد"
-                                value={formData.supplierId}
+                                value={formData.supplierId || ''}
                                 onChange={(v) => handleSupplierChange(parseInt(v))}
                                 icon={Truck}
                                 options={supplierOptions}
@@ -1047,8 +1178,8 @@ const RFQFormPage: React.FC = () => {
                         <FormInput
                             label="تاريخ الطلب"
                             type="date"
-                            value={formData.rfqDate?.split('T')[0] || ''}
-                            onChange={(v) => setFormData(prev => ({ ...prev, rfqDate: v }))}
+                            value={optimisticData.rfqDate?.split('T')[0] || ''}
+                            onChange={(v) => handleUpdate({ type: 'UPDATE_FIELD', field: 'rfqDate', value: v })}
                             icon={Calendar}
                             required
                             disabled={isView}
@@ -1057,8 +1188,8 @@ const RFQFormPage: React.FC = () => {
                         <FormInput
                             label="تاريخ استحقاق الرد"
                             type="date"
-                            value={formData.responseDueDate || ''}
-                            onChange={(v) => setFormData(prev => ({ ...prev, responseDueDate: v }))}
+                            value={optimisticData.responseDueDate || ''}
+                            onChange={(v) => handleUpdate({ type: 'UPDATE_FIELD', field: 'responseDueDate', value: v })}
                             icon={Calendar}
                             disabled={isView}
                         />
@@ -1070,29 +1201,29 @@ const RFQFormPage: React.FC = () => {
                             طلب الشراء (PR) <span className="text-rose-500">*</span>
                         </label>
                         <select
-                            value={formData.prId || ''}
+                            value={optimisticData.prId || ''}
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val) loadPRData(parseInt(val));
-                                else setFormData(prev => ({ ...prev, prId: undefined, prNumber: undefined, items: [] }));
+                                else handleUpdate({ type: 'SET_RFQs', payload: { ...optimisticData, prId: undefined, prNumber: undefined, items: [] } });
                             }}
                             disabled={isView}
-                            required
+                            required={false}
                             className={`w-full px-4 py-3 rounded-xl border-2 border-slate-200 
                                 focus:border-brand-primary outline-none bg-white font-medium transition-all
                                 ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : ''}`}
                         >
-                            <option value="">اختر طلب شراء...</option>
+                            <option value="">اختر طلب شراء (اختياري)...</option>
                             {availablePRs.map(pr => (
                                 <option key={pr.id} value={pr.id}>
                                     #{pr.prNumber} ({pr.items.length} صنف)
                                 </option>
                             ))}
                         </select>
-                        {formData.prNumber && (
+                        {optimisticData.prNumber && (
                             <p className="text-xs text-emerald-600 flex items-center gap-1 mt-2">
                                 <CheckCircle2 className="w-3 h-3" />
-                                مرتبط بطلب شراء: #{formData.prNumber}
+                                مرتبط بطلب شراء: #{optimisticData.prNumber}
                             </p>
                         )}
                     </div>
@@ -1100,8 +1231,8 @@ const RFQFormPage: React.FC = () => {
                     <div className="mt-6">
                         <FormTextarea
                             label="ملاحظات"
-                            value={formData.notes || ''}
-                            onChange={(v) => setFormData(prev => ({ ...prev, notes: v }))}
+                            value={optimisticData.notes || ''}
+                            onChange={(v) => handleUpdate({ type: 'UPDATE_FIELD', field: 'notes', value: v })}
                             icon={FileText}
                             placeholder={isView ? '' : "أي ملاحظات إضافية..."}
                             rows={2}
@@ -1118,7 +1249,7 @@ const RFQFormPage: React.FC = () => {
                             </div>
                             <div>
                                 <h2 className="text-lg font-bold text-slate-800">الأصناف والبنود</h2>
-                                <p className="text-sm text-slate-500">{formData.items.length} بند</p>
+                                <p className="text-sm text-slate-500">{optimisticData.items.length} بند</p>
                             </div>
                         </div>
                         {!prIdFromUrl && (
@@ -1136,14 +1267,14 @@ const RFQFormPage: React.FC = () => {
                     </div>
 
                     <div className="space-y-4">
-                        {formData.items.map((item, index) => (
+                        {optimisticData.items.map((item, index) => (
                             <ItemRow
                                 key={index}
                                 item={item}
                                 index={index}
                                 items={items}
                                 units={units}
-                                usedItemIds={formData.items.map(i => i.itemId).filter(id => id !== 0)}
+                                usedItemIds={optimisticData.items.map(i => i.itemId).filter(id => id !== 0)}
                                 supplierPrice={getSupplierPrice(item.itemId)}
                                 disabled={isView}
                                 onUpdate={(field, value) => updateItem(index, field, value)}
@@ -1158,7 +1289,7 @@ const RFQFormPage: React.FC = () => {
                     </div>
                 </div>
 
-                {formData.items.length > 0 && (
+                {optimisticData.items.length > 0 && (
                     <div className="bg-gradient-to-l from-brand-primary/5 to-slate-50 p-6 rounded-2xl border border-slate-200">
                         <div className="flex flex-wrap items-center gap-6">
                             <div className="flex items-center gap-3">
@@ -1179,7 +1310,7 @@ const RFQFormPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">إجمالي البنود</div>
-                                    <div className="text-lg font-bold text-slate-800">{formData.items.length}</div>
+                                    <div className="text-lg font-bold text-slate-800">{optimisticData.items.length}</div>
                                 </div>
                             </div>
 
@@ -1192,12 +1323,12 @@ const RFQFormPage: React.FC = () => {
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">إجمالي الكميات</div>
                                     <div className="text-lg font-bold text-slate-800">
-                                        {formData.items.reduce((sum, i) => sum + (i.requestedQty || 0), 0).toLocaleString()}
+                                        {optimisticData.items.reduce((sum, i) => sum + (i.requestedQty || 0), 0).toLocaleString()}
                                     </div>
                                 </div>
                             </div>
 
-                            {formData.items.some(i => i.estimatedPrice) && (
+                            {optimisticData.items.some(i => i.estimatedPrice) && (
                                 <>
                                     <div className="w-px h-10 bg-slate-200" />
                                     <div className="flex items-center gap-3">
@@ -1207,7 +1338,7 @@ const RFQFormPage: React.FC = () => {
                                         <div>
                                             <div className="text-xs text-slate-500 font-medium">القيمة التقديرية</div>
                                             <div className="text-lg font-bold text-brand-primary">
-                                                {formData.items
+                                                {optimisticData.items
                                                     .reduce((sum, i) => sum + ((i.estimatedPrice || 0) * (i.requestedQty || 0)), 0)
                                                     .toLocaleString()} EGP
                                             </div>
