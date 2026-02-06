@@ -38,7 +38,6 @@ const GRNFormPage: React.FC = () => {
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [locations, setLocations] = useState<WarehouseLocationDto[]>([]);
     const [processing, setProcessing] = useState(false);
-    const [finalizing, setFinalizing] = useState(false);
     const [selectedPo, setSelectedPo] = useState<PurchaseOrderDto | null>(null);
 
     // Form State
@@ -319,7 +318,7 @@ const GRNFormPage: React.FC = () => {
 
     // Track if warehouse changed in view mode
     const [warehouseChanged, setWarehouseChanged] = useState(false);
-    const initialWarehouseId = useMemo(() => form.warehouseId, [id, !!form.warehouseId]);
+
 
     // Handle form submission
     const handleSubmit = async (e?: React.FormEvent) => {

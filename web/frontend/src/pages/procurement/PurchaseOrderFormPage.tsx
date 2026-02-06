@@ -413,7 +413,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                                         <Package className="w-5 h-5 text-purple-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف</h3>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المسعرة</h3>
                                         <p className="text-slate-500 text-sm">قائمة المواد والكميات المطلوب توريدها</p>
                                     </div>
                                 </div>
