@@ -39,7 +39,7 @@ const SupplierQuotationFormPage: React.FC = () => {
 
     // State
     const [loading, setLoading] = useState(false);
-    const [_, startTransition] = useTransition();
+    const [, startTransition] = useTransition();
     const [saving, setSaving] = useState(false);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [rfqs, setRfqs] = useState<RFQ[]>([]);
@@ -928,19 +928,18 @@ const SupplierQuotationFormPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
-                            flex gap-4 animate-slide-in shadow-lg"
-                        style={{ animationDelay: '400ms' }}>
-                        <div className="p-3 bg-blue-100 rounded-xl h-fit">
-                            <AlertCircle className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
-                            <p className="text-sm leading-relaxed text-blue-700">
-                                سيتم حفظ أسعار الأصناف تلقائياً في <strong>كتالوج المورد</strong> لاستخدامها في الطلبات المستقبلية.
-                            </p>
-                        </div>
+                {/* Info Alert */}
+                <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
+                        flex gap-4 animate-slide-in shadow-lg"
+                    style={{ animationDelay: '400ms' }}>
+                    <div className="p-3 bg-blue-100 rounded-xl h-fit">
+                        <AlertCircle className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
+                        <p className="text-sm leading-relaxed text-blue-700">
+                            سيتم حفظ أسعار الأصناف تلقائياً في <strong>كتالوج المورد</strong> لاستخدامها في الطلبات المستقبلية.
+                        </p>
                     </div>
                 </div>
             </form>

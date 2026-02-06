@@ -33,13 +33,8 @@ public class PurchaseRequisitionService {
     private final ItemRepository itemRepository;
     private final UnitRepository unitRepository;
     private final com.rasras.erp.approval.ApprovalService approvalService;
-    private final PurchaseOrderRepository purchaseOrderRepository;
-    private final GoodsReceiptNoteRepository goodsReceiptNoteRepository;
-    private final QualityInspectionRepository qualityInspectionRepository;
-    private final RFQRepository rfqRepository;
-    private final QuotationComparisonRepository quotationComparisonRepository;
-    private final SupplierQuotationRepository supplierQuotationRepository;
-    private final ApprovalRequestRepository approvalRequestRepository;
+    private final com.rasras.erp.approval.ApprovalRequestRepository approvalRequestRepository;
+    private final com.rasras.erp.approval.ApprovalActionRepository approvalActionRepository;
 
     @Transactional(readOnly = true)
     public List<PurchaseRequisitionDto> getAllPurchaseRequisitions() {
@@ -138,9 +133,17 @@ public class PurchaseRequisitionService {
     public void deletePurchaseRequisition(Integer id) {
         PurchaseRequisition pr = prRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "عرض الشراء غير موجود"));
-        if (!"Draft".equals(pr.getStatus())) {
+        if (!"Draft".equals(pr.getStatus()) && !"Pending".equals(pr.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "لا يمكن حذف عرض الشراء إلا إذا كان بحالة مسودة. الحالة الحالية: " + pr.getStatus());
+                    "لا يمكن حذف طلب الشراء إلا إذا كان بحالة مسودة أو قيد الانتظار (قبل الاعتماد). الحالة الحالية: " + pr.getStatus());
+        }
+        // حذف طلب الاعتماد المرتبط ليختفي من صفحة الاعتمادات
+        List<com.rasras.erp.approval.ApprovalRequest> approvalRequests = approvalRequestRepository
+                .findByDocumentTypeAndDocumentId("PurchaseRequisition", pr.getId());
+        for (var ar : approvalRequests) {
+            approvalActionRepository.findByRequestIdOrderByActionDateDesc(ar.getId())
+                    .forEach(approvalActionRepository::delete);
+            approvalRequestRepository.delete(ar);
         }
         prRepository.delete(pr);
     }
@@ -247,8 +250,8 @@ public class PurchaseRequisitionService {
     }
 
     private String generatePrNumber() {
-        // Simple generation: PR-YYYYMMDD-XXXX
-        return "PR-" + System.currentTimeMillis(); // Placeholder for better logic
+        long n = prRepository.count() + 1;
+        return "PR-" + n;
     }
 
     private PurchaseRequisitionDto mapToDto(PurchaseRequisition pr) {

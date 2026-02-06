@@ -108,6 +108,7 @@ public class StockIssueNoteService {
         StockIssueNote note = StockIssueNote.builder()
                 .issueNoteNumber(generateIssueNoteNumber())
                 .issueDate(LocalDateTime.now())
+                .issueType("SALE_ORDER")
                 .salesOrder(so)
                 .customer(so.getCustomer())
                 .warehouse(warehouse)
@@ -142,16 +143,38 @@ public class StockIssueNoteService {
 
     @Transactional
     public StockIssueNoteDto create(StockIssueNoteDto dto) {
-        SalesOrder so = salesOrderRepository.findById(dto.getSalesOrderId())
-                .orElseThrow(() -> new RuntimeException("Sales Order not found"));
-        Customer customer = customerRepository.findById(dto.getCustomerId())
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+        String issueType = dto.getIssueType() != null ? dto.getIssueType() : "SALE_ORDER";
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
+
+        if ("SALE_ORDER".equals(issueType)) {
+            if (dto.getSalesOrderId() == null || dto.getCustomerId() == null) {
+                throw new RuntimeException("Sales Order and Customer are required for SALE_ORDER issue type");
+            }
+        } else if ("PRODUCTION".equals(issueType) || "PROJECT".equals(issueType) || "INTERNAL".equals(issueType)) {
+            if (dto.getReferenceNumber() == null || dto.getReferenceNumber().isBlank()) {
+                throw new RuntimeException("Reference number is required for " + issueType + " issue type");
+            }
+        }
+
+        SalesOrder so = null;
+        Customer customer = null;
+        if (dto.getSalesOrderId() != null) {
+            so = salesOrderRepository.findById(dto.getSalesOrderId())
+                    .orElseThrow(() -> new RuntimeException("Sales Order not found"));
+        }
+        if (dto.getCustomerId() != null) {
+            customer = customerRepository.findById(dto.getCustomerId())
+                    .orElseThrow(() -> new RuntimeException("Customer not found"));
+        }
 
         StockIssueNote note = StockIssueNote.builder()
                 .issueNoteNumber(dto.getIssueNoteNumber() != null ? dto.getIssueNoteNumber() : generateIssueNoteNumber())
                 .issueDate(dto.getIssueDate() != null ? dto.getIssueDate() : LocalDateTime.now())
+                .issueType(issueType)
+                .referenceType(dto.getReferenceType())
+                .referenceId(dto.getReferenceId())
+                .referenceNumber(dto.getReferenceNumber())
                 .salesOrder(so)
                 .customer(customer)
                 .warehouse(warehouse)
@@ -169,14 +192,18 @@ public class StockIssueNoteService {
         List<StockIssueNoteItem> items = new ArrayList<>();
         if (dto.getItems() != null) {
             for (StockIssueNoteItemDto itemDto : dto.getItems()) {
-                SalesOrderItem soItem = so.getItems().stream()
-                        .filter(i -> i.getId().equals(itemDto.getSoItemId()))
-                        .findFirst()
-                        .orElseThrow(() -> new RuntimeException("SO Item not found: " + itemDto.getSoItemId()));
                 Item item = itemRepository.findById(itemDto.getItemId())
                         .orElseThrow(() -> new RuntimeException("Item not found"));
                 UnitOfMeasure unit = unitRepository.findById(itemDto.getUnitId())
                         .orElseThrow(() -> new RuntimeException("Unit not found"));
+
+                SalesOrderItem soItem = null;
+                if ("SALE_ORDER".equals(issueType) && so != null && itemDto.getSoItemId() != null) {
+                    soItem = so.getItems().stream()
+                            .filter(i -> i.getId().equals(itemDto.getSoItemId()))
+                            .findFirst()
+                            .orElse(null);
+                }
 
                 StockIssueNoteItem issueItem = StockIssueNoteItem.builder()
                         .stockIssueNote(note)
@@ -220,11 +247,16 @@ public class StockIssueNoteService {
 
         if (dto.getItems() != null) {
             note.getItems().clear();
+            String issueType = note.getIssueType() != null ? note.getIssueType() : "SALE_ORDER";
+            SalesOrder so = note.getSalesOrder();
             for (StockIssueNoteItemDto itemDto : dto.getItems()) {
-                SalesOrderItem soItem = note.getSalesOrder().getItems().stream()
-                        .filter(i -> i.getId().equals(itemDto.getSoItemId()))
-                        .findFirst()
-                        .orElseThrow(() -> new RuntimeException("SO Item not found"));
+                SalesOrderItem soItem = null;
+                if ("SALE_ORDER".equals(issueType) && so != null && itemDto.getSoItemId() != null) {
+                    soItem = so.getItems().stream()
+                            .filter(i -> i.getId().equals(itemDto.getSoItemId()))
+                            .findFirst()
+                            .orElse(null);
+                }
                 Item item = itemRepository.findById(itemDto.getItemId())
                         .orElseThrow(() -> new RuntimeException("Item not found"));
                 UnitOfMeasure unit = unitRepository.findById(itemDto.getUnitId())
@@ -289,8 +321,10 @@ public class StockIssueNoteService {
             );
 
             SalesOrderItem soItem = item.getSalesOrderItem();
-            BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty() : BigDecimal.ZERO).add(qty);
-            soItem.setDeliveredQty(newDelivered);
+            if (soItem != null) {
+                BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty() : BigDecimal.ZERO).add(qty);
+                soItem.setDeliveredQty(newDelivered);
+            }
         }
 
         note.setStatus("Approved");
@@ -307,11 +341,15 @@ public class StockIssueNoteService {
                 .id(note.getId())
                 .issueNoteNumber(note.getIssueNoteNumber())
                 .issueDate(note.getIssueDate())
-                .salesOrderId(note.getSalesOrder().getId())
-                .soNumber(note.getSalesOrder().getSoNumber())
-                .customerId(note.getCustomer().getId())
-                .customerNameAr(note.getCustomer().getCustomerNameAr())
-                .customerCode(note.getCustomer().getCustomerCode())
+                .issueType(note.getIssueType())
+                .referenceType(note.getReferenceType())
+                .referenceId(note.getReferenceId())
+                .referenceNumber(note.getReferenceNumber())
+                .salesOrderId(note.getSalesOrder() != null ? note.getSalesOrder().getId() : null)
+                .soNumber(note.getSalesOrder() != null ? note.getSalesOrder().getSoNumber() : null)
+                .customerId(note.getCustomer() != null ? note.getCustomer().getId() : null)
+                .customerNameAr(note.getCustomer() != null ? note.getCustomer().getCustomerNameAr() : null)
+                .customerCode(note.getCustomer() != null ? note.getCustomer().getCustomerCode() : null)
                 .warehouseId(note.getWarehouse().getId())
                 .warehouseNameAr(note.getWarehouse().getWarehouseNameAr())
                 .issuedByUserId(note.getIssuedByUserId())
@@ -341,7 +379,7 @@ public class StockIssueNoteService {
         StockIssueNoteItemDto dto = StockIssueNoteItemDto.builder()
                 .id(item.getId())
                 .stockIssueNoteId(item.getStockIssueNote().getId())
-                .soItemId(item.getSalesOrderItem().getId())
+                .soItemId(item.getSalesOrderItem() != null ? item.getSalesOrderItem().getId() : null)
                 .itemId(item.getItem().getId())
                 .itemCode(item.getItem().getItemCode())
                 .itemNameAr(item.getItem().getItemNameAr())

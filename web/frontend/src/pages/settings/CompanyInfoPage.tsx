@@ -267,9 +267,9 @@ const FileUpload: React.FC<{
     const getImageUrl = (url: string) => {
         if (!url) return '';
         if (url.startsWith('http') || url.startsWith('blob:')) return url;
-        // If it's a relative path, prepend API base URL (or localhost for dev)
-        // Assuming API Client baseURL is http://localhost:8080/api
-        return `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+        // If it's a relative path, prepend API base URL
+        const baseUrl = import.meta.env.VITE_API_URL || 'https://api.rasrasplastic.com';
+        return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
     };
 
     const displayUrl = getImageUrl(value);

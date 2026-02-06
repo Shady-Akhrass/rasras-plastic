@@ -87,7 +87,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                     grnId: gId,
                     grnNumber: grn.grnNumber,
                     supplierId: grn.supplierId,
-                    notes: `تم الإنشاء من إذن استلام بضائع رقم: ${grn.grnNumber}`,
+                    notes: `تم الإنشاء من إذن إضافة رقم: ${grn.grnNumber}`,
                     items: grn.items.map(gItem => {
                         const price = gItem.unitCost || 0;
                         const qty = gItem.acceptedQty || gItem.receivedQty;
@@ -105,11 +105,11 @@ const SupplierInvoiceFormPage: React.FC = () => {
                         };
                     })
                 }));
-                toast.success(`تم تحميل ${grn.items.length} صنف من إذن الاستلام`);
+                toast.success(`تم تحميل ${grn.items.length} صنف من إذن الإضافة`);
             }
         } catch (error) {
             console.error('Failed to load GRN data:', error);
-            toast.error('فشل تحميل بيانات الاستلام');
+            toast.error('فشل تحميل بيانات إذن الإضافة');
         } finally {
             setLoading(false);
         }
@@ -425,24 +425,24 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             {(grnId || quotationId) && (
                                 <div className="md:col-span-2 space-y-2">
                                     <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                        <Hash className="w-4 h-4 text-blue-600" />
+                                        <Hash className="w-4 h-4 text-brand-primary" />
                                         المستند المرجعي
                                     </label>
-                                    <div className="flex items-center gap-3 p-4 bg-gradient-to-l from-blue-50 to-cyan-50 
-                                        rounded-xl border-2 border-blue-200">
-                                        <div className="p-2 bg-blue-100 rounded-lg">
-                                            <FileText className="w-5 h-5 text-blue-600" />
+                                    <div className="flex items-center gap-3 p-4 bg-gradient-to-l from-brand-primary/5 to-brand-primary/10 
+                                        rounded-xl border-2 border-brand-primary/20">
+                                        <div className="p-2 bg-brand-primary/10 rounded-lg">
+                                            <FileText className="w-5 h-5 text-brand-primary" />
                                         </div>
                                         <div className="flex-1">
-                                            <div className="text-xs text-blue-600 font-semibold">
-                                                {grnId ? 'إذن استلام بضائع' : 'عرض سعر'}
+                                            <div className="text-xs text-brand-primary font-semibold">
+                                                {grnId ? 'إذن إضافة' : 'عرض سعر'}
                                             </div>
                                             <div className="font-bold text-slate-800">
                                                 {grnId ? `GRN #${formData.grnNumber || grnId}` : `Quotation #${quotationId}`}
                                             </div>
                                         </div>
                                         {!loading && (formData.items || []).length > 0 && (
-                                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                            <CheckCircle2 className="w-5 h-5 text-brand-primary" />
                                         )}
                                     </div>
                                 </div>

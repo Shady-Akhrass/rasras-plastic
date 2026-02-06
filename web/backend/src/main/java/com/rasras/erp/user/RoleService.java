@@ -1,5 +1,8 @@
 package com.rasras.erp.user;
 
+import com.rasras.erp.approval.ApprovalLimitRepository;
+import com.rasras.erp.approval.ApprovalWorkflowStepRepository;
+import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.user.dto.RoleDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,6 +18,9 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
+    private final UserRepository userRepository;
+    private final ApprovalWorkflowStepRepository approvalWorkflowStepRepository;
+    private final ApprovalLimitRepository approvalLimitRepository;
 
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRoles() {
@@ -58,6 +64,15 @@ public class RoleService {
 
     @Transactional
     public void deleteRole(Integer id) {
+        if (userRepository.existsByRole_RoleId(id)) {
+            throw new BadRequestException("لا يمكن حذف الدور لأنه مرتبط بمستخدمين. قم بتغيير دور المستخدمين أولاً.");
+        }
+        if (approvalWorkflowStepRepository.existsByApproverRole_RoleId(id)) {
+            throw new BadRequestException("لا يمكن حذف الدور لأنه مستخدم في خطوات سير الموافقة. قم بإزالة الدور من سير العمل أولاً.");
+        }
+        if (approvalLimitRepository.existsByRole_RoleId(id) || approvalLimitRepository.existsByRequiresReviewBy_RoleId(id)) {
+            throw new BadRequestException("لا يمكن حذف الدور لأنه مستخدم في حدود الموافقة. قم بتعديل حدود الموافقة أولاً.");
+        }
         // First delete role permissions
         List<RolePermission> permissions = rolePermissionRepository.findByRoleRoleId(id);
         rolePermissionRepository.deleteAll(permissions);

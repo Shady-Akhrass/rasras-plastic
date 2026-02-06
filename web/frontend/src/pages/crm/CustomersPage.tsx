@@ -229,7 +229,8 @@ const CustomersPage: React.FC = () => {
         try {
             await customerService.deleteCustomer(customerToDelete);
             toast.success('تم حذف العميل بنجاح');
-            fetchCustomers();
+            setCustomers(prev => prev.filter(c => c.id !== customerToDelete));
+            setCustomerToDelete(null);
             setIsDeleteModalOpen(false);
         } catch (error) {
             toast.error('فشل في حذف العميل');

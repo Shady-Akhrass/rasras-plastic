@@ -28,7 +28,7 @@ public class StockIssueNoteItem {
     private StockIssueNote stockIssueNote;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "SOItemID", nullable = false)
+    @JoinColumn(name = "SOItemID")
     private SalesOrderItem salesOrderItem;
 
     @ManyToOne(fetch = FetchType.LAZY)

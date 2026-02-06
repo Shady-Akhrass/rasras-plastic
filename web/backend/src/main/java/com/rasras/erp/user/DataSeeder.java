@@ -8,6 +8,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -20,6 +22,8 @@ public class DataSeeder implements CommandLineRunner {
     private final com.rasras.erp.approval.ApprovalWorkflowRepository workflowRepo;
     private final com.rasras.erp.approval.ApprovalWorkflowStepRepository stepRepo;
     private final com.rasras.erp.approval.ApprovalLimitRepository limitRepo;
+    private final PermissionRepository permissionRepository;
+    private final RolePermissionRepository rolePermissionRepository;
 
     @Override
     @Transactional
@@ -28,6 +32,9 @@ public class DataSeeder implements CommandLineRunner {
 
         // 0. Ensure Roles exist first
         seedRoles();
+
+        // 0.05 صلاحيات الأقسام (للعرض الديناميكي في القائمة الجانبية)
+        seedSectionPermissions();
 
         // 0.1 Seed Approval Workflows
         seedApprovalWorkflows();
@@ -116,6 +123,56 @@ public class DataSeeder implements CommandLineRunner {
                         .build();
                 roleRepository.save(role);
                 log.info("Created role: {}", roleData[0]);
+            }
+        }
+    }
+
+    /** إنشاء صلاحيات الأقسام وتعيينها لـ ADMIN حتى تعمل القائمة والمسارات ديناميكياً من لوحة التحكم */
+    private void seedSectionPermissions() {
+        log.info("Seeding section permissions...");
+        String[][] sectionPerms = {
+                { "SECTION_MAIN", "الرئيسية والاعتمادات", "Main & Approvals", "MENU" },
+                { "SECTION_USERS", "المستخدمين", "Users", "MENU" },
+                { "SECTION_EMPLOYEES", "الموظفين", "Employees", "MENU" },
+                { "SECTION_WAREHOUSE", "المخازن", "Warehouse", "MENU" },
+                { "SECTION_OPERATIONS", "العمليات", "Operations", "MENU" },
+                { "SECTION_SALES", "المبيعات", "Sales", "MENU" },
+                { "SECTION_CRM", "العملاء (CRM)", "CRM", "MENU" },
+                { "SECTION_PROCUREMENT", "المشتريات", "Procurement", "MENU" },
+                { "SECTION_SYSTEM", "إعدادات النظام", "System Settings", "MENU" },
+        };
+        for (String[] p : sectionPerms) {
+            if (permissionRepository.findByPermissionCode(p[0]).isEmpty()) {
+                Permission perm = Permission.builder()
+                        .permissionCode(p[0])
+                        .permissionNameAr(p[1])
+                        .permissionNameEn(p[2])
+                        .moduleName(p[3])
+                        .isActive(true)
+                        .build();
+                permissionRepository.save(perm);
+                log.info("Created permission: {}", p[0]);
+            }
+        }
+        Role adminRole = roleRepository.findByRoleCode("ADMIN").orElse(null);
+        if (adminRole != null) {
+            List<Permission> sectionPermissions = sectionPerms.length > 0
+                    ? java.util.Arrays.stream(sectionPerms)
+                            .map(sp -> permissionRepository.findByPermissionCode(sp[0]).orElse(null))
+                            .filter(perm -> perm != null)
+                            .collect(java.util.stream.Collectors.toList())
+                    : java.util.Collections.emptyList();
+            for (Permission perm : sectionPermissions) {
+                boolean alreadyAssigned = rolePermissionRepository.findByRoleRoleId(adminRole.getRoleId()).stream()
+                        .anyMatch(rp -> rp.getPermission().getPermissionId().equals(perm.getPermissionId()));
+                if (!alreadyAssigned) {
+                    rolePermissionRepository.save(RolePermission.builder()
+                            .role(adminRole)
+                            .permission(perm)
+                            .isAllowed(true)
+                            .build());
+                    log.info("Assigned permission {} to ADMIN", perm.getPermissionCode());
+                }
             }
         }
     }

@@ -6,7 +6,6 @@ import {
     AlertTriangle,
     RefreshCw,
     Download,
-    Plus,
     Edit,
     Trash2,
     X,
@@ -267,16 +266,6 @@ const StockLevelsPage: React.FC = () => {
         setShowModal(true);
     };
 
-    const openCreate = () => {
-        setCurrentStock({
-            itemId: undefined,
-            warehouseId: undefined,
-            quantityOnHand: 0,
-            quantityReserved: 0,
-            averageCost: 0
-        });
-        setShowModal(true);
-    };
 
     const filteredStocks = useMemo(() => {
         return stocks.filter(s => {
@@ -352,15 +341,6 @@ const StockLevelsPage: React.FC = () => {
                         >
                             <Download className="w-5 h-5" />
                             <span className="hidden sm:inline">تصدير</span>
-                        </button>
-                        <button
-                            onClick={openCreate}
-                            className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
-                                hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
-                                hover:shadow-xl hover:scale-105"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>إضافة رصيد</span>
                         </button>
                     </div>
                 </div>

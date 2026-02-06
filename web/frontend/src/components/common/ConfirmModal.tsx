@@ -12,6 +12,8 @@ interface ConfirmModalProps {
     onCancel: () => void;
     isLoading?: boolean;
     variant?: 'danger' | 'warning' | 'info';
+    /** Optional error message to show below the main message (e.g. after a failed delete) */
+    errorMessage?: string | null;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -23,7 +25,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     onConfirm,
     onCancel,
     isLoading = false,
-    variant = 'danger'
+    variant = 'danger',
+    errorMessage
 }) => {
     if (!isOpen) return null;
 
@@ -76,6 +79,11 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                         <p className="text-slate-500 font-readex leading-relaxed">
                             {message}
                         </p>
+                        {errorMessage && (
+                            <p className="mt-3 text-rose-600 text-sm font-readex bg-rose-50 border border-rose-100 rounded-lg p-3">
+                                {errorMessage}
+                            </p>
+                        )}
                     </div>
 
                     <div className="p-6 bg-slate-50 flex gap-3">

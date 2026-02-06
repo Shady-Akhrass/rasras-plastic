@@ -41,4 +41,12 @@ public class StockBalanceController {
         stockService.deleteBalance(id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @GetMapping("/reports/periodic")
+    public ResponseEntity<ApiResponse<java.util.List<PeriodicInventoryReportDto>>> getPeriodicReport(
+            @RequestParam int month,
+            @RequestParam int year,
+            @RequestParam(required = false) Integer warehouseId) {
+        return ResponseEntity.ok(ApiResponse.success(stockService.getPeriodicReport(month, year, warehouseId)));
+    }
 }

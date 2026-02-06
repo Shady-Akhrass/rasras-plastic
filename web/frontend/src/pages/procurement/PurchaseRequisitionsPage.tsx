@@ -199,12 +199,12 @@ const PRTableRow: React.FC<{
                 >
                     <Edit3 className="w-5 h-5" />
                 </button>
-                {(pr.status === 'Draft' || pr.status === 'Approved') && (
+                {(pr.status === 'Draft' || pr.status === 'Pending') && (
                     <button
                         onClick={() => onDelete(pr)}
                         className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
                             rounded-lg transition-all duration-200"
-                        title="حذف"
+                        title="حذف (قبل الاعتماد)"
                     >
                         <Trash2 className="w-5 h-5" />
                     </button>
@@ -628,9 +628,9 @@ const PurchaseRequisitionsPage: React.FC = () => {
             {/* Delete Confirmation */}
             <ConfirmModal
                 isOpen={isDeleteModalOpen}
-                title="حذف عرض الشراء"
+                title="حذف طلب الشراء"
                 message={prToDelete
-                    ? `هل أنت متأكد من حذف عرض الشراء رقم ${prToDelete.prNumber}؟ سيتم حذفه نهائياً.`
+                    ? `هل أنت متأكد من حذف طلب الشراء رقم ${prToDelete.prNumber}؟ سيتم حذفه نهائياً.`
                     : ''}
                 confirmText="حذف"
                 cancelText="إلغاء"

@@ -114,7 +114,8 @@ public class RFQService {
         }
 
         private String generateRFQNumber() {
-                return "RFQ-" + System.currentTimeMillis();
+                long n = rfqRepository.count() + 1;
+                return "RFQ-" + String.format("%04d", n);
         }
 
         private RFQDto mapToDto(RequestForQuotation rfq) {

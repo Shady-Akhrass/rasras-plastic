@@ -23,7 +23,7 @@ public class CustomerService {
 
     public List<CustomerDto> getActiveCustomers() {
         return customerRepository.findAll().stream()
-                .filter(Customer::getIsActive)
+                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -61,14 +61,17 @@ public class CustomerService {
                 .creditLimit(dto.getCreditLimit())
                 .currentBalance(dto.getCurrentBalance() != null ? dto.getCurrentBalance() : java.math.BigDecimal.ZERO)
                 .currency(dto.getCurrency() != null ? dto.getCurrency() : "EGP")
-                .salesRepId(dto.getSalesRepId())
-                .priceListId(dto.getPriceListId())
+                .salesRepId(normalizeFk(dto.getSalesRepId()))
+                .priceListId(normalizeFk(dto.getPriceListId()))
                 .discountPercentage(dto.getDiscountPercentage())
                 .isApproved(false)
                 .isActive(true)
                 .notes(dto.getNotes())
                 .createdAt(java.time.LocalDateTime.now())
                 .build();
+
+        customer.setSalesRepId(normalizeFk(customer.getSalesRepId()));
+        customer.setPriceListId(normalizeFk(customer.getPriceListId()));
 
         Customer savedCustomer = customerRepository.save(customer);
 
@@ -114,8 +117,8 @@ public class CustomerService {
         customer.setPaymentTermDays(dto.getPaymentTermDays());
         customer.setCreditLimit(dto.getCreditLimit());
         customer.setCurrency(dto.getCurrency());
-        customer.setSalesRepId(dto.getSalesRepId());
-        customer.setPriceListId(dto.getPriceListId());
+        customer.setSalesRepId(normalizeFk(dto.getSalesRepId()));
+        customer.setPriceListId(normalizeFk(dto.getPriceListId()));
         customer.setDiscountPercentage(dto.getDiscountPercentage());
         customer.setIsActive(dto.getIsActive());
         customer.setNotes(dto.getNotes());
@@ -150,8 +153,9 @@ public class CustomerService {
     public void deleteCustomer(Integer id) {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
-        customer.setIsActive(false);
-        customerRepository.save(customer);
+        List<CustomerContact> contacts = customerContactRepository.findByCustomerId(id);
+        customerContactRepository.deleteAll(contacts);
+        customerRepository.delete(customer);
     }
 
     private CustomerDto mapToDto(Customer entity) {
@@ -205,5 +209,10 @@ public class CustomerService {
                 .isPrimary(entity.getIsPrimary())
                 .isActive(entity.getIsActive())
                 .build();
+    }
+
+    /** لا نُدخل 0 كقيمة لـ Foreign Key؛ نستبدلها بـ null لتفادي انتهاك القيد في قاعدة البيانات */
+    private static Integer normalizeFk(Integer id) {
+        return (id != null && id != 0) ? id : null;
     }
 }

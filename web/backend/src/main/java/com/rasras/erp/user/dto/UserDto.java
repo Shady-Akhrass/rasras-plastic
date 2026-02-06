@@ -18,6 +18,8 @@ public class UserDto {
     private Integer employeeId;
     private Integer roleId;
     private String roleName;
+    private String roleNameAr;
+    private String displayNameAr;
     private Boolean isActive;
     private Boolean isLocked;
     private LocalDateTime lastLoginAt;

@@ -501,7 +501,7 @@ const PurchaseRequisitionFormPage = () => {
                                     <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 rounded-xl">
                                         <Package className="w-4 h-4 text-brand-primary" />
                                         <span className="text-sm font-bold text-brand-primary">
-                                            {totalItems} صنف
+                                            <span dir="ltr">{totalItems}</span> صنف
                                         </span>
                                     </div>
                                     {!isViewMode && (
@@ -553,11 +553,13 @@ const PurchaseRequisitionFormPage = () => {
                                                         ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 >
                                                     <option value={0}>اختر الصنف...</option>
-                                                    {items.map(i => (
-                                                        <option key={i.id} value={i.id}>
-                                                            {i.itemNameAr} ({i.grade || i.itemCode || ''})
-                                                        </option>
-                                                    ))}
+                                                    {items
+                                                        .filter(i => !formData.items?.some((added, idx) => added.itemId === i.id && idx !== index))
+                                                        .map(i => (
+                                                            <option key={i.id} value={i.id}>
+                                                                {i.itemNameAr} ({i.grade || i.itemCode || ''})
+                                                            </option>
+                                                        ))}
                                                 </select>
                                             </td>
                                             <td className="py-4 px-4">
@@ -645,12 +647,12 @@ const PurchaseRequisitionFormPage = () => {
                         <div className="space-y-5 mt-6">
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">عدد الأصناف</span>
-                                <span className="font-bold text-lg">{totalItems}</span>
+                                <span className="font-bold text-lg" dir="ltr">{totalItems}</span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">إجمالي الكميات</span>
-                                <span className="font-bold text-lg text-emerald-400">
-                                    {totalQuantity.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                <span className="font-bold text-lg text-emerald-400" dir="ltr">
+                                    {totalQuantity.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="pt-6 border-t border-white/10">
@@ -691,7 +693,7 @@ const PurchaseRequisitionFormPage = () => {
                     </div>
 
                     {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
+                    <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
                         flex gap-4 animate-slide-in shadow-lg"
                         style={{ animationDelay: '400ms' }}>
                         <div className="p-3 bg-blue-100 rounded-xl h-fit">

@@ -6,6 +6,8 @@ export interface User {
     employeeId: number;
     roleId: number;
     roleName: string;
+    roleNameAr?: string;
+    displayNameAr?: string;
     isActive: boolean;
     isLocked: boolean;
     lastLoginAt: string | null;

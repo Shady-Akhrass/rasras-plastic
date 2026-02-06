@@ -78,6 +78,70 @@ const FormInput: React.FC<{
     );
 };
 
+// Category Select - يعرض نوع التصنيف (أساسي/فرعي) بخط صغير
+const CategoryFormSelect: React.FC<{
+    label: string;
+    value: number | string;
+    onChange: (value: string) => void;
+    categories: ItemCategoryDto[];
+    icon?: React.ElementType;
+    required?: boolean;
+    placeholder?: string;
+}> = ({ label, value, onChange, categories, icon: Icon, required, placeholder }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const selected = categories.find(c => c.id === value || String(c.id) === String(value));
+    const typeLabel = (cat: ItemCategoryDto) => cat.parentCategoryId ? 'فرعي' : 'أساسي';
+
+    return (
+        <div className="space-y-2">
+            <label className={`block text-sm font-semibold transition-colors duration-200
+                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
+                {label}
+                {required && <span className="text-rose-500 mr-1">*</span>}
+            </label>
+            <div className="relative">
+                {Icon && (
+                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 z-10 transition-all duration-200
+                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                )}
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(!isOpen)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => { setIsFocused(false); setTimeout(() => setIsOpen(false), 150); }}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none text-right
+                        appearance-none bg-white cursor-pointer flex items-center justify-between
+                        ${Icon ? 'pr-12' : ''}
+                        ${isFocused || isOpen
+                            ? 'border-brand-primary shadow-lg shadow-brand-primary/10'
+                            : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                    <span className={selected ? 'text-slate-800' : 'text-slate-400'}>
+                        {selected ? selected.categoryNameAr : placeholder}
+                    </span>
+                    <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? 'rotate-90' : 'rotate-[270deg]'}`} />
+                </button>
+                {isOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 py-1 bg-white border-2 border-brand-primary/30 rounded-xl shadow-lg z-50 max-h-60 overflow-auto">
+                        {categories.map(cat => (
+                            <button
+                                key={cat.id}
+                                type="button"
+                                onMouseDown={(e) => { e.preventDefault(); onChange(String(cat.id!)); setIsOpen(false); }}
+                                className={`w-full px-4 py-2.5 text-right hover:bg-brand-primary/5 flex flex-col items-end gap-0.5 ${selected?.id === cat.id ? 'bg-brand-primary/10' : ''}`}
+                            >
+                                <span className="font-medium text-slate-800">{cat.categoryNameAr}</span>
+                                <span className="text-[11px] text-slate-400 font-normal">{typeLabel(cat)}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // Form Select Component
 const FormSelect: React.FC<{
     label: string;
@@ -722,17 +786,14 @@ const ItemFormPage: React.FC = () => {
                                 description="تصنيف الصنف ووحدة القياس"
                             >
                                 <div className="space-y-4">
-                                    <FormSelect
+                                    <CategoryFormSelect
                                         label="التصنيف"
                                         value={formData.categoryId || ''}
-                                        onChange={(v) => updateForm('categoryId', parseInt(v))}
+                                        onChange={(v) => updateForm('categoryId', parseInt(v) || 0)}
+                                        categories={categories}
                                         icon={Layers}
                                         required
                                         placeholder="اختر التصنيف"
-                                        options={categories.map(cat => ({
-                                            value: cat.id!,
-                                            label: cat.categoryNameAr
-                                        }))}
                                     />
                                     <FormSelect
                                         label="وحدة القياس الأساسية"

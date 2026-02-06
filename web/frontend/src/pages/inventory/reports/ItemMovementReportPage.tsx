@@ -20,7 +20,7 @@ const ItemMovementReportPage: React.FC = () => {
         try {
             setLoading(true);
             const res = await itemService.getAllItems();
-            setItems(res.data || []);
+            setItems((res.data || []).map(i => ({ id: i.id, itemCode: i.itemCode ?? '', itemNameAr: i.itemNameAr })));
         } catch {
             setItems([]);
         } finally {
@@ -39,7 +39,7 @@ const ItemMovementReportPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 rounded-3xl p-8 text-white">
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white">
                 <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
@@ -68,7 +68,7 @@ const ItemMovementReportPage: React.FC = () => {
                     <div className="p-4 max-h-[400px] overflow-y-auto">
                         {loading ? (
                             <div className="space-y-2">
-                                {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-slate-100 rounded-lg animate-pulse" />)}
+                                {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-12 bg-slate-100 rounded-lg animate-pulse" />)}
                             </div>
                         ) : (
                             <div className="space-y-1">
@@ -106,7 +106,7 @@ const ItemMovementReportPage: React.FC = () => {
                             </div>
                         ) : loadingMovements ? (
                             <div className="space-y-3">
-                                {[1,2,3,4,5,6].map(i => <div key={i} className="h-14 bg-slate-100 rounded-lg animate-pulse" />)}
+                                {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-14 bg-slate-100 rounded-lg animate-pulse" />)}
                             </div>
                         ) : movements.length === 0 ? (
                             <div className="text-center py-16 text-slate-500">
