@@ -26,6 +26,7 @@ public class PurchaseReturnService {
     private final UnitRepository unitRepo;
     private final GoodsReceiptNoteRepository grnRepo;
     private final com.rasras.erp.inventory.InventoryService inventoryService;
+    private final com.rasras.erp.approval.ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<PurchaseReturnDto> getAllReturns() {
@@ -71,6 +72,20 @@ public class PurchaseReturnService {
             saved.setApprovedDate(java.time.LocalDateTime.now());
             processApprovalEffects(saved, 1);
             saved = returnRepo.save(saved);
+        } else {
+            // Initiate approval workflow if status is Pending or Draft (and has items)
+            if (saved.getItems() != null && !saved.getItems().isEmpty()) {
+                approvalService.initiateApproval(
+                        "RET_APPROVAL",
+                        "PurchaseReturn",
+                        saved.getId(),
+                        saved.getReturnNumber(),
+                        1, // Placeholder requester ID
+                        saved.getTotalAmount());
+
+                saved.setStatus("Pending");
+                saved = returnRepo.save(saved);
+            }
         }
 
         return mapToDto(saved);
@@ -95,19 +110,25 @@ public class PurchaseReturnService {
     }
 
     private void processApprovalEffects(PurchaseReturn entity, Integer userId) {
-        // 1. Update Stock (Decrement)
-        for (PurchaseReturnItem item : entity.getItems()) {
-            inventoryService.updateStock(
-                    item.getItem().getId(),
-                    entity.getWarehouse().getId(),
-                    item.getReturnedQty(),
-                    "OUT",
-                    "RETURN",
-                    "PurchaseReturn",
-                    entity.getId(),
-                    entity.getReturnNumber(),
-                    item.getUnitPrice(),
-                    userId);
+        // 1. Update Stock (Decrement) - ONLY if items were originally accepted into
+        // stock
+        boolean isRejectionReturn = entity.getReturnReason() != null &&
+                entity.getReturnReason().contains("Rejected during Quality Inspection");
+
+        if (!isRejectionReturn) {
+            for (PurchaseReturnItem item : entity.getItems()) {
+                inventoryService.updateStock(
+                        item.getItem().getId(),
+                        entity.getWarehouse().getId(),
+                        item.getReturnedQty(),
+                        "OUT",
+                        "RETURN",
+                        "PurchaseReturn",
+                        entity.getId(),
+                        entity.getReturnNumber(),
+                        item.getUnitPrice(),
+                        userId);
+            }
         }
 
         // 2. Update Supplier Balance (Decrease) & Total Returned (Increase)

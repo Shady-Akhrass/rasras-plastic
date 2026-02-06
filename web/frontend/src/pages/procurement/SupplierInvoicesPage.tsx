@@ -1,23 +1,387 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Search,
-    Plus,
-    FileText,
-    Truck,
-    Calendar,
-    ArrowLeft,
-    RefreshCw,
-    Eye,
-    AlertCircle,
-    CheckCircle2,
-    Clock,
-    DollarSign
+    Search, Plus, FileText, Truck, Calendar, ArrowLeft, RefreshCw,
+    Eye, CheckCircle2, Clock, DollarSign, XCircle,
+    Receipt, Package, Hash, Layers,
+    ExternalLink, Ban, Wallet
 } from 'lucide-react';
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 import { grnService } from '../../services/grnService';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
+
+// Stat Card Component
+const StatCard: React.FC<{
+    icon: React.ElementType;
+    value: number | string;
+    label: string;
+    color: 'primary' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
+    suffix?: string;
+    onClick?: () => void;
+    active?: boolean;
+}> = ({ icon: Icon, value, label, color, suffix, onClick, active }) => {
+    const colorClasses = {
+        primary: 'bg-brand-primary/10 text-brand-primary',
+        success: 'bg-emerald-100 text-emerald-600',
+        warning: 'bg-amber-100 text-amber-600',
+        purple: 'bg-purple-100 text-purple-600',
+        blue: 'bg-blue-100 text-blue-600',
+        rose: 'bg-rose-100 text-rose-600'
+    };
+
+    return (
+        <button
+            onClick={onClick}
+            disabled={!onClick}
+            className={`w-full p-5 rounded-2xl border transition-all duration-300 group text-right
+                ${active
+                    ? 'bg-brand-primary border-brand-primary text-white shadow-lg shadow-brand-primary/30'
+                    : 'bg-white border-slate-100 hover:shadow-lg hover:border-brand-primary/20'
+                }
+                ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+        >
+            <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-xl transition-all duration-300
+                    ${active ? 'bg-white/20' : `${colorClasses[color]} group-hover:scale-110`}`}>
+                    <Icon className={`w-5 h-5 ${active ? 'text-white' : ''}`} />
+                </div>
+                <div className="flex-1">
+                    <div className={`text-2xl font-bold ${active ? 'text-white' : 'text-slate-800'}`}>
+                        {typeof value === 'number' ? value.toLocaleString() : value}
+                        {suffix && <span className="text-sm font-medium mr-1 opacity-70">{suffix}</span>}
+                    </div>
+                    <div className={`text-sm ${active ? 'text-white/80' : 'text-slate-500'}`}>
+                        {label}
+                    </div>
+                </div>
+            </div>
+        </button>
+    );
+};
+
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const config: Record<string, { label: string; bg: string; text: string; border: string; icon: React.ElementType }> = {
+        'Pending': {
+            label: 'قيد المراجعة',
+            bg: 'bg-amber-50',
+            text: 'text-amber-700',
+            border: 'border-amber-200',
+            icon: Clock
+        },
+        'Approved': {
+            label: 'معتمدة',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-700',
+            border: 'border-emerald-200',
+            icon: CheckCircle2
+        },
+        'Rejected': {
+            label: 'مرفوضة',
+            bg: 'bg-rose-50',
+            text: 'text-rose-700',
+            border: 'border-rose-200',
+            icon: Ban
+        },
+        'Paid': {
+            label: 'مدفوعة',
+            bg: 'bg-blue-50',
+            text: 'text-blue-700',
+            border: 'border-blue-200',
+            icon: Wallet
+        },
+        'Unpaid': {
+            label: 'غير مدفوعة',
+            bg: 'bg-slate-50',
+            text: 'text-slate-600',
+            border: 'border-slate-200',
+            icon: DollarSign
+        },
+    };
+
+    const c = config[status] || {
+        label: status,
+        bg: 'bg-slate-50',
+        text: 'text-slate-600',
+        border: 'border-slate-200',
+        icon: FileText
+    };
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${c.bg} ${c.text} ${c.border}`}>
+            <c.icon className="w-3.5 h-3.5" />
+            {c.label}
+        </span>
+    );
+};
+
+// Approval Badge Component
+const ApprovalBadge: React.FC<{ status: string }> = ({ status }) => {
+    if (!status) return null;
+
+    const config: Record<string, { label: string; className: string }> = {
+        'Approved': { label: 'معتمد للصرف', className: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+        'Rejected': { label: 'مرفوض الصرف', className: 'bg-rose-50 text-rose-600 border-rose-100' },
+        'Pending': { label: 'بانتظار اعتماد الصرف', className: 'bg-amber-50 text-amber-600 border-amber-100' },
+    };
+
+    const c = config[status] || config['Pending'];
+
+    return (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${c.className}`}>
+            {c.label}
+        </span>
+    );
+};
+
+// Tab Button Component
+const TabButton: React.FC<{
+    active: boolean;
+    onClick: () => void;
+    icon: React.ElementType;
+    label: string;
+    badge?: number;
+}> = ({ active, onClick, icon: Icon, label, badge }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300
+            ${active
+                ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30'
+                : 'bg-white text-slate-600 border border-slate-200 hover:border-brand-primary/30 hover:bg-brand-primary/5'
+            }`}
+    >
+        <Icon className="w-5 h-5" />
+        <span>{label}</span>
+        {badge !== undefined && badge > 0 && (
+            <span className={`px-2 py-0.5 rounded-full text-xs font-bold
+                ${active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'}`}>
+                {badge}
+            </span>
+        )}
+    </button>
+);
+
+// Invoice Row Component
+const InvoiceRow: React.FC<{
+    invoice: SupplierInvoiceDto;
+    index: number;
+    onView: () => void;
+    onApprove: () => void;
+}> = ({ invoice, index, onView, onApprove }) => (
+    <tr
+        className="group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0"
+        style={{
+            animationDelay: `${index * 30}ms`,
+            animation: 'fadeInUp 0.3s ease-out forwards'
+        }}
+    >
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                    rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Receipt className="w-5 h-5 text-brand-primary" />
+                </div>
+                <div>
+                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                        {invoice.invoiceNumber}
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">
+                        سند: {invoice.supplierInvoiceNo}
+                    </div>
+                </div>
+            </div>
+        </td>
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-slate-100 rounded-lg">
+                    <Truck className="w-4 h-4 text-slate-500" />
+                </div>
+                <span className="font-medium text-slate-700">{invoice.supplierNameAr}</span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                {invoice.invoiceDate}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-600 
+                rounded-lg text-xs font-bold border border-rose-100">
+                <Clock className="w-3.5 h-3.5" />
+                {invoice.dueDate}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <div className="font-bold text-lg text-brand-primary">
+                {invoice.totalAmount.toLocaleString()}
+                <span className="text-xs font-medium text-slate-400 mr-1">{invoice.currency}</span>
+            </div>
+            {invoice.paidAmount! > 0 && (
+                <div className="text-xs text-emerald-600 font-bold mt-0.5">
+                    مسدد: {invoice.paidAmount?.toLocaleString()}
+                </div>
+            )}
+        </td>
+        <td className="px-6 py-4">
+            <div className="flex flex-col items-center gap-1.5">
+                <StatusBadge status={invoice.status} />
+                <ApprovalBadge status={invoice.approvalStatus || ''} />
+            </div>
+        </td>
+        <td className="px-6 py-4">
+            <div className="flex justify-center gap-2">
+                <button
+                    onClick={onView}
+                    className="p-2.5 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
+                        rounded-xl transition-all duration-200 group/btn"
+                    title="عرض"
+                >
+                    <Eye className="w-4 h-4" />
+                </button>
+                {invoice.status === 'Unpaid' && invoice.approvalStatus === 'Pending' && (
+                    <button
+                        onClick={onApprove}
+                        className="p-2.5 text-emerald-500 hover:text-white hover:bg-emerald-500 
+                            rounded-xl transition-all duration-200"
+                        title="اعتماد الصرف"
+                    >
+                        <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+        </td>
+    </tr>
+);
+
+// GRN Row Component
+const GRNRow: React.FC<{
+    grn: any;
+    index: number;
+    onCreateInvoice: () => void;
+    onViewPO: () => void;
+}> = ({ grn, index, onCreateInvoice, onViewPO }) => (
+    <tr
+        className="group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0"
+        style={{
+            animationDelay: `${index * 30}ms`,
+            animation: 'fadeInUp 0.3s ease-out forwards'
+        }}
+    >
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-100 to-emerald-50 
+                    rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Package className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                        #{grn.grnNumber}
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">
+                        {grn.deliveryNoteNo || '---'}
+                    </div>
+                </div>
+            </div>
+        </td>
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-slate-100 rounded-lg">
+                    <Truck className="w-4 h-4 text-slate-500" />
+                </div>
+                <span className="font-medium text-slate-700">{grn.supplierNameAr}</span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <button
+                onClick={onViewPO}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary/10 
+                    text-brand-primary rounded-lg text-sm font-bold hover:bg-brand-primary 
+                    hover:text-white transition-all group/po"
+            >
+                <Hash className="w-3.5 h-3.5" />
+                {grn.poNumber}
+                <ExternalLink className="w-3 h-3 opacity-0 group-hover/po:opacity-100 transition-opacity" />
+            </button>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                {new Date(grn.grnDate!).toLocaleDateString('ar-EG')}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 
+                text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200">
+                <Package className="w-4 h-4" />
+                {grn.totalAcceptedQty || grn.totalReceivedQty}
+            </span>
+        </td>
+        <td className="px-6 py-4">
+            <button
+                onClick={onCreateInvoice}
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white 
+                    rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all 
+                    shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40"
+            >
+                <DollarSign className="w-4 h-4" />
+                <span>إنشاء فاتورة</span>
+            </button>
+        </td>
+    </tr>
+);
+
+// Loading Skeleton
+const TableSkeleton: React.FC<{ columns: number }> = ({ columns }) => (
+    <>
+        {[1, 2, 3, 4, 5].map(i => (
+            <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-xl" />
+                        <div className="space-y-2">
+                            <div className="h-4 w-28 bg-slate-200 rounded" />
+                            <div className="h-3 w-20 bg-slate-100 rounded" />
+                        </div>
+                    </div>
+                </td>
+                {Array.from({ length: columns - 2 }).map((_, j) => (
+                    <td key={j} className="px-6 py-4">
+                        <div className="h-6 bg-slate-100 rounded-lg" />
+                    </td>
+                ))}
+                <td className="px-6 py-4">
+                    <div className="flex gap-2 justify-center">
+                        <div className="h-9 w-9 bg-slate-100 rounded-xl" />
+                        <div className="h-9 w-9 bg-slate-100 rounded-xl" />
+                    </div>
+                </td>
+            </tr>
+        ))}
+    </>
+);
+
+// Empty State Component
+const EmptyState: React.FC<{
+    icon: React.ElementType;
+    title: string;
+    description: string;
+    action?: React.ReactNode;
+}> = ({ icon: Icon, title, description, action }) => (
+    <tr>
+        <td colSpan={7} className="px-6 py-20">
+            <div className="text-center">
+                <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
+                    <Icon className="w-12 h-12 text-slate-400" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
+                <p className="text-slate-500 max-w-md mx-auto mb-6">{description}</p>
+                {action}
+            </div>
+        </td>
+    </tr>
+);
 
 const SupplierInvoicesPage: React.FC = () => {
     const navigate = useNavigate();
@@ -25,6 +389,7 @@ const SupplierInvoicesPage: React.FC = () => {
     const [invoices, setInvoices] = useState<SupplierInvoiceDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [activeTab, setActiveTab] = useState<'invoices' | 'pending'>('invoices');
     const [pendingGRNs, setPendingGRNs] = useState<any[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
@@ -59,13 +424,24 @@ const SupplierInvoicesPage: React.FC = () => {
         try {
             setLoading(true);
             const data = await grnService.getAllGRNs();
-            // Filter only finalized GRNs that haven't been billed yet
             setPendingGRNs(data.filter((g: any) => g.status === 'Completed'));
         } catch (error) {
             console.error('Failed to fetch pending GRNs:', error);
             toast.error('فشل تحميل التوريدات المعلقة');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleApproveInvoice = async (invoice: SupplierInvoiceDto) => {
+        if (window.confirm('هل توافق على اعتماد صرف هذه الفاتورة؟')) {
+            try {
+                await supplierInvoiceService.approvePayment(invoice.id!, 1, true);
+                fetchInvoices();
+                toast.success('تم اعتماد الصرف بنجاح', { icon: '✅' });
+            } catch (e) {
+                toast.error('فشل الاعتماد');
+            }
         }
     };
 
@@ -78,7 +454,6 @@ const SupplierInvoicesPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || inv.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        // الأحدث فوق والأقدم تحت
         return [...filtered].sort((a, b) => {
             const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.id ?? 0);
             const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.id ?? 0);
@@ -92,7 +467,6 @@ const SupplierInvoicesPage: React.FC = () => {
             g.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             g.poNumber?.toLowerCase().includes(searchTerm.toLowerCase())
         );
-        // الأحدث فوق والأقدم تحت
         return [...filtered].sort((a, b) => {
             const dateA = a.grnDate ? new Date(a.grnDate).getTime() : (a.id ?? 0);
             const dateB = b.grnDate ? new Date(b.grnDate).getTime() : (b.id ?? 0);
@@ -100,275 +474,309 @@ const SupplierInvoicesPage: React.FC = () => {
         });
     }, [pendingGRNs, searchTerm]);
 
-    const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize);
+    const paginatedInvoices = filteredInvoices.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
 
-    const paginatedPending = filteredPending.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize);
+    const paginatedPending = filteredPending.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'Pending':
-                return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-bold border border-amber-100"><Clock className="w-3 h-3" /> قيد المراجعة</span>;
-            case 'Approved':
-                return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold border border-emerald-100"><CheckCircle2 className="w-3 h-3" /> معتمدة</span>;
-            case 'Rejected':
-                return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-600 text-xs font-bold border border-rose-100"><AlertCircle className="w-3 h-3" /> مرفوضة</span>;
-            case 'Paid':
-                return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100"><DollarSign className="w-3 h-3" /> مدفوعة</span>;
-            default:
-                return <span className="px-3 py-1 rounded-full bg-slate-50 text-slate-500 text-xs font-bold border border-slate-100">{status}</span>;
-        }
-    };
+    const stats = useMemo(() => ({
+        total: invoices.length,
+        pending: invoices.filter(i => i.status === 'Pending').length,
+        approved: invoices.filter(i => i.status === 'Approved').length,
+        paid: invoices.filter(i => i.status === 'Paid').length,
+        totalAmount: invoices.reduce((sum, i) => sum + (i.totalAmount || 0), 0),
+        pendingGRNs: pendingGRNs.length,
+    }), [invoices, pendingGRNs]);
+
+    const statusOptions = [
+        { value: 'All', label: 'جميع الحالات' },
+        { value: 'Pending', label: 'قيد المراجعة' },
+        { value: 'Approved', label: 'معتمدة' },
+        { value: 'Paid', label: 'مدفوعة' },
+        { value: 'Rejected', label: 'مرفوضة' },
+    ];
 
     return (
         <div className="space-y-6">
+            {/* Custom Styles */}
             <style>{`
-                @keyframes slideIn {
-                    from { transform: translateY(10px); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-                .animate-slide-in {
-                    animation: slideIn 0.4s ease-out forwards;
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
                 }
             `}</style>
 
-            {/* Header */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-brand-primary/10 hover:text-brand-primary transition-all">
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">فواتير الموردين</h1>
-                        <p className="text-slate-500 text-sm">إدارة وتسجيل المطالبات المالية للموردين</p>
+            {/* Header Section */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="p-3 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-colors"
+                        >
+                            <ArrowLeft className="w-6 h-6" />
+                        </button>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+                            <Receipt className="w-10 h-10" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold mb-2">فواتير الموردين</h1>
+                            <p className="text-white/70 text-lg">إدارة وتسجيل المطالبات المالية للموردين</p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => navigate('/dashboard/procurement/invoices/new')}
+                            className="flex items-center gap-2 px-6 py-3.5 bg-white text-brand-primary 
+                                rounded-xl font-bold hover:bg-white/90 transition-all
+                                shadow-lg shadow-black/10 hover:shadow-xl hover:-translate-y-0.5"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>تسجيل فاتورة</span>
+                        </button>
+                        <button
+                            onClick={activeTab === 'invoices' ? fetchInvoices : fetchPendingGRNs}
+                            disabled={loading}
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-xl 
+                                hover:bg-white/20 transition-all duration-200 disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
                     </div>
                 </div>
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => navigate('/dashboard/procurement/invoices/new')}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-brand-primary text-white rounded-xl font-bold shadow-lg hover:scale-105 transition-all"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>تسجيل فاتورة</span>
-                    </button>
-                    <button onClick={activeTab === 'invoices' ? fetchInvoices : fetchPendingGRNs} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-brand-primary/10 hover:text-brand-primary transition-all border border-slate-200">
-                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <StatCard
+                    icon={Receipt}
+                    value={stats.total}
+                    label="إجمالي الفواتير"
+                    color="primary"
+                />
+                <StatCard
+                    icon={Clock}
+                    value={stats.pending}
+                    label="قيد المراجعة"
+                    color="warning"
+                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Pending'); }}
+                    active={statusFilter === 'Pending'}
+                />
+                <StatCard
+                    icon={CheckCircle2}
+                    value={stats.approved}
+                    label="معتمدة"
+                    color="success"
+                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Approved'); }}
+                    active={statusFilter === 'Approved'}
+                />
+                <StatCard
+                    icon={Wallet}
+                    value={stats.paid}
+                    label="مدفوعة"
+                    color="blue"
+                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Paid'); }}
+                    active={statusFilter === 'Paid'}
+                />
+                <StatCard
+                    icon={DollarSign}
+                    value={stats.totalAmount}
+                    label="إجمالي المبالغ"
+                    color="purple"
+                    suffix="ج.م"
+                />
+                <StatCard
+                    icon={Package}
+                    value={stats.pendingGRNs}
+                    label="بانتظار الفوترة"
+                    color="rose"
+                    onClick={() => setActiveTab('pending')}
+                    active={activeTab === 'pending'}
+                />
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 p-1 bg-white w-fit rounded-2xl border border-slate-100 shadow-sm">
-                <button
+            <div className="flex flex-wrap gap-3">
+                <TabButton
+                    active={activeTab === 'invoices'}
                     onClick={() => setActiveTab('invoices')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'invoices'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <FileText className="w-4 h-4" />
-                    <span>الفواتير المسجلة</span>
-                </button>
-                <button
+                    icon={FileText}
+                    label="الفواتير المسجلة"
+                />
+                <TabButton
+                    active={activeTab === 'pending'}
                     onClick={() => setActiveTab('pending')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'pending'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <Truck className="w-4 h-4" />
-                    <span>توريدات بانتظار الفوترة</span>
-                    {pendingGRNs.length > 0 && (
-                        <span className={`${activeTab === 'pending' ? 'bg-white text-brand-primary' : 'bg-brand-primary text-white'} text-[10px] px-2 py-0.5 rounded-full font-bold ml-1 transition-colors`}>
-                            {pendingGRNs.length}
-                        </span>
-                    )}
-                </button>
+                    icon={Truck}
+                    label="توريدات بانتظار الفوترة"
+                    badge={pendingGRNs.length}
+                />
             </div>
 
             {/* Search & Filters */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder={activeTab === 'invoices' ? "بحث برقم الفاتورة أو اسم المورد..." : "بحث برقم الاستلام أو المورد..."}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pr-12 pl-4 py-3 rounded-xl border-2 border-transparent bg-slate-50 focus:border-brand-primary outline-none transition-all"
-                    />
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
+                            transition-colors duration-200
+                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
+                        <input
+                            type="text"
+                            placeholder={activeTab === 'invoices'
+                                ? "بحث برقم الفاتورة أو اسم المورد..."
+                                : "بحث برقم الاستلام أو المورد..."}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setIsSearchFocused(false)}
+                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
+                                outline-none bg-slate-50
+                                ${isSearchFocused
+                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                    : 'border-transparent hover:border-slate-200'}`}
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 
+                                    rounded-full transition-colors"
+                            >
+                                <XCircle className="w-4 h-4 text-slate-400" />
+                            </button>
+                        )}
+                    </div>
+
+                    {activeTab === 'invoices' && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl 
+                            border-2 border-transparent hover:border-slate-200 transition-all">
+                            <Layers className="w-5 h-5 text-slate-400" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                            >
+                                {statusOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
-                {activeTab === 'invoices' && (
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2 bg-slate-50 rounded-xl font-bold text-slate-700 outline-none border-2 border-transparent focus:border-brand-primary"
-                    >
-                        <option value="All">جميع الحالات</option>
-                        <option value="Pending">قيد المراجعة</option>
-                        <option value="Approved">معتمدة</option>
-                        <option value="Paid">مدفوعة</option>
-                        <option value="Rejected">مرفوضة</option>
-                    </select>
-                )}
             </div>
 
-            {/* Content List */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
+            {/* Results Count */}
+            {!loading && (
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-brand-primary rounded-full" />
+                    <span className="text-slate-600">
+                        عرض{' '}
+                        <span className="font-bold text-slate-800">
+                            {activeTab === 'invoices' ? filteredInvoices.length : filteredPending.length}
+                        </span>{' '}
+                        {activeTab === 'invoices' ? 'فاتورة' : 'توريد'}
+                    </span>
+                </div>
+            )}
+
+            {/* Table */}
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-right border-collapse">
+                    <table className="w-full">
                         <thead>
-                            <tr className="bg-slate-50/50 text-slate-500 font-bold border-b border-slate-100">
+                            <tr className="bg-slate-50 border-b border-slate-100">
                                 {activeTab === 'invoices' ? (
                                     <>
-                                        <th className="px-6 py-5 text-sm">رقم الفاتورة</th>
-                                        <th className="px-6 py-5 text-sm">المورد</th>
-                                        <th className="px-6 py-5 text-sm text-center">التاريخ</th>
-                                        <th className="px-6 py-5 text-sm text-center">تاريخ الاستحقاق</th>
-                                        <th className="px-6 py-5 text-sm text-center">إجمالي المبلغ</th>
-                                        <th className="px-6 py-5 text-sm text-center">الحالة</th>
-                                        <th className="px-6 py-5 text-sm">الإجراءات</th>
+                                        <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">رقم الفاتورة</th>
+                                        <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">المورد</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">التاريخ</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الاستحقاق</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">المبلغ</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الحالة</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الإجراءات</th>
                                     </>
                                 ) : (
                                     <>
-                                        <th className="px-6 py-5 text-sm">رقم الاستلام (GRN)</th>
-                                        <th className="px-6 py-5 text-sm">المورد</th>
-                                        <th className="px-6 py-5 text-sm text-center">أمر الشراء</th>
-                                        <th className="px-6 py-5 text-sm text-center">تاريخ الاستلام</th>
-                                        <th className="px-6 py-5 text-sm text-center">الكمية المقبولة</th>
-                                        <th className="px-6 py-5 text-sm">الإجراءات</th>
+                                        <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">رقم الاستلام</th>
+                                        <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">المورد</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">أمر الشراء</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">تاريخ الاستلام</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الكمية</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الإجراءات</th>
                                     </>
                                 )}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50/50">
+                        <tbody>
                             {loading ? (
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <tr key={i} className="animate-pulse">
-                                        <td colSpan={7} className="px-6 py-8"><div className="h-6 bg-slate-50 rounded-lg w-full"></div></td>
-                                    </tr>
-                                ))
-                            ) : (activeTab === 'invoices' ? filteredInvoices : filteredPending).length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-32 text-center">
-                                        <div className="flex flex-col items-center gap-4 max-w-sm mx-auto">
-                                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
-                                                {activeTab === 'invoices' ? <FileText className="w-10 h-10" /> : <Truck className="w-10 h-10" />}
-                                            </div>
-                                            <div className="space-y-1">
-                                                <h3 className="text-lg font-bold text-slate-800">
-                                                    {activeTab === 'invoices' ? 'لا توجد فواتير' : 'لا توجد توريدات بانتظار الفوترة'}
-                                                </h3>
-                                                <p className="text-slate-500 text-sm">
-                                                    {activeTab === 'invoices' ? 'ابدأ بتسجيل أول فاتورة توريد بالنظام' : 'سيتم ظهور التوريدات التي تم فحصها وإضافتها للمخزن هنا'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <TableSkeleton columns={activeTab === 'invoices' ? 7 : 6} />
                             ) : activeTab === 'invoices' ? (
-                                paginatedInvoices.map((inv, idx) => (
-                                    <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors animate-slide-in" style={{ animationDelay: `${idx * 40}ms` }}>
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-800">{inv.invoiceNumber}</div>
-                                            <div className="text-[10px] text-slate-400 font-medium">سند رقم: {inv.supplierInvoiceNo}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <Truck className="w-4 h-4 text-slate-300" />
-                                                <span className="font-medium text-slate-700">{inv.supplierNameAr}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                                                <Calendar className="w-3 h-3" />
-                                                {inv.invoiceDate}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="inline-flex items-center gap-1.5 text-xs text-rose-500 font-bold bg-rose-50 px-2 py-0.5 rounded-lg">
-                                                {inv.dueDate}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="font-black text-brand-primary">
-                                                {inv.totalAmount.toLocaleString()} <span className="text-[10px] font-bold opacity-50">{inv.currency}</span>
-                                            </div>
-                                            {inv.paidAmount! > 0 && <div className="text-[10px] text-emerald-600 font-bold">مسدد: {inv.paidAmount?.toLocaleString()}</div>}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex flex-col gap-1 items-center">
-                                                {getStatusBadge(inv.status)}
-                                                {inv.approvalStatus && (
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${inv.approvalStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                        inv.approvalStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                                            'bg-amber-50 text-amber-600 border-amber-100'
-                                                        }`}>
-                                                        {inv.approvalStatus === 'Approved' ? 'معتمد للصرف' :
-                                                            inv.approvalStatus === 'Rejected' ? 'مرفوض الصرف' : 'بانتظار اعتماد الصرف'}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex justify-end gap-2">
-                                                <button
-                                                    onClick={() => navigate(`/dashboard/procurement/invoices/${inv.id}`)}
-                                                    className="p-2 text-brand-primary bg-brand-primary/5 rounded-xl hover:bg-brand-primary hover:text-white transition-all shadow-sm"
-                                                    title="عرض"
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                </button>
-                                                {inv.status === 'Unpaid' && inv.approvalStatus === 'Pending' && (
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (window.confirm('هل توافق على اعتماد صرف هذه الفاتورة؟')) {
-                                                                try {
-                                                                    await supplierInvoiceService.approvePayment(inv.id!, 1, true);
-                                                                    fetchInvoices();
-                                                                    toast.success('تم اعتماد الصرف');
-                                                                } catch (e) {
-                                                                    toast.error('فشل الاعتماد');
-                                                                }
-                                                            }
-                                                        }}
-                                                        className="p-2 text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                                                        title="اعتماد الصرف"
-                                                    >
-                                                        <CheckCircle2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                paginatedPending.map((g, idx) => (
-                                    <tr key={g.id} className="hover:bg-slate-50/50 transition-colors animate-slide-in" style={{ animationDelay: `${idx * 40}ms` }}>
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-800">#{g.grnNumber}</div>
-                                            <div className="text-[10px] text-slate-400 font-medium">{g.deliveryNoteNo}</div>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-slate-700">{g.supplierNameAr}</td>
-                                        <td className="px-6 py-4 text-center text-sm font-bold text-brand-primary cursor-pointer hover:underline" onClick={() => navigate(`/dashboard/procurement/po/${g.poId}`)}>
-                                            #{g.poNumber}
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-xs text-slate-500">{new Date(g.grnDate!).toLocaleDateString('ar-EG')}</td>
-                                        <td className="px-6 py-4 text-center font-bold text-slate-700">{g.totalAcceptedQty || g.totalReceivedQty}</td>
-                                        <td className="px-6 py-4">
+                                filteredInvoices.length === 0 ? (
+                                    <EmptyState
+                                        icon={Receipt}
+                                        title="لا توجد فواتير"
+                                        description="ابدأ بتسجيل أول فاتورة توريد بالنظام"
+                                        action={
                                             <button
-                                                onClick={() => navigate(`/dashboard/procurement/invoices/new?grnId=${g.id}`)}
-                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-all shadow-sm"
+                                                onClick={() => navigate('/dashboard/procurement/invoices/new')}
+                                                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary 
+                                                    text-white rounded-xl font-bold hover:bg-brand-primary/90 
+                                                    transition-all shadow-lg shadow-brand-primary/30"
                                             >
-                                                <DollarSign className="w-4 h-4" />
-                                                <span>إنشاء فاتورة</span>
+                                                <Plus className="w-5 h-5" />
+                                                تسجيل فاتورة جديدة
                                             </button>
-                                        </td>
-                                    </tr>
+                                        }
+                                    />
+                                ) : (
+                                    paginatedInvoices.map((inv, index) => (
+                                        <InvoiceRow
+                                            key={inv.id}
+                                            invoice={inv}
+                                            index={index}
+                                            onView={() => navigate(`/dashboard/procurement/invoices/${inv.id}`)}
+                                            onApprove={() => handleApproveInvoice(inv)}
+                                        />
+                                    ))
+                                )
+                            ) : filteredPending.length === 0 ? (
+                                <EmptyState
+                                    icon={Truck}
+                                    title="لا توجد توريدات بانتظار الفوترة"
+                                    description="سيتم ظهور التوريدات التي تم فحصها وإضافتها للمخزن هنا"
+                                />
+                            ) : (
+                                paginatedPending.map((grn, index) => (
+                                    <GRNRow
+                                        key={grn.id}
+                                        grn={grn}
+                                        index={index}
+                                        onCreateInvoice={() => navigate(`/dashboard/procurement/invoices/new?grnId=${grn.id}`)}
+                                        onViewPO={() => navigate(`/dashboard/procurement/po/${grn.poId}`)}
+                                    />
                                 ))
                             )}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination */}
                 {!loading && (activeTab === 'invoices' ? filteredInvoices.length : filteredPending.length) > 0 && (
                     <Pagination
                         currentPage={currentPage}

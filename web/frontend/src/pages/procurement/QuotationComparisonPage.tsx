@@ -11,11 +11,13 @@ import {
     Search,
     RefreshCw,
     X,
-    ShoppingCart,
-    Eye
+    Edit3,
+    Trash2
 } from 'lucide-react';
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import toast from 'react-hot-toast';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -100,8 +102,8 @@ const ComparisonTableRow: React.FC<{
     comparison: QuotationComparison;
     index: number;
     onView: (id: number) => void;
-    onCreatePO: (compId: number, quotId: number) => void;
-}> = ({ comparison, index, onView, onCreatePO }) => (
+    onDelete: (comparison: QuotationComparison) => void;
+}> = ({ comparison, index, onView, onDelete }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -150,22 +152,18 @@ const ComparisonTableRow: React.FC<{
             <div className="flex items-center justify-end gap-2">
                 <button
                     onClick={() => onView(comparison.id!)}
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                    title="عرض التفاصيل"
+                    className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
+                    title="تعديل"
                 >
-                    <Eye className="w-4 h-4" />
+                    <Edit3 className="w-4 h-4" />
                 </button>
-
-
-                {comparison.status === 'Approved' && comparison.selectedQuotationId && (
-                    <button
-                        onClick={() => onCreatePO(comparison.id!, comparison.selectedQuotationId!)}
-                        className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
-                        title="إصدار أمر شراء"
-                    >
-                        <ShoppingCart className="w-4 h-4" />
-                    </button>
-                )}
+                <button
+                    onClick={() => onDelete(comparison)}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                    title="حذف"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
             </div>
         </td>
     </tr>
@@ -233,6 +231,9 @@ const QuotationComparisonPage: React.FC = () => {
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [comparisonToDelete, setComparisonToDelete] = useState<QuotationComparison | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchComparisons();
@@ -277,13 +278,29 @@ const QuotationComparisonPage: React.FC = () => {
         approved: comparisons.filter(c => c.status === 'Approved').length,
     }), [comparisons]);
 
-
-    const handleCreatePO = (compId: number, quotId: number) => {
-        navigate(`/dashboard/procurement/po/new?comparisonId=${compId}&quotationId=${quotId}`);
+    const handleView = (id: number) => {
+        navigate(`/dashboard/procurement/comparison/${id}`);
     };
 
-    const handleViewComparison = (id: number) => {
-        navigate(`/dashboard/procurement/comparison/${id}`);
+    const handleDeleteClick = (comparison: QuotationComparison) => {
+        setComparisonToDelete(comparison);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!comparisonToDelete?.id) return;
+        setIsDeleting(true);
+        try {
+            await purchaseService.deleteComparison(comparisonToDelete.id);
+            toast.success('تم حذف مقارنة العروض بنجاح');
+            fetchComparisons();
+            setIsDeleteModalOpen(false);
+            setComparisonToDelete(null);
+        } catch (error) {
+            toast.error('فشل حذف مقارنة العروض');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
@@ -441,8 +458,8 @@ const QuotationComparisonPage: React.FC = () => {
                                         key={comparison.id}
                                         comparison={comparison}
                                         index={index}
-                                        onView={handleViewComparison}
-                                        onCreatePO={handleCreatePO}
+                                        onView={handleView}
+                                        onDelete={handleDeleteClick}
                                     />
                                 ))
                             )}
@@ -459,6 +476,18 @@ const QuotationComparisonPage: React.FC = () => {
                     />
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف مقارنة العروض"
+                message={`هل أنت متأكد من حذف مقارنة العروض رقم ${comparisonToDelete?.comparisonNumber}؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`}
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setComparisonToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

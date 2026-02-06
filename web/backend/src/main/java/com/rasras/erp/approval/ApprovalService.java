@@ -12,6 +12,7 @@ import com.rasras.erp.procurement.QuotationComparisonRepository;
 import com.rasras.erp.procurement.SupplierQuotationRepository;
 import com.rasras.erp.procurement.PurchaseOrder;
 import com.rasras.erp.procurement.PurchaseOrderItem;
+import com.rasras.erp.procurement.PurchaseReturnRepository;
 import com.rasras.erp.procurement.SupplierQuotation;
 import com.rasras.erp.procurement.SupplierQuotationItem;
 import com.rasras.erp.inventory.UnitRepository;
@@ -44,6 +45,7 @@ public class ApprovalService {
     private final InventoryService inventoryService;
     private final QuotationComparisonRepository comparisonRepo;
     private final SupplierQuotationRepository quotationRepo;
+    private final PurchaseReturnRepository returnRepo;
     private final ItemRepository itemRepo;
     private final UnitRepository unitRepo;
 
@@ -260,6 +262,58 @@ public class ApprovalService {
                 }
                 comparisonRepo.save(qc);
             });
+        } else if ("PurchaseReturn".equalsIgnoreCase(type)) {
+            returnRepo.findById(id).ifPresent(ret -> {
+                ret.setStatus(status);
+                if ("Approved".equals(status)) {
+                    ret.setApprovedByUserId(userId);
+                    ret.setApprovedDate(LocalDateTime.now());
+
+                    // Logic from PurchaseReturnService.processApprovalEffects
+                    // 1. Update Stock (Decrement) - ONLY if items were originally accepted into
+                    // stock
+                    // If return is for items rejected during inspection, they were never in stock
+                    // (AcceptedQty only was added)
+                    boolean isRejectionReturn = ret.getReturnReason() != null &&
+                            ret.getReturnReason().contains("Rejected during Quality Inspection");
+
+                    if (!isRejectionReturn) {
+                        for (com.rasras.erp.procurement.PurchaseReturnItem item : ret.getItems()) {
+                            inventoryService.updateStock(
+                                    item.getItem().getId(),
+                                    ret.getWarehouse().getId(),
+                                    item.getReturnedQty(),
+                                    "OUT",
+                                    "RETURN",
+                                    "PurchaseReturn",
+                                    ret.getId(),
+                                    ret.getReturnNumber(),
+                                    item.getUnitPrice(),
+                                    userId);
+                        }
+                    }
+
+                    // 2. Update Supplier Balance (Decrease) & Total Returned (Increase)
+                    com.rasras.erp.supplier.Supplier supplier = ret.getSupplier();
+                    BigDecimal currentBalance = supplier.getCurrentBalance() != null ? supplier.getCurrentBalance()
+                            : BigDecimal.ZERO;
+                    BigDecimal currentReturned = supplier.getTotalReturned() != null ? supplier.getTotalReturned()
+                            : BigDecimal.ZERO;
+
+                    supplier.setCurrentBalance(currentBalance.subtract(ret.getTotalAmount()));
+                    supplier.setTotalReturned(currentReturned.add(ret.getTotalAmount()));
+                    supplierRepo.save(supplier);
+
+                    // 3. Update GRN status if reference exists
+                    if (ret.getGrnId() != null) {
+                        grnRepo.findById(ret.getGrnId()).ifPresent(grn -> {
+                            grn.setStatus("Returned");
+                            grnRepo.save(grn);
+                        });
+                    }
+                }
+                returnRepo.save(ret);
+            });
         }
     }
 
@@ -287,7 +341,7 @@ public class ApprovalService {
                 item.setUnit(poItem.getUnit());
                 item.setOrderedQty(poItem.getOrderedQty());
                 item.setReceivedQty(poItem.getOrderedQty()); // Default to ordered
-                item.setAcceptedQty(java.math.BigDecimal.ZERO);
+                item.setAcceptedQty(poItem.getOrderedQty()); // Default Accepted to Received until inspected
                 item.setRejectedQty(java.math.BigDecimal.ZERO);
                 item.setUnitCost(poItem.getUnitPrice());
                 return item;

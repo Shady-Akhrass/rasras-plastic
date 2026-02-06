@@ -11,11 +11,15 @@ import {
     Calendar,
     DollarSign,
     Package,
-    Plus,
     Truck,
     Clock,
-    AlertCircle
+    AlertCircle,
+    CheckCircle2,
+    Eye,
+    XCircle,
+    RefreshCw
 } from 'lucide-react';
+import { approvalService } from '../../services/approvalService';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
@@ -30,6 +34,8 @@ const SupplierQuotationFormPage: React.FC = () => {
     // Get rfqId from URL
     const queryParams = new URLSearchParams(location.search);
     const rfqIdFromUrl = queryParams.get('rfqId');
+    const isView = queryParams.get('mode') === 'view';
+    const approvalId = queryParams.get('approvalId');
 
     // State
     const [loading, setLoading] = useState(false);
@@ -39,8 +45,9 @@ const SupplierQuotationFormPage: React.FC = () => {
     const [rfqs, setRfqs] = useState<RFQ[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
-    const [rfqItems, setRfqItems] = useState<any[]>([]); // To store requested quantities for validation
+    const [rfqItems, setRfqItems] = useState<any[]>([]);
     const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
     const [formData, setFormData] = useState<SupplierQuotation>({
         quotationNumber: '',
@@ -94,7 +101,6 @@ const SupplierQuotationFormPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getQuotationById(qId);
 
-            // Derive deliveryCost if it's not set or to ensure it's consistent
             const itemsGrandTotal = calculateGrandTotal(data.items, 0);
             const derivedDeliveryCost = data.totalAmount - itemsGrandTotal;
 
@@ -103,7 +109,6 @@ const SupplierQuotationFormPage: React.FC = () => {
                 deliveryCost: data.deliveryCost || derivedDeliveryCost
             });
 
-            // If it's linked to an RFQ, load RFQ items for validation
             if (data.rfqId) {
                 purchaseService.getRFQById(data.rfqId).then(rfq => {
                     setRfqItems(rfq.items);
@@ -176,21 +181,7 @@ const SupplierQuotationFormPage: React.FC = () => {
         return itemsTotal + deliveryCost;
     };
 
-    // Item Management
-    const addItem = () => {
-        const newItem: SupplierQuotationItem = {
-            itemId: 0,
-            offeredQty: 1,
-            unitId: 0,
-            unitPrice: 0,
-            discountPercentage: 0,
-            taxPercentage: 14,
-            totalPrice: 0,
-            polymerGrade: ''
-        };
-        setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
-    };
-
+    // Item Management - Remove item only (no add)
     const removeItem = (index: number) => {
         const newItems = formData.items.filter((_, i) => i !== index);
         setFormData(prev => ({
@@ -249,7 +240,6 @@ const SupplierQuotationFormPage: React.FC = () => {
             setSupplierItems(fetchedItems);
 
             const rfqItems = rfq.items.map(ri => {
-                // Check if this item has a catalog price
                 const catalogPrice = fetchedItems.find(si => si.itemId === ri.itemId)?.lastPrice || 0;
                 const qty = ri.requestedQty;
                 const gross = qty * catalogPrice;
@@ -267,7 +257,6 @@ const SupplierQuotationFormPage: React.FC = () => {
             });
             setFormData(prev => {
                 const updatedItemsTotal = rfqItems.reduce((sum, item) => sum + item.totalPrice, 0);
-                // If it's a new quotation from RFQ, we might want to keep the existing deliveryCost or default to 0
                 const currentDeliveryCost = prev.deliveryCost || 0;
                 return {
                     ...prev,
@@ -342,17 +331,14 @@ const SupplierQuotationFormPage: React.FC = () => {
             for (const item of formData.items) {
                 if (item.itemId && item.unitPrice > 0) {
                     try {
-                        // Check if this item exists in supplier catalog
                         const existingItem = supplierItems.find(si => si.itemId === item.itemId);
                         if (existingItem) {
-                            // Update existing item with new price
                             await supplierService.linkItem({
                                 ...existingItem,
                                 lastPrice: item.unitPrice,
                                 lastPriceDate: new Date().toISOString().split('T')[0]
                             });
                         } else {
-                            // Add new item to supplier catalog
                             await supplierService.linkItem({
                                 supplierId: formData.supplierId,
                                 itemId: item.itemId,
@@ -374,6 +360,22 @@ const SupplierQuotationFormPage: React.FC = () => {
             toast.error('حدث خطأ أثناء حفظ العرض');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/procurement/approvals');
+        } catch (error) {
+            console.error('Failed to take action:', error);
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -425,20 +427,54 @@ const SupplierQuotationFormPage: React.FC = () => {
                             <p className="text-white/80 text-lg">أدخل تفاصيل عرض السعر المستلم من المورد</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={saving}
-                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                        {saving ? (
-                            <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                        ) : (
-                            <Save className="w-5 h-5" />
-                        )}
-                        <span>{saving ? 'جاري الحفظ...' : 'حفظ عرض السعر'}</span>
-                    </button>
+                    {!isView && (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={saving}
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                            {saving ? (
+                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                            ) : (
+                                <Save className="w-5 h-5" />
+                            )}
+                            <span>{saving ? 'جاري الحفظ...' : 'حفظ عرض السعر'}</span>
+                        </button>
+                    )}
+                    {isView && (
+                        <div className="flex items-center gap-3">
+                            {approvalId && (
+                                <>
+                                    <button
+                                        onClick={() => handleApprovalAction('Approved')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                        <span>اعتماد</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprovalAction('Rejected')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                        <span>رفض</span>
+                                    </button>
+                                </>
+                            )}
+                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                <Eye className="w-5 h-5" />
+                                <span className="font-bold">وضع العرض فقط</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -466,8 +502,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 <select
                                     value={formData.rfqId || 0}
                                     onChange={(e) => handleRFQLink(parseInt(e.target.value))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
                                     <option value={0}>لا يوجد...</option>
                                     {rfqs.map(r => (
@@ -486,8 +524,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         value={formData.supplierId}
                                         onChange={(e) => handleSupplierChange(parseInt(e.target.value))}
                                         required
-                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                            focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                        disabled={isView}
+                                        className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                            focus:border-brand-primary outline-none transition-all font-semibold
+                                            ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                     >
                                         <option value={0}>اختر المورد...</option>
                                         {suppliers.map(s => (
@@ -518,9 +558,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     value={formData.quotationNumber || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, quotationNumber: e.target.value }))}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
-                                    placeholder="INV-XXX"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                    placeholder={isView ? '' : "INV-XXX"}
                                 />
                             </div>
 
@@ -534,8 +576,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     value={formData.quotationDate}
                                     onChange={(e) => setFormData(prev => ({ ...prev, quotationDate: e.target.value }))}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
 
@@ -549,8 +593,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     value={formData.validUntilDate || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, validUntilDate: e.target.value }))}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
 
@@ -565,8 +611,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     onChange={(e) => setFormData(prev => ({ ...prev, deliveryDays: parseInt(e.target.value) }))}
                                     required
                                     min="0"
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
 
@@ -579,38 +627,28 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     type="text"
                                     value={formData.paymentTerms || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
-                                    placeholder="مثلاً: كاش، 50% مقدم، ..."
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                    placeholder={isView ? '' : "مثلاً: كاش، 50% مقدم، ..."}
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* Items Table */}
+                    {/* Items Table - Button Removed */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
                         style={{ animationDelay: '100ms' }}>
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-purple-100 rounded-xl">
-                                        <ShoppingCart className="w-5 h-5 text-purple-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المسعرة</h3>
-                                        <p className="text-slate-500 text-sm">قائمة الأصناف وأسعارها حسب عرض المورد</p>
-                                    </div>
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-purple-100 rounded-xl">
+                                    <ShoppingCart className="w-5 h-5 text-purple-600" />
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={addItem}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
-                                        font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
-                                        hover:scale-105 active:scale-95"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    إضافة صنف
-                                </button>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">الأصناف المسعرة</h3>
+                                    <p className="text-slate-500 text-sm">قائمة الأصناف وأسعارها حسب عرض المورد</p>
+                                </div>
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -641,8 +679,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     value={item.itemId}
                                                     onChange={(e) => updateItem(index, 'itemId', parseInt(e.target.value))}
                                                     required
-                                                    className="w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
-                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    disabled={isView}
+                                                    className={`w-full min-w-[200px] px-3 py-2 border-2 border-slate-200 
+                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 >
                                                     <option value={0}>اختر صنف...</option>
                                                     {items.map(i => (
@@ -658,9 +698,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     required
                                                     min="0.01"
                                                     step="0.01"
-                                                    className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                    disabled={isView}
+                                                    className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-brand-primary outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                        focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -671,9 +713,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     required
                                                     min="0.01"
                                                     step="0.01"
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                    disabled={isView}
+                                                    className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-emerald-600 outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                        focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -681,10 +725,12 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     type="text"
                                                     value={item.polymerGrade || ''}
                                                     onChange={(e) => updateItem(index, 'polymerGrade', e.target.value)}
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                    disabled={isView}
+                                                    className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-semibold outline-none 
-                                                        focus:border-brand-primary transition-all"
-                                                    placeholder="Grade"
+                                                        focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                    placeholder={isView ? '' : "Grade"}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -695,8 +741,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     min="0"
                                                     max="100"
                                                     step="0.01"
-                                                    className="w-20 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    disabled={isView}
+                                                    className={`w-20 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -707,22 +755,26 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     min="0"
                                                     max="100"
                                                     step="0.01"
-                                                    className="w-20 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    disabled={isView}
+                                                    className={`w-20 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
                                                 {item.totalPrice.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="py-4 pl-6 text-left">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeItem(index)}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
-                                                        rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {!isView && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeItem(index)}
+                                                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
+                                                            rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -733,8 +785,8 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
                                         <Package className="w-10 h-10 text-slate-400" />
                                     </div>
-                                    <p className="text-slate-400 font-semibold">لا توجد أصناف مضافة</p>
-                                    <p className="text-slate-400 text-sm mt-1">انقر على "إضافة صنف" لبدء الإضافة</p>
+                                    <p className="text-slate-400 font-semibold">لا توجد أصناف</p>
+                                    <p className="text-slate-400 text-sm mt-1">اختر مورد أو طلب سعر لتحميل الأصناف تلقائياً</p>
                                 </div>
                             )}
                         </div>
@@ -764,9 +816,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 setFormData(prev => ({ ...prev, ...updates }));
                                             });
                                         }}
-                                        className="w-full px-5 py-3 bg-white border-2 border-slate-200 rounded-2xl 
+                                        disabled={isView}
+                                        className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
                                             text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
-                                            transition-all shadow-sm"
+                                            transition-all shadow-sm
+                                            ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                         placeholder="0.00"
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
@@ -837,37 +891,42 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 setFormData(prev => ({ ...prev, ...updates }));
                                             });
                                         }}
-                                        className="w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl px-4 py-2 text-2xl font-black text-emerald-400 outline-none focus:border-emerald-400 transition-all text-right"
+                                        disabled={isView}
+                                        className={`w-full border rounded-xl px-4 py-2 text-2xl font-black outline-none transition-all text-right
+                                            ${isView
+                                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400/70 cursor-not-allowed'
+                                                : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 focus:border-emerald-400'}`}
                                     />
                                 </div>
                                 <span className="text-sm font-bold mr-2 text-emerald-400/60">{optimisticData.currency}</span>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Notes */}
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
-                    style={{ animationDelay: '300ms' }}>
-                    <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-blue-100 rounded-xl">
-                                <FileText className="w-5 h-5 text-blue-600" />
+                    {/* Notes */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '300ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 rounded-xl">
+                                    <FileText className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
                             </div>
-                            <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
+                        </div>
+                        <div className="p-6">
+                            <textarea
+                                value={formData.notes || ''}
+                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                disabled={isView}
+                                className={`w-full p-4 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all 
+                                        text-sm leading-relaxed h-40 resize-none
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                placeholder={isView ? '' : "أي ملاحظات حول العرض أو شروط خاصة..."}
+                            />
                         </div>
                     </div>
-                    <div className="p-6">
-                        <textarea
-                            value={formData.notes || ''}
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
-                                    focus:border-brand-primary focus:bg-white outline-none transition-all 
-                                    text-sm leading-relaxed h-40 resize-none"
-                            placeholder="أي ملاحظات حول العرض أو شروط خاصة..."
-                        />
-                    </div>
-                </div>
 
                 {/* Info Alert */}
                 <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 

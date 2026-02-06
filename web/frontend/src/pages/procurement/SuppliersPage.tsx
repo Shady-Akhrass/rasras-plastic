@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -90,6 +91,9 @@ const SuppliersPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [supplierToDelete, setSupplierToDelete] = useState<SupplierDto | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchSuppliers();
@@ -118,14 +122,25 @@ const SuppliersPage: React.FC = () => {
         }
     };
 
-    const handleDelete = async (supplier: SupplierDto) => {
-        if (!window.confirm(`هل أنت متأكد من حذف المورد "${supplier.supplierNameAr}"؟`)) return;
+    const handleDeleteClick = (supplier: SupplierDto) => {
+        setSupplierToDelete(supplier);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!supplierToDelete) return;
+
         try {
-            await supplierService.deleteSupplier(supplier.id!);
+            setIsDeleting(true);
+            await supplierService.deleteSupplier(supplierToDelete.id!);
             toast.success('تم حذف المورد بنجاح');
+            setIsDeleteModalOpen(false);
+            setSupplierToDelete(null);
             fetchSuppliers();
         } catch (error) {
             toast.error('فشل حذف المورد');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -389,15 +404,6 @@ const SuppliersPage: React.FC = () => {
                                                 >
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
-                                                {['PENDING', 'Pending'].includes(supplier.status || '') && (
-                                                    <button
-                                                        onClick={() => navigate('/dashboard/procurement/approvals?type=Supplier')}
-                                                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                                                        title="مراجعة"
-                                                    >
-                                                        <ExternalLink className="w-4 h-4" />
-                                                    </button>
-                                                )}
                                                 {['DRAFT', 'Draft'].includes(supplier.status || '') && (
                                                     <button
                                                         onClick={() => handleApprove(supplier.id!)}
@@ -408,7 +414,7 @@ const SuppliersPage: React.FC = () => {
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={() => handleDelete(supplier)}
+                                                    onClick={() => handleDeleteClick(supplier)}
                                                     className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
                                                     title="حذف"
                                                 >
@@ -423,6 +429,19 @@ const SuppliersPage: React.FC = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف المورد"
+                message={`هل أنت متأكد من حذف المورد "${supplierToDelete?.supplierNameAr}"؟ سيتم حذف جميع البيانات المرتبطة به ولا يمكن التراجع عن هذه الخطوة.`}
+                confirmText="حذف المورد"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setSupplierToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

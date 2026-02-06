@@ -14,8 +14,12 @@ import {
     Info,
     AlertCircle,
     Receipt,
-    CheckCircle2
+    CheckCircle2,
+    Eye,
+    XCircle,
+    RefreshCw
 } from 'lucide-react';
+import { approvalService } from '../../services/approvalService';
 import { supplierInvoiceService, type SupplierInvoiceDto, type SupplierInvoiceItemDto } from '../../services/supplierInvoiceService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { grnService } from '../../services/grnService';
@@ -32,6 +36,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const queryParams = new URLSearchParams(location.search);
     const quotationId = queryParams.get('quotationId');
     const grnId = queryParams.get('grnId');
+    const isView = queryParams.get('mode') === 'view';
+    const approvalId = queryParams.get('approvalId');
 
     // Data State
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
@@ -39,6 +45,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const [units, setUnits] = useState<UnitDto[]>([]);
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<SupplierInvoiceDto>({
@@ -271,6 +278,22 @@ const SupplierInvoiceFormPage: React.FC = () => {
         }
     };
 
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/procurement/approvals');
+        } catch (error) {
+            console.error('Failed to take action:', error);
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     const totalItems = formData.items?.length || 0;
     const totalQuantity = formData.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
 
@@ -331,20 +354,54 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             <p className="text-white/80 text-lg">تسجيل المطالبة المالية بناءً على المستندات الورقية من المورد</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={saving || totalItems === 0}
-                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                        {saving ? (
-                            <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                        ) : (
-                            <Save className="w-5 h-5" />
-                        )}
-                        <span>{saving ? 'جاري الحفظ...' : 'حفظ واعتماد'}</span>
-                    </button>
+                    {!isView && (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={saving || totalItems === 0}
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                            {saving ? (
+                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                            ) : (
+                                <Save className="w-5 h-5" />
+                            )}
+                            <span>{saving ? 'جاري الحفظ...' : 'حفظ واعتماد'}</span>
+                        </button>
+                    )}
+                    {isView && (
+                        <div className="flex items-center gap-3">
+                            {approvalId && (
+                                <>
+                                    <button
+                                        onClick={() => handleApprovalAction('Approved')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                        <span>اعتماد</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprovalAction('Rejected')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                        <span>رفض</span>
+                                    </button>
+                                </>
+                            )}
+                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
+                                <Eye className="w-5 h-5" />
+                                <span className="font-bold">وضع العرض فقط</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -415,9 +472,11 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     value={formData.supplierInvoiceNo}
                                     onChange={(e) => setFormData({ ...formData, supplierInvoiceNo: e.target.value })}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-mono font-semibold"
-                                    placeholder="Supplier Inv #"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-mono font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                    placeholder={isView ? '' : "Supplier Inv #"}
                                 />
                             </div>
                             <div className="space-y-2 md:col-span-2">
@@ -429,8 +488,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     value={formData.supplierId}
                                     onChange={(e) => setFormData({ ...formData, supplierId: parseInt(e.target.value) })}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
                                     <option value="0">اختر المورد...</option>
                                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplierNameAr}</option>)}
@@ -460,16 +521,18 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                             {totalItems} صنف
                                         </span>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={addItem}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
-                                            font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
-                                            hover:scale-105 active:scale-95"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        إضافة صنف
-                                    </button>
+                                    {!isView && (
+                                        <button
+                                            type="button"
+                                            onClick={addItem}
+                                            className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
+                                                font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
+                                                hover:scale-105 active:scale-95"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            إضافة صنف
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -500,8 +563,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                     value={item.itemId}
                                                     onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) })}
                                                     required
-                                                    className="w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
-                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    disabled={isView}
+                                                    className={`w-full min-w-[200px] px-3 py-2 border-2 border-slate-200 
+                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 >
                                                     <option value="0">اختر صنف...</option>
                                                     {items.map(i => <option key={i.id} value={i.id}>{i.itemNameAr}</option>)}
@@ -513,19 +578,23 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                     value={item.quantity}
                                                     onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
                                                     required
+                                                    disabled={isView}
                                                     min="0.001"
                                                     step="0.001"
-                                                    className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                    className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-brand-primary outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                        focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70 text-brand-primary/50' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
                                                 <select
                                                     value={item.unitId}
                                                     onChange={(e) => updateItem(idx, { unitId: parseInt(e.target.value) })}
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    disabled={isView}
+                                                    className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                        text-sm font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 >
                                                     <option value="0">الوحدة...</option>
                                                     {units.map(u => <option key={u.id} value={u.id}>{u.unitNameAr}</option>)}
@@ -537,11 +606,12 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                     value={item.unitPrice}
                                                     onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
                                                     required
+                                                    disabled={isView}
                                                     min="0.01"
                                                     step="0.01"
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-bold text-emerald-600 outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                    className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-bold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70 text-emerald-600/50' : 'bg-white text-emerald-600'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
@@ -551,8 +621,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => removeItem(idx)}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
-                                                        rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                    className={`p-2 hover:bg-rose-50 rounded-lg transition-all ${isView ? 'hidden' : 'text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100'}`}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -611,8 +680,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || 0 })}
                                     min="0"
                                     step="0.01"
-                                    className="w-28 px-3 py-2 bg-rose-500/10 border-2 border-rose-500/30 rounded-lg 
-                                        text-rose-400 font-bold text-right outline-none focus:border-rose-500/50 transition-all"
+                                    disabled={isView}
+                                    className={`w-28 px-3 py-2 border-2 rounded-lg 
+                                        font-bold text-right outline-none transition-all
+                                        ${isView ? 'bg-slate-700/50 border-transparent text-slate-400 cursor-not-allowed' : 'bg-rose-500/10 border-rose-500/30 text-rose-400 focus:border-rose-500/50'}`}
                                 />
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
@@ -623,8 +694,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, taxAmount: parseFloat(e.target.value) || 0 })}
                                     min="0"
                                     step="0.01"
-                                    className="w-28 px-3 py-2 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-lg 
-                                        text-emerald-400 font-bold text-right outline-none focus:border-emerald-500/50 transition-all"
+                                    disabled={isView}
+                                    className={`w-28 px-3 py-2 border-2 rounded-lg 
+                                        font-bold text-right outline-none transition-all
+                                        ${isView ? 'bg-slate-700/50 border-transparent text-slate-400 cursor-not-allowed' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 focus:border-emerald-500/50'}`}
                                 />
                             </div>
                             <div className="pt-6 border-t border-white/10">
@@ -659,8 +732,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     value={formData.invoiceDate}
                                     onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -673,8 +748,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     value={formData.dueDate}
                                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70 border-rose-200' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
                         </div>

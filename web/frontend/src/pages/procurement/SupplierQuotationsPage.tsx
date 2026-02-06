@@ -15,10 +15,13 @@ import {
     ShoppingCart,
     X,
     XCircle,
-    AlertCircle
+    AlertCircle,
+    Trash2
 } from 'lucide-react';
 import purchaseService, { type SupplierQuotation } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import toast from 'react-hot-toast';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -88,8 +91,9 @@ const QuotationTableRow: React.FC<{
     quotation: SupplierQuotation;
     index: number;
     onView: (id: number) => void;
+    onDelete: (quotation: SupplierQuotation) => void;
     navigate: ReturnType<typeof useNavigate>;
-}> = ({ quotation, index, onView, navigate }) => (
+}> = ({ quotation, index, onView, onDelete, navigate }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
         onClick={() => onView(quotation.id!)}
@@ -179,6 +183,13 @@ const QuotationTableRow: React.FC<{
                         </button>
                     </>
                 )}
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(quotation); }}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                    title="حذف"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
             </div>
         </td>
     </tr>
@@ -192,6 +203,9 @@ const SupplierQuotationsPage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [showExpired, setShowExpired] = useState(false);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [quotationToDelete, setQuotationToDelete] = useState<SupplierQuotation | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchQuotations();
@@ -205,7 +219,29 @@ const SupplierQuotationsPage: React.FC = () => {
         } catch (error) {
             console.error('Failed to fetch quotations:', error);
         } finally {
+            setStatusFilter('All'); // Ensure filter is reset after fetch if needed or just handle state
             setLoading(false);
+        }
+    };
+
+    const handleDeleteClick = (quotation: SupplierQuotation) => {
+        setQuotationToDelete(quotation);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!quotationToDelete?.id) return;
+        setIsDeleting(true);
+        try {
+            await purchaseService.deleteQuotation(quotationToDelete.id);
+            toast.success('تم حذف عرض السعر بنجاح');
+            fetchQuotations();
+            setIsDeleteModalOpen(false);
+            setQuotationToDelete(null);
+        } catch (error) {
+            toast.error('فشل حذف عرض السعر');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -364,22 +400,6 @@ const SupplierQuotationsPage: React.FC = () => {
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent">
-                    <Filter className="text-slate-400 w-5 h-5" />
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
-                    >
-                        <option value="All">جميع الحالات</option>
-                        <option value="Received">مستلم</option>
-                        <option value="Selected">مقبول</option>
-                        <option value="Rejected">مرفوض</option>
-                    </select>
-                </div>
-                <button onClick={fetchQuotations} className="p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
-                    <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                </button>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -408,6 +428,7 @@ const SupplierQuotationsPage: React.FC = () => {
                                         quotation={q}
                                         index={index}
                                         onView={(id) => navigate(`/dashboard/procurement/quotation/${id}`)}
+                                        onDelete={handleDeleteClick}
                                         navigate={navigate}
                                     />
                                 ))
@@ -425,6 +446,18 @@ const SupplierQuotationsPage: React.FC = () => {
                     />
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف عرض السعر"
+                message={`هل أنت متأكد من حذف عرض السعر رقم ${quotationToDelete?.quotationNumber}؟ سيتم حذف جميع البيانات المرتبطة به ولا يمكن التراجع عن هذه الخطوة.`}
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setQuotationToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

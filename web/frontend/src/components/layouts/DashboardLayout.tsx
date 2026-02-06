@@ -8,7 +8,7 @@ import {
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity, ClipboardCheck, GitCompare,
     Undo2
 } from 'lucide-react';
-import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation,useNavigate} from 'react-router-dom';
 import { approvalService } from '../../services/approvalService';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
 import { grnService } from '../../services/grnService';
@@ -216,7 +216,7 @@ const DashboardLayout: React.FC = () => {
     const location = useLocation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
+    
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);

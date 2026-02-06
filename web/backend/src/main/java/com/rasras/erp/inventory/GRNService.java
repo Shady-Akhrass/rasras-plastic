@@ -210,17 +210,20 @@ public class GRNService {
 
     private void updateInventory(GoodsReceiptNote grn) {
         for (GRNItem item : grn.getItems()) {
-            inventoryService.updateStock(
-                    item.getItem().getId(),
-                    grn.getWarehouseId(),
-                    item.getReceivedQty(),
-                    "IN",
-                    "GRN",
-                    "GoodsReceiptNote",
-                    grn.getId(),
-                    grn.getGrnNumber(),
-                    item.getUnitCost(),
-                    grn.getCreatedBy());
+            BigDecimal qtyToRecord = item.getAcceptedQty() != null ? item.getAcceptedQty() : item.getReceivedQty();
+            if (qtyToRecord.compareTo(BigDecimal.ZERO) > 0) {
+                inventoryService.updateStock(
+                        item.getItem().getId(),
+                        grn.getWarehouseId(),
+                        qtyToRecord,
+                        "IN",
+                        "GRN",
+                        "GoodsReceiptNote",
+                        grn.getId(),
+                        grn.getGrnNumber(),
+                        item.getUnitCost(),
+                        grn.getCreatedBy());
+            }
         }
     }
 
@@ -238,7 +241,7 @@ public class GRNService {
                 .unit(unitRepo.findById(dto.getUnitId()).orElseThrow())
                 .orderedQty(dto.getOrderedQty())
                 .receivedQty(dto.getReceivedQty())
-                .acceptedQty(dto.getAcceptedQty())
+                .acceptedQty(dto.getAcceptedQty() != null ? dto.getAcceptedQty() : dto.getReceivedQty())
                 .unitCost(dto.getUnitCost())
                 .totalCost(dto.getTotalCost())
                 .lotNumber(dto.getLotNumber())

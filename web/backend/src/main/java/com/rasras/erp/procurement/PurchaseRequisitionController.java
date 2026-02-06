@@ -53,4 +53,9 @@ public class PurchaseRequisitionController {
         prService.deletePurchaseRequisition(id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @GetMapping("/{id}/lifecycle")
+    public ResponseEntity<ApiResponse<PRLifecycleDto>> getPRLifecycle(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(prService.getPRLifecycle(id)));
+    }
 }

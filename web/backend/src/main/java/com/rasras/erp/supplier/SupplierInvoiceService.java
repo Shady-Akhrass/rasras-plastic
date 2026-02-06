@@ -174,13 +174,18 @@ public class SupplierInvoiceService {
                                 .build();
 
                 List<SupplierInvoiceItem> items = grn.getItems().stream()
-                                .filter(gi -> gi.getAcceptedQty() != null
-                                                && gi.getAcceptedQty().compareTo(BigDecimal.ZERO) > 0)
+                                .filter(gi -> {
+                                        BigDecimal qty = gi.getAcceptedQty() != null ? gi.getAcceptedQty()
+                                                        : gi.getReceivedQty();
+                                        return qty != null && qty.compareTo(BigDecimal.ZERO) > 0;
+                                })
                                 .map(gi -> {
+                                        BigDecimal acceptedQty = gi.getAcceptedQty() != null ? gi.getAcceptedQty()
+                                                        : gi.getReceivedQty();
                                         BigDecimal unitCost = gi.getUnitCost() != null ? gi.getUnitCost()
                                                         : BigDecimal.ZERO;
                                         BigDecimal taxRate = new BigDecimal("0.14"); // Standard VAT
-                                        BigDecimal subTotal = gi.getAcceptedQty().multiply(unitCost);
+                                        BigDecimal subTotal = acceptedQty.multiply(unitCost);
                                         BigDecimal taxAmount = subTotal.multiply(taxRate);
 
                                         return SupplierInvoiceItem.builder()
@@ -189,7 +194,7 @@ public class SupplierInvoiceService {
                                                         .item(gi.getItem())
                                                         .unit(gi.getUnit())
                                                         .description(gi.getItem().getItemNameAr())
-                                                        .quantity(gi.getAcceptedQty())
+                                                        .quantity(acceptedQty)
                                                         .unitPrice(unitCost)
                                                         .taxPercentage(taxRate.multiply(new BigDecimal("100")))
                                                         .taxAmount(taxAmount)

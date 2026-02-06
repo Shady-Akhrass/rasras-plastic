@@ -15,10 +15,8 @@ import {
     Search,
     Filter,
     RefreshCw,
-    XCircle,
-    CheckCircle2,
-    X,
-    ExternalLink
+    XCircle, CheckCircle2,
+    RotateCcw
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
@@ -43,16 +41,16 @@ const StatCard: React.FC<{
     };
 
     return (
-        <div className="bg-white p-3 rounded-xl border border-slate-100 hover:shadow-md 
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
             hover:border-brand-primary/20 transition-all duration-300 group">
-            <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${colorClasses[color]} 
-                    group-hover:scale-105 transition-transform duration-300`}>
-                    <Icon className="w-4 h-4" />
+            <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${colorClasses[color]} 
+                    group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className="w-5 h-5" />
                 </div>
                 <div>
-                    <div className="text-lg font-bold text-slate-800">{value}</div>
-                    <div className="text-xs text-slate-500">{label}</div>
+                    <div className="text-2xl font-bold text-slate-800">{value}</div>
+                    <div className="text-sm text-slate-500">{label}</div>
                 </div>
             </div>
         </div>
@@ -101,21 +99,34 @@ const RequestCard: React.FC<{
     index: number;
     onApprove: (id: number) => void;
     onReject: (id: number) => void;
-    onView: (request: ApprovalRequestDto) => void;
     processing: boolean;
-}> = ({ request, index, onApprove, onReject, onView, processing }) => {
+}> = ({ request, index, onApprove, onReject, processing }) => {
     const getDocTypeConfig = (type: string) => {
-        const configs: Record<string, { bg: string; text: string; icon: React.ElementType }> = {
+        const configs: Record<string, { label?: string; shortLabel?: string; bg: string; text: string; border?: string; icon: React.ElementType }> = {
             'PurchaseRequisition': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
             'PR': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
             'RFQ': { bg: 'bg-amber-50', text: 'text-amber-600', icon: FileText },
-            'Supplier': { bg: 'bg-amber-50', text: 'text-amber-600', icon: Tag },
             'SupplierQuotation': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
             'SQ': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
             'QuotationComparison': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
             'QC': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
-            'PurchaseOrder': { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            'PurchaseOrder': {
+                label: 'أمر شراء',
+                shortLabel: 'PO',
+                bg: 'bg-blue-50',
+                text: 'text-blue-600',
+                border: 'border-blue-200',
+                icon: ShoppingCart,
+            },
             'PO': { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            'PurchaseReturn': {
+                label: 'مرتجع مشتريات',
+                shortLabel: 'PRN',
+                bg: 'bg-rose-50',
+                text: 'text-rose-600',
+                border: 'border-rose-100',
+                icon: RotateCcw,
+            },
             'GoodsReceiptNote': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
             'GRN': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
             'SupplierInvoice': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
@@ -132,9 +143,33 @@ const RequestCard: React.FC<{
 
     const config = getDocTypeConfig(request.documentType);
     const DocIcon = config.icon;
-    const docTypeAr = DOC_TYPE_LABELS[request.documentType] || request.documentType;
-    const workflowAr = getWorkflowLabelAr(request.workflowName);
-    const stepAr = getWorkflowLabelAr(request.currentStepName);
+    const navigate = useNavigate();
+
+    const handleViewDocument = () => {
+        const typeRoutes: Record<string, string> = {
+            'PR': '/dashboard/procurement/pr',
+            'PurchaseRequisition': '/dashboard/procurement/pr',
+            'RFQ': '/dashboard/procurement/rfq',
+            'SQ': '/dashboard/procurement/quotation',
+            'SupplierQuotation': '/dashboard/procurement/quotation',
+            'QC': '/dashboard/procurement/comparison',
+            'QuotationComparison': '/dashboard/procurement/comparison',
+            'PO': '/dashboard/procurement/po',
+            'PurchaseOrder': '/dashboard/procurement/po',
+            'GRN': '/dashboard/procurement/grn',
+            'GoodsReceiptNote': '/dashboard/procurement/grn',
+            'SINV': '/dashboard/procurement/invoices',
+            'SupplierInvoice': '/dashboard/procurement/invoices',
+            'PurchaseReturn': '/dashboard/procurement/returns'
+        };
+
+        const route = typeRoutes[request.documentType];
+        if (route) {
+            navigate(`${route}/${request.documentId}?mode=view&approvalId=${request.id}`);
+        } else {
+            toast.error('لم يتم تحديد مسار لهذا المستند');
+        }
+    };
 
     return (
         <div
@@ -156,7 +191,7 @@ const RequestCard: React.FC<{
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-600 
                                 rounded-lg text-xs font-bold">
-                                {docTypeAr}
+                                {request.documentType}
                             </span>
                             <span className="text-xs font-mono text-slate-400">#{request.documentNumber}</span>
                             {request.priority === 'High' && (
@@ -169,7 +204,7 @@ const RequestCard: React.FC<{
                         </div>
                         <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-bold text-slate-800 text-lg group-hover:text-brand-primary transition-colors">
-                                {workflowAr}
+                                {request.workflowName}
                             </h3>
                             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">
                                 {request.documentNumber}
@@ -186,7 +221,7 @@ const RequestCard: React.FC<{
                             </div>
                             <div className="flex items-center gap-2 text-brand-primary font-bold">
                                 <Clock className="w-4 h-4" />
-                                <span>{stepAr}</span>
+                                <span>{request.currentStepName}</span>
                             </div>
                         </div>
                     </div>
@@ -205,7 +240,7 @@ const RequestCard: React.FC<{
                 {/* Right: Actions */}
                 <div className="flex flex-row lg:flex-col justify-center gap-3 min-w-[140px]">
                     <button
-                        onClick={() => onView(request)}
+                        onClick={handleViewDocument}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 
                             bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 
                             transition-all hover:scale-105"
@@ -474,36 +509,9 @@ const ApprovalsInbox: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>(initialType);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
-    const [viewRequest, setViewRequest] = useState<ApprovalRequestDto | null>(null);
 
     // Mock User ID (from auth context in production)
     const currentUserId = 1;
-
-    const navigate = useNavigate();
-    const handleOpenDocument = (request: ApprovalRequestDto) => {
-        const typeRoutes: Record<string, string> = {
-            'PR': '/dashboard/procurement/pr',
-            'PurchaseRequisition': '/dashboard/procurement/pr',
-            'RFQ': '/dashboard/procurement/rfq',
-            'SQ': '/dashboard/procurement/quotation',
-            'SupplierQuotation': '/dashboard/procurement/quotation',
-            'QC': '/dashboard/procurement/comparison',
-            'QuotationComparison': '/dashboard/procurement/comparison',
-            'PO': '/dashboard/procurement/po',
-            'PurchaseOrder': '/dashboard/procurement/po',
-            'GRN': '/dashboard/procurement/grn',
-            'GoodsReceiptNote': '/dashboard/procurement/grn',
-            'SINV': '/dashboard/procurement/invoices',
-            'SupplierInvoice': '/dashboard/procurement/invoices',
-            'Supplier': '/dashboard/procurement/suppliers',
-        };
-        const route = typeRoutes[request.documentType];
-        if (route) {
-            navigate(`${route}/${request.documentId}`);
-        } else {
-            toast.error('لم يتم تحديد مسار لهذا المستند');
-        }
-    };
 
     useEffect(() => {
         fetchRequests();
@@ -625,7 +633,7 @@ const ApprovalsInbox: React.FC = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard
                     icon={Bell}
                     value={stats.total}
@@ -698,8 +706,6 @@ const ApprovalsInbox: React.FC = () => {
                                 onChange={(e) => setTypeFilter(e.target.value)}
                                 className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
                             >
-                                <option value="All">الكل</option>
-                                <option value="Supplier">موردين</option>
                                 <option value="PR">طلبات شراء</option>
                                 <option value="RFQ">طلبات عروض أسعار</option>
                                 <option value="SQ">عروض موردين</option>
@@ -741,19 +747,11 @@ const ApprovalsInbox: React.FC = () => {
                             index={index}
                             onApprove={() => handleAction(req.id, 'Approved')}
                             onReject={() => handleAction(req.id, 'Rejected')}
-                            onView={(r) => setViewRequest(r)}
                             processing={false}
                         />
                     ))
                 )}
             </div>
-            {/* View Modal */}
-            <ViewModal
-                request={viewRequest}
-                onClose={() => setViewRequest(null)}
-                onOpenDocument={handleOpenDocument}
-            />
-
             {!loading && filteredRequests.length > 0 && (
                 <Pagination
                     currentPage={currentPage}
