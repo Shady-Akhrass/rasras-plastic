@@ -2,7 +2,7 @@ import axios from 'axios';
 import { clearSession } from './authUtils';
 
 const apiClient = axios.create({
-    baseURL: 'http://localhost:8080/api',
+    baseURL: `${import.meta.env.VITE_API_URL || 'https://api.rasrasplastic.com'}/api`,
     headers: {
         'Content-Type': 'application/json',
     },

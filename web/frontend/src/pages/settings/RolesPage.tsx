@@ -8,6 +8,25 @@ import { roleService, type RoleDto, type PermissionDto } from '../../services/ro
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/common/ConfirmModal';
 
+function getApiErrorMessage(error: any, fallback: string): string {
+    const data = error.response?.data;
+    if (!data) return fallback;
+    if (typeof data === 'string') return data;
+    const msg = data.message ?? data.error ?? data.msg ?? (Array.isArray(data.errors) ? data.errors[0] : null);
+    const text = typeof msg === 'string' ? msg : fallback;
+    return text;
+}
+
+/** Use when deleting a role: if API returns the generic "related data" message, show the role-specific one */
+const ROLE_DELETE_FALLBACK = 'لا يمكن حذف الدور لأنه مرتبط بمستخدمين. قم بتغيير دور المستخدمين أولاً.';
+function getRoleDeleteErrorMessage(error: any): string {
+    const msg = getApiErrorMessage(error, ROLE_DELETE_FALLBACK);
+    if (msg.includes('التصنيف') || msg.includes('وحدة القياس') || msg.includes('البيانات المرتبطة غير صحيحة')) {
+        return ROLE_DELETE_FALLBACK;
+    }
+    return msg;
+}
+
 // Stat Card Component
 const StatCard: React.FC<{
     icon: React.ElementType;
@@ -514,6 +533,7 @@ const RolesPage: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState<RoleDto>({
         roleCode: '',
@@ -561,7 +581,7 @@ const RolesPage: React.FC = () => {
             fetchData();
         } catch (error: any) {
             console.error('Error saving role:', error);
-            toast.error(error.response?.data?.message || 'فشل حفظ الدور');
+            toast.error(getApiErrorMessage(error, 'فشل حفظ الدور'));
         } finally {
             setIsSaving(false);
         }
@@ -583,7 +603,7 @@ const RolesPage: React.FC = () => {
             fetchData();
         } catch (error: any) {
             console.error('Error saving permissions:', error);
-            toast.error(error.response?.data?.message || 'فشل حفظ الصلاحيات');
+            toast.error(getApiErrorMessage(error, 'فشل حفظ الصلاحيات'));
         } finally {
             setIsSavingPerms(false);
         }
@@ -591,11 +611,13 @@ const RolesPage: React.FC = () => {
 
     const handleDeleteClick = (roleId: number) => {
         setRoleToDelete(roleId);
+        setDeleteError(null);
         setIsDeleteModalOpen(true);
     };
 
     const handleDeleteConfirm = async () => {
         if (!roleToDelete) return;
+        setDeleteError(null);
         setIsDeleting(true);
         try {
             await roleService.deleteRole(roleToDelete);
@@ -604,11 +626,18 @@ const RolesPage: React.FC = () => {
             setRoleToDelete(null);
             fetchData();
         } catch (error: any) {
-            console.error('Error deleting role:', error);
-            toast.error(error.response?.data?.message || 'فشل حذف الدور');
+            const msg = getRoleDeleteErrorMessage(error);
+            setDeleteError(msg);
+            toast.error(msg);
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    const handleDeleteModalClose = () => {
+        setIsDeleteModalOpen(false);
+        setRoleToDelete(null);
+        setDeleteError(null);
     };
 
     const resetForm = () => {
@@ -898,10 +927,51 @@ const RolesPage: React.FC = () => {
                 isOpen={showPermModal}
                 onClose={() => setShowPermModal(false)}
                 title="إدارة الصلاحيات"
-                subtitle={`تعديل صلاحيات الدور: ${currentRoleForPerms?.roleNameAr}`}
+                subtitle={currentRoleForPerms ? `تعديل صلاحيات الدور: ${currentRoleForPerms.roleNameAr}` : undefined}
                 size="large"
             >
                 <div className="p-6">
+                    {/* تفاصيل الدور */}
+                    {currentRoleForPerms && (
+                        <div className="mb-6 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
+                            <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-brand-primary" />
+                                تفاصيل الدور
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-0.5">الكود</p>
+                                    <p className="text-sm font-bold text-slate-800 font-mono">{currentRoleForPerms.roleCode}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-0.5">الاسم العربي</p>
+                                    <p className="text-sm font-bold text-slate-800">{currentRoleForPerms.roleNameAr}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-0.5">الاسم الإنجليزي</p>
+                                    <p className="text-sm text-slate-700" dir="ltr">{currentRoleForPerms.roleNameEn || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-0.5">الحالة</p>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${currentRoleForPerms.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                                        {currentRoleForPerms.isActive ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                        {currentRoleForPerms.isActive ? 'نشط' : 'معطل'}
+                                    </span>
+                                </div>
+                            </div>
+                            {currentRoleForPerms.description && (
+                                <div className="mt-4 pt-4 border-t border-slate-200">
+                                    <p className="text-xs text-slate-500 mb-1">الوصف</p>
+                                    <p className="text-sm text-slate-700">{currentRoleForPerms.description}</p>
+                                </div>
+                            )}
+                            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center gap-2 text-sm text-slate-600">
+                                <Key className="w-4 h-4 text-brand-primary" />
+                                <span>الصلاحيات المحددة: <strong className="text-brand-primary">{selectedPermissions.length}</strong> من <strong>{permissions.length}</strong></span>
+                            </div>
+                        </div>
+                    )}
+
                     <PermissionMatrix
                         permissions={permissions}
                         selectedIds={selectedPermissions}
@@ -943,9 +1013,10 @@ const RolesPage: React.FC = () => {
                 confirmText="حذف"
                 cancelText="إلغاء"
                 onConfirm={handleDeleteConfirm}
-                onCancel={() => setIsDeleteModalOpen(false)}
+                onCancel={handleDeleteModalClose}
                 isLoading={isDeleting}
                 variant="danger"
+                errorMessage={deleteError}
             />
         </div>
     );

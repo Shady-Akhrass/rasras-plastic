@@ -229,6 +229,8 @@ const DashboardLayout: React.FC = () => {
     const user = userString ? JSON.parse(userString) : null;
     const userName = user?.fullNameAr || user?.username || 'المستخدم';
     const userRole = user?.roleCode || user?.roleName || 'USER';
+    /** صلاحيات المستخدم من تسجيل الدخول (ديناميكية من لوحة التحكم) */
+    const userPermissions: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -283,12 +285,12 @@ const DashboardLayout: React.FC = () => {
         return () => clearTimeout(timeoutId);
     }, []);
 
-    // حماية المسارات حسب الصلاحيات: إعادة توجيه من لا يملك الصلاحية إلى لوحة القيادة
+    // حماية المسارات حسب الصلاحيات (ديناميكية بالصلاحيات أو بالأدوار احتياطياً)
     useEffect(() => {
-        if (!canAccessPath(location.pathname, userRole)) {
+        if (!canAccessPath(location.pathname, userRole, userPermissions)) {
             navigate('/dashboard', { replace: true });
         }
-    }, [location.pathname, userRole, navigate]);
+    }, [location.pathname, userRole, userPermissions, navigate]);
 
     const handleLogout = () => {
         clearSession();
@@ -308,70 +310,72 @@ const DashboardLayout: React.FC = () => {
         return name.split(' ').map(n => n[0]).join('').slice(0, 2);
     };
 
-    // أدوار الأقسام: كل قسم يظهر فقط للأدوار المذكورة (بدون roles = يظهر للجميع)
+    // أدوار الأقسام (احتياطي عند عدم وجود صلاحيات من الخادم)
     const ROLES_PROCUREMENT = ['PM', 'BUYER', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
     const ROLES_SALES = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
-    const ROLES_WAREHOUSE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
+    const ROLES_WAREHOUSE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'WAREHOUSE_MANAGER', 'WH_MANAGER'];
     const ROLES_OPERATIONS = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'SM'];
     const ROLES_CRM = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
     const ROLES_SYSTEM = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN'];
 
-    const navItems = [
-        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations', roles: ROLES_OPERATIONS },
-        { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
-        { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations', roles: ROLES_OPERATIONS },
-        { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations', roles: ROLES_OPERATIONS },
-        { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations', roles: ROLES_OPERATIONS },
-        { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/stocks', icon: Package, label: 'أرصدة المخزون', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/reports/stagnant', icon: Clock, label: 'الأصناف الراكدة', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/reports/movement', icon: Activity, label: 'حركة الصنف التفصيلية', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/count', icon: ClipboardCheck, label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/count', icon: AlertTriangle, label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports', search: '?mode=surprise', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2, label: 'تقرير المخزون الدوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/inventory/reports/variance', icon: GitCompare, label: 'تقرير الفروقات', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE },
-        { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/sales/orders', icon: ClipboardList, label: 'أوامر البيع', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/sales/issue-notes', icon: Package, label: 'إذونات الصرف', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/sales/delivery-orders', icon: Truck, label: 'أوامر التوصيل', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/sales/invoices', icon: FileText, label: 'فواتير المبيعات', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/sales/receipts', icon: Receipt, label: 'إيصالات الدفع', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales', roles: ROLES_SALES },
-        { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm', roles: ROLES_CRM },
-        { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement', badge: pendingInspectionsCount || undefined, roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/grn', icon: Package, label: 'إشعارات الاستلام (GRN)', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT },
-        { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
-        // أقسام الإعدادات (النظام)
-        { to: '/dashboard/settings', icon: Settings, label: 'رئيسية الإعدادات', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/units', icon: Ruler, label: 'وحدات القياس', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/users', icon: User, label: 'إدارة المستخدمين', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/roles', icon: Shield, label: 'الأدوار والصلاحيات', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/permissions', icon: Lock, label: 'سجل الصلاحيات', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/security', icon: Shield, label: 'الأمان والخصوصية', section: 'system', roles: ROLES_SYSTEM },
-        { to: '/dashboard/settings/notifications', icon: Bell, label: 'الإشعارات', section: 'system', roles: ROLES_SYSTEM },
-    ];
+    const navItems: Array<{
+        to: string; icon: React.ElementType; label: string; section: string;
+        roles?: readonly string[]; requiredPermission?: string;
+        warehouseGroup?: string; search?: string; badge?: number;
+    }> = [
+            { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
+            { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main', requiredPermission: 'SECTION_USERS' },
+            { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main', requiredPermission: 'SECTION_EMPLOYEES' },
+            { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/stocks', icon: Package, label: 'أرصدة المخزون', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/stagnant', icon: Clock, label: 'الأصناف الراكدة', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/movement', icon: Activity, label: 'حركة الصنف التفصيلية', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/count', icon: ClipboardCheck, label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/count', icon: AlertTriangle, label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports', search: '?mode=surprise', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2, label: 'تقرير المخزون الدوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/variance', icon: GitCompare, label: 'تقرير الفروقات', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/orders', icon: ClipboardList, label: 'أوامر البيع', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/issue-notes', icon: Package, label: 'إذونات الصرف', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/delivery-orders', icon: Truck, label: 'أوامر التوصيل', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/invoices', icon: FileText, label: 'فواتير المبيعات', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/receipts', icon: Receipt, label: 'إيصالات الدفع', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm', roles: ROLES_CRM, requiredPermission: 'SECTION_CRM' },
+            { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement', badge: pendingInspectionsCount || undefined, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/grn', icon: Package, label: 'إذن إضافة (GRN)', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
+            { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+            { to: '/dashboard/settings/units', icon: Ruler, label: 'وحدات القياس', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+            { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+            { to: '/dashboard/settings/users', icon: User, label: 'إدارة المستخدمين', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+            { to: '/dashboard/settings/roles', icon: Shield, label: 'الأدوار والصلاحيات', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+            { to: '/dashboard/settings/permissions', icon: Lock, label: 'سجل الصلاحيات', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+            { to: '/dashboard/settings/security', icon: Shield, label: 'الأمان والخصوصية', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+            { to: '/dashboard/settings/notifications', icon: Bell, label: 'الإشعارات', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
+        ];
 
     // تحديث عنوان التبويب حسب الصفحة الحالية
     useEffect(() => {
@@ -382,12 +386,18 @@ const DashboardLayout: React.FC = () => {
         document.title = match ? `${match.label} | نظام RasRas` : 'نظام RasRas';
     }, [location.pathname]);
 
-    const filteredNavItems = navItems.filter(item =>
-        !item.roles || item.roles.length === 0 || item.roles.includes(userRole.toUpperCase())
-    );
+    // عرض العناصر: إن وُجدت صلاحيات المستخدم نعتمد عليها (ديناميكي)، وإلا نعتمد على الأدوار (احتياطي)
+    const filteredNavItems = navItems.filter(item => {
+        const usePerms = userPermissions.length > 0;
+        if (usePerms) {
+            if (!item.requiredPermission) return true;
+            return userPermissions.includes(item.requiredPermission);
+        }
+        return !item.roles || item.roles.length === 0 || item.roles.includes(userRole.toUpperCase());
+    });
 
     // أدوار المدير: عندهم قائمة منسدلة (ينقرون لفتح كل قسم). غير المدير: القوائم الفرعية تظهر مباشرة
-    const MANAGER_ROLES = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'MANAGER'];
+    const MANAGER_ROLES = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'MANAGER', 'WAREHOUSE_MANAGER', 'WH_MANAGER'];
     const isManagerRole = MANAGER_ROLES.includes(userRole.toUpperCase());
 
     const sectionIds = ['main', 'operations', 'sales', 'crm', 'warehouse', 'procurement', 'system'] as const;

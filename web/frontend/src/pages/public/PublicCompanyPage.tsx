@@ -275,7 +275,8 @@ const PublicCompanyPage: React.FC = () => {
     const getImageUrl = (url: string) => {
         if (!url) return '';
         if (url.startsWith('http') || url.startsWith('blob:')) return url;
-        return `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+        const baseUrl = import.meta.env.VITE_API_URL || 'https://api.rasrasplastic.com';
+        return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
     };
 
     return (

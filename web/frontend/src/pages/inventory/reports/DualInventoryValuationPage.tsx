@@ -141,7 +141,7 @@ const DualInventoryValuationPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="relative overflow-hidden bg-gradient-to-br from-rose-600 via-pink-600 to-rose-700 rounded-3xl p-8 text-white">
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white">
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
                         <button
@@ -261,7 +261,7 @@ const DualInventoryValuationPage: React.FC = () => {
                                         <td className="px-4 py-3">
                                             {r.hasAlert && <AlertTriangle className="w-5 h-5 text-amber-600" />}
                                         </td>
-                                        <td className="px-6 py-3 font-mono text-slate-700">{r.grade || r.itemCode}</td>
+                                        <td className="px-6 py-3 font-mono text-slate-700">{r.itemCode}</td>
                                         <td className="px-6 py-3">{r.itemNameAr}</td>
                                         <td className="px-6 py-3 font-medium">{(r.qty || 0).toLocaleString()}</td>
                                         <td className="px-6 py-3">{(r.historicalCostPerUnit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>

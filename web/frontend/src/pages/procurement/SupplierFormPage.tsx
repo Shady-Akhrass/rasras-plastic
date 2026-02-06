@@ -4,7 +4,7 @@ import {
     Save, ArrowRight, Building2, DollarSign, MapPin, Phone, Mail,
     FileText, Globe, CreditCard, ShieldCheck, Package, Trash2, Plus,
     X, RefreshCw, CheckCircle2, User, Clock, Star, Tag, Layers,
-    ChevronRight, AlertTriangle, Send, Hash, Calendar, Landmark,
+    ChevronRight, Send, Hash, Calendar, Landmark,
     BadgeCheck, XCircle, Info
 } from 'lucide-react';
 import { supplierService, type SupplierDto, type SupplierItemDto, type SupplierBankDto } from '../../services/supplierService';

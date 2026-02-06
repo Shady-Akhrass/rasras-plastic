@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
     ChevronRight, Save, Users, DollarSign,
     Settings, RefreshCw,
@@ -7,7 +7,7 @@ import {
     CreditCard, Percent, FileText, Trash2, Plus, User, Tag
 } from 'lucide-react';
 import customerService, { type Customer, type CustomerContact } from '../../services/customerService';
-import userService from '../../services/userService';
+import employeeService from '../../services/employeeService';
 import { priceListService } from '../../services/priceListService';
 import { toast } from 'react-hot-toast';
 
@@ -22,8 +22,10 @@ const FormInput: React.FC<{
     type?: string;
     dir?: string;
     disabled?: boolean;
-}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', dir, disabled }) => {
+    error?: string;
+}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', dir, disabled, error }) => {
     const [isFocused, setIsFocused] = useState(false);
+    const hasError = Boolean(error?.trim());
     return (
         <div className="space-y-2">
             <label className={`block text-sm font-semibold transition-colors
@@ -32,7 +34,7 @@ const FormInput: React.FC<{
             </label>
             <div className="relative">
                 {Icon && <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all
-                    ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />}
+                    ${hasError ? 'text-rose-500' : isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />}
                 <input
                     type={type}
                     value={value || ''}
@@ -45,9 +47,10 @@ const FormInput: React.FC<{
                     dir={dir}
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all outline-none bg-slate-50
                         ${Icon ? 'pr-12' : ''}
-                        ${isFocused ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10' : 'border-transparent hover:border-slate-200'}`}
+                        ${hasError ? 'border-rose-400 bg-rose-50/50 focus:border-rose-500' : isFocused ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10' : 'border-transparent hover:border-slate-200'}`}
                 />
             </div>
+            {hasError && <p className="text-rose-600 text-sm font-medium">{error}</p>}
         </div>
     );
 };
@@ -59,27 +62,32 @@ const FormSelect: React.FC<{
     options: { value: number | string; label: string }[];
     icon?: React.ElementType;
     required?: boolean;
-}> = ({ label, value, onChange, options, icon: Icon, required }) => (
-    <div className="space-y-2">
-        <label className="block text-sm font-semibold text-slate-700">
-            {label} {required && <span className="text-rose-500">*</span>}
-        </label>
-        <div className="relative">
-            {Icon && <Icon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />}
-            <select
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-                required={required}
-                className={`w-full px-4 py-3 rounded-xl border-2 border-transparent bg-slate-50 transition-all outline-none appearance-none cursor-pointer
-                    ${Icon ? 'pr-12' : ''} hover:border-slate-200 focus:border-brand-primary focus:bg-white`}
-            >
-                <option value="">اختر...</option>
-                {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-            </select>
-            <ChevronRight className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" />
+    error?: string;
+}> = ({ label, value, onChange, options, icon: Icon, required, error }) => {
+    const hasError = Boolean(error?.trim());
+    return (
+        <div className="space-y-2">
+            <label className="block text-sm font-semibold text-slate-700">
+                {label} {required && <span className="text-rose-500">*</span>}
+            </label>
+            <div className="relative">
+                {Icon && <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 ${hasError ? 'text-rose-500' : 'text-slate-400'}`} />}
+                <select
+                    value={value || ''}
+                    onChange={(e) => onChange(e.target.value)}
+                    required={required}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all outline-none appearance-none cursor-pointer bg-slate-50
+                        ${Icon ? 'pr-12' : ''} ${hasError ? 'border-rose-400 bg-rose-50/50' : 'border-transparent hover:border-slate-200 focus:border-brand-primary focus:bg-white'}`}
+                >
+                    <option value="">اختر...</option>
+                    {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+                <ChevronRight className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" />
+            </div>
+            {hasError && <p className="text-rose-600 text-sm font-medium">{error}</p>}
         </div>
-    </div>
-);
+    );
+};
 
 const FormSection: React.FC<{ title: string; icon: React.ElementType; children: React.ReactNode }> = ({ title, icon: Icon, children }) => (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
@@ -103,6 +111,7 @@ const CustomerFormPage: React.FC = () => {
     const [salesReps, setSalesReps] = useState<{ value: number; label: string }[]>([]);
     const [priceLists, setPriceLists] = useState<{ value: number; label: string }[]>([]);
     const [activeTab, setActiveTab] = useState<'basic' | 'financial' | 'contacts' | 'notes'>('basic');
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const [formData, setFormData] = useState<Customer>({
         customerCode: '',
@@ -141,15 +150,18 @@ const CustomerFormPage: React.FC = () => {
 
     const fetchMetadata = async () => {
         try {
-            const [users, plists] = await Promise.all([
-                userService.getAll(),
+            const [employeesList, plistsResp] = await Promise.all([
+                employeeService.getAllActiveList(),
                 priceListService.getAllPriceLists()
             ]);
-            setSalesReps((users || []).map((u: any) => ({
-                value: u.userId,
-                label: u.username
+            // مسؤول المبيعات = موظف (SalesRepID في DB يشير إلى employees.EmployeeID)
+            const empList = Array.isArray(employeesList) ? employeesList : [];
+            setSalesReps(empList.map((e: { employeeId: number; fullNameAr?: string }) => ({
+                value: e.employeeId,
+                label: e.fullNameAr || `موظف ${e.employeeId}`
             })));
-            setPriceLists(plists.data.map((p: any) => ({ value: p.id!, label: p.listNameAr })));
+            const listArray = Array.isArray(plistsResp?.data) ? plistsResp.data : [];
+            setPriceLists(listArray.map((p: any) => ({ value: p.id ?? p.priceListId, label: p.priceListName ?? p.listNameAr })));
         } catch (error) {
             console.error('Error fetching metadata:', error);
         }
@@ -167,15 +179,52 @@ const CustomerFormPage: React.FC = () => {
         }
     };
 
+    /** تحقق من البيانات الأساسية المطلوبة قبل الحفظ */
+    const validateBasicData = (): Record<string, string> => {
+        const err: Record<string, string> = {};
+        const code = String(formData.customerCode ?? '').trim();
+        const nameAr = String(formData.customerNameAr ?? '').trim();
+        const email = String(formData.email ?? '').trim();
+
+        if (!code) err.customerCode = 'كود العميل مطلوب';
+        if (!nameAr) err.customerNameAr = 'الاسم بالعربية مطلوب';
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) err.email = 'البريد الإلكتروني غير صحيح';
+
+        return err;
+    };
+
+    const clearError = (field: string) => {
+        setErrors(prev => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+        });
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        const basicErrors = validateBasicData();
+        if (Object.keys(basicErrors).length > 0) {
+            setErrors(basicErrors);
+            setActiveTab('basic');
+            toast.error('يرجى إكمال البيانات الأساسية المطلوبة وتصحيح الأخطاء');
+            return;
+        }
+        setErrors({});
         setLoading(true);
         try {
+            const salesRepId = formData.salesRepId && formData.salesRepId > 0 ? formData.salesRepId : undefined;
+            const priceListId = formData.priceListId && formData.priceListId > 0 ? formData.priceListId : undefined;
+            const toSave: Customer = { ...formData };
+            if (salesRepId != null && salesRepId > 0) (toSave as any).salesRepId = salesRepId;
+            else delete (toSave as any).salesRepId;
+            if (priceListId != null && priceListId > 0) (toSave as any).priceListId = priceListId;
+            else delete (toSave as any).priceListId;
             if (isEdit) {
-                await customerService.updateCustomer(Number(id), formData);
+                await customerService.updateCustomer(Number(id), toSave);
                 toast.success('تم تحديث بيانات العميل بنجاح');
             } else {
-                await customerService.createCustomer(formData);
+                await customerService.createCustomer(toSave);
                 toast.success('تم إضافة العميل بنجاح');
             }
             navigate('/dashboard/crm/customers');
@@ -255,10 +304,10 @@ const CustomerFormPage: React.FC = () => {
             {/* Tab Secret Content */}
             <div className="space-y-6">
                 {activeTab === 'basic' && (
-                    <FormSection title="المعلومات التنظيمية" icon={Building2}>
+                    <FormSection title="البيانات الأساسية" icon={Building2}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FormInput label="كود العميل" value={formData.customerCode} onChange={v => setFormData({ ...formData, customerCode: v })} required icon={FileText} />
-                            <FormInput label="الاسم بالعربية" value={formData.customerNameAr} onChange={v => setFormData({ ...formData, customerNameAr: v })} required icon={Building2} />
+                            <FormInput label="كود العميل" value={formData.customerCode} onChange={v => { setFormData({ ...formData, customerCode: v }); clearError('customerCode'); }} required icon={FileText} error={errors.customerCode} />
+                            <FormInput label="الاسم بالعربية" value={formData.customerNameAr} onChange={v => { setFormData({ ...formData, customerNameAr: v }); clearError('customerNameAr'); }} required icon={Building2} error={errors.customerNameAr} />
                             <FormInput label="الاسم بالإنجليزية" value={formData.customerNameEn || ''} onChange={v => setFormData({ ...formData, customerNameEn: v })} icon={Globe} dir="ltr" />
                             <FormSelect label="نوع العميل" value={formData.customerType || ''} onChange={v => setFormData({ ...formData, customerType: v })} options={[{ value: 'COMPANY', label: 'شركة' }, { value: 'INDIVIDUAL', label: 'فرد' }]} icon={Users} />
                             <FormSelect label="فئة العميل" value={formData.customerClass || ''} onChange={v => setFormData({ ...formData, customerClass: v })} options={[{ value: 'A', label: 'فئة A' }, { value: 'B', label: 'فئة B' }, { value: 'C', label: 'فئة C' }]} icon={Tag} />
@@ -267,7 +316,7 @@ const CustomerFormPage: React.FC = () => {
                             <FormInput label="المدينة" value={formData.city || ''} onChange={v => setFormData({ ...formData, city: v })} icon={MapPin} />
                             <FormInput label="العنوان" value={formData.address || ''} onChange={v => setFormData({ ...formData, address: v })} icon={MapPin} />
                             <FormInput label="الهاتف" value={formData.phone || ''} onChange={v => setFormData({ ...formData, phone: v })} icon={Phone} />
-                            <FormInput label="البريد الإلكتروني" value={formData.email || ''} onChange={v => setFormData({ ...formData, email: v })} icon={Mail} />
+                            <FormInput label="البريد الإلكتروني" value={formData.email || ''} onChange={v => { setFormData({ ...formData, email: v }); clearError('email'); }} icon={Mail} error={errors.email} />
                             <FormInput label="الموقع الإلكتروني" value={formData.website || ''} onChange={v => setFormData({ ...formData, website: v })} icon={Globe} />
                         </div>
                     </FormSection>
@@ -279,8 +328,29 @@ const CustomerFormPage: React.FC = () => {
                             <FormInput label="حد الائتمان" type="number" value={formData.creditLimit || 0} onChange={v => setFormData({ ...formData, creditLimit: Number(v) })} icon={DollarSign} />
                             <FormInput label="فترة السداد (أيام)" type="number" value={formData.paymentTermDays || 0} onChange={v => setFormData({ ...formData, paymentTermDays: Number(v) })} icon={Settings} />
                             <FormSelect label="العملة" value={formData.currency || 'EGP'} onChange={v => setFormData({ ...formData, currency: v })} options={[{ value: 'EGP', label: 'جنيه مصري' }, { value: 'USD', label: 'دولار أمريكي' }, { value: 'EUR', label: 'يورو' }]} icon={DollarSign} />
-                            <FormSelect label="قائمة الأسعار" value={formData.priceListId || ''} onChange={v => setFormData({ ...formData, priceListId: Number(v) })} options={priceLists} icon={FileText} />
-                            <FormSelect label="مسؤول المبيعات" value={formData.salesRepId || ''} onChange={v => setFormData({ ...formData, salesRepId: Number(v) })} options={salesReps} icon={User} />
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <label className="block text-sm font-semibold text-slate-700">قائمة الأسعار</label>
+                                    {priceLists.length === 0 && (
+                                        <Link to="/dashboard/inventory/price-lists" className="text-xs font-medium text-brand-primary hover:underline">
+                                            إضافة قائمة أسعار
+                                        </Link>
+                                    )}
+                                </div>
+                                <div className="relative">
+                                    <FileText className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    <select
+                                        value={formData.priceListId ?? ''}
+                                        onChange={(e) => setFormData({ ...formData, priceListId: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                        className="w-full px-4 py-3 rounded-xl border-2 border-transparent bg-slate-50 transition-all outline-none appearance-none cursor-pointer pr-12 hover:border-slate-200 focus:border-brand-primary focus:bg-white"
+                                    >
+                                        <option value="">اختر...</option>
+                                        {priceLists.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                    </select>
+                                    <ChevronRight className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90" />
+                                </div>
+                            </div>
+                            <FormSelect label="مسؤول المبيعات" value={formData.salesRepId ?? ''} onChange={v => setFormData({ ...formData, salesRepId: v === '' ? undefined : Number(v) })} options={salesReps} icon={User} />
                             <FormInput label="نسبة الخصم تعاقدي (%)" type="number" value={formData.discountPercentage || 0} onChange={v => setFormData({ ...formData, discountPercentage: Number(v) })} icon={Percent} />
                         </div>
                     </FormSection>

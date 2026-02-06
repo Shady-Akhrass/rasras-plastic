@@ -123,7 +123,7 @@ const PurchaseReturnFormPage: React.FC = () => {
                 }));
             }
         } catch (e) {
-            toast.error('فشل تحميل بيانات إذن الاستلام');
+            toast.error('فشل تحميل بيانات إذن الإضافة');
         }
     };
 
@@ -282,7 +282,7 @@ const PurchaseReturnFormPage: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <FileText className="w-4 h-4 text-brand-primary" />
-                                    مرجع الاستلام (GRN)
+                                    مرجع إذن الإضافة (GRN)
                                 </label>
                                 <select
                                     value={formData.grnId || 0}
@@ -290,7 +290,7 @@ const PurchaseReturnFormPage: React.FC = () => {
                                     className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary focus:bg-white outline-none transition-all font-mono font-semibold"
                                 >
-                                    <option value="0">اختياري: اختر إذن استلام...</option>
+                                    <option value="0">اختياري: اختر إذن إضافة...</option>
                                     {grns.map(g => (
                                         <option key={g.id} value={g.id}>
                                             #{g.grnNumber} - {g.supplierNameAr}

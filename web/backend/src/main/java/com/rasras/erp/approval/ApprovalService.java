@@ -193,8 +193,9 @@ public class ApprovalService {
                 po.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     po.setStatus("Confirmed");
-                    // NEW: Automatically create GRN for Inspection
-                    createGRNFromPO(po, userId);
+                    // Auto GRN creation disabled to avoid unexpected failures on PO approval.
+                    // GRN will be created explicitly from the receiving workflow instead.
+                    // createGRNFromPO(po, userId);
                 }
                 poRepo.save(po);
             });
@@ -224,20 +225,24 @@ public class ApprovalService {
                     grn.setStatus("Completed");
                     supplierInvoiceService.createInvoiceFromGRN(grn.getId());
 
-                    // Auto-update stock levels
+                    // Policy: Stock updated only after quality acceptance (إذن إضافة)
+                    // submitGRN enforces Status=Inspected before approval; here we add accepted quantities only
                     if (grn.getItems() != null) {
                         for (GRNItem item : grn.getItems()) {
-                            inventoryService.updateStock(
-                                    item.getItem().getId(),
-                                    grn.getWarehouseId(),
-                                    item.getAcceptedQty() != null ? item.getAcceptedQty() : java.math.BigDecimal.ZERO,
-                                    "IN",
-                                    "GRN",
-                                    "GoodsReceiptNote",
-                                    grn.getId(),
-                                    grn.getGrnNumber(),
-                                    item.getUnitCost(),
-                                    userId);
+                            BigDecimal qtyToAdd = item.getAcceptedQty() != null ? item.getAcceptedQty() : java.math.BigDecimal.ZERO;
+                            if (qtyToAdd.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                                inventoryService.updateStock(
+                                        item.getItem().getId(),
+                                        grn.getWarehouseId(),
+                                        qtyToAdd,
+                                        "IN",
+                                        "GRN",
+                                        "GoodsReceiptNote",
+                                        grn.getId(),
+                                        grn.getGrnNumber(),
+                                        item.getUnitCost(),
+                                        userId);
+                            }
                         }
                     }
                 }

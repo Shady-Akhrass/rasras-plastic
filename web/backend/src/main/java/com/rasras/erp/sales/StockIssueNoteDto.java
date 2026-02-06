@@ -1,5 +1,6 @@
 package com.rasras.erp.sales;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,6 +17,11 @@ public class StockIssueNoteDto {
     private Integer id;
     private String issueNoteNumber;
     private LocalDateTime issueDate;
+    private String issueType; // SALE_ORDER, PRODUCTION, PROJECT, INTERNAL
+    private String referenceType;
+    private Integer referenceId;
+    @JsonAlias("referenceNo")
+    private String referenceNumber;
     private Integer salesOrderId;
     private String soNumber;
     private Integer customerId;

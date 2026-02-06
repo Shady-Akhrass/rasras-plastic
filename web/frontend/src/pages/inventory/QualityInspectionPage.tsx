@@ -138,7 +138,7 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
         <p className="text-slate-500 max-w-md mx-auto">
             {searchTerm
                 ? `لم يتم العثور على شحنات تطابق "${searchTerm}"`
-                : 'لا توجد إشعارات استلام بانتظار الفحص حالياً'}
+                : 'لا توجد أذونات إضافة بانتظار الفحص حالياً'}
         </p>
     </div>
 );

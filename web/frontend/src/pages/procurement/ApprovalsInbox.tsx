@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
+import purchaseService, { type PurchaseRequisition } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 
@@ -69,8 +70,8 @@ const DOC_TYPE_LABELS: Record<string, string> = {
     QC: 'مقارنة عروض',
     PurchaseOrder: 'أمر شراء',
     PO: 'أمر شراء',
-    GoodsReceiptNote: 'إشعار استلام',
-    GRN: 'إشعار استلام',
+    GoodsReceiptNote: 'إذن إضافة',
+    GRN: 'إذن إضافة',
     SupplierInvoice: 'فاتورة مورد',
     SINV: 'فاتورة مورد',
     SalesOrder: 'أمر بيع',
@@ -87,6 +88,7 @@ const getWorkflowLabelAr = (name: string): string => {
     const labels: Record<string, string> = {
         'Supplier Approval': 'اعتماد المورد',
         'General Manager Approval': 'اعتماد المدير العام',
+        'Procurement Manager Approval': 'اعتماد مدير المشتريات',
         'Purchase Requisition Approval': 'اعتماد طلب الشراء',
         'PR Approval': 'اعتماد طلب الشراء',
     };
@@ -245,6 +247,22 @@ const ViewModal: React.FC<{
     onClose: () => void;
     onOpenDocument: (request: ApprovalRequestDto) => void;
 }> = ({ request, onClose, onOpenDocument }) => {
+    const [prDetails, setPrDetails] = useState<PurchaseRequisition | null>(null);
+    const [loadingPr, setLoadingPr] = useState(false);
+
+    useEffect(() => {
+        if (!request) return;
+        if (request.documentType === 'PurchaseRequisition' || request.documentType === 'PR') {
+            setLoadingPr(true);
+            purchaseService.getPRById(request.documentId)
+                .then((data: PurchaseRequisition) => setPrDetails(data))
+                .catch(() => setPrDetails(null))
+                .finally(() => setLoadingPr(false));
+        } else {
+            setPrDetails(null);
+        }
+    }, [request?.documentId, request?.documentType]);
+
     if (!request) return null;
 
     const docTypeAr = DOC_TYPE_LABELS[request.documentType] || request.documentType;
@@ -298,7 +316,7 @@ const ViewModal: React.FC<{
                         </div>
                         <div className="bg-slate-50 rounded-2xl p-4">
                             <div className="text-xs text-slate-400 font-medium mb-1">رقم المستند</div>
-                            <div className="font-mono font-bold text-slate-800">#{request.documentNumber}</div>
+                            <div className="font-mono font-bold text-slate-800" dir="ltr">#{request.documentNumber}</div>
                         </div>
                         <div className="bg-slate-50 rounded-2xl p-4 col-span-2">
                             <div className="text-xs text-slate-400 font-medium mb-1">الخطوة الحالية</div>
@@ -325,10 +343,46 @@ const ViewModal: React.FC<{
                         </div>
                         <div className="bg-emerald-50 rounded-2xl p-4 col-span-2 border border-emerald-100">
                             <div className="text-xs text-emerald-600 font-medium mb-1">إجمالي القيمة</div>
-                            <div className="text-2xl font-bold text-emerald-700">
-                                {(request.totalAmount || 0).toLocaleString()} ج.م
+                            <div className="text-2xl font-bold text-emerald-700" dir="ltr">
+                                {(request.totalAmount || 0).toLocaleString('en-US')} ج.م
                             </div>
                         </div>
+                        {(request.documentType === 'PurchaseRequisition' || request.documentType === 'PR') && (
+                            <div className="col-span-2 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                                <div className="text-xs text-slate-500 font-medium mb-3 flex items-center gap-2">
+                                    <Package className="w-4 h-4" />
+                                    الأصناف والكميات المطلوبة
+                                </div>
+                                {loadingPr ? (
+                                    <div className="text-sm text-slate-400">جاري التحميل...</div>
+                                ) : prDetails?.items && prDetails.items.length > 0 ? (
+                                    <div className="overflow-x-auto max-h-48 overflow-y-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-slate-200 text-slate-500">
+                                                    <th className="py-2 pr-3 text-right font-medium">#</th>
+                                                    <th className="py-2 px-3 text-right font-medium">الصنف</th>
+                                                    <th className="py-2 px-3 text-center font-medium">الكمية</th>
+                                                    <th className="py-2 pl-3 text-right font-medium">الوحدة</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {prDetails.items.map((item, idx) => (
+                                                    <tr key={idx} className="border-b border-slate-100 last:border-0">
+                                                        <td className="py-2 pr-3 text-slate-500" dir="ltr">{idx + 1}</td>
+                                                        <td className="py-2 px-3 font-medium text-slate-800">{item.itemNameAr || item.itemCode || '—'}</td>
+                                                        <td className="py-2 px-3 text-center font-bold text-brand-primary" dir="ltr">{item.requestedQty}</td>
+                                                        <td className="py-2 pl-3 text-slate-600">{item.unitName || '—'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-slate-400">لا توجد أصناف</div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className="flex gap-3 pt-2">
                         <button
@@ -599,7 +653,7 @@ const ApprovalsInbox: React.FC = () => {
                 <StatCard
                     icon={Package}
                     value={stats.goodsReceiptNotes}
-                    label="استلامات"
+                    label="أذونات إضافة"
                     color="blue"
                 />
             </div>
@@ -650,7 +704,7 @@ const ApprovalsInbox: React.FC = () => {
                                 <option value="RFQ">طلبات عروض أسعار</option>
                                 <option value="SQ">عروض موردين</option>
                                 <option value="PO">أوامر شراء</option>
-                                <option value="GRN">إشعارات استلام</option>
+                                <option value="GRN">أذونات إضافة</option>
                                 <option value="QC">مقارنة عروض</option>
                                 <option value="SINV">فواتير موردين</option>
                                 <option value="SO">أوامر بيع</option>

@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * إذن صرف من المخزن (Stock Issue Note)
- * يصدر من المخزن بناءً على أمر البيع SO
+ * يصدر من المخزن بناءً على أمر البيع أو أمر تشغيل
  */
 @Entity
 @Table(name = "stockissuenotes")
@@ -34,12 +34,25 @@ public class StockIssueNote extends AuditableEntity {
     @Builder.Default
     private LocalDateTime issueDate = LocalDateTime.now();
 
+    @Column(name = "IssueType", length = 20)
+    @Builder.Default
+    private String issueType = "SALE_ORDER"; // SALE_ORDER, PRODUCTION, PROJECT, INTERNAL
+
+    @Column(name = "ReferenceType", length = 20)
+    private String referenceType;
+
+    @Column(name = "ReferenceID")
+    private Integer referenceId;
+
+    @Column(name = "ReferenceNumber", length = 50)
+    private String referenceNumber;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "SOID", nullable = false)
+    @JoinColumn(name = "SOID")
     private SalesOrder salesOrder;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "CustomerID", nullable = false)
+    @JoinColumn(name = "CustomerID")
     private Customer customer;
 
     @ManyToOne(fetch = FetchType.LAZY)

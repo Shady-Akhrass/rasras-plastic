@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.*;
 import com.rasras.erp.shared.dto.ApiResponse;
 import java.util.List;
 
+@RestController
+@RequestMapping("/crm/customers")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class CustomerController {

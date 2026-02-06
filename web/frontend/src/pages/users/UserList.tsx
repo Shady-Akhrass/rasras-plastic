@@ -62,6 +62,9 @@ const UserCard: React.FC<{
     index: number;
 }> = ({ user, onEdit, onDelete, index }) => {
 
+    const displayName = user.displayNameAr || user.username;
+    const roleDisplay = user.roleNameAr || user.roleName;
+
     const getInitials = (name: string) => {
         return name.slice(0, 2).toUpperCase();
     };
@@ -101,7 +104,7 @@ const UserCard: React.FC<{
                         <div className={`relative w-14 h-14 rounded-xl bg-gradient-to-br ${getAvatarColor(user.username)} 
                             flex items-center justify-center text-white font-bold text-lg shadow-lg
                             group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                            {getInitials(user.username)}
+                            {getInitials(displayName)}
                             {/* Online Indicator */}
                             <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white
                                 ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
@@ -110,12 +113,12 @@ const UserCard: React.FC<{
                         <div>
                             <h3 className="text-lg font-bold text-slate-900 group-hover:text-brand-primary 
                                 transition-colors duration-300">
-                                {user.username}
+                                {displayName}
                             </h3>
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-brand-primary/10 
                                 text-brand-primary text-xs font-semibold rounded-full">
                                 <Shield className="w-3 h-3" />
-                                {user.roleName}
+                                {roleDisplay}
                             </span>
                         </div>
                     </div>
@@ -198,6 +201,9 @@ const UserTableRow: React.FC<{
     onDelete: (id: number) => void;
     index: number;
 }> = ({ user, onEdit, onDelete, index }) => {
+    const displayName = user.displayNameAr || user.username;
+    const roleDisplay = user.roleNameAr || user.roleName;
+
     const getInitials = (name: string) => name.slice(0, 2).toUpperCase();
 
     const getAvatarColor = (name: string) => {
@@ -225,13 +231,13 @@ const UserTableRow: React.FC<{
                     <div className={`relative w-10 h-10 rounded-xl bg-gradient-to-br ${getAvatarColor(user.username)} 
                         flex items-center justify-center text-white font-bold text-sm shadow-md
                         group-hover:scale-110 transition-transform duration-300`}>
-                        {getInitials(user.username)}
+                        {getInitials(displayName)}
                         <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white
                             ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     </div>
                     <div>
                         <p className="font-semibold text-slate-900 group-hover:text-brand-primary transition-colors">
-                            {user.username}
+                            {displayName}
                         </p>
                     </div>
                 </div>
@@ -242,7 +248,7 @@ const UserTableRow: React.FC<{
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-primary/10 
                     text-brand-primary text-xs font-semibold rounded-full">
                     <Shield className="w-3 h-3" />
-                    {user.roleName}
+                    {roleDisplay}
                 </span>
             </td>
 
@@ -467,8 +473,12 @@ const UserList: React.FC = () => {
     // Filtered and computed data
     const filteredUsers = useMemo(() => {
         return users.filter(user => {
+            const displayName = user.displayNameAr || user.username;
+            const roleDisplay = user.roleNameAr || user.roleName;
             const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                user.roleName.toLowerCase().includes(searchTerm.toLowerCase());
+                displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                user.roleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                roleDisplay.toLowerCase().includes(searchTerm.toLowerCase());
 
             const matchesFilter = filterStatus === 'all' ||
                 (filterStatus === 'active' && user.isActive) ||

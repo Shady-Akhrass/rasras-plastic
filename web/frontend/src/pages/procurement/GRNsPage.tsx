@@ -149,7 +149,7 @@ const GRNTableRow: React.FC<{
                 )}
                 <button
                     onClick={() => onView(receipt.id!)}
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                    className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                     title="عرض التفاصيل"
                 >
                     <Eye className="w-4 h-4" />
@@ -157,8 +157,8 @@ const GRNTableRow: React.FC<{
                 {receipt.status === 'Approved' && receipt.approvalStatus === 'Approved' && (
                     <button
                         onClick={() => onFinalize(receipt.id!, 1)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white 
-                            rounded-lg text-xs font-bold hover:bg-emerald-600 hover:scale-105 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary text-white 
+                            rounded-lg text-xs font-bold hover:bg-brand-primary/90 hover:scale-105 transition-all"
                         title="إضافة للمخزن"
                     >
                         <Archive className="w-3.5 h-3.5" />
@@ -208,12 +208,12 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
                     )}
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">
-                    {searchTerm ? 'لا توجد نتائج' : 'لا يوجد إشعارات استلام'}
+                    {searchTerm ? 'لا توجد نتائج' : 'لا يوجد أذونات إضافة'}
                 </h3>
                 <p className="text-slate-500 max-w-md mx-auto">
                     {searchTerm
                         ? `لم يتم العثور على إشعارات تطابق "${searchTerm}"`
-                        : 'لم يتم تسجيل أي إشعارات استلام بضائع بعد'}
+                        : 'لم يتم تسجيل أي أذونات إضافة بعد'}
                 </p>
             </div>
         </td>
@@ -280,14 +280,14 @@ const GRNsPage: React.FC = () => {
     }, [receipts]);
 
     const handleFinalizeStoreIn = async (id: number, type: number = 1) => {
-        const confirmMsg = type === 2 ? 'هل أنت متأكد من إرسال هذا الاستلام للاعتماد؟' : 'هل أنت متأكد من إصدار إذن الإضافة لهذا الاستلام؟';
+        const confirmMsg = type === 2 ? 'هل أنت متأكد من إرسال إذن الإضافة للاعتماد؟' : 'هل أنت متأكد من إصدار إذن الإضافة؟';
         if (!window.confirm(confirmMsg)) return;
 
         try {
             setLoading(true);
             if (type === 2) {
                 await grnService.submitGRN(id, 1);
-                toast.success('تم إرسال إذن الاستلام للاعتماد');
+                toast.success('تم إرسال إذن الإضافة للاعتماد');
             } else {
                 await grnService.finalizeStoreIn(id, 1);
                 toast.success('تم إضافة الكميات للمخزون بنجاح');
@@ -336,7 +336,7 @@ const GRNsPage: React.FC = () => {
                             <Warehouse className="w-10 h-10" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold mb-2">إشعارات الاستلام (GRN)</h1>
+                            <h1 className="text-3xl font-bold mb-2">إذن إضافة (GRN)</h1>
                             <p className="text-white/70 text-lg">متابعة توريدات المخازن بناءً على أوامر الشراء</p>
                         </div>
                     </div>
@@ -357,7 +357,7 @@ const GRNsPage: React.FC = () => {
                                 hover:shadow-xl hover:scale-105"
                         >
                             <Plus className="w-5 h-5" />
-                            <span>تسجيل استلام</span>
+                            <span>تسجيل إذن إضافة</span>
                         </button>
                     </div>
                 </div>
@@ -368,13 +368,13 @@ const GRNsPage: React.FC = () => {
                 <StatCard
                     icon={FileText}
                     value={stats.total}
-                    label="إجمالي الاستلامات"
+                    label="إجمالي أذونات الإضافة"
                     color="primary"
                 />
                 <StatCard
                     icon={Calendar}
                     value={stats.today}
-                    label="استلامات اليوم"
+                    label="أذونات اليوم"
                     color="warning"
                 />
                 <StatCard
@@ -394,7 +394,7 @@ const GRNsPage: React.FC = () => {
                             ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                         <input
                             type="text"
-                            placeholder="بحث برقم الاستلام، المورد، أو أمر الشراء..."
+                            placeholder="بحث برقم إذن الإضافة، المورد، أو أمر الشراء..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
@@ -434,7 +434,7 @@ const GRNsPage: React.FC = () => {
                     <div className="w-1.5 h-6 bg-brand-primary rounded-full" />
                     <span className="text-slate-600">
                         عرض <span className="font-bold text-slate-800">{filteredReceipts.length}</span> من{' '}
-                        <span className="font-bold text-slate-800">{receipts.length}</span> إشعار استلام
+                        <span className="font-bold text-slate-800">{receipts.length}</span> إذن إضافة
                     </span>
                 </div>
             )}
@@ -445,7 +445,7 @@ const GRNsPage: React.FC = () => {
                     <table className="w-full">
                         <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                             <tr>
-                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم الاستلام</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم إذن الإضافة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">أمر الشراء</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>

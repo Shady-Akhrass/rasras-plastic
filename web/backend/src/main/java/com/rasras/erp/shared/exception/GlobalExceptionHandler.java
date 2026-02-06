@@ -47,11 +47,26 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        Throwable root = ex.getMostSpecificCause();
+        String causeMsg = root != null ? root.getMessage() : "";
         String msg = "لا يمكن تنفيذ العملية - تحقق من صحة البيانات (التصنيف، الوحدة، الروابط)";
-        if (ex.getCause() != null && ex.getCause().getMessage() != null) {
-            String cause = ex.getCause().getMessage();
-            if (cause.contains("Duplicate") || cause.contains("UNIQUE")) msg = "كود الصنف مكرر - يرجى المحاولة مجدداً";
-            else if (cause.contains("foreign key") || cause.contains("ConstraintViolation")) msg = "البيانات المرتبطة غير صحيحة (التصنيف أو وحدة القياس)";
+        if (causeMsg.contains("Duplicate") || causeMsg.contains("UNIQUE")) {
+            msg = "كود مكرر - يرجى المحاولة مجدداً";
+        } else if (causeMsg.contains("foreign key") || causeMsg.contains("ConstraintViolation")) {
+            if (causeMsg.contains("FK_Customers_SalesRep") || causeMsg.contains("SalesRepID"))
+                msg = "مسؤول المبيعات غير صحيح - اختر موظفاً من القائمة أو اترك الحقل فارغاً";
+            else if (causeMsg.contains("PriceListID") || (causeMsg.contains("FK") && causeMsg.contains("PriceList")))
+                msg = "قائمة الأسعار غير صحيحة - اختر قائمة من القائمة أو اترك الحقل فارغاً";
+            else if (causeMsg.contains("customers") || causeMsg.contains("CustomerID"))
+                msg = "لا يمكن حذف العميل لوجود فواتير أو طلبات أو حركات مرتبطة به";
+            else if (causeMsg.contains("ApproverRoleID") || causeMsg.contains("approvalworkflowsteps"))
+                msg = "لا يمكن حذف الدور لأنه مستخدم في خطوات سير الموافقة. قم بإزالة الدور من سير العمل أولاً.";
+            else if (causeMsg.contains("approvallimits") || (causeMsg.contains("RequiresReviewBy") && causeMsg.contains("role")))
+                msg = "لا يمكن حذف الدور لأنه مستخدم في حدود الموافقة. قم بتعديل حدود الموافقة أولاً.";
+            else if (causeMsg.contains("RoleID") || (causeMsg.contains("role") && (causeMsg.contains("users") || causeMsg.contains("user"))))
+                msg = "لا يمكن حذف الدور لأنه مرتبط بمستخدمين. قم بتغيير دور المستخدمين أولاً.";
+            else
+                msg = "البيانات المرتبطة غير صحيحة - تحقق من الحقول المرتبطة (مندوب المبيعات، قائمة الأسعار، التصنيف، أو وحدة القياس)";
         }
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)

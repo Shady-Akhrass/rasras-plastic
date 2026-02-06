@@ -16,4 +16,7 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Inte
 
     @Query("SELECT b FROM StockBalance b WHERE b.item.id = :itemId")
     List<StockBalance> findByItemId(@Param("itemId") Integer itemId);
+
+    @Query("SELECT b FROM StockBalance b WHERE b.warehouse.id = :warehouseId")
+    List<StockBalance> findByWarehouseId(@Param("warehouseId") Integer warehouseId);
 }

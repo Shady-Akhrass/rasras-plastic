@@ -179,7 +179,7 @@ const purchaseService = {
         return response.data.data;
     },
     deletePR: async (id: number) => {
-        await apiClient.post(`/procurement/pr/${id}/delete`);
+        await apiClient.delete(`/procurement/pr/${id}`);
     },
 
     // RFQs

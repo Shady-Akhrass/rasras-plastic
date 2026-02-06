@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,4 +23,6 @@ public class LoginResponse {
     private String roleName;
     private String roleCode;
     private String fullNameAr;
+    /** صلاحيات المستخدم (أكواد الصلاحيات من دور المستخدم) لاستخدامها ديناميكياً في القائمة والمسارات */
+    private List<String> permissions;
 }

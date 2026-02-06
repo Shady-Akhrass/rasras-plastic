@@ -155,9 +155,18 @@ public class GRNService {
         GoodsReceiptNote grn = grnRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("GRN not found"));
 
-        if (!"Draft".equals(grn.getStatus()) && !"Pending Inspection".equals(grn.getStatus())
-                && !"Inspected".equals(grn.getStatus())) {
-            throw new RuntimeException("GRN must be in Draft, Pending Inspection, or Inspected status to submit");
+        if (!"Inspected".equals(grn.getStatus())) {
+            throw new RuntimeException("GRN must be inspected by Quality before submission for approval. Current status: " + grn.getStatus());
+        }
+
+        // Policy: No material may enter warehouse without quality report
+        if (grn.getItems() == null || grn.getItems().isEmpty()) {
+            throw new RuntimeException("GRN has no items to submit");
+        }
+        boolean allItemsInspected = grn.getItems().stream()
+                .allMatch(item -> item.getQualityStatus() != null && !item.getQualityStatus().isBlank());
+        if (!allItemsInspected) {
+            throw new RuntimeException("All GRN items must have quality inspection results before submission");
         }
 
         grn.setStatus("Pending Approval");

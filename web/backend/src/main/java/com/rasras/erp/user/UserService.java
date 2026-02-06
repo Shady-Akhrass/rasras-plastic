@@ -1,5 +1,6 @@
 package com.rasras.erp.user;
 
+import com.rasras.erp.employee.EmployeeRepository;
 import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import com.rasras.erp.user.dto.*;
@@ -19,6 +20,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
@@ -103,12 +105,20 @@ public class UserService {
     }
 
     private UserDto toDto(User user) {
+        String displayNameAr = user.getEmployeeId() != null
+                ? employeeRepository.findById(user.getEmployeeId())
+                        .map(e -> (e.getFirstNameAr() != null ? e.getFirstNameAr() : "") + " " + (e.getLastNameAr() != null ? e.getLastNameAr() : "")).map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .orElse(user.getUsername())
+                : user.getUsername();
         return UserDto.builder()
                 .userId(user.getUserId())
                 .username(user.getUsername())
                 .employeeId(user.getEmployeeId())
                 .roleId(user.getRole().getRoleId())
                 .roleName(user.getRole().getRoleNameEn())
+                .roleNameAr(user.getRole().getRoleNameAr())
+                .displayNameAr(displayNameAr)
                 .isActive(user.getIsActive())
                 .isLocked(user.getIsLocked())
                 .lastLoginAt(user.getLastLoginAt())
