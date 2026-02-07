@@ -65,6 +65,16 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             className: 'bg-blue-50 text-blue-700 border-blue-200',
             label: 'تم الفحص'
         },
+        'Pending Approval': {
+            icon: Clock,
+            className: 'bg-violet-50 text-violet-700 border-violet-200',
+            label: 'بانتظار الاعتماد'
+        },
+        'Approved': {
+            icon: CheckCircle2,
+            className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+            label: 'إذن معتمد - جاهز للتخزين'
+        },
         'Completed': {
             icon: CheckCircle2,
             className: 'bg-emerald-50 text-emerald-700 border-emerald-200',

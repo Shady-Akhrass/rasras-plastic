@@ -226,29 +226,10 @@ public class ApprovalService {
             grnRepo.findById(id).ifPresent(grn -> {
                 grn.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
-                    grn.setStatus("Completed");
+                    // إذن الإضافة المعتمد = مرحلة فاصلة: المستند مُصدَر وجاهز للتخزين
+                    // لا يتم تحديث أرصدة المخزون هنا؛ يتم ذلك في خطوة التخزين (finalizeStoreIn)
+                    grn.setStatus("Approved");
                     supplierInvoiceService.createInvoiceFromGRN(grn.getId());
-
-                    // Policy: Stock updated only after quality acceptance (إذن إضافة)
-                    // submitGRN enforces Status=Inspected before approval; here we add accepted quantities only
-                    if (grn.getItems() != null) {
-                        for (GRNItem item : grn.getItems()) {
-                            BigDecimal qtyToAdd = item.getAcceptedQty() != null ? item.getAcceptedQty() : java.math.BigDecimal.ZERO;
-                            if (qtyToAdd.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                                inventoryService.updateStock(
-                                        item.getItem().getId(),
-                                        grn.getWarehouseId(),
-                                        qtyToAdd,
-                                        "IN",
-                                        "GRN",
-                                        "GoodsReceiptNote",
-                                        grn.getId(),
-                                        grn.getGrnNumber(),
-                                        item.getUnitCost(),
-                                        userId);
-                            }
-                        }
-                    }
                 }
                 grnRepo.save(grn);
             });
