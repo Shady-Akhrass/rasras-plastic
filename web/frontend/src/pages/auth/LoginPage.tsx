@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, ArrowLeft, Loader2, Eye, EyeOff, Box } from 'lucide-react';
+import { User, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import usePageTitle from '../../hooks/usePageTitle';
 import apiClient from '../../services/apiClient';
@@ -126,9 +126,9 @@ const LoginPage: React.FC = () => {
                             initial={{ scale: 0, rotate: -180 }}
                             animate={{ scale: 1, rotate: 0 }}
                             transition={{ type: "spring", duration: 0.8, delay: 0.2 }}
-                            className="w-20 h-20 bg-gradient-to-br from-brand-primary to-brand-primary/80 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-brand-primary/30"
+                            className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-slate-200 overflow-hidden border border-slate-100"
                         >
-                            <Box className="w-10 h-10 text-white" />
+                            <img src="/logo.jpeg" alt="Logo" className="w-full h-full object-cover" />
                         </motion.div>
 
                         <motion.h1
@@ -244,8 +244,8 @@ const LoginPage: React.FC = () => {
                                 type="button"
                                 onClick={() => setRememberMe(!rememberMe)}
                                 className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200 ${rememberMe
-                                        ? 'bg-brand-primary border-brand-primary'
-                                        : 'border-slate-300 hover:border-slate-400 bg-white'
+                                    ? 'bg-brand-primary border-brand-primary'
+                                    : 'border-slate-300 hover:border-slate-400 bg-white'
                                     }`}
                             >
                                 {rememberMe && (
