@@ -799,16 +799,16 @@ const GRNFormPage: React.FC = () => {
                                                                 disabled={isView}
                                                                 className="w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold outline-none 
-                                                                focus:border-brand-primary transition-all"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-3">
-                                                            <input
-                                                                type="text"
-                                                                value={rows[i.id!]?.lotNumber || ''}
-                                                                onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
-                                                                placeholder="LOT-XXX"
-                                                                className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                                focus:border-brand-primary transition-all`}
+                                                        />
+                                                    </td>
+                                                    <td className="py-4 px-3">
+                                                        <input
+                                                            type="text"
+                                                            value={rows[i.id!]?.lotNumber || ''}
+                                                            onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
+                                                            placeholder="LOT-XXX"
+                                                            className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center outline-none focus:border-brand-primary transition-all"
                                                             />
                                                         </td>

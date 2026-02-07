@@ -962,7 +962,7 @@ const SupplierQuotationFormPage: React.FC = () => {
 
                     {/* Info Alert */}
                     <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
-                            flex gap-4 animate-slide-in shadow-lg"
+                        flex gap-4 animate-slide-in shadow-lg"
                         style={{ animationDelay: '400ms' }}>
                         <div className="p-3 bg-blue-100 rounded-xl h-fit">
                             <AlertCircle className="w-6 h-6 text-blue-600" />
