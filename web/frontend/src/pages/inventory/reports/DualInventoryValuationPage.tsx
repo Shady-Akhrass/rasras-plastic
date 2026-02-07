@@ -17,6 +17,7 @@ export interface DualValuationRow {
     itemId: number;
     itemCode: string;
     itemNameAr: string;
+    grade?: string;
     unitName?: string;
     qty: number;
     /** التكلفة التاريخية للوحدة (محاسبة): من متوسط التكلفة في الأرصدة أو standardCost/lastPurchasePrice */
@@ -105,6 +106,7 @@ const DualInventoryValuationPage: React.FC = () => {
                 itemId,
                 itemCode: (item?.grade || item?.itemCode) ?? '—',
                 itemNameAr: item?.itemNameAr ?? '—',
+                grade: item?.grade,
                 unitName: item?.unitName,
                 qty,
                 historicalCostPerUnit: historicalPerUnit,

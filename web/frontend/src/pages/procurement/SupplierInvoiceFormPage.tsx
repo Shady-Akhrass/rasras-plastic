@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useOptimistic, startTransition } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
@@ -59,10 +59,103 @@ const SupplierInvoiceFormPage: React.FC = () => {
         subTotal: 0,
         discountAmount: 0,
         taxAmount: 0,
+        deliveryCost: 0,
         totalAmount: 0,
         status: 'Unpaid',
         items: []
     });
+
+    // --- Logic: Centralized Calculation Helper ---
+    const calculateInvoiceTotals = (invoice: SupplierInvoiceDto): SupplierInvoiceDto => {
+        let subTotalSum = 0;
+        let totalDiscountSum = 0;
+        let totalTaxSum = 0;
+
+        const updatedItems = (invoice.items || []).map(item => {
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.unitPrice) || 0;
+            const discountRate = (Number(item.discountPercentage) || 0) / 100;
+            const taxRate = (Number(item.taxPercentage) || 0) / 100;
+
+            // Math: Gross -> Discount -> Tax
+            const grossAmount = qty * price;
+            const discountAmount = grossAmount * discountRate;
+            const taxableAmount = grossAmount - discountAmount;
+            const taxAmount = taxableAmount * taxRate;
+            const totalPrice = taxableAmount + taxAmount;
+
+            // Accumulate Global Totals
+            subTotalSum += grossAmount;
+            totalDiscountSum += discountAmount;
+            totalTaxSum += taxAmount;
+
+            return {
+                ...item,
+                discountAmount,
+                taxAmount,
+                totalPrice
+            };
+        });
+
+        const delivery = Number(invoice.deliveryCost) || 0;
+
+        // Final Calculation
+        const finalTotal = (subTotalSum - totalDiscountSum) + totalTaxSum + delivery;
+
+        return {
+            ...invoice,
+            items: updatedItems,
+            subTotal: subTotalSum,
+            discountAmount: totalDiscountSum,
+            taxAmount: totalTaxSum,
+            totalAmount: finalTotal
+        };
+    };
+
+    // --- Optimistic Logic ---
+    type InvoiceAction =
+        | { type: 'SET_DATA', payload: SupplierInvoiceDto }
+        | { type: 'UPDATE_FIELD', field: keyof SupplierInvoiceDto, value: any }
+        | { type: 'UPDATE_ITEM', index: number, item: Partial<SupplierInvoiceItemDto> }
+        | { type: 'ADD_ITEM' }
+        | { type: 'REMOVE_ITEM', index: number };
+
+    const invoiceReducer = (state: SupplierInvoiceDto, action: InvoiceAction): SupplierInvoiceDto => {
+        let newState = { ...state };
+        switch (action.type) {
+            case 'SET_DATA':
+                newState = action.payload;
+                break;
+            case 'UPDATE_FIELD':
+                newState = { ...newState, [action.field]: action.value };
+                break;
+            case 'UPDATE_ITEM':
+                const newItems = [...(newState.items || [])];
+                newItems[action.index] = { ...newItems[action.index], ...action.item };
+                newState.items = newItems;
+                break;
+            case 'ADD_ITEM':
+                const newItem: SupplierInvoiceItemDto = {
+                    itemId: 0, unitId: 0, quantity: 1, unitPrice: 0,
+                    totalPrice: 0, discountPercentage: 0, taxPercentage: 14
+                };
+                newState.items = [...(newState.items || []), newItem];
+                break;
+            case 'REMOVE_ITEM':
+                newState.items = (newState.items || []).filter((_, i) => i !== action.index);
+                break;
+        }
+        return calculateInvoiceTotals(newState);
+    };
+
+    const [optimisticData, updateOptimistic] = useOptimistic(formData, invoiceReducer);
+
+    const handleUpdate = (action: InvoiceAction) => {
+        startTransition(() => {
+            updateOptimistic(action);
+            setFormData(prev => invoiceReducer(prev, action));
+        });
+    };
 
     useEffect(() => {
         loadSuppliers();
@@ -82,8 +175,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
             setLoading(true);
             const grn = await grnService.getGRNById(gId);
             if (grn) {
-                setFormData(prev => ({
-                    ...prev,
+                const mappedData: SupplierInvoiceDto = {
+                    ...formData,
                     grnId: gId,
                     grnNumber: grn.grnNumber,
                     supplierId: grn.supplierId,
@@ -97,14 +190,13 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             quantity: qty,
                             unitPrice: price,
                             discountPercentage: 0,
-                            discountAmount: 0,
                             taxPercentage: 14,
-                            taxAmount: (qty * price) * 0.14,
-                            totalPrice: (qty * price) * 1.14,
+                            totalPrice: 0,
                             grnItemId: gItem.id
                         };
                     })
-                }));
+                };
+                handleUpdate({ type: 'SET_DATA', payload: calculateInvoiceTotals(mappedData) });
                 toast.success(`تم تحميل ${grn.items.length} صنف من إذن الإضافة`);
             }
         } catch (error) {
@@ -120,13 +212,12 @@ const SupplierInvoiceFormPage: React.FC = () => {
             setLoading(true);
             const quotation = await purchaseService.getQuotationById(qId);
             if (quotation) {
-                setFormData(prev => ({
-                    ...prev,
+                const mappedData: SupplierInvoiceDto = {
+                    ...formData,
                     supplierId: quotation.supplierId,
                     currency: quotation.currency || 'EGP',
                     exchangeRate: quotation.exchangeRate || 1,
-                    subTotal: quotation.totalAmount,
-                    totalAmount: quotation.totalAmount,
+                    deliveryCost: quotation.deliveryCost || 0,
                     notes: `تم الإنشاء من عرض سعر رقم: ${quotation.quotationNumber}. ${quotation.notes || ''}`,
                     items: quotation.items.map(qItem => ({
                         itemId: qItem.itemId,
@@ -134,12 +225,11 @@ const SupplierInvoiceFormPage: React.FC = () => {
                         quantity: qItem.offeredQty,
                         unitPrice: qItem.unitPrice,
                         discountPercentage: qItem.discountPercentage || 0,
-                        discountAmount: qItem.discountAmount || 0,
                         taxPercentage: qItem.taxPercentage || 0,
-                        taxAmount: qItem.taxAmount || 0,
-                        totalPrice: qItem.totalPrice
+                        totalPrice: 0,
                     }))
-                }));
+                };
+                handleUpdate({ type: 'SET_DATA', payload: calculateInvoiceTotals(mappedData) });
                 toast.success(`تم تحميل ${quotation.items.length} صنف من عرض السعر`);
             }
         } catch (error) {
@@ -172,63 +262,15 @@ const SupplierInvoiceFormPage: React.FC = () => {
     };
 
     const loadInvoice = async () => {
-        // Mocked or from API if implemented
-    };
-
-    useEffect(() => {
-        calculateTotals();
-    }, [formData.items, formData.discountAmount, formData.taxAmount]);
-
-    const calculateTotals = () => {
-        const subTotal = formData.items?.reduce((acc, item) => acc + (item.totalPrice || 0), 0) || 0;
-        const totalAmount = subTotal - (formData.discountAmount || 0) + (formData.taxAmount || 0);
-        setFormData(prev => ({ ...prev, subTotal, totalAmount }));
-    };
-
-    const addItem = () => {
-        const newItem: SupplierInvoiceItemDto = {
-            itemId: 0,
-            unitId: 0,
-            quantity: 1,
-            unitPrice: 0,
-            discountPercentage: 0,
-            discountAmount: 0,
-            taxPercentage: 14,
-            taxAmount: 0,
-            totalPrice: 0
-        };
-        setFormData(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
-    };
-
-    const removeItem = (index: number) => {
-        setFormData(prev => ({
-            ...prev,
-            items: prev.items?.filter((_, i) => i !== index)
-        }));
-    };
-
-    const updateItem = (index: number, updates: Partial<SupplierInvoiceItemDto>) => {
-        setFormData(prev => {
-            const newItems = [...(prev.items || [])];
-            const item = { ...newItems[index], ...updates };
-
-            // Auto-select unit when item is selected
-            if (updates.itemId) {
-                const selectedItem = items.find(i => i.id === updates.itemId);
-                if (selectedItem) {
-                    item.unitId = selectedItem.unitId;
-                }
-            }
-
-            // Recalculate item total
-            const base = item.quantity * item.unitPrice;
-            item.discountAmount = base * ((item.discountPercentage || 0) / 100);
-            item.taxAmount = (base - item.discountAmount) * ((item.taxPercentage || 0) / 100);
-            item.totalPrice = base - item.discountAmount + item.taxAmount;
-
-            newItems[index] = item;
-            return { ...prev, items: newItems };
-        });
+        try {
+            setLoading(true);
+            const response = await supplierInvoiceService.getInvoiceById(parseInt(id!));
+            handleUpdate({ type: 'SET_DATA', payload: calculateInvoiceTotals(response.data) });
+        } catch (error) {
+            toast.error('فشل تحميل الفاتورة');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -249,9 +291,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
             return;
         }
 
-        // Validate items
-        for (let i = 0; i < formData.items.length; i++) {
-            const item = formData.items[i];
+        // Validate items using optimisticData
+        const itemsToValidate = optimisticData.items || [];
+        for (let i = 0; i < itemsToValidate.length; i++) {
+            const item = itemsToValidate[i];
             if (!item.itemId) {
                 toast.error(`يرجى اختيار الصنف في السطر ${i + 1}`);
                 return;
@@ -268,7 +311,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
         try {
             setSaving(true);
-            await supplierInvoiceService.createInvoice(formData);
+            await supplierInvoiceService.createInvoice(optimisticData);
             toast.success('تم حفظ الفاتورة بنجاح');
             navigate('/dashboard/procurement/invoices');
         } catch (error: any) {
@@ -294,8 +337,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
         }
     };
 
-    const totalItems = formData.items?.length || 0;
-    const totalQuantity = formData.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+    const totalItems = optimisticData.items?.length || 0;
 
     if (loading && (grnId || quotationId)) {
         return (
@@ -438,7 +480,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                 {grnId ? 'إذن إضافة' : 'عرض سعر'}
                                             </div>
                                             <div className="font-bold text-slate-800">
-                                                {grnId ? `GRN #${formData.grnNumber || grnId}` : `Quotation #${quotationId}`}
+                                                {grnId ? `GRN #${optimisticData.grnNumber || grnId}` : `Quotation #${quotationId}`}
                                             </div>
                                         </div>
                                         {!loading && (formData.items || []).length > 0 && (
@@ -455,7 +497,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                 </label>
                                 <input
                                     type="text"
-                                    value={formData.invoiceNumber}
+                                    value={optimisticData.invoiceNumber}
                                     disabled
                                     className="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-xl 
                                         text-slate-500 font-semibold outline-none cursor-not-allowed"
@@ -469,8 +511,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                 </label>
                                 <input
                                     type="text"
-                                    value={formData.supplierInvoiceNo}
-                                    onChange={(e) => setFormData({ ...formData, supplierInvoiceNo: e.target.value })}
+                                    value={optimisticData.supplierInvoiceNo}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierInvoiceNo', value: e.target.value })}
                                     required
                                     disabled={isView}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
@@ -485,8 +527,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     المورد <span className="text-rose-500">*</span>
                                 </label>
                                 <select
-                                    value={formData.supplierId}
-                                    onChange={(e) => setFormData({ ...formData, supplierId: parseInt(e.target.value) })}
+                                    value={optimisticData.supplierId}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierId', value: parseInt(e.target.value) })}
                                     required
                                     disabled={isView}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
@@ -524,7 +566,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     {!isView && (
                                         <button
                                             type="button"
-                                            onClick={addItem}
+                                            onClick={() => handleUpdate({ type: 'ADD_ITEM', })}
                                             className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
                                                 font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
                                                 hover:scale-105 active:scale-95"
@@ -556,12 +598,18 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {(formData.items || []).map((item, idx) => (
+                                    {(optimisticData.items || []).map((item, idx) => (
                                         <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
                                             <td className="py-4 pr-6">
                                                 <select
                                                     value={item.itemId}
-                                                    onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) })}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value);
+                                                        const updates: Partial<SupplierInvoiceItemDto> = { itemId: val };
+                                                        const selectedItem = items.find(i => i.id === val);
+                                                        if (selectedItem) updates.unitId = selectedItem.unitId;
+                                                        handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: updates });
+                                                    }}
                                                     required
                                                     disabled={isView}
                                                     className={`w-full min-w-[200px] px-3 py-2 border-2 border-slate-200 
@@ -576,7 +624,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                 <input
                                                     type="number"
                                                     value={item.quantity}
-                                                    onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { quantity: parseFloat(e.target.value) || 0 } })}
                                                     required
                                                     disabled={isView}
                                                     min="0.001"
@@ -590,7 +638,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                             <td className="py-4 px-4">
                                                 <select
                                                     value={item.unitId}
-                                                    onChange={(e) => updateItem(idx, { unitId: parseInt(e.target.value) })}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitId: parseInt(e.target.value) } })}
                                                     disabled={isView}
                                                     className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm font-semibold outline-none focus:border-brand-primary transition-all
@@ -604,7 +652,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                 <input
                                                     type="number"
                                                     value={item.unitPrice}
-                                                    onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
+                                                    onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitPrice: parseFloat(e.target.value) || 0 } })}
                                                     required
                                                     disabled={isView}
                                                     min="0.01"
@@ -620,7 +668,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                             <td className="py-4 pl-6 text-left">
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeItem(idx)}
+                                                    onClick={() => handleUpdate({ type: 'REMOVE_ITEM', index: idx })}
                                                     className={`p-2 hover:bg-rose-50 rounded-lg transition-all ${isView ? 'hidden' : 'text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100'}`}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -630,7 +678,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                     ))}
                                 </tbody>
                             </table>
-                            {(!formData.items || formData.items.length === 0) && (
+                            {(!optimisticData.items || optimisticData.items.length === 0) && (
                                 <div className="py-20 text-center">
                                     <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
                                         <Package className="w-10 h-10 text-slate-400" />
@@ -657,54 +705,42 @@ const SupplierInvoiceFormPage: React.FC = () => {
                         </div>
                         <div className="space-y-5 mt-6">
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                <span className="text-white/60 text-sm">عدد الأصناف</span>
-                                <span className="font-bold text-lg">{totalItems}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                <span className="text-white/60 text-sm">إجمالي الكميات</span>
-                                <span className="font-bold text-lg text-emerald-400">
-                                    {totalQuantity.toLocaleString('ar-EG')}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                <span className="text-white/60 text-sm">الإجمالي الفرعي</span>
+                                <span className="text-white/60 text-sm">الإجمالي قبل الضريبة (الصافي)</span>
                                 <span className="font-bold text-lg">
-                                    {formData.subTotal.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    {(optimisticData.totalAmount - (optimisticData.taxAmount || 0) - (optimisticData.deliveryCost || 0)).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-rose-500/10 rounded-xl border border-rose-500/20">
-                                <span className="text-rose-400 font-semibold text-sm">الخصم الإجمالي</span>
-                                <input
-                                    type="number"
-                                    value={formData.discountAmount}
-                                    onChange={(e) => setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || 0 })}
-                                    min="0"
-                                    step="0.01"
-                                    disabled={isView}
-                                    className={`w-28 px-3 py-2 border-2 rounded-lg 
-                                        font-bold text-right outline-none transition-all
-                                        ${isView ? 'bg-slate-700/50 border-transparent text-slate-400 cursor-not-allowed' : 'bg-rose-500/10 border-rose-500/30 text-rose-400 focus:border-rose-500/50'}`}
-                                />
+                                <span className="text-rose-400 font-semibold text-sm">إجمالي الخصم</span>
+                                <span className="font-bold text-lg text-rose-400">
+                                    {optimisticData.discountAmount?.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                                <span className="text-emerald-400 font-semibold text-sm">الضريبة (VAT)</span>
+                                <span className="text-emerald-400 font-semibold text-sm">ضريبة القيمة المضافة</span>
+                                <span className="font-bold text-lg text-emerald-400">
+                                    {optimisticData.taxAmount?.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                <span className="text-blue-400 font-semibold text-sm">اسعار التوصيل</span>
                                 <input
                                     type="number"
-                                    value={formData.taxAmount}
-                                    onChange={(e) => setFormData({ ...formData, taxAmount: parseFloat(e.target.value) || 0 })}
+                                    value={optimisticData.deliveryCost || 0}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'deliveryCost', value: parseFloat(e.target.value) || 0 })}
                                     min="0"
                                     step="0.01"
                                     disabled={isView}
                                     className={`w-28 px-3 py-2 border-2 rounded-lg 
                                         font-bold text-right outline-none transition-all
-                                        ${isView ? 'bg-slate-700/50 border-transparent text-slate-400 cursor-not-allowed' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 focus:border-emerald-500/50'}`}
+                                        ${isView ? 'bg-slate-700/50 border-transparent text-slate-400 cursor-not-allowed' : 'bg-blue-500/10 border-blue-500/30 text-blue-400 focus:border-blue-500/50'}`}
                                 />
                             </div>
                             <div className="pt-6 border-t border-white/10">
-                                <div className="text-xs text-white/40 mb-2">إجمالي الفاتورة</div>
+                                <div className="text-xs text-white/40 mb-2">إجمالي الفاتورة النهائي</div>
                                 <div className="text-4xl font-black text-emerald-400">
-                                    {formData.totalAmount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                                    <span className="text-sm font-bold mr-2">{formData.currency}</span>
+                                    {optimisticData.totalAmount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    <span className="text-sm font-bold mr-2">{optimisticData.currency}</span>
                                 </div>
                             </div>
                         </div>
@@ -729,8 +765,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                 </label>
                                 <input
                                     type="date"
-                                    value={formData.invoiceDate}
-                                    onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
+                                    value={optimisticData.invoiceDate}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'invoiceDate', value: e.target.value })}
                                     required
                                     disabled={isView}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
@@ -745,8 +781,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                 </label>
                                 <input
                                     type="date"
-                                    value={formData.dueDate}
-                                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                                    value={optimisticData.dueDate}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'dueDate', value: e.target.value })}
                                     required
                                     disabled={isView}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 

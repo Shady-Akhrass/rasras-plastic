@@ -28,10 +28,10 @@ const StatCard: React.FC<{
     icon: React.ElementType;
     value: string | number;
     label: string;
-    color: 'primary' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
+    color: 'indigo' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
 }> = ({ icon: Icon, value, label, color }) => {
     const colorClasses = {
-        primary: 'bg-brand-primary/10 text-brand-primary',
+        indigo: 'bg-indigo-100 text-indigo-600',
         success: 'bg-emerald-100 text-emerald-600',
         warning: 'bg-amber-100 text-amber-600',
         purple: 'bg-purple-100 text-purple-600',
@@ -41,7 +41,7 @@ const StatCard: React.FC<{
 
     return (
         <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
-            hover:border-brand-primary/20 transition-all duration-300 group">
+            hover:border-indigo-200 transition-all duration-300 group">
             <div className="flex items-center gap-4">
                 <div className={`p-3 rounded-xl ${colorClasses[color]} 
                     group-hover:scale-110 transition-transform duration-300`}>
@@ -95,7 +95,7 @@ const QuotationTableRow: React.FC<{
     navigate: ReturnType<typeof useNavigate>;
 }> = ({ quotation, index, onView, onDelete, navigate }) => (
     <tr
-        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
+        className="hover:bg-indigo-50/50 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
         onClick={() => onView(quotation.id!)}
         style={{
             animationDelay: `${index * 30}ms`,
@@ -104,12 +104,12 @@ const QuotationTableRow: React.FC<{
     >
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-50 
                     rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Tag className="w-5 h-5 text-brand-primary" />
+                    <Tag className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div>
-                    <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors block">
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors block">
                         #{quotation.quotationNumber || 'بدون رقم'}
                     </span>
                     {quotation.rfqNumber && (
@@ -154,7 +154,7 @@ const QuotationTableRow: React.FC<{
             <div className="flex justify-end gap-2">
                 <button
                     onClick={(e) => { e.stopPropagation(); onView(quotation.id!); }}
-                    className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                     title="عرض التفاصيل"
                 >
                     <FileText className="w-4 h-4" />
@@ -166,7 +166,7 @@ const QuotationTableRow: React.FC<{
                                 e.stopPropagation();
                                 navigate(`/dashboard/procurement/po/new?quotationId=${quotation.id}`);
                             }}
-                            className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                             title="إصدار أمر شراء"
                         >
                             <ShoppingCart className="w-4 h-4" />
@@ -219,7 +219,6 @@ const SupplierQuotationsPage: React.FC = () => {
         } catch (error) {
             console.error('Failed to fetch quotations:', error);
         } finally {
-            setStatusFilter('All'); // Ensure filter is reset after fetch if needed or just handle state
             setLoading(false);
         }
     };
@@ -274,6 +273,7 @@ const SupplierQuotationsPage: React.FC = () => {
         const start = (currentPage - 1) * pageSize;
         return filteredQuotations.slice(start, start + pageSize);
     }, [filteredQuotations, currentPage, pageSize]);
+
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, statusFilter, showExpired]);
@@ -300,11 +300,18 @@ const SupplierQuotationsPage: React.FC = () => {
                 }
             `}</style>
 
-            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-500 to-indigo-400 
-                rounded-3xl p-8 text-white">
+            {/* Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
-                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
                             <Tag className="w-10 h-10" />
                         </div>
                         <div>
@@ -315,9 +322,8 @@ const SupplierQuotationsPage: React.FC = () => {
 
                     <button
                         onClick={() => navigate('/dashboard/procurement/quotation/new')}
-                        className="flex items-center gap-3 px-6 py-3 bg-white text-indigo-600 rounded-xl 
-                            hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
-                            hover:shadow-xl hover:scale-105"
+                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
                     >
                         <Plus className="w-5 h-5" />
                         <span>تسجيل عرض سعر جديد</span>
@@ -325,8 +331,9 @@ const SupplierQuotationsPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <StatCard icon={FileText} value={stats.total} label="إجمالي العروض" color="primary" />
+                <StatCard icon={FileText} value={stats.total} label="إجمالي العروض" color="indigo" />
                 <StatCard icon={Clock} value={stats.received} label="مستلم" color="blue" />
                 <StatCard icon={CheckCircle2} value={stats.selected} label="مقبول" color="success" />
                 <StatCard icon={DollarSign} value={`${stats.avgAmount} ج.م`} label="متوسط القيمة" color="purple" />
@@ -338,7 +345,7 @@ const SupplierQuotationsPage: React.FC = () => {
                     <div className="relative flex-1">
                         <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
                             transition-colors duration-200
-                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
+                            ${isSearchFocused ? 'text-indigo-600' : 'text-slate-400'}`} />
                         <input
                             type="text"
                             placeholder="بحث برقم العرض، اسم المورد، أو رقم طلب السعر..."
@@ -349,7 +356,7 @@ const SupplierQuotationsPage: React.FC = () => {
                             className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
                                 outline-none bg-slate-50
                                 ${isSearchFocused
-                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                    ? 'border-indigo-500 bg-white shadow-lg shadow-indigo-500/10'
                                     : 'border-transparent hover:border-slate-200'}`}
                         />
                         {searchTerm && (
@@ -372,17 +379,21 @@ const SupplierQuotationsPage: React.FC = () => {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
                             >
+                                <option value="All">جميع الحالات</option>
+                                <option value="Received">مستلم</option>
+                                <option value="Selected">مقبول</option>
                                 <option value="Rejected">مرفوض</option>
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-slate-200 transition-all duration-200">
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent 
+                            hover:border-slate-200 transition-all duration-200">
                             <input
                                 type="checkbox"
                                 id="showExpired"
                                 checked={showExpired}
                                 onChange={(e) => setShowExpired(e.target.checked)}
-                                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                             />
                             <label htmlFor="showExpired" className="text-sm font-bold text-slate-600 cursor-pointer">
                                 إظهار العروض المنتهية
@@ -393,8 +404,8 @@ const SupplierQuotationsPage: React.FC = () => {
                             onClick={fetchQuotations}
                             disabled={loading}
                             className="p-3 rounded-xl border border-slate-200 text-slate-600 
-                                hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
-                                disabled:opacity-50"
+                                hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 
+                                transition-all duration-200 disabled:opacity-50"
                         >
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
@@ -402,6 +413,7 @@ const SupplierQuotationsPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-right">
@@ -418,9 +430,28 @@ const SupplierQuotationsPage: React.FC = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={6} className="text-center py-10">جاري التحميل...</td></tr>
+                                <tr>
+                                    <td colSpan={7} className="text-center py-20">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                                            <span className="text-slate-500 font-medium">جاري التحميل...</span>
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : filteredQuotations.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center py-10 text-slate-500">لا توجد نتائج</td></tr>
+                                <tr>
+                                    <td colSpan={7} className="text-center py-20">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center">
+                                                <FileText className="w-10 h-10 text-indigo-300" />
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 font-semibold">لا توجد نتائج</p>
+                                                <p className="text-slate-400 text-sm mt-1">جرب تغيير معايير البحث</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : (
                                 paginatedQuotations.map((q, index) => (
                                     <QuotationTableRow

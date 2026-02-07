@@ -39,6 +39,8 @@ export interface PurchaseRequisition {
     items: PurchaseRequisitionItem[];
     createdAt?: string;
     createdBy?: number;
+    hasActiveOrders?: boolean;
+    hasComparison?: boolean;
 }
 
 export interface RFQItem {
@@ -66,6 +68,8 @@ export interface RFQ {
     status?: string;
     notes?: string;
     items: RFQItem[];
+    hasActiveOrders?: boolean;
+    hasQuotation?: boolean;
 }
 
 export interface SupplierQuotationItem {

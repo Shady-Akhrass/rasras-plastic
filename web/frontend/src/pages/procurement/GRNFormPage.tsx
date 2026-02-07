@@ -3,11 +3,12 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save, ArrowRight, Package, Info, Hash, FileText,
     Truck, ClipboardCheck, AlertCircle, Building2, CheckCircle2,
-    RefreshCw, Layers, CheckCircle, Eye, XCircle
+    RefreshCw, Layers, CheckCircle, Eye, XCircle, Clock
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../services/grnService';
 import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto } from '../../services/purchaseOrderService';
+import purchaseService from '../../services/purchaseService';
 import warehouseService from '../../services/warehouseService';
 import type { WarehouseDto, WarehouseLocationDto } from '../../services/warehouseService';
 import toast from 'react-hot-toast';
@@ -80,14 +81,19 @@ const GRNFormPage: React.FC = () => {
                 ]);
                 const poList = Array.isArray(poRes) ? poRes : (poRes as any)?.data ?? [];
                 const whList = (whRes as any)?.data ?? (whRes as any) ?? [];
-                // Show only POs that are not closed
+                const finalWhList = Array.isArray(whList) ? whList : [];
                 setPos(poList.filter((p: PurchaseOrderDto) => p.status !== 'Closed'));
-                setWarehouses(Array.isArray(whList) ? whList : []);
+                setWarehouses(finalWhList);
+
+                // Auto-select warehouse if only one exists
+                if (finalWhList.length === 1 && isNew) {
+                    setForm(prev => ({ ...prev, warehouseId: finalWhList[0].id }));
+                }
             } catch (e) {
                 toast.error('فشل تحميل البيانات');
             }
         })();
-    }, []);
+    }, [isNew]);
 
     // Load existing GRN for view/edit mode
     useEffect(() => {
@@ -131,7 +137,21 @@ const GRNFormPage: React.FC = () => {
                 try {
                     const r = await warehouseService.getById(form.warehouseId!);
                     const dto = (r as any)?.data ?? r;
-                    setLocations(dto?.locations ?? []);
+                    const whLocations = dto?.locations ?? [];
+                    setLocations(whLocations);
+
+                    // Auto-select first location if only one exists or for all rows if none set
+                    if (whLocations.length > 0 && isNew) {
+                        setRows(prev => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach(key => {
+                                if (!next[Number(key)].locationId) {
+                                    next[Number(key)].locationId = whLocations[0].id;
+                                }
+                            });
+                            return next;
+                        });
+                    }
                 } catch {
                     setLocations([]);
                 }
@@ -139,7 +159,7 @@ const GRNFormPage: React.FC = () => {
         } else {
             setLocations([]);
         }
-    }, [form.warehouseId]);
+    }, [form.warehouseId, isNew]);
 
     // Handle PO selection
     const handleSelectPo = async (poId: number) => {
@@ -177,9 +197,27 @@ const GRNFormPage: React.FC = () => {
             const r: Record<number, any> = {};
             (po.items || []).forEach((i: PurchaseOrderItemDto) => {
                 const rem = (Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0);
-                if (rem > 0 && i.id) r[i.id] = { receivedQty: rem, acceptedQty: rem };
+                if (rem > 0 && i.id) {
+                    r[i.id] = {
+                        receivedQty: rem,
+                        acceptedQty: rem,
+                        locationId: locations.length === 1 ? locations[0].id : undefined
+                    };
+                }
             });
             setRows(r);
+
+            // Fetch quotation if exists to get the quotation number as the supplier invoice number
+            if (po.quotationId) {
+                try {
+                    const qh = await purchaseService.getQuotationById(po.quotationId);
+                    if (qh) {
+                        setForm(f => ({ ...f, supplierInvoiceNo: qh.quotationNumber }));
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch quotation:', err);
+                }
+            }
         } catch {
             toast.error('فشل تحميل أمر الشراء');
         }
@@ -232,8 +270,12 @@ const GRNFormPage: React.FC = () => {
         setRows((r) => ({ ...r, [poItemId]: { ...r[poItemId], ...upd } }));
     };
 
-    // Build items array for submission
     const buildItems = (): GRNItemDto[] => {
+        // For existing GRN, we just return the current items
+        if (!isNew) {
+            return (form.items || []);
+        }
+
         if (!selectedPo?.items) return [];
         return selectedPo.items
             .filter((i) => i.id && ((Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0)) > 0)
@@ -265,17 +307,22 @@ const GRNFormPage: React.FC = () => {
     // Calculate totals
     const totals = useMemo(() => {
         const items = buildItems();
-        const totalQty = items.reduce((sum, item) => sum + (item.receivedQty || 0), 0);
-        const totalCost = items.reduce((sum, item) => sum + (item.totalCost || 0), 0);
-        return { totalQty, totalCost, itemCount: items.length };
-    }, [rows, selectedPo]);
+        const totalQty = items.reduce((sum: number, item: GRNItemDto) => sum + (item.receivedQty || 0), 0);
+        const totalOrderedQty = items.reduce((sum: number, item: GRNItemDto) => sum + (item.orderedQty || 0), 0);
+        const totalCost = items.reduce((sum: number, item: GRNItemDto) => sum + (item.totalCost || 0), 0);
+        return { totalQty, totalOrderedQty, totalCost, itemCount: items.length };
+    }, [rows, selectedPo, form.items, isNew]);
 
     // Max remaining quantity for a PO item
     const maxRem = (i: PurchaseOrderItemDto) => (Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0);
 
+    // Track if warehouse changed in view mode
+    const [warehouseChanged, setWarehouseChanged] = useState(false);
+
+
     // Handle form submission
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
 
         // Validation
         if (!form.poId || !form.supplierId) {
@@ -288,42 +335,33 @@ const GRNFormPage: React.FC = () => {
         }
 
         const items = buildItems();
-        if (items.length === 0) {
+        if (items.length === 0 && isNew) {
             toast.error('يجب إضافة صنف واحد على الأقل بكمية مستلمة');
             return;
         }
 
-        // Validate items
-        for (const item of items) {
-            if (item.receivedQty <= 0) {
-                toast.error(`الكمية المستلمة للصنف ${item.itemNameAr} يجب أن تكون أكبر من صفر`);
-                return;
-            }
-            if (item.receivedQty > item.orderedQty) {
-                toast.error(`الكمية المستلمة للصنف ${item.itemNameAr} لا يمكن أن تتجاوز الكمية المطلوبة`);
-                return;
-            }
-            if (item.acceptedQty && item.acceptedQty > item.receivedQty) {
-                toast.error(`الكمية المقبولة للصنف ${item.itemNameAr} لا يمكن أن تتجاوز الكمية المستلمة`);
-                return;
-            }
-        }
-
         setSaving(true);
         try {
-            const payload: GoodsReceiptNoteDto = {
-                poId: form.poId,
-                supplierId: form.supplierId,
-                warehouseId: form.warehouseId,
-                deliveryNoteNo: form.deliveryNoteNo || undefined,
-                supplierInvoiceNo: form.supplierInvoiceNo || undefined,
-                receivedByUserId,
-                notes: form.notes || undefined,
-                items
-            };
-            await grnService.createGRN(payload);
-            toast.success('تم إنشاء إذن الإضافة بنجاح وتحديث أرصدة المخزون');
-            navigate('/dashboard/procurement/grn');
+            if (isNew) {
+                const payload: GoodsReceiptNoteDto = {
+                    poId: form.poId,
+                    supplierId: form.supplierId,
+                    warehouseId: form.warehouseId,
+                    deliveryNoteNo: form.deliveryNoteNo || undefined,
+                    supplierInvoiceNo: form.supplierInvoiceNo || undefined,
+                    receivedByUserId,
+                    notes: form.notes || undefined,
+                    items
+                };
+                await grnService.createGRN(payload);
+                toast.success('تم إنشاء إذن الإضافة بنجاح وتحديث أرصدة المخزون');
+                navigate('/dashboard/procurement/grn');
+            } else {
+                // Update existing GRN (specifically for warehouse redirect)
+                await grnService.updateGRN(parseInt(id!), form as GoodsReceiptNoteDto);
+                toast.success('تم تحديث بيانات إذن الإضافة بنجاح');
+                setWarehouseChanged(false);
+            }
         } catch (err: any) {
             toast.error(err?.response?.data?.message || 'فشل حفظ إذن الإضافة');
         } finally {
@@ -336,6 +374,12 @@ const GRNFormPage: React.FC = () => {
         try {
             setProcessing(true);
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
+
+            // If warehouse was changed, save it first
+            if (warehouseChanged && id) {
+                await grnService.updateGRN(parseInt(id), form as GoodsReceiptNoteDto);
+            }
+
             await approvalService.takeAction(parseInt(approvalId), 1, action);
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
             navigate('/dashboard/procurement/approvals');
@@ -509,8 +553,12 @@ const GRNFormPage: React.FC = () => {
                             <ClipboardCheck className="w-10 h-10" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold mb-2">إذن إضافة جديد (GRN)</h1>
-                            <p className="text-white/80 text-lg">استلام المواد من المورد وتحديث أرصدة المخزون</p>
+                            <h1 className="text-3xl font-bold mb-2">
+                                {isNew ? 'إذن إضافة جديد (GRN)' : `إذن الإضافة ${form.grnNumber || ''}`}
+                            </h1>
+                            <p className="text-white/80 text-lg">
+                                {isNew ? 'استلام المواد من المورد وتحديث أرصدة المخزون' : 'عرض وتدقيق تفاصيل إذن الاستلام'}
+                            </p>
                         </div>
                     </div>
                     <button
@@ -531,7 +579,7 @@ const GRNFormPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Content */}
+                {/* Main Content (2/3) */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Basic Data Card */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
@@ -655,6 +703,12 @@ const GRNFormPage: React.FC = () => {
                                     <p className="text-xs text-brand-primary mb-1">إجمالي التكلفة</p>
                                     <p className="font-semibold text-slate-800">{totals.totalCost.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م</p>
                                 </div>
+                                {!isNew && (
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-xl">
+                                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                        <span className="text-sm font-bold text-emerald-600">{form.items?.length || 0} صنف</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -681,68 +735,69 @@ const GRNFormPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[1000px]">
-                                    <thead>
-                                        <tr className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
-                                            <th className="py-4 pr-6 text-right">الصنف</th>
-                                            <th className="py-4 px-3 text-center">المتبقي</th>
-                                            <th className="py-4 px-3 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <CheckCircle2 className="w-3 h-3 text-brand-primary" />
-                                                    المستلم *
-                                                </div>
-                                            </th>
-                                            <th className="py-4 px-3 text-center">المقبول</th>
-                                            <th className="py-4 px-3 text-center">اللوت</th>
-                                            <th className="py-4 px-3 text-center">تاريخ الإنتاج</th>
-                                            <th className="py-4 px-3 text-center">الصلاحية</th>
-                                            <th className="py-4 pl-6 text-center">الموقع</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {selectedPo.items
-                                            ?.filter((i) => maxRem(i) > 0)
-                                            .map((i) => (
-                                                <tr key={i.id} className="group hover:bg-slate-50/50 transition-colors">
-                                                    <td className="py-4 pr-6">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-2 h-2 rounded-full ${(rows[i.id!]?.receivedQty || 0) > 0 ? 'bg-brand-primary' : 'bg-slate-300'
-                                                                }`} />
-                                                            <span className="font-bold text-slate-800">{i.itemNameAr}</span>
-                                                        </div>
-                                                        <div className="text-xs text-slate-500 mt-1 mr-5">{i.unitNameAr}</div>
-                                                    </td>
-                                                    <td className="py-4 px-3 text-center">
-                                                        <span className="px-3 py-1 bg-slate-100 rounded-lg text-slate-600 font-semibold text-sm">
-                                                            {maxRem(i)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            max={maxRem(i)}
-                                                            step="0.001"
-                                                            value={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                            onChange={(e) => {
-                                                                const val = parseFloat(e.target.value) || 0;
-                                                                updateRow(i.id!, { receivedQty: val, acceptedQty: val }, i);
-                                                            }}
-                                                            className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                {isNew ? (
+                                    <table className="w-full min-w-[1000px]">
+                                        <thead>
+                                            <tr className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
+                                                <th className="py-4 pr-6 text-right">الصنف</th>
+                                                <th className="py-4 px-3 text-center">المتبقي</th>
+                                                <th className="py-4 px-3 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <CheckCircle2 className="w-3 h-3 text-brand-primary" />
+                                                        المستلم *
+                                                    </div>
+                                                </th>
+                                                <th className="py-4 px-3 text-center">المقبول</th>
+                                                <th className="py-4 px-3 text-center">اللوت</th>
+                                                <th className="py-4 px-3 text-center">تاريخ الإنتاج</th>
+                                                <th className="py-4 px-3 text-center">الصلاحية</th>
+                                                <th className="py-4 pl-6 text-center">الموقع</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {selectedPo.items
+                                                ?.filter((i) => maxRem(i) > 0)
+                                                .map((i) => (
+                                                    <tr key={i.id} className="group hover:bg-slate-50/50 transition-colors">
+                                                        <td className="py-4 pr-6">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-2 h-2 rounded-full ${(rows[i.id!]?.receivedQty || 0) > 0 ? 'bg-brand-primary' : 'bg-slate-300'
+                                                                    }`} />
+                                                                <span className="font-bold text-slate-800">{i.itemNameAr}</span>
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 mt-1 mr-5">{i.unitNameAr}</div>
+                                                        </td>
+                                                        <td className="py-4 px-3 text-center">
+                                                            <span className="px-3 py-1 bg-slate-100 rounded-lg text-slate-600 font-semibold text-sm">
+                                                                {maxRem(i)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-3">
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                max={maxRem(i)}
+                                                                step="0.001"
+                                                                value={rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value) || 0;
+                                                                    updateRow(i.id!, { receivedQty: val, acceptedQty: val }, i);
+                                                                }}
+                                                                className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold text-brand-primary outline-none 
                                                                 focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            max={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                            step="0.001"
-                                                            value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                            onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 }, i)}
-                                                            disabled={isView}
-                                                            className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 px-3">
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                max={rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                                step="0.001"
+                                                                value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                                onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 }, i)}
+                                                                disabled={isView}
+                                                                className="w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold outline-none 
                                                                 focus:border-brand-primary transition-all`}
                                                         />
@@ -755,59 +810,95 @@ const GRNFormPage: React.FC = () => {
                                                             placeholder="LOT-XXX"
                                                             className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center outline-none focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="date"
-                                                            value={rows[i.id!]?.manufactureDate || ''}
-                                                            onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
-                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 px-3">
+                                                            <input
+                                                                type="date"
+                                                                value={rows[i.id!]?.manufactureDate || ''}
+                                                                onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
+                                                                className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm outline-none focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="date"
-                                                            value={rows[i.id!]?.expiryDate || ''}
-                                                            onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined }, i)}
-                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 px-3">
+                                                            <input
+                                                                type="date"
+                                                                value={rows[i.id!]?.expiryDate || ''}
+                                                                onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined }, i)}
+                                                                className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm outline-none focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 pl-6">
-                                                        <select
-                                                            value={rows[i.id!]?.locationId || ''}
-                                                            onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
-                                                            className="w-32 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 pl-6">
+                                                            <select
+                                                                value={rows[i.id!]?.locationId || ''}
+                                                                onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
+                                                                className="w-32 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm outline-none focus:border-brand-primary transition-all"
-                                                        >
-                                                            <option value="">اختر الموقع</option>
-                                                            {locations.map((l) => (
-                                                                <option key={l.id} value={l.id}>
-                                                                    {l.locationCode} {l.locationName ? `- ${l.locationName}` : ''}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
+                                                            >
+                                                                <option value="">اختر الموقع</option>
+                                                                {locations.map((l) => (
+                                                                    <option key={l.id} value={l.id}>
+                                                                        {l.locationCode} {l.locationName ? `- ${l.locationName}` : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    /* IF VIEWING/EDITING EXISTING GRN */
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
+                                                <th className="py-4 pr-6 text-right">الصنف</th>
+                                                <th className="py-4 px-3 text-center">المطلوب</th>
+                                                <th className="py-4 px-3 text-center">المستلم</th>
+                                                <th className="py-4 px-3 text-center">المقبول</th>
+                                                <th className="py-4 px-3 text-center">الوحدة</th>
+                                                <th className="py-4 px-3 text-center">اللوت</th>
+                                                {/* Show extra columns if needed in view mode */}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {(form.items || []).map((it, idx) => (
+                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="py-4 pr-6 font-semibold text-slate-800">{it.itemNameAr}</td>
+                                                    <td className="py-4 px-3 text-center font-medium text-slate-600">{it.orderedQty}</td>
+                                                    <td className="py-4 px-3 text-center font-bold text-emerald-600">{it.receivedQty}</td>
+                                                    <td className="py-4 px-3 text-center font-bold text-slate-700">{it.acceptedQty || it.receivedQty}</td>
+                                                    <td className="py-4 px-3 text-center text-slate-600">{it.unitNameAr}</td>
+                                                    <td className="py-4 px-3 text-center text-slate-500">{it.lotNumber || '—'}</td>
                                                 </tr>
                                             ))}
-                                    </tbody>
-                                </table>
+                                            {(!form.items || form.items.length === 0) && (
+                                                <tr>
+                                                    <td colSpan={7} className="py-10 text-center text-slate-400">لا توجد بنود</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                )}
                             </div>
-                            {(!selectedPo.items || selectedPo.items.filter(i => maxRem(i) > 0).length === 0) && (
-                                <div className="py-16 text-center">
-                                    <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
-                                        <Package className="w-8 h-8 text-slate-400" />
-                                    </div>
-                                    <p className="text-slate-400 font-semibold">لا توجد أصناف متبقية للاستلام في أمر الشراء هذا</p>
-                                </div>
-                            )}
                         </div>
                     )}
 
-                    {/* Empty State */}
-                    {!selectedPo && (
+                    {/* No Items Empty State for Create Mode */}
+                    {isNew && selectedPo && (!selectedPo.items || selectedPo.items.filter(i => maxRem(i) > 0).length === 0) && (
+                        <div className="py-16 text-center">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                <Package className="w-8 h-8 text-slate-400" />
+                            </div>
+                            <p className="text-slate-400 font-semibold">لا توجد أصناف متبقية للاستلام في أمر الشراء هذا</p>
+                        </div>
+                    )}
+
+
+                    {/* Empty State when no PO selected in Create Mode */}
+                    {isNew && !selectedPo && (
                         <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-16 text-center animate-slide-in">
                             <div className="w-20 h-20 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                                 <Package className="w-10 h-10 text-slate-400" />
@@ -818,7 +909,7 @@ const GRNFormPage: React.FC = () => {
                     )}
                 </div>
 
-                {/* Sidebar */}
+                {/* Sidebar (1/3) */}
                 <div className="space-y-6">
                     {/* Summary Card */}
                     <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
@@ -839,15 +930,30 @@ const GRNFormPage: React.FC = () => {
                                 <span className="text-white/60 text-sm">إجمالي الكميات</span>
                                 <span className="font-bold text-lg text-brand-primary">{totals.totalQty.toLocaleString()}</span>
                             </div>
+                            <div className="p-4 bg-white/5 rounded-xl space-y-3">
+                                <label className="flex items-center gap-2 text-xs text-white/60 font-bold uppercase tracking-wider">
+                                    <FileText className="w-3 h-3" />
+                                    رقم فاتورة المورد
+                                </label>
+                                <div className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white/80 font-bold">
+                                    {form.supplierInvoiceNo || '—'}
+                                </div>
+                            </div>
+                            {!isNew && (
+                                <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                    <span className="text-emerald-400 text-sm">تاريخ الإذن</span>
+                                    <span className="font-bold text-emerald-100">{form.grnDate ? new Date(form.grnDate).toLocaleDateString('ar-EG') : '—'}</span>
+                                </div>
+                            )}
                             <div className="pt-6 border-t border-white/10">
                                 <div className="text-xs text-white/40 mb-2">إجمالي التكلفة</div>
                                 <div className="text-3xl font-black text-brand-primary">
                                     {totals.totalCost.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                                    <span className="text-sm font-bold mr-2">ج.م</span>
+                                    <span className="text-sm font-bold opacity-70">ج.م</span>
                                 </div>
                             </div>
                         </div>
-                        {totals.itemCount > 0 && (
+                        {totals.itemCount > 0 && isNew && (
                             <div className="mt-6 pt-4 border-t border-white/10">
                                 <div className="flex items-center gap-2 text-brand-primary">
                                     <CheckCircle className="w-5 h-5" />
@@ -872,6 +978,41 @@ const GRNFormPage: React.FC = () => {
                             </p>
                         </div>
                     </div>
+
+                    {/* Status Alert */}
+                    {!isNew && (
+                        <div className={`p-5 rounded-2xl border-2 flex gap-4 animate-slide-in shadow-lg
+                            ${form.status === 'Finalized' ? 'bg-emerald-50 border-emerald-200' : 'bg-blue-50 border-blue-200'}`}
+                            style={{ animationDelay: '400ms' }}>
+                            <div className={`p-3 rounded-xl h-fit ${form.status === 'Finalized' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                                {form.status === 'Finalized' ? <CheckCircle className="w-6 h-6 text-emerald-600" /> : <Clock className="w-6 h-6 text-blue-600" />}
+                            </div>
+                            <div>
+                                <h4 className={`font-bold mb-1 ${form.status === 'Finalized' ? 'text-emerald-800' : 'text-blue-800'}`}>حالة المستند</h4>
+                                <p className={`text-sm leading-relaxed ${form.status === 'Finalized' ? 'text-emerald-700' : 'text-blue-700'}`}>
+                                    {form.status === 'Finalized' ? 'تمت إضافة الكميات للمخزون وإغلاق إذن الإضافة.' : 'إذن الإضافة محفوظ بانتظار الاعتماد أو الإضافة للمخزون.'}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Info Alert */}
+                    {isNew && (
+                        <div className="p-5 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border-2 border-emerald-200 
+                        flex gap-4 animate-slide-in shadow-lg"
+                            style={{ animationDelay: '300ms' }}>
+                            <div className="p-3 bg-emerald-100 rounded-xl h-fit">
+                                <AlertCircle className="w-6 h-6 text-emerald-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-emerald-800 mb-2">معلومة هامة</h4>
+                                <p className="text-sm leading-relaxed text-emerald-700">
+                                    سيتم <strong>تحديث أرصدة المخزون تلقائياً</strong> فور حفظ إذن الإضافة.
+                                    تأكد من صحة الكميات والمواقع قبل الحفظ.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* FIFO Info */}
                     <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 

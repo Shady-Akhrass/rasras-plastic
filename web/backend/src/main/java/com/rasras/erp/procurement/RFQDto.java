@@ -18,9 +18,9 @@ public class RFQDto {
     private String rfqNumber;
     private LocalDate rfqDate;
     private Integer prId;
-    private String prNumber; 
+    private String prNumber;
     private Integer supplierId;
-    private String supplierNameAr; 
+    private String supplierNameAr;
     private LocalDate responseDueDate;
     private String status;
     private Integer sentByUserId;
@@ -29,4 +29,6 @@ public class RFQDto {
     private LocalDateTime createdAt;
     private Integer createdBy;
     private List<RFQItemDto> items;
+    private Boolean hasActiveOrders;
+    private Boolean hasQuotation;
 }

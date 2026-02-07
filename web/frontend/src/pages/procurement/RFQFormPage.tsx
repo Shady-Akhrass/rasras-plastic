@@ -115,83 +115,6 @@ const FormInput: React.FC<{
     );
 };
 
-// Form Multi-Select Component (قائمة منسدلة بداخلها اختيار من متعدد)
-const FormMultiSelect: React.FC<{
-    label: string;
-    value: number[];
-    onChange: (value: number[]) => void;
-    icon?: React.ElementType;
-    options: { value: number; label: string }[];
-    placeholder?: string;
-    required?: boolean;
-}> = ({ label, value, onChange, icon: Icon, options, placeholder, required }) => {
-    const [isOpen, setIsOpen] = useState(false);
-
-    const toggle = (id: number) => {
-        if (value.includes(id)) {
-            onChange(value.filter(v => v !== id));
-        } else {
-            onChange([...value, id]);
-        }
-    };
-
-    const selectedLabels = options.filter(o => value.includes(o.value)).map(o => o.label);
-    const displayText = value.length === 0
-        ? (placeholder || 'اختر الموردين...')
-        : value.length === 1
-            ? selectedLabels[0]
-            : `تم اختيار ${value.length} مورد`;
-
-    return (
-        <div className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-700">
-                {label}
-                {required && <span className="text-rose-500 mr-1">*</span>}
-            </label>
-            <div className="relative">
-                <button
-                    type="button"
-                    onClick={() => setIsOpen(prev => !prev)}
-                    onBlur={() => setTimeout(() => setIsOpen(false), 150)}
-                    className={`w-full px-4 py-3 rounded-xl border-2 text-right transition-all outline-none flex items-center justify-between
-                        ${Icon ? 'pr-12' : ''}
-                        ${isOpen ? 'border-brand-primary bg-white shadow-lg' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}
-                        ${value.length > 0 ? 'text-slate-800 font-medium' : 'text-slate-500'}`}
-                >
-                    <span className="truncate">{displayText}</span>
-                    <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-                </button>
-                {Icon && (
-                    <Icon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                )}
-                {isOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-white rounded-xl border-2 border-slate-200 shadow-xl max-h-56 overflow-y-auto py-2">
-                        {options.length === 0 ? (
-                            <p className="px-4 py-2 text-slate-400 text-sm">{placeholder || 'لا توجد خيارات'}</p>
-                        ) : (
-                            options.map(opt => (
-                                <label
-                                    key={opt.value}
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={value.includes(opt.value)}
-                                        onChange={() => toggle(opt.value)}
-                                        className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
-                                    />
-                                    <span className="font-medium text-slate-800">{opt.label}</span>
-                                </label>
-                            ))
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
 // Form Textarea Component
 const FormTextarea: React.FC<{
     label: string;
@@ -246,91 +169,76 @@ const ItemRow: React.FC<{
     disabled?: boolean;
     onUpdate: (field: keyof RFQItem, value: any) => void;
     onRemove: () => void;
-    readOnly?: boolean;
-}> = ({ item, index, items, units, supplierPrice, onUpdate, onRemove, readOnly }) => (
-    <div
-        className="p-5 bg-white rounded-2xl border-2 border-slate-100 relative group 
+}> = ({ item, index, items, units, usedItemIds, supplierPrice, disabled, onUpdate, onRemove }) => {
+    // Filter out already-used items (except the current item's selection)
+    const availableItems = items.filter(i =>
+        i.id === item.itemId || !usedItemIds.includes(i.id!)
+    );
+
+    return (
+        <div
+            className="p-5 bg-white rounded-2xl border-2 border-slate-100 relative group 
             transition-all duration-300 hover:shadow-lg hover:border-brand-primary/20"
-        style={{
-            animationDelay: `${index * 50}ms`,
-            animation: 'fadeInUp 0.3s ease-out forwards'
-        }}
-    >
-        {/* Remove Button - مخفي في وضع القراءة فقط (من طلب شراء) */}
-        {!readOnly && (
-            <button
-                type="button"
-                onClick={onRemove}
-                className="absolute -left-3 -top-3 p-2.5 bg-rose-100 text-rose-600 rounded-xl 
+            style={{
+                animationDelay: `${index * 50}ms`,
+                animation: 'fadeInUp 0.3s ease-out forwards'
+            }}
+        >
+            {!disabled && (
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    className="absolute -left-3 -top-3 p-2.5 bg-rose-100 text-rose-600 rounded-xl 
                     opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg 
                     hover:scale-110 hover:bg-rose-500 hover:text-white"
-            >
-                <Trash2 className="w-4 h-4" />
-            </button>
-        )}
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            )}
 
         <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
             flex items-center justify-center text-sm font-bold shadow-lg">
-            {index + 1}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
-            {/* Item Select */}
-            <div className="md:col-span-4 space-y-2">
-                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <Package className="w-3.5 h-3.5" />
-                    الصنف
-                </label>
-                <select
-                    value={item.itemId}
-                    onChange={(e) => !readOnly && onUpdate('itemId', parseInt(e.target.value))}
-                    disabled={readOnly}
-                    className={`w-full px-4 py-2.5 rounded-xl border-2 font-medium transition-all
-                        ${readOnly ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
-                >
-                    <option value={0}>اختر صنف...</option>
-                    {items.map(i => (
-                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>
-                    ))}
-                </select>
+                {index + 1}
             </div>
 
-            {/* Quantity - غير قابلة للتعديل */}
-            <div className="md:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <Hash className="w-3.5 h-3.5" />
-                    الكمية
-                </label>
-                <input
-                    type="number"
-                    value={item.requestedQty}
-                    readOnly
-                    disabled
-                    className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600 font-medium"
-                    min="0"
-                    step="0.01"
-                />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
+                <div className="md:col-span-4 space-y-2">
+                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <Package className="w-3.5 h-3.5" />
+                        الصنف
+                    </label>
+                    <select
+                        value={item.itemId}
+                        disabled={disabled}
+                        onChange={(e) => onUpdate('itemId', parseInt(e.target.value))}
+                        className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
+                        focus:border-brand-primary outline-none font-medium transition-all
+                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                    >
+                        <option value={0}>اختر صنف...</option>
+                        {availableItems.map(i => (
+                            <option key={i.id} value={i.id}>{i.itemNameAr} ({i.itemCode})</option>
+                        ))}
+                    </select>
+                </div>
 
-            {/* Unit */}
-            <div className="md:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <Layers className="w-3.5 h-3.5" />
-                    الوحدة
-                </label>
-                <select
-                    value={item.unitId}
-                    onChange={(e) => !readOnly && onUpdate('unitId', parseInt(e.target.value))}
-                    disabled={readOnly}
-                    className={`w-full px-4 py-2.5 rounded-xl border-2 font-medium transition-all
-                        ${readOnly ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
-                >
-                    <option value={0}>الوحدة...</option>
-                    {units.map(u => (
-                        <option key={u.id} value={u.id}>{u.unitNameAr}</option>
-                    ))}
-                </select>
-            </div>
+                <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <Hash className="w-3.5 h-3.5" />
+                        الكمية
+                    </label>
+                    <input
+                        type="number"
+                        value={item.requestedQty}
+                        disabled={disabled}
+                        onChange={(e) => onUpdate('requestedQty', parseFloat(e.target.value))}
+                        className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
+                        focus:border-brand-primary outline-none font-medium transition-all
+                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                        min="0"
+                        step="0.01"
+                    />
+                </div>
 
             {/* Expected Price */}
             <div className="md:col-span-2 space-y-2">
@@ -358,51 +266,47 @@ const ItemRow: React.FC<{
                 />
             </div>
 
-            {/* Specifications */}
-            <div className="md:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5" />
-                    مواصفات
-                </label>
-                <input
-                    type="text"
-                    value={item.specifications || ''}
-                    onChange={(e) => !readOnly && onUpdate('specifications', e.target.value)}
-                    readOnly={readOnly}
-                    disabled={readOnly}
-                    placeholder="اختياري..."
-                    className={`w-full px-4 py-2.5 rounded-xl border-2 font-medium transition-all
-                        ${readOnly ? 'border-slate-100 bg-slate-50 cursor-not-allowed text-slate-600' : 'border-slate-200 focus:border-brand-primary outline-none bg-white'}`}
-                />
+                <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        مواصفات
+                    </label>
+                    <input
+                        type="text"
+                        value={item.specifications || ''}
+                        disabled={disabled}
+                        onChange={(e) => onUpdate('specifications', e.target.value)}
+                        placeholder={disabled ? '' : "اختياري..."}
+                        className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
+                        focus:border-brand-primary outline-none font-medium transition-all
+                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                    />
+                </div>
             </div>
         </div>
     </div>
 );
 
 // Empty Items State
-const EmptyItemsState: React.FC<{ onAdd: () => void; hideAddButton?: boolean }> = ({ onAdd, hideAddButton }) => (
+const EmptyItemsState: React.FC<{ onAdd: () => void }> = ({ onAdd }) => (
     <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
         <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
             <Package className="w-10 h-10 text-slate-300" />
         </div>
         <h3 className="text-lg font-bold text-slate-800 mb-2">لا توجد بنود مضافة</h3>
         <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">
-            {hideAddButton
-                ? 'الأصناف تُحمَّل من طلب الشراء المعتمد فقط ولا يمكن إضافتها أو تعديلها'
-                : 'ابدأ بالضغط على زر إضافة صنف لإضافة بنود طلب عرض السعر'}
+            ابدأ بالضغط على زر إضافة صنف لإضافة بنود طلب عرض السعر
         </p>
-        {!hideAddButton && (
-            <button
-                type="button"
-                onClick={onAdd}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white 
-                    rounded-xl font-bold hover:bg-brand-primary/90 transition-all
-                    shadow-lg shadow-brand-primary/30"
-            >
-                <Plus className="w-5 h-5" />
-                إضافة صنف الآن
-            </button>
-        )}
+        <button
+            type="button"
+            onClick={onAdd}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white 
+                rounded-xl font-bold hover:bg-brand-primary/90 transition-all
+                shadow-lg shadow-brand-primary/30"
+        >
+            <Plus className="w-5 h-5" />
+            إضافة صنف الآن
+        </button>
     </div>
 );
 
@@ -463,14 +367,12 @@ const RFQFormPage: React.FC = () => {
     });
 
     useEffect(() => {
-        let cancelled = false;
         loadDependencies();
         if (isEdit) {
             loadRFQ(parseInt(id!));
         } else if (prIdFromUrl) {
-            loadPRData(parseInt(prIdFromUrl), () => !cancelled);
+            loadPRData(parseInt(prIdFromUrl));
         }
-        return () => { cancelled = true; };
     }, [id, prIdFromUrl]);
 
     const loadDependencies = async () => {
@@ -484,9 +386,13 @@ const RFQFormPage: React.FC = () => {
             setSuppliers(suppliersData);
             setItems(itemsData.data || []);
             setUnits(unitsData.data || []);
-            // Filter only approved PRs
-            const approvedPRs = prsData.filter((pr: any) => pr.status === 'Approved');
-            setAvailablePRs(approvedPRs.map((pr: any) => ({
+            setUnits(unitsData.data || []);
+            // Filter enabled PRs: Approved AND No Active Orders (not fully processed)
+            const availablePRsList = prsData.filter((pr: any) =>
+                pr.status === 'Approved' && !pr.hasActiveOrders
+            );
+
+            setAvailablePRs(availablePRsList.map((pr: any) => ({
                 id: pr.id,
                 prNumber: pr.prNumber,
                 items: pr.items || []
@@ -497,7 +403,7 @@ const RFQFormPage: React.FC = () => {
         }
     };
 
-    const loadPRData = async (prId: number, shouldShowToast?: () => boolean) => {
+    const loadPRData = async (prId: number) => {
         try {
             setLoading(true);
             const pr = await purchaseService.getPRById(prId);
@@ -514,15 +420,11 @@ const RFQFormPage: React.FC = () => {
                         specifications: pi.specifications || ''
                     }))
                 }));
-                if (!shouldShowToast || shouldShowToast()) {
-                    toast.success('تم تحميل بيانات طلب الشراء', { icon: '📋' });
-                }
+                toast.success('تم تحميل بيانات طلب الشراء', { icon: '📋' });
             }
         } catch (error) {
             console.error('Failed to load PR data:', error);
-            if (!shouldShowToast || shouldShowToast()) {
-                toast.error('فشل تحميل بيانات طلب الشراء');
-            }
+            toast.error('فشل تحميل بيانات طلب الشراء');
         } finally {
             setLoading(false);
         }
@@ -605,8 +507,8 @@ const RFQFormPage: React.FC = () => {
             ? supplierIds.length > 0
             : (formData.supplierId ?? 0) > 0;
 
-        if (!hasSuppliers) {
-            toast.error(prIdFromUrl ? 'يرجى اختيار مورد واحد على الأقل' : 'يرجى اختيار مورد');
+        if (!formData.prId) {
+            toast.error('يرجى اختيار طلب شراء (PR)');
             return;
         }
 
@@ -619,20 +521,12 @@ const RFQFormPage: React.FC = () => {
             setSaving(true);
 
             if (isEdit) {
-                // Update logic
-            } else if (prIdFromUrl && supplierIds.length > 0) {
-                const idsToCreate = supplierIds;
-                let created = 0;
-                for (const sid of idsToCreate) {
-                    await purchaseService.createRFQ({
-                        ...formData,
-                        supplierId: sid,
-                        items: formData.items
-                    });
-                    created++;
-                }
-                toast.success(`تم إنشاء ${created} طلب عرض سعر بنجاح`, { icon: '🎉' });
-                navigate('/dashboard/procurement/rfq');
+                // Update single RFQ
+                await purchaseService.updateRFQ(parseInt(id!), {
+                    ...formData,
+                    supplierId: selectedSupplierIds[0]
+                } as RFQ);
+                toast.success('تم تحديث طلب عرض السعر بنجاح', { icon: '🎉' });
             } else {
                 await purchaseService.createRFQ({
                     ...formData,
@@ -641,6 +535,8 @@ const RFQFormPage: React.FC = () => {
                 toast.success('تم حفظ طلب عرض السعر بنجاح', { icon: '🎉' });
                 navigate('/dashboard/procurement/rfq');
             }
+
+            navigate('/dashboard/procurement/rfq');
         } catch (error) {
             console.error('Failed to save RFQ:', error);
             toast.error('حدث خطأ أثناء حفظ البيانات');
@@ -841,17 +737,21 @@ const RFQFormPage: React.FC = () => {
                                 onChange={(v: string) => handleSupplierChange(parseInt(v) || 0)}
                                 icon={Truck}
                                 options={supplierOptions}
-                                placeholder="اختر المورد..."
+                                selectedValues={selectedSupplierIds}
+                                onChange={handleSuppliersChange}
+                                icon={Truck}
+                                placeholder="اختر المورد أو الموردين..."
                                 required
                                 loading={loadingSupplierItems}
-                                helperText={supplierItems.length > 0 ? (
-                                    <>
-                                        <Sparkles className="w-3 h-3" />
-                                        هذا المورد لديه {supplierItems.length} صنف مسجل في الكتالوج
-                                    </>
-                                ) : undefined}
+                                disabled={isView}
                             />
-                        )}
+                            {supplierItems.length > 0 && selectedSupplierIds.length === 1 && (
+                                <p className="text-xs text-emerald-600 flex items-center gap-1 mt-2">
+                                    <Sparkles className="w-3 h-3" />
+                                    هذا المورد لديه {supplierItems.length} صنف مسجل في الكتالوج
+                                </p>
+                            )}
+                        </div>
 
                         <FormInput
                             label="تاريخ الطلب"
@@ -930,7 +830,7 @@ const RFQFormPage: React.FC = () => {
                                 <p className="text-sm text-slate-500">{formData.items.length} بند</p>
                             </div>
                         </div>
-                        {!prIdFromUrl && (
+                        {!isView && (
                             <button
                                 type="button"
                                 onClick={addItem}
@@ -957,12 +857,11 @@ const RFQFormPage: React.FC = () => {
                                 disabled={isView}
                                 onUpdate={(field, value) => updateItem(index, field, value)}
                                 onRemove={() => removeItem(index)}
-                                readOnly={!!prIdFromUrl}
                             />
                         ))}
 
                         {formData.items.length === 0 && (
-                            <EmptyItemsState onAdd={addItem} hideAddButton={!!prIdFromUrl} />
+                            <EmptyItemsState onAdd={addItem} />
                         )}
                     </div>
                 </div>

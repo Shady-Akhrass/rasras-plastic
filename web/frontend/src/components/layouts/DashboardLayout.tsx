@@ -225,6 +225,7 @@ const DashboardLayout: React.FC = () => {
     const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
     const [pendingInspectionsCount, setPendingInspectionsCount] = useState(0);
 
+
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
     const userName = user?.fullNameAr || user?.username || 'المستخدم';
@@ -258,17 +259,20 @@ const DashboardLayout: React.FC = () => {
 
     // Fetch pending inspections count
     useEffect(() => {
-        const fetchInspectionsCount = async () => {
+        const fetchCounts = async () => {
             try {
+                // Pending Inspections
                 const grns = await grnService.getAllGRNs();
-                const count = grns.filter(g => g.status === 'Pending Inspection').length;
-                setPendingInspectionsCount(count);
+                const inspections = grns.filter(g => g.status === 'Pending Inspection').length;
+                setPendingInspectionsCount(inspections);
+
+                setPendingInspectionsCount(inspections);
             } catch (error) {
-                console.error('Failed to fetch inspections count', error);
+                console.error('Failed to fetch counts', error);
             }
         };
-        fetchInspectionsCount();
-        const interval = setInterval(fetchInspectionsCount, 10000); // Faster refresh (10s)
+        fetchCounts();
+        const interval = setInterval(fetchCounts, 10000); // Faster refresh (10s)
         return () => clearInterval(interval);
     }, []);
 

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClipboardCheck, Zap, ChevronRight, Plus, Calendar, Save, CheckCircle } from 'lucide-react';
 import warehouseService from '../../services/warehouseService';
 import type { WarehouseDto } from '../../services/warehouseService';
-import stockAdjustmentService, { type StockAdjustmentDto, type StockAdjustmentItemDto } from '../../services/stockAdjustmentService';
+import stockAdjustmentService, { type StockAdjustmentDto } from '../../services/stockAdjustmentService';
 import { toast } from 'react-hot-toast';
 
 type CountType = 'periodic' | 'surprise';

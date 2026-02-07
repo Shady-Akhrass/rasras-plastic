@@ -12,7 +12,6 @@ import {
     CheckCircle2,
     RefreshCw,
     Edit3,
-    ExternalLink,
     Trash2
 } from 'lucide-react';
 import { supplierService, type SupplierDto } from '../../services/supplierService';

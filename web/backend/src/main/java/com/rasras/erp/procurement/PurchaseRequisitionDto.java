@@ -44,4 +44,8 @@ public class PurchaseRequisitionDto {
     private Integer updatedBy;
 
     private List<PurchaseRequisitionItemDto> items;
+
+    // Derived fields
+    private Boolean hasActiveOrders;
+    private Boolean hasComparison;
 }

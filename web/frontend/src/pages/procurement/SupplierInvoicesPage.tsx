@@ -166,93 +166,169 @@ const TabButton: React.FC<{
 const InvoiceRow: React.FC<{
     invoice: SupplierInvoiceDto;
     index: number;
+    isExpanded: boolean;
+    onToggle: () => void;
     onView: () => void;
     onApprove: () => void;
-}> = ({ invoice, index, onView, onApprove }) => (
-    <tr
-        className="group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0"
-        style={{
-            animationDelay: `${index * 30}ms`,
-            animation: 'fadeInUp 0.3s ease-out forwards'
-        }}
-    >
-        <td className="px-6 py-4">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+}> = ({ invoice, index, isExpanded, onToggle, onView, onApprove }) => (
+    <>
+        <tr
+            className={`group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0 cursor-pointer ${isExpanded ? 'bg-brand-primary/5' : ''}`}
+            onClick={onToggle}
+            style={{
+                animationDelay: `${index * 30}ms`,
+                animation: 'fadeInUp 0.3s ease-out forwards'
+            }}
+        >
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                     rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Receipt className="w-5 h-5 text-brand-primary" />
-                </div>
-                <div>
-                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                        {invoice.invoiceNumber}
+                        <Receipt className="w-5 h-5 text-brand-primary" />
                     </div>
-                    <div className="text-xs text-slate-400 font-mono">
-                        سند: {invoice.supplierInvoiceNo}
+                    <div>
+                        <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                            {invoice.invoiceNumber}
+                        </div>
+                        <div className="text-xs text-slate-400 font-mono">
+                            سند: {invoice.supplierInvoiceNo}
+                        </div>
                     </div>
                 </div>
-            </div>
-        </td>
-        <td className="px-6 py-4">
-            <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-slate-100 rounded-lg">
-                    <Truck className="w-4 h-4 text-slate-500" />
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-slate-100 rounded-lg">
+                        <Truck className="w-4 h-4 text-slate-500" />
+                    </div>
+                    <span className="font-medium text-slate-700">{invoice.supplierNameAr}</span>
                 </div>
-                <span className="font-medium text-slate-700">{invoice.supplierNameAr}</span>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                {invoice.invoiceDate}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-600 
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    {invoice.invoiceDate}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-600 
                 rounded-lg text-xs font-bold border border-rose-100">
-                <Clock className="w-3.5 h-3.5" />
-                {invoice.dueDate}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <div className="font-bold text-lg text-brand-primary">
-                {invoice.totalAmount.toLocaleString()}
-                <span className="text-xs font-medium text-slate-400 mr-1">{invoice.currency}</span>
-            </div>
-            {invoice.paidAmount! > 0 && (
-                <div className="text-xs text-emerald-600 font-bold mt-0.5">
-                    مسدد: {invoice.paidAmount?.toLocaleString()}
+                    <Clock className="w-3.5 h-3.5" />
+                    {invoice.dueDate}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <div className="font-bold text-lg text-brand-primary">
+                    {invoice.totalAmount.toLocaleString()}
+                    <span className="text-xs font-medium text-slate-400 mr-1">{invoice.currency}</span>
                 </div>
-            )}
-        </td>
-        <td className="px-6 py-4">
-            <div className="flex flex-col items-center gap-1.5">
-                <StatusBadge status={invoice.status} />
-                <ApprovalBadge status={invoice.approvalStatus || ''} />
-            </div>
-        </td>
-        <td className="px-6 py-4">
-            <div className="flex justify-center gap-2">
-                <button
-                    onClick={onView}
-                    className="p-2.5 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
-                        rounded-xl transition-all duration-200 group/btn"
-                    title="عرض"
-                >
-                    <Eye className="w-4 h-4" />
-                </button>
-                {invoice.status === 'Unpaid' && invoice.approvalStatus === 'Pending' && (
-                    <button
-                        onClick={onApprove}
-                        className="p-2.5 text-emerald-500 hover:text-white hover:bg-emerald-500 
-                            rounded-xl transition-all duration-200"
-                        title="اعتماد الصرف"
-                    >
-                        <CheckCircle2 className="w-4 h-4" />
-                    </button>
+                {invoice.paidAmount! > 0 && (
+                    <div className="text-xs text-emerald-600 font-bold mt-0.5">
+                        مسدد: {invoice.paidAmount?.toLocaleString()}
+                    </div>
                 )}
-            </div>
-        </td>
-    </tr>
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex flex-col items-center gap-1.5">
+                    <StatusBadge status={invoice.status} />
+                    <ApprovalBadge status={invoice.approvalStatus || ''} />
+                </div>
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex justify-center gap-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onView(); }}
+                        className="p-2.5 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
+                        rounded-xl transition-all duration-200 group/btn"
+                        title="عرض"
+                    >
+                        <Eye className="w-4 h-4" />
+                    </button>
+                    {invoice.status === 'Unpaid' && invoice.approvalStatus === 'Pending' && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onApprove(); }}
+                            className="p-2.5 text-emerald-500 hover:text-white hover:bg-emerald-500 
+                            rounded-xl transition-all duration-200"
+                            title="اعتماد الصرف"
+                        >
+                            <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                    )}
+                    <button
+                        className={`p-2.5 rounded-xl transition-all duration-200 ${isExpanded ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-300'}`}
+                    >
+                        <Plus className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-45' : ''}`} />
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {isExpanded && invoice.items && invoice.items.length > 0 && (
+            <tr>
+                <td colSpan={7} className="px-6 py-4 bg-slate-50/50">
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-fadeInUp">
+                        <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Package className="w-4 h-4 text-brand-primary" />
+                                <span className="font-bold text-slate-700">تفاصيل الأصناف ({invoice.items.length})</span>
+                            </div>
+                            <div className="flex gap-4 text-xs font-bold">
+                                <div className="flex gap-1 text-slate-500">
+                                    <span>الخصم:</span>
+                                    <span className="text-rose-600">{(invoice.discountAmount || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex gap-1 text-slate-500">
+                                    <span>الضريبة:</span>
+                                    <span className="text-amber-600">{(invoice.taxAmount || 0).toLocaleString()}</span>
+                                </div>
+                                {invoice.deliveryCost! > 0 && (
+                                    <div className="flex gap-1 text-slate-500">
+                                        <span>التوصيل:</span>
+                                        <span className="text-blue-600">{(invoice.deliveryCost || 0).toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-slate-50/50 text-slate-500 border-b border-slate-100">
+                                        <th className="px-6 py-3 text-right font-semibold">الصنف</th>
+                                        <th className="px-6 py-3 text-center font-semibold">الكمية</th>
+                                        <th className="px-6 py-3 text-center font-semibold">الوحدة</th>
+                                        <th className="px-6 py-3 text-center font-semibold">السعر</th>
+                                        <th className="px-6 py-3 text-center font-semibold">خصم %</th>
+                                        <th className="px-6 py-3 text-center font-semibold">الضريبة %</th>
+                                        <th className="px-6 py-3 text-left font-semibold">الإجمالي</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {invoice.items.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-slate-700">{item.itemNameAr}</td>
+                                            <td className="px-6 py-4 text-center font-bold text-brand-primary">{item.quantity}</td>
+                                            <td className="px-6 py-4 text-center text-slate-500">{item.unitNameAr}</td>
+                                            <td className="px-6 py-4 text-center font-bold text-emerald-600">{item.unitPrice.toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded text-[10px] font-bold border border-rose-100">
+                                                    {item.discountPercentage || 0}%
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-bold border border-amber-100">
+                                                    {item.taxPercentage || 0}%
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-left font-bold text-slate-900">{item.totalPrice.toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        )}
+    </>
 );
 
 // GRN Row Component
@@ -394,6 +470,7 @@ const SupplierInvoicesPage: React.FC = () => {
     const [pendingGRNs, setPendingGRNs] = useState<any[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
+    const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
 
     useEffect(() => {
         if (activeTab === 'invoices') {
@@ -489,6 +566,10 @@ const SupplierInvoicesPage: React.FC = () => {
         pending: invoices.filter(i => i.status === 'Pending').length,
         approved: invoices.filter(i => i.status === 'Approved').length,
         paid: invoices.filter(i => i.status === 'Paid').length,
+        subTotal: invoices.reduce((sum, i) => sum + (i.subTotal || 0), 0),
+        taxAmount: invoices.reduce((sum, i) => sum + (i.taxAmount || 0), 0),
+        discountAmount: invoices.reduce((sum, i) => sum + (i.discountAmount || 0), 0),
+        deliveryCost: invoices.reduce((sum, i) => sum + (i.deliveryCost || 0), 0),
         totalAmount: invoices.reduce((sum, i) => sum + (i.totalAmount || 0), 0),
         pendingGRNs: pendingGRNs.length,
     }), [invoices, pendingGRNs]);
@@ -568,46 +649,44 @@ const SupplierInvoicesPage: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <StatCard
                     icon={Receipt}
-                    value={stats.total}
-                    label="إجمالي الفواتير"
+                    value={stats.subTotal}
+                    label="الإجمالي (قبل الخصم والضريبة)"
                     color="primary"
+                    suffix="ج.م"
+                />
+                <StatCard
+                    icon={Ban}
+                    value={stats.discountAmount}
+                    label="إجمالي الخصومات"
+                    color="rose"
+                    suffix="ج.م"
                 />
                 <StatCard
                     icon={Clock}
-                    value={stats.pending}
-                    label="قيد المراجعة"
+                    value={stats.taxAmount}
+                    label="إجمالي الضريبة"
                     color="warning"
-                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Pending'); }}
-                    active={statusFilter === 'Pending'}
+                    suffix="ج.م"
                 />
                 <StatCard
-                    icon={CheckCircle2}
-                    value={stats.approved}
-                    label="معتمدة"
-                    color="success"
-                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Approved'); }}
-                    active={statusFilter === 'Approved'}
-                />
-                <StatCard
-                    icon={Wallet}
-                    value={stats.paid}
-                    label="مدفوعة"
+                    icon={Truck}
+                    value={stats.deliveryCost}
+                    label="إجمالي التوصيل"
                     color="blue"
-                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Paid'); }}
-                    active={statusFilter === 'Paid'}
+                    suffix="ج.م"
                 />
                 <StatCard
                     icon={DollarSign}
                     value={stats.totalAmount}
-                    label="إجمالي المبالغ"
-                    color="purple"
+                    label="الإجمالي النهائي"
+                    color="success"
                     suffix="ج.م"
                 />
                 <StatCard
                     icon={Package}
                     value={stats.pendingGRNs}
                     label="بانتظار الفوترة"
-                    color="rose"
+                    color="purple"
                     onClick={() => setActiveTab('pending')}
                     active={activeTab === 'pending'}
                 />
@@ -750,6 +829,8 @@ const SupplierInvoicesPage: React.FC = () => {
                                             key={inv.id}
                                             invoice={inv}
                                             index={index}
+                                            isExpanded={expandedInvoiceId === inv.id}
+                                            onToggle={() => setExpandedInvoiceId(expandedInvoiceId === inv.id ? null : (inv.id ?? null))}
                                             onView={() => navigate(`/dashboard/procurement/invoices/${inv.id}`)}
                                             onApprove={() => handleApproveInvoice(inv)}
                                         />

@@ -3,6 +3,11 @@ package com.rasras.erp.procurement;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.supplier.SupplierRepository;
+// Already existing imports
+// Need to ensure SupplierQuotationRepository is available if not already in package or imported
+// Since it's in the same package, explicit import might not be needed, BUT if it was used without being available it would fail.
+// RFQService is in com.rasras.erp.procurement, same as SupplierQuotationRepository.
+// So no import needed for same package class.
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +25,8 @@ public class RFQService {
         private final SupplierRepository supplierRepository;
         private final ItemRepository itemRepository;
         private final UnitRepository unitRepository;
+        private final PurchaseOrderRepository purchaseOrderRepository;
+        private final SupplierQuotationRepository supplierQuotationRepository;
 
         @Transactional(readOnly = true)
         public List<RFQDto> getAllRFQs() {
@@ -52,6 +59,12 @@ public class RFQService {
                 if (dto.getPrId() != null) {
                         rfq.setPurchaseRequisition(prRepository.findById(dto.getPrId())
                                         .orElseThrow(() -> new RuntimeException("Purchase Requisition not found")));
+
+                        if (rfqRepository.existsByPurchaseRequisitionIdAndSupplierId(dto.getPrId(),
+                                        dto.getSupplierId())) {
+                                throw new RuntimeException(
+                                                "Duplicate RFQ: A request has already been sent to this supplier for this PR.");
+                        }
                 }
 
                 rfq.setRfqDate(dto.getRfqDate() != null ? dto.getRfqDate() : LocalDate.now());
@@ -139,6 +152,10 @@ public class RFQService {
                                                 ? rfq.getItems().stream().map(this::mapItemToDto)
                                                                 .collect(Collectors.toList())
                                                 : new ArrayList<>())
+                                .hasActiveOrders(rfq.getPurchaseRequisition() != null
+                                                && !purchaseOrderRepository
+                                                                .findByPrId(rfq.getPurchaseRequisition().getId())
+                                                                .isEmpty())
                                 .build();
         }
 

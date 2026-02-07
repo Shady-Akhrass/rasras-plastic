@@ -485,7 +485,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                     ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                             >
                                 <option value="">اختر طلب شراء معتمد...</option>
-                                {prs.map(pr => (
+                                {prs.filter(pr => (!pr.hasActiveOrders && !pr.hasComparison) || pr.id === (selectedPrId || formData.prId)).map(pr => (
                                     <option key={pr.id} value={pr.id}>
                                         {pr.prNumber} - {pr.requestedByUserName} ({pr.requestedByDeptName})
                                     </option>
