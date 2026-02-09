@@ -27,6 +27,53 @@ import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purc
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 import { formatNumber, formatDate } from '../../utils/format';
 
+// --- Calculation Helpers (matching PurchaseOrderFormPage) ---
+const calculateInvoiceTotals = (invoice: SupplierInvoiceDto): SupplierInvoiceDto => {
+    let subTotal = 0;
+    let totalDiscountAmount = 0;
+    let totalTaxAmount = 0;
+
+    const updatedItems = (invoice.items || []).map(item => {
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const discountRate = (Number(item.discountPercentage) || 0) / 100;
+        const taxRate = (Number(item.taxPercentage) || 0) / 100;
+
+        // Math: Gross -> Discount -> Tax on Taxable Amount
+        const grossAmount = qty * price;
+        const discountAmount = grossAmount * discountRate;
+        const taxableAmount = grossAmount - discountAmount;
+        const taxAmount = taxableAmount * taxRate;
+        const totalPrice = taxableAmount + taxAmount;
+
+        // Accumulate Global Totals
+        subTotal += grossAmount;
+        totalDiscountAmount += discountAmount;
+        totalTaxAmount += taxAmount;
+
+        return {
+            ...item,
+            discountAmount,
+            taxAmount,
+            totalPrice
+        };
+    });
+
+    const deliveryCost = Number(invoice.deliveryCost) || 0;
+
+    // Final Calculation: (Subtotal - Discount) + Tax + DeliveryCost
+    const grandTotal = (subTotal - totalDiscountAmount) + totalTaxAmount + deliveryCost;
+
+    return {
+        ...invoice,
+        items: updatedItems,
+        subTotal,
+        discountAmount: totalDiscountAmount,
+        taxAmount: totalTaxAmount,
+        totalAmount: grandTotal
+    };
+};
+
 // Stat Card Component
 const StatCard: React.FC<{
     icon: React.ElementType;
@@ -401,10 +448,11 @@ const SupplierOutstandingPage: React.FC = () => {
         const totalReturned = summaries.reduce((acc, curr) => acc + (curr.totalReturned || 0), 0);
         const providersWithBalance = summaries.filter(s => (s.currentBalance || 0) > 0).length;
 
-        // Calculate breakdown from all invoices
-        const totalTax = allInvoices.reduce((sum, inv) => sum + (inv.taxAmount || 0), 0);
-        const totalDiscount = allInvoices.reduce((sum, inv) => sum + (inv.discountAmount || 0), 0);
-        const totalDelivery = allInvoices.reduce((sum, inv) => sum + (inv.deliveryCost || 0), 0);
+        // Recalculate all invoices with proper PO-style calculation
+        const calculatedInvoices = allInvoices.map(inv => calculateInvoiceTotals(inv));
+        const totalTax = calculatedInvoices.reduce((sum, inv) => sum + (inv.taxAmount || 0), 0);
+        const totalDiscount = calculatedInvoices.reduce((sum, inv) => sum + (inv.discountAmount || 0), 0);
+        const totalDelivery = calculatedInvoices.reduce((sum, inv) => sum + (inv.deliveryCost || 0), 0);
 
         return {
             totalOutstanding: formatNumber(totalOutstanding),
@@ -515,7 +563,7 @@ const SupplierOutstandingPage: React.FC = () => {
                 <StatCard
                     icon={Truck}
                     value={stats.totalDelivery}
-                    label="إجمالي التوصيل"
+                    label="إجمالي مصاريف الشحن"
                     color="blue"
                 />
                 <StatCard

@@ -7,6 +7,7 @@ export interface SupplierInvoiceDto {
     invoiceDate: string;
     dueDate: string;
     poId?: number;
+    poNumber?: string;
     grnId?: number;
     grnNumber?: string;
     supplierId: number;
@@ -63,6 +64,13 @@ export const supplierInvoiceService = {
     approvePayment: async (id: number, userId: number, approved: boolean) => {
         const response = await apiClient.post<{ data: SupplierInvoiceDto }>(`/suppliers/invoices/${id}/approve-payment`, null, {
             params: { userId, approved }
+        });
+        return response.data;
+    },
+
+    downloadPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/suppliers/invoices/${id}/pdf`, {
+            responseType: 'blob'
         });
         return response.data;
     }

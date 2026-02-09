@@ -122,7 +122,7 @@ const POTableRow: React.FC<{
                     <ShoppingCart className="w-5 h-5 text-brand-primary" />
                 </div>
                 <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                    #{order.poNumber}
+                    {order.poNumber}
                 </span>
             </div>
         </td>
@@ -139,6 +139,9 @@ const POTableRow: React.FC<{
             <span className="font-bold text-emerald-600">
                 {formatNumber(order.totalAmount)} {order.currency}
             </span>
+        </td>
+        <td className="px-6 py-4 text-center font-bold text-blue-600">
+            {(order.shippingCost || 0).toLocaleString()}
         </td>
         <td className="px-6 py-4">
             <StatusBadge status={order.status!} />
@@ -194,7 +197,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
-        <td colSpan={6} className="px-6 py-16">
+        <td colSpan={7} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm || statusFilter !== 'All' ? (
@@ -456,6 +459,7 @@ const PurchaseOrdersPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الإجمالي</th>
+                                <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">مصاريف الشحن</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>

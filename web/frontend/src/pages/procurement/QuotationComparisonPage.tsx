@@ -119,7 +119,7 @@ const ComparisonTableRow: React.FC<{
                 </div>
                 <div>
                     <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors block">
-                        #{comparison.comparisonNumber || 'بدون رقم'}
+                        {comparison.comparisonNumber || 'بدون رقم'}
                     </span>
                     {comparison.prNumber && (
                         <span className="text-xs text-slate-400">طلب شراء #{comparison.prNumber}</span>

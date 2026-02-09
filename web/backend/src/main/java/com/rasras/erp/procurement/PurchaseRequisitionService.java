@@ -281,7 +281,7 @@ public class PurchaseRequisitionService {
 
         private String generatePrNumber() {
                 long n = prRepository.count() + 1;
-                return "PR-" + n;
+                return "#PR-" + n;
         }
 
         private PurchaseRequisitionDto mapToDto(PurchaseRequisition pr) {

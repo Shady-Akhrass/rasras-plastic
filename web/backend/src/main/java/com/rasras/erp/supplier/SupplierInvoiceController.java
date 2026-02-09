@@ -38,4 +38,13 @@ public class SupplierInvoiceController {
             @RequestParam boolean approved) {
         return ResponseEntity.ok(ApiResponse.success(invoiceService.approvePayment(id, userId, approved)));
     }
+
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable Integer id) {
+        byte[] pdf = invoiceService.generateInvoicePdf(id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=\"invoice-" + id + ".pdf\"")
+                .body(pdf);
+    }
 }

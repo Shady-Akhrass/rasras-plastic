@@ -16,6 +16,7 @@ import {
     Tag,
     Calendar,
     Truck,
+    ShoppingCart,
     Eye,
     XCircle,
     RefreshCw
@@ -63,6 +64,13 @@ const QuotationComparisonFormPage: React.FC = () => {
         loadSettings();
         if (isEdit) {
             loadComparison(parseInt(id));
+        } else {
+            // Check if prId is passed as query parameter (when creating from rejected comparison)
+            const prIdParam = queryParams.get('prId');
+            if (prIdParam) {
+                setSelectedPrId(parseInt(prIdParam));
+                setFormData(prev => ({ ...prev, prId: parseInt(prIdParam) }));
+            }
         }
     }, [id]);
 
@@ -280,19 +288,20 @@ const QuotationComparisonFormPage: React.FC = () => {
         toast.success('تم تحديد العرض صاحب أعلى تقييم');
     };
 
-    const handleSave = async () => {
+    // Save comparison and return saved comparison
+    const saveComparison = async () => {
         try {
             if (requireThreeQuotations && quotations.length < 3) {
                 toast.error('يجب توفر 3 عروض أسعار صالحة على الأقل للمقارنة والترسية حسب إعدادات النظام');
-                return;
+                return null;
             }
             if (!formData.selectedQuotationId) {
                 toast.error('يرجى اختيار العرض الأفضل');
-                return;
+                return null;
             }
             if (!formData.selectionReason) {
                 toast.error('يرجى ذكر سبب الاختيار');
-                return;
+                return null;
             }
 
             setSaving(true);
@@ -314,11 +323,37 @@ const QuotationComparisonFormPage: React.FC = () => {
 
             toast.success('تم حفظ المقارنة وإرسالها للاعتماد بنجاح');
             navigate('/dashboard/procurement/comparison');
+            return savedComp;
         } catch (error) {
             console.error('Failed to save and submit comparison:', error);
             toast.error('فشل حفظ أو إرسال المقارنة');
+            return null;
         } finally {
             setSaving(false);
+        }
+    };
+    const handleSave = () => { saveComparison(); };
+
+    // Attempt to save (if dirty) and then create PO only if comparison is approved
+    const handleSaveAndCreatePO = async () => {
+        // If form already has approved status, skip saving and go create PO
+        if (formData.status === 'Approved') {
+            const qId = formData.selectedQuotationId;
+            const compId = (formData as any).id || undefined;
+            if (qId) {
+                navigate(`/dashboard/procurement/po/create?quotationId=${qId}${compId ? `&comparisonId=${compId}` : ''}`);
+            }
+            return;
+        }
+
+        // Otherwise, save current state first and then check status
+        const saved = await saveComparison();
+        if (!saved) return;
+        if (saved.status === 'Approved') {
+            const qId = saved.selectedQuotationId || formData.selectedQuotationId;
+            navigate(`/dashboard/procurement/po/create?quotationId=${qId}&comparisonId=${saved.id}`);
+        } else {
+            toast.error('لا يمكن إنشاء أمر شراء قبل اعتماد المقارنة');
         }
     };
 
@@ -336,6 +371,17 @@ const QuotationComparisonFormPage: React.FC = () => {
         } finally {
             setProcessing(false);
         }
+    };
+
+    const handleCreateNewComparison = () => {
+        const prId = formData.prId;
+        if (!prId) {
+            toast.error('لا يمكن إنشاء مقارنة جديدة بدون تحديد طلب شراء');
+            return;
+        }
+        // Navigate to create new comparison page with the same PR
+        navigate(`/dashboard/procurement/comparison/new?prId=${prId}`);
+        toast.success('تم فتح نموذج مقارنة جديد بنفس طلب الشراء');
     };
 
 
@@ -394,27 +440,51 @@ const QuotationComparisonFormPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        {isEdit && formData.status !== 'Draft' && formData.status !== 'Approved' && (
+                        {isEdit && formData.status === 'Rejected' && (
+                            <button
+                                onClick={handleCreateNewComparison}
+                                className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl 
+                                    font-bold shadow-lg hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
+                                title="إنشاء مقارنة جديدة بنفس طلب الشراء"
+                            >
+                                <RefreshCw className="w-5 h-5" />
+                                <span>إنشاء مقارنة جديدة</span>
+                            </button>
+                        )}
+                        {isEdit && formData.status !== 'Draft' && formData.status !== 'Approved' && formData.status !== 'Rejected' && (
                             <div className="px-5 py-2.5 bg-amber-50 text-amber-600 rounded-xl font-bold flex items-center gap-2 border border-amber-100 italic">
                                 <Clock className="w-5 h-5" />
                                 <span>بانتظار الاعتماد</span>
                             </div>
                         )}
                         {!isView && (
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                                    font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                                    disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                            >
-                                {saving ? (
-                                    <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                                ) : (
-                                    <Save className="w-5 h-5" />
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleSave}
+                                    disabled={saving}
+                                    className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                                        font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                        disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                    {saving ? (
+                                        <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                                    ) : (
+                                        <Save className="w-5 h-5" />
+                                    )}
+                                    <span>{saving ? 'جاري الحفظ...' : 'حفظ المقارنة'}</span>
+                                </button>
+
+                                {formData.selectedQuotationId && formData.status === 'Approved' && (
+                                    <button
+                                        onClick={handleSaveAndCreatePO}
+                                        disabled={saving}
+                                        className="flex items-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-bold shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                    >
+                                        <ShoppingCart className="w-4 h-4" />
+                                        <span>حفظ وإنشاء أمر شراء</span>
+                                    </button>
                                 )}
-                                <span>{saving ? 'جاري الحفظ...' : 'حفظ المقارنة'}</span>
-                            </button>
+                            </div>
                         )}
                         {isView && (
                             <div className="flex items-center gap-3">

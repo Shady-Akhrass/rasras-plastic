@@ -120,7 +120,8 @@ public class QuotationComparisonService {
         }
 
         private String generateComparisonNumber() {
-                return "COMP-" + System.currentTimeMillis();
+                long count = comparisonRepository.count() + 1;
+                return "#COMP-" + count;
         }
 
         private QuotationComparisonDto mapToDto(QuotationComparison comparison) {

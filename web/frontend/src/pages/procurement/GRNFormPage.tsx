@@ -14,15 +14,6 @@ import type { WarehouseDto, WarehouseLocationDto } from '../../services/warehous
 import { formatNumber, formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 
-/**
- * واجهة موحدة لإذن الإضافة (GRN) - Goods Receipt Note
- * تجمع بين دورة المشتريات ودورة المخزن
- * - اختيار أمر الشراء (PO)
- * - تحديد المخزن والموقع
- * - تسجيل اللوت وتاريخ الإنتاج/الصلاحية
- * - تحديث الأرصدة تلقائياً عند الاعتماد
- */
-
 const GRNFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -52,7 +43,7 @@ const GRNFormPage: React.FC = () => {
         items: []
     });
 
-    // Row-level state for each item (lot, dates, location, quantities)
+    // Row-level state
     const [rows, setRows] = useState<Record<number, {
         receivedQty: number;
         acceptedQty?: number;
@@ -86,7 +77,6 @@ const GRNFormPage: React.FC = () => {
                 setPos(poList.filter((p: PurchaseOrderDto) => p.status !== 'Closed'));
                 setWarehouses(finalWhList);
 
-                // Auto-select warehouse if only one exists
                 if (finalWhList.length === 1 && isNew) {
                     setForm(prev => ({ ...prev, warehouseId: finalWhList[0].id }));
                 }
@@ -96,7 +86,7 @@ const GRNFormPage: React.FC = () => {
         })();
     }, [isNew]);
 
-    // Load existing GRN for view/edit mode
+    // Load existing GRN
     useEffect(() => {
         if (!isNew && id) {
             (async () => {
@@ -104,7 +94,6 @@ const GRNFormPage: React.FC = () => {
                     const g = await grnService.getGRNById(parseInt(id));
                     if (g) {
                         setForm({ ...g, items: g.items || [] });
-                        // Use a partial PO structure for display purposes
                         setSelectedPo({
                             supplierId: g.supplierId!,
                             supplierNameAr: g.supplierNameAr,
@@ -124,14 +113,14 @@ const GRNFormPage: React.FC = () => {
         }
     }, [id, isNew]);
 
-    // Load preselected PO from query param
+    // Load preselected PO
     useEffect(() => {
         if (preselectedPoId && isNew && pos.length > 0) {
             handleSelectPo(parseInt(preselectedPoId));
         }
     }, [preselectedPoId, isNew, pos]);
 
-    // Load warehouse locations when warehouse changes
+    // Load warehouse locations
     useEffect(() => {
         if (form.warehouseId) {
             (async () => {
@@ -141,7 +130,6 @@ const GRNFormPage: React.FC = () => {
                     const whLocations = dto?.locations ?? [];
                     setLocations(whLocations);
 
-                    // Auto-select first location if only one exists or for all rows if none set
                     if (whLocations.length > 0 && isNew) {
                         setRows(prev => {
                             const next = { ...prev };
@@ -194,7 +182,6 @@ const GRNFormPage: React.FC = () => {
                     } as GRNItemDto;
                 }).filter(Boolean) as GRNItemDto[]
             }));
-            // Initialize row state
             const r: Record<number, any> = {};
             (po.items || []).forEach((i: PurchaseOrderItemDto) => {
                 const rem = (Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0);
@@ -208,7 +195,6 @@ const GRNFormPage: React.FC = () => {
             });
             setRows(r);
 
-            // Fetch quotation if exists to get the quotation number as the supplier invoice number
             if (po.quotationId) {
                 try {
                     const qh = await purchaseService.getQuotationById(po.quotationId);
@@ -224,7 +210,7 @@ const GRNFormPage: React.FC = () => {
         }
     };
 
-    /** فحص المدخلات قبل التحديث */
+    /** Validate row update */
     const validateRowUpdate = (
         poItemId: number,
         upd: Partial<typeof rows[0]>,
@@ -258,7 +244,7 @@ const GRNFormPage: React.FC = () => {
         return { valid: true };
     };
 
-    // Update row data (مع فحص المدخلات)
+    // Update row data
     const updateRow = (poItemId: number, upd: Partial<typeof rows[0]>, item?: PurchaseOrderItemDto) => {
         const poItem = item ?? selectedPo?.items?.find((i) => i.id === poItemId);
         if (poItem) {
@@ -272,11 +258,9 @@ const GRNFormPage: React.FC = () => {
     };
 
     const buildItems = (): GRNItemDto[] => {
-        // For existing GRN, we just return the current items
         if (!isNew) {
             return (form.items || []);
         }
-
         if (!selectedPo?.items) return [];
         return selectedPo.items
             .filter((i) => i.id && ((Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0)) > 0)
@@ -284,6 +268,16 @@ const GRNFormPage: React.FC = () => {
                 const r = rows[i.id!] || {};
                 const receivedQty = Number(r.receivedQty) || 0;
                 const unitCost = Number(i.unitPrice) || 0;
+
+                // Calculate cost using PO formula: Gross -> Discount -> Tax
+                const grossAmount = receivedQty * unitCost;
+                const discountRate = (Number(i.discountPercentage) || 0) / 100;
+                const taxRate = (Number(i.taxPercentage) || 0) / 100;
+                const discountAmount = grossAmount * discountRate;
+                const taxableAmount = grossAmount - discountAmount;
+                const taxAmount = taxableAmount * taxRate;
+                const totalCost = taxableAmount + taxAmount;
+
                 return {
                     poItemId: i.id!,
                     itemId: i.itemId,
@@ -294,7 +288,7 @@ const GRNFormPage: React.FC = () => {
                     unitId: i.unitId,
                     unitNameAr: i.unitNameAr,
                     unitCost,
-                    totalCost: receivedQty * unitCost,
+                    totalCost,
                     lotNumber: r.lotNumber || undefined,
                     manufactureDate: r.manufactureDate || undefined,
                     expiryDate: r.expiryDate || undefined,
@@ -314,18 +308,15 @@ const GRNFormPage: React.FC = () => {
         return { totalQty, totalOrderedQty, totalCost, itemCount: items.length };
     }, [rows, selectedPo, form.items, isNew]);
 
-    // Max remaining quantity for a PO item
+    // Max remaining quantity
     const maxRem = (i: PurchaseOrderItemDto) => (Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0);
 
-    // Track if warehouse changed in view mode
     const [warehouseChanged, setWarehouseChanged] = useState(false);
-
 
     // Handle form submission
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
-        // Validation
         if (!form.poId || !form.supplierId) {
             toast.error('الرجاء اختيار أمر الشراء');
             return;
@@ -358,7 +349,6 @@ const GRNFormPage: React.FC = () => {
                 toast.success('تم إنشاء إذن الإضافة بنجاح وتحديث أرصدة المخزون');
                 navigate('/dashboard/procurement/grn');
             } else {
-                // Update existing GRN (specifically for warehouse redirect)
                 await grnService.updateGRN(parseInt(id!), form as GoodsReceiptNoteDto);
                 toast.success('تم تحديث بيانات إذن الإضافة بنجاح');
                 setWarehouseChanged(false);
@@ -376,7 +366,6 @@ const GRNFormPage: React.FC = () => {
             setProcessing(true);
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
 
-            // If warehouse was changed, save it first
             if (warehouseChanged && id) {
                 await grnService.updateGRN(parseInt(id), form as GoodsReceiptNoteDto);
             }
@@ -411,7 +400,7 @@ const GRNFormPage: React.FC = () => {
         }
     };
 
-    // View mode for existing GRN
+    // ─── View/Edit Existing GRN ─────────────────────────────────────────────
     if (!isNew && id) {
         const g = form as GoodsReceiptNoteDto;
         return (
@@ -441,54 +430,56 @@ const GRNFormPage: React.FC = () => {
                 {/* Header */}
                 <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white shadow-2xl">
                     <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
-                    <div className="relative flex items-center gap-5">
-                        <button
-                            onClick={() => navigate('/dashboard/procurement/grn')}
-                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
-                                hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
-                        >
-                            <ArrowRight className="w-5 h-5" />
-                        </button>
-                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-                            <ClipboardCheck className="w-10 h-10" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold mb-2">إذن الإضافة {g.grnNumber}</h1>
-                            <p className="text-white/80 text-lg">عرض تفاصيل إذن الإضافة</p>
-                        </div>
-                    </div>
-                    {isView && (
-                        <div className="flex items-center gap-3">
-                            {approvalId && (
-                                <>
-                                    <button
-                                        onClick={() => handleApprovalAction('Approved')}
-                                        disabled={processing}
-                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
-                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
-                                            disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                                        <span>اعتماد</span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleApprovalAction('Rejected')}
-                                        disabled={processing}
-                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
-                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
-                                            disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
-                                        <span>رفض</span>
-                                    </button>
-                                </>
-                            )}
-                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
-                                <Eye className="w-5 h-5" />
-                                <span className="font-bold">وضع العرض فقط</span>
+                    <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="flex items-center gap-5">
+                            <button
+                                onClick={() => navigate('/dashboard/procurement/grn')}
+                                className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
+                                    hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
+                            >
+                                <ArrowRight className="w-5 h-5" />
+                            </button>
+                            <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                                <ClipboardCheck className="w-10 h-10" />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-bold mb-2">إذن الإضافة {g.grnNumber}</h1>
+                                <p className="text-white/80 text-lg">عرض تفاصيل إذن الإضافة</p>
                             </div>
                         </div>
-                    )}
+                        {isView && (
+                            <div className="flex items-center gap-3">
+                                {approvalId && (
+                                    <>
+                                        <button
+                                            onClick={() => handleApprovalAction('Approved')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                                font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                                disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                            <span>اعتماد</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleApprovalAction('Rejected')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                                font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                                disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                            <span>رفض</span>
+                                        </button>
+                                    </>
+                                )}
+                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
+                                    <Eye className="w-5 h-5" />
+                                    <span className="font-bold">وضع العرض فقط</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Details Card */}
@@ -564,7 +555,7 @@ const GRNFormPage: React.FC = () => {
         );
     }
 
-    // Create/Edit form
+    // ─── Create Form ────────────────────────────────────────────────────────
     return (
         <div className="space-y-6 pb-20" dir="rtl">
             <style>{`
@@ -745,12 +736,6 @@ const GRNFormPage: React.FC = () => {
                                     <p className="text-xs text-brand-primary mb-1">إجمالي التكلفة</p>
                                     <p className="font-semibold text-slate-800">{formatNumber(totals.totalCost, { minimumFractionDigits: 2 })} ج.م</p>
                                 </div>
-                                {!isNew && (
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-xl">
-                                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                                        <span className="text-sm font-bold text-emerald-600">{form.items?.length || 0} صنف</span>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
@@ -777,158 +762,122 @@ const GRNFormPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="overflow-x-auto">
-                                {isNew ? (
-                                    <table className="w-full min-w-[1000px]">
-                                        <thead>
-                                            <tr className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
-                                                <th className="py-4 pr-6 text-right">الصنف</th>
-                                                <th className="py-4 px-3 text-center">المتبقي</th>
-                                                <th className="py-4 px-3 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <CheckCircle2 className="w-3 h-3 text-brand-primary" />
-                                                        المستلم *
-                                                    </div>
-                                                </th>
-                                                <th className="py-4 px-3 text-center">المقبول</th>
-                                                <th className="py-4 px-3 text-center">اللوت</th>
-                                                <th className="py-4 px-3 text-center">تاريخ الإنتاج</th>
-                                                <th className="py-4 px-3 text-center">الصلاحية</th>
-                                                <th className="py-4 pl-6 text-center">الموقع</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {selectedPo.items
-                                                ?.filter((i) => maxRem(i) > 0)
-                                                .map((i) => (
-                                                    <tr key={i.id} className="group hover:bg-slate-50/50 transition-colors">
-                                                        <td className="py-4 pr-6">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-2 h-2 rounded-full ${(rows[i.id!]?.receivedQty || 0) > 0 ? 'bg-brand-primary' : 'bg-slate-300'
-                                                                    }`} />
-                                                                <span className="font-bold text-slate-800">{i.itemNameAr}</span>
-                                                            </div>
-                                                            <div className="text-xs text-slate-500 mt-1 mr-5">{i.unitNameAr}</div>
-                                                        </td>
-                                                        <td className="py-4 px-3 text-center">
-                                                            <span className="px-3 py-1 bg-slate-100 rounded-lg text-slate-600 font-semibold text-sm">
-                                                                {maxRem(i)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-4 px-3">
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                max={maxRem(i)}
-                                                                step="0.001"
-                                                                value={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                                onChange={(e) => {
-                                                                    const val = parseFloat(e.target.value) || 0;
-                                                                    updateRow(i.id!, { receivedQty: val, acceptedQty: val }, i);
-                                                                }}
-                                                                className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                <table className="w-full min-w-[1000px]">
+                                    <thead>
+                                        <tr className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
+                                            <th className="py-4 pr-6 text-right">الصنف</th>
+                                            <th className="py-4 px-3 text-center">المتبقي</th>
+                                            <th className="py-4 px-3 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <CheckCircle2 className="w-3 h-3 text-brand-primary" />
+                                                    المستلم *
+                                                </div>
+                                            </th>
+                                            <th className="py-4 px-3 text-center">المقبول</th>
+                                            <th className="py-4 px-3 text-center">اللوت</th>
+                                            <th className="py-4 px-3 text-center">تاريخ الإنتاج</th>
+                                            <th className="py-4 px-3 text-center">الصلاحية</th>
+                                            <th className="py-4 pl-6 text-center">الموقع</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {selectedPo.items
+                                            ?.filter((i) => maxRem(i) > 0)
+                                            .map((i) => (
+                                                <tr key={i.id} className="group hover:bg-slate-50/50 transition-colors">
+                                                    <td className="py-4 pr-6">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-2 h-2 rounded-full ${(rows[i.id!]?.receivedQty || 0) > 0 ? 'bg-brand-primary' : 'bg-slate-300'}`} />
+                                                            <span className="font-bold text-slate-800">{i.itemNameAr}</span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 mt-1 mr-5">{i.unitNameAr}</div>
+                                                    </td>
+                                                    <td className="py-4 px-3 text-center">
+                                                        <span className="px-3 py-1 bg-slate-100 rounded-lg text-slate-600 font-semibold text-sm">
+                                                            {maxRem(i)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-3">
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            max={maxRem(i)}
+                                                            step="0.001"
+                                                            value={rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                            onChange={(e) => {
+                                                                const val = parseFloat(e.target.value) || 0;
+                                                                updateRow(i.id!, { receivedQty: val, acceptedQty: val }, i);
+                                                            }}
+                                                            className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold text-brand-primary outline-none 
                                                                 focus:border-brand-primary transition-all"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-3">
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                max={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                                step="0.001"
-                                                                value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                                onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 }, i)}
-                                                                disabled={isView}
-                                                                className="w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                        />
+                                                    </td>
+                                                    <td className="py-4 px-3">
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            max={rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                            step="0.001"
+                                                            value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                            onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 }, i)}
+                                                            className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold outline-none 
                                                                 focus:border-brand-primary transition-all"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-3">
-                                                            <input
-                                                                type="text"
-                                                                value={rows[i.id!]?.lotNumber || ''}
-                                                                onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
-                                                                placeholder="LOT-XXX"
-                                                                className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        />
+                                                    </td>
+                                                    <td className="py-4 px-3">
+                                                        <input
+                                                            type="text"
+                                                            value={rows[i.id!]?.lotNumber || ''}
+                                                            onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
+                                                            placeholder="LOT-XXX"
+                                                            className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center outline-none focus:border-brand-primary transition-all"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-3">
-                                                            <input
-                                                                type="date"
-                                                                value={rows[i.id!]?.manufactureDate || ''}
-                                                                onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
-                                                                className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        />
+                                                    </td>
+                                                    <td className="py-4 px-3">
+                                                        <input
+                                                            type="date"
+                                                            value={rows[i.id!]?.manufactureDate || ''}
+                                                            onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
+                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm outline-none focus:border-brand-primary transition-all"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-3">
-                                                            <input
-                                                                type="date"
-                                                                value={rows[i.id!]?.expiryDate || ''}
-                                                                onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined }, i)}
-                                                                className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        />
+                                                    </td>
+                                                    <td className="py-4 px-3">
+                                                        <input
+                                                            type="date"
+                                                            value={rows[i.id!]?.expiryDate || ''}
+                                                            onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined }, i)}
+                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm outline-none focus:border-brand-primary transition-all"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 pl-6">
-                                                            <select
-                                                                value={rows[i.id!]?.locationId || ''}
-                                                                onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
-                                                                className="w-32 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        />
+                                                    </td>
+                                                    <td className="py-4 pl-6">
+                                                        <select
+                                                            value={rows[i.id!]?.locationId || ''}
+                                                            onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
+                                                            className="w-32 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm outline-none focus:border-brand-primary transition-all"
-                                                            >
-                                                                <option value="">اختر الموقع</option>
-                                                                {locations.map((l) => (
-                                                                    <option key={l.id} value={l.id}>
-                                                                        {l.locationCode} {l.locationName ? `- ${l.locationName}` : ''}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    /* IF VIEWING/EDITING EXISTING GRN */
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200">
-                                                <th className="py-4 pr-6 text-right">الصنف</th>
-                                                <th className="py-4 px-3 text-center">المطلوب</th>
-                                                <th className="py-4 px-3 text-center">المستلم</th>
-                                                <th className="py-4 px-3 text-center">المقبول</th>
-                                                <th className="py-4 px-3 text-center">الوحدة</th>
-                                                <th className="py-4 px-3 text-center">اللوت</th>
-                                                {/* Show extra columns if needed in view mode */}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {(form.items || []).map((it, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="py-4 pr-6 font-semibold text-slate-800">{it.itemNameAr}</td>
-                                                    <td className="py-4 px-3 text-center font-medium text-slate-600">{it.orderedQty}</td>
-                                                    <td className="py-4 px-3 text-center font-bold text-emerald-600">{it.receivedQty}</td>
-                                                    <td className="py-4 px-3 text-center font-bold text-slate-700">{it.acceptedQty || it.receivedQty}</td>
-                                                    <td className="py-4 px-3 text-center text-slate-600">{it.unitNameAr}</td>
-                                                    <td className="py-4 px-3 text-center text-slate-500">{it.lotNumber || '—'}</td>
+                                                        >
+                                                            <option value="">اختر الموقع</option>
+                                                            {locations.map((l) => (
+                                                                <option key={l.id} value={l.id}>
+                                                                    {l.locationCode} {l.locationName ? `- ${l.locationName}` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
                                                 </tr>
                                             ))}
-                                            {(!form.items || form.items.length === 0) && (
-                                                <tr>
-                                                    <td colSpan={7} className="py-10 text-center text-slate-400">لا توجد بنود</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
 
-                    {/* No Items Empty State for Create Mode */}
+                    {/* No Items Empty State */}
                     {isNew && selectedPo && (!selectedPo.items || selectedPo.items.filter(i => maxRem(i) > 0).length === 0) && (
                         <div className="py-16 text-center">
                             <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
@@ -938,8 +887,7 @@ const GRNFormPage: React.FC = () => {
                         </div>
                     )}
 
-
-                    {/* Empty State when no PO selected in Create Mode */}
+                    {/* Empty State when no PO selected */}
                     {isNew && !selectedPo && (
                         <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-16 text-center animate-slide-in">
                             <div className="w-20 h-20 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
@@ -991,7 +939,7 @@ const GRNFormPage: React.FC = () => {
                                 <div className="text-xs text-white/40 mb-2">إجمالي التكلفة</div>
                                 <div className="text-3xl font-black text-brand-primary">
                                     {formatNumber(totals.totalCost, { minimumFractionDigits: 2 })}
-                                    <span className="text-sm font-bold opacity-70">ج.م</span>
+                                    <span className="text-sm font-bold opacity-70"> ج.م</span>
                                 </div>
                             </div>
                         </div>
@@ -1006,20 +954,22 @@ const GRNFormPage: React.FC = () => {
                     </div>
 
                     {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
-                        flex gap-4 animate-slide-in shadow-lg"
-                        style={{ animationDelay: '300ms' }}>
-                        <div className="p-3 bg-brand-primary/10 rounded-xl h-fit">
-                            <AlertCircle className="w-6 h-6 text-brand-primary" />
+                    {isNew && (
+                        <div className="p-5 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border-2 border-emerald-200 
+                            flex gap-4 animate-slide-in shadow-lg"
+                            style={{ animationDelay: '300ms' }}>
+                            <div className="p-3 bg-emerald-100 rounded-xl h-fit">
+                                <AlertCircle className="w-6 h-6 text-emerald-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-emerald-800 mb-2">معلومة هامة</h4>
+                                <p className="text-sm leading-relaxed text-emerald-700">
+                                    سيتم <strong>تحديث أرصدة المخزون تلقائياً</strong> فور حفظ إذن الإضافة.
+                                    تأكد من صحة الكميات والمواقع قبل الحفظ.
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h4 className="font-bold text-slate-800 mb-2">معلومة هامة</h4>
-                            <p className="text-sm leading-relaxed text-brand-primary">
-                                سيتم <strong>تحديث أرصدة المخزون تلقائياً</strong> فور حفظ إذن الإضافة.
-                                تأكد من صحة الكميات والمواقع قبل الحفظ.
-                            </p>
-                        </div>
-                    </div>
+                    )}
 
                     {/* Status Alert */}
                     {!isNew && (
@@ -1038,26 +988,8 @@ const GRNFormPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Info Alert */}
-                    {isNew && (
-                        <div className="p-5 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border-2 border-emerald-200 
-                        flex gap-4 animate-slide-in shadow-lg"
-                            style={{ animationDelay: '300ms' }}>
-                            <div className="p-3 bg-emerald-100 rounded-xl h-fit">
-                                <AlertCircle className="w-6 h-6 text-emerald-600" />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-emerald-800 mb-2">معلومة هامة</h4>
-                                <p className="text-sm leading-relaxed text-emerald-700">
-                                    سيتم <strong>تحديث أرصدة المخزون تلقائياً</strong> فور حفظ إذن الإضافة.
-                                    تأكد من صحة الكميات والمواقع قبل الحفظ.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
                     {/* FIFO Info */}
-                    <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
+                    <div className="p-5 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl border-2 border-blue-200 
                         flex gap-4 animate-slide-in"
                         style={{ animationDelay: '350ms' }}>
                         <div className="p-3 bg-blue-100 rounded-xl h-fit">

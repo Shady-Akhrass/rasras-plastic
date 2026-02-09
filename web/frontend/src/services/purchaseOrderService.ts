@@ -26,6 +26,7 @@ export interface PurchaseOrderDto {
     poDate?: string;
     prId?: number;
     quotationId?: number;
+    comparisonId?: number;
     supplierId: number;
     supplierNameAr?: string;
     expectedDeliveryDate?: string;

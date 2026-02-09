@@ -128,7 +128,7 @@ public class RFQService {
 
         private String generateRFQNumber() {
                 long n = rfqRepository.count() + 1;
-                return "RFQ-" + String.format("%04d", n);
+                return "#RFQ-" + n;
         }
 
         private RFQDto mapToDto(RequestForQuotation rfq) {
