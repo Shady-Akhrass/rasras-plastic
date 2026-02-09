@@ -28,6 +28,12 @@ export const stockBalanceService = {
         return response.data;
     },
 
+    /** أرصدة المخزن (أصناف ذات رصيد > 0 فقط) - للقوائم المنسدلة في التحويل */
+    getBalancesByWarehouse: async (warehouseId: number): Promise<StockBalanceDto[]> => {
+        const response = await apiClient.get<ApiResponse<StockBalanceDto[]>>(`/inventory/stocks?warehouseId=${warehouseId}`);
+        return (response.data as any)?.data ?? [];
+    },
+
     getBalanceById: async (id: number) => {
         const response = await apiClient.get<ApiResponse<StockBalanceDto>>(`/inventory/stocks/${id}`);
         return response.data;

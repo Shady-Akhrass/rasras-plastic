@@ -25,8 +25,9 @@ public class ApprovalController {
             @PathVariable Integer id,
             @RequestParam Integer userId,
             @RequestParam String action,
-            @RequestParam(required = false) String comments) {
-        approvalService.processAction(id, userId, action, comments);
+            @RequestParam(required = false) String comments,
+            @RequestParam(required = false) Integer warehouseId) {
+        approvalService.processAction(id, userId, action, comments, warehouseId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

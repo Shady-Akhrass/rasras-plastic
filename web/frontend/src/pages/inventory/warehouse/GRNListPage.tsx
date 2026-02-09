@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../../services/grnService';
 import Pagination from '../../../components/common/Pagination';
+import { formatDate } from '../../../utils/format';
 import { toast } from 'react-hot-toast';
 
 /**
@@ -48,10 +49,12 @@ const GRNListPage: React.FC = () => {
             const matchesStatus = statusFilter === 'all' || g.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
+        // الأحدث في الأعلى
         return [...f].sort((a, b) => {
-            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : (a.id ?? 0);
-            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : 0;
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [list, search, statusFilter]);
 
@@ -169,7 +172,7 @@ const GRNListPage: React.FC = () => {
                                             <span className="font-mono font-bold text-emerald-700">{g.grnNumber || '—'}</span>
                                         </td>
                                         <td className="px-6 py-4 text-slate-600">
-                                            {g.grnDate ? new Date(g.grnDate).toLocaleDateString('ar-EG') : '—'}
+                                            {g.grnDate ? formatDate(g.grnDate) : '—'}
                                         </td>
                                         <td className="px-6 py-4 text-slate-700">{g.poNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{g.supplierNameAr || '—'}</td>

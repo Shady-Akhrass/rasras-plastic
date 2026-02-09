@@ -653,11 +653,13 @@ const RolesPage: React.FC = () => {
     };
 
     const filteredRoles = useMemo(() => {
-        return roles.filter(role =>
+        const filtered = roles.filter(role =>
             role.roleNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
             role.roleCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (role.roleNameEn && role.roleNameEn.toLowerCase().includes(searchTerm.toLowerCase()))
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [roles, searchTerm]);
 
     const stats = useMemo(() => ({

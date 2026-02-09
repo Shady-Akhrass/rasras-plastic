@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
 import { qualityService } from '../../services/qualityService';
+import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../../components/common/ConfirmModal';
 
@@ -90,7 +91,7 @@ const GRNCard: React.FC<{
         <p className="text-slate-500 text-sm mb-4">{grn.supplierNameAr}</p>
         <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100">
             <div className="text-xs text-slate-400">
-                {new Date(grn.grnDate!).toLocaleDateString('ar-EG')}
+                {formatDate(grn.grnDate!)}
             </div>
             <button
                 onClick={() => onInspect(grn)}
@@ -162,7 +163,8 @@ const QualityInspectionPage: React.FC = () => {
         try {
             setLoading(true);
             const allGrns = await grnService.getAllGRNs();
-            setGrns(allGrns.filter(g => g.status === 'Pending Inspection' || g.status === 'Inspected'));
+            const list = Array.isArray(allGrns) ? allGrns : [];
+            setGrns(list.filter(g => g.status === 'Pending Inspection' || g.status === 'Inspected'));
         } catch (error) {
             console.error('Error fetching GRNs:', error);
             toast.error('فشل تحميل الشحنات');
@@ -172,9 +174,10 @@ const QualityInspectionPage: React.FC = () => {
     };
 
     const handleRecordInspection = (grn: GoodsReceiptNoteDto) => {
+        const items = Array.isArray(grn.items) ? grn.items : [];
         const grnWithDetails = {
             ...grn,
-            items: grn.items.map(item => ({
+            items: items.map(item => ({
                 ...item,
                 acceptedQty: item.acceptedQty || item.receivedQty,
                 rejectedQty: item.rejectedQty || 0,
@@ -226,10 +229,17 @@ const QualityInspectionPage: React.FC = () => {
     };
 
     const filteredGRNs = useMemo(() => {
-        return grns.filter(grn =>
+        const filtered = grns.filter(grn =>
             grn.grnNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             grn.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => {
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : 0;
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
+        });
     }, [grns, searchTerm]);
 
     const stats = useMemo(() => ({
@@ -269,7 +279,7 @@ const QualityInspectionPage: React.FC = () => {
                     </div>
                     <div>
                         <h1 className="text-3xl font-bold mb-2">فحص الجودة</h1>
-                        <p className="text-white/70 text-lg">مراجعة وفحص الشحنات الواردة قبل الإضافة للمخزون</p>
+                        <p className="text-white/70 text-lg">مراجعة وفحص الشحنات الواردة — الكميات المقبولة والمرفوضة فقط (اختيار المخزن يتم في إذن الإضافة)</p>
                     </div>
                 </div>
             </div>
@@ -388,7 +398,7 @@ const QualityInspectionPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {selectedGrn.items.map((item, idx) => (
+                                {(selectedGrn.items || []).map((item, idx) => (
                                     <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                                         <td className="py-4 pr-4 font-bold text-slate-800">{item.itemNameAr}</td>
                                         <td className="py-4 px-4 text-center font-semibold text-slate-600">

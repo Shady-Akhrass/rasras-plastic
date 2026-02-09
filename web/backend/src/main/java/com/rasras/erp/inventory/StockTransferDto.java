@@ -28,5 +28,6 @@ public class StockTransferDto {
     private LocalDateTime shippedDate;
     private LocalDateTime receivedDate;
     private String notes;
+    private Integer createdBy;
     private List<StockTransferItemDto> items;
 }

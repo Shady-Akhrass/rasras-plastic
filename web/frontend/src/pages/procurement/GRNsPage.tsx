@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
 import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -52,8 +53,9 @@ const StatCard: React.FC<{
     );
 };
 
-// Status Badge Component
+// Status Badge Component (دعم حساسية الأحرف)
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const statusKey = (status || '').trim();
     const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
         'Pending Inspection': {
             icon: Clock,
@@ -64,6 +66,16 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             icon: ClipboardCheck,
             className: 'bg-blue-50 text-blue-700 border-blue-200',
             label: 'تم الفحص'
+        },
+        'Pending Approval': {
+            icon: Clock,
+            className: 'bg-violet-50 text-violet-700 border-violet-200',
+            label: 'بانتظار الاعتماد'
+        },
+        'Approved': {
+            icon: CheckCircle2,
+            className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+            label: 'إذن معتمد - جاهز للتخزين'
         },
         'Completed': {
             icon: CheckCircle2,
@@ -77,7 +89,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         }
     };
 
-    const { icon: Icon, className, label } = config[status] || config['Draft'];
+    const { icon: Icon, className, label } = config[statusKey] || config[statusKey.charAt(0).toUpperCase() + statusKey.slice(1).toLowerCase()] || config['Draft'];
 
     return (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
@@ -121,7 +133,7 @@ const GRNTableRow: React.FC<{
         <td className="px-6 py-4 text-sm text-slate-600">
             <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{new Date(receipt.grnDate!).toLocaleDateString('ar-EG')}</span>
+                <span>{formatDate(receipt.grnDate!)}</span>
             </div>
         </td>
         <td className="px-6 py-4">
@@ -138,9 +150,9 @@ const GRNTableRow: React.FC<{
         </td>
         <td className="px-6 py-4">
             <div className="flex items-center justify-end gap-2">
-                {(receipt.status === 'Draft' || receipt.status === 'Pending Inspection') && (
+                {receipt.status === 'Inspected' && receipt.approvalStatus !== 'Approved' && (
                     <button
-                        onClick={() => onFinalize(receipt.id!, 2)} // Using '2' as a marker for submit vs finalize
+                        onClick={() => onFinalize(receipt.id!, 2)}
                         className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                         title="إرسال للاعتماد"
                     >
@@ -154,17 +166,25 @@ const GRNTableRow: React.FC<{
                 >
                     <Eye className="w-4 h-4" />
                 </button>
-                {receipt.status === 'Approved' && receipt.approvalStatus === 'Approved' && (
-                    <button
-                        onClick={() => onFinalize(receipt.id!, 1)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary text-white 
-                            rounded-lg text-xs font-bold hover:bg-brand-primary/90 hover:scale-105 transition-all"
-                        title="إضافة للمخزن"
-                    >
-                        <Archive className="w-3.5 h-3.5" />
-                        <span>إضافة للمخزن</span>
-                    </button>
-                )}
+                {/* زر إضافة للمخزن: للإذونات التي تم اعتماد فحص الجودة لها فقط (تم الفحص أو إذن معتمد) */}
+                {(() => {
+                    const s = (receipt.status || '').toLowerCase();
+                    const qcApproved = receipt.status === 'Inspected';      // تم الفحص = اعتماد فحص الجودة
+                    const docApproved = receipt.status === 'Approved';     // إذن الإضافة معتمد (يشمل اعتماد الفحص)
+                    const notYetStored = s !== 'completed';
+                    const canAddToStore = (qcApproved || docApproved) && notYetStored;
+                    return canAddToStore && (
+                        <button
+                            onClick={() => onFinalize(receipt.id!, 1)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary text-white 
+                                rounded-lg text-xs font-bold hover:bg-brand-primary/90 hover:scale-105 transition-all"
+                            title="إضافة للمخزن"
+                        >
+                            <Archive className="w-3.5 h-3.5" />
+                            <span>إضافة للمخزن</span>
+                        </button>
+                    );
+                })()}
             </div>
         </td>
     </tr>
@@ -220,12 +240,15 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
     </tr>
 );
 
+const READY_FOR_STORE_STATUSES = ['Inspected', 'Pending Approval', 'Approved'];
+
 const GRNsPage: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [receipts, setReceipts] = useState<GoodsReceiptNoteDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<'all' | 'ready'>('all'); // افتراضي: الكل حتى تظهر الأذونات الجديدة (بانتظار الفحص وغيرها)
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
 
@@ -251,15 +274,17 @@ const GRNsPage: React.FC = () => {
                 r.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 r.poNumber?.toLowerCase().includes(searchTerm.toLowerCase());
             const isNotReturned = r.status?.toLowerCase() !== 'returned';
-            return matchesSearch && isNotReturned;
+            const matchesStatus = statusFilter === 'all' || (r.status && READY_FOR_STORE_STATUSES.includes(r.status));
+            return matchesSearch && isNotReturned && matchesStatus;
         });
-        // الأحدث فوق والأقدم تحت
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
             const dateA = a.grnDate ? new Date(a.grnDate).getTime() : 0;
             const dateB = b.grnDate ? new Date(b.grnDate).getTime() : 0;
-            return dateB - dateA;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
-    }, [receipts, searchTerm]);
+    }, [receipts, searchTerm, statusFilter]);
 
     const paginatedReceipts = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
@@ -268,14 +293,16 @@ const GRNsPage: React.FC = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, statusFilter]);
 
     const stats = useMemo(() => {
         const activeReceipts = receipts.filter(r => r.status?.toLowerCase() !== 'returned');
+        const readyForStore = activeReceipts.filter(r => r.status && READY_FOR_STORE_STATUSES.includes(r.status));
         return {
             total: activeReceipts.length,
+            readyForStore: readyForStore.length,
             today: activeReceipts.filter(r => new Date(r.grnDate!).toDateString() === new Date().toDateString()).length,
-            totalQty: activeReceipts.reduce((sum, r) => sum + (r.totalReceivedQty || 0), 0).toLocaleString()
+            totalQty: formatNumber(activeReceipts.reduce((sum, r) => sum + (r.totalReceivedQty || 0), 0))
         };
     }, [receipts]);
 
@@ -337,7 +364,7 @@ const GRNsPage: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">إذن إضافة (GRN)</h1>
-                            <p className="text-white/70 text-lg">متابعة توريدات المخازن بناءً على أوامر الشراء</p>
+                            <p className="text-white/70 text-lg">بعد فحص الجودة — أذونات جاهزة للإدخال للمخازن</p>
                         </div>
                     </div>
 
@@ -364,7 +391,13 @@ const GRNsPage: React.FC = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <StatCard
+                    icon={Archive}
+                    value={stats.readyForStore}
+                    label="جاهزة للإدخال للمخازن"
+                    color="success"
+                />
                 <StatCard
                     icon={FileText}
                     value={stats.total}
@@ -381,13 +414,31 @@ const GRNsPage: React.FC = () => {
                     icon={Package}
                     value={stats.totalQty}
                     label="إجمالي الكميات المستلمة"
-                    color="success"
+                    color="purple"
                 />
             </div>
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setStatusFilter('ready')}
+                            className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${statusFilter === 'ready'
+                                ? 'bg-emerald-500 text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            جاهزة للتخزين (بعد فحص الجودة)
+                        </button>
+                        <button
+                            onClick={() => setStatusFilter('all')}
+                            className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${statusFilter === 'all'
+                                ? 'bg-brand-primary text-white shadow-lg'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            الكل
+                        </button>
+                    </div>
                     <div className="relative flex-1">
                         <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
                             transition-colors duration-200

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Receipt, RefreshCw, Eye, FileText } from 'lucide-react';
 import { salesInvoiceService, type SalesInvoiceDto } from '../../services/salesInvoiceService';
 import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const SalesInvoiceListPage: React.FC = () => {
@@ -33,10 +34,12 @@ const SalesInvoiceListPage: React.FC = () => {
             (inv.invoiceNumber || '').toLowerCase().includes(search.toLowerCase()) ||
             (inv.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
         );
+        // الأحدث في الأعلى
         return [...f].sort((a, b) => {
-            const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.id ?? 0);
-            const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0;
+            const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [list, search]);
 
@@ -114,11 +117,11 @@ const SalesInvoiceListPage: React.FC = () => {
                                 paginated.map((inv) => (
                                     <tr key={inv.id} className="border-b border-slate-100 hover:bg-purple-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-purple-700">{inv.invoiceNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{inv.invoiceDate ? formatDate(inv.invoiceDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{inv.customerNameAr || '—'}</td>
-                                        <td className="px-6 py-4">{(inv.totalAmount ?? 0).toLocaleString('ar-EG')} {inv.currency || ''}</td>
-                                        <td className="px-6 py-4 text-emerald-600">{(inv.paidAmount ?? 0).toLocaleString('ar-EG')}</td>
-                                        <td className="px-6 py-4">{(inv.remainingAmount ?? 0).toLocaleString('ar-EG')}</td>
+                                        <td className="px-6 py-4">{formatNumber(inv.totalAmount ?? 0)} {inv.currency || ''}</td>
+                                        <td className="px-6 py-4 text-emerald-600">{formatNumber(inv.paidAmount ?? 0)}</td>
+                                        <td className="px-6 py-4">{formatNumber(inv.remainingAmount ?? 0)}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/invoices/${inv.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
                                         </td>

@@ -18,6 +18,7 @@ import {
     AlertCircle,
     Trash2
 } from 'lucide-react';
+import { formatNumber, formatDate } from '../../utils/format';
 import purchaseService, { type SupplierQuotation } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -121,7 +122,7 @@ const QuotationTableRow: React.FC<{
         <td className="px-6 py-4 text-sm text-slate-600">
             <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{new Date(quotation.quotationDate).toLocaleDateString('ar-EG')}</span>
+                <span>{formatDate(quotation.quotationDate)}</span>
             </div>
         </td>
         <td className="px-6 py-4 text-sm text-slate-600 font-bold">
@@ -133,7 +134,7 @@ const QuotationTableRow: React.FC<{
         <td className="px-6 py-4 text-sm text-slate-800 font-bold text-left">
             <div className="flex items-center justify-end gap-2">
                 <DollarSign className="w-4 h-4 text-emerald-500" />
-                <span>{quotation.totalAmount?.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} {quotation.currency}</span>
+                <span>{formatNumber(quotation.totalAmount, { minimumFractionDigits: 2 })} {quotation.currency}</span>
             </div>
         </td>
         <td className="px-6 py-4 text-sm text-slate-600">
@@ -259,11 +260,12 @@ const SupplierQuotationsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || q.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        // الأحدث فوق والأقدم تحت
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
-            const dateA = a.quotationDate ? new Date(a.quotationDate).getTime() : (a.id ?? 0);
-            const dateB = b.quotationDate ? new Date(b.quotationDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.quotationDate ? new Date(a.quotationDate).getTime() : 0;
+            const dateB = b.quotationDate ? new Date(b.quotationDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [quotations, searchTerm, statusFilter, showExpired]);
 
@@ -287,7 +289,7 @@ const SupplierQuotationsPage: React.FC = () => {
             total,
             received: quotations.filter(q => q.status === 'Received').length,
             selected: quotations.filter(q => q.status === 'Selected').length,
-            avgAmount: avgAmount.toLocaleString('ar-EG', { maximumFractionDigits: 0 })
+            avgAmount: formatNumber(avgAmount, { maximumFractionDigits: 0 })
         };
     }, [quotations]);
 

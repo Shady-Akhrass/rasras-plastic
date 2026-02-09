@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import purchaseService, { type PurchaseRequisition, type PRLifecycle } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
+import { formatDate } from '../../utils/format';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import PRLifecycleTracker from '../../components/procurement/PRLifecycleTracker';
 import toast from 'react-hot-toast';
@@ -155,7 +156,7 @@ const PRTableRow: React.FC<{
             <td className="px-6 py-4 text-sm text-slate-600">
                 <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-slate-400" />
-                    <span>{new Date(pr.prDate || '').toLocaleDateString('ar-EG')}</span>
+                    <span>{formatDate(pr.prDate || '')}</span>
                 </div>
             </td>
             <td className="px-6 py-4 text-sm text-slate-600">
@@ -241,7 +242,7 @@ const PRTableRow: React.FC<{
                             <span className="mr-3 text-slate-600">جاري تحميل بيانات التتبع...</span>
                         </div>
                     ) : lifecycle ? (
-                        <PRLifecycleTracker lifecycle={lifecycle} />
+                        <PRLifecycleTracker lifecycle={lifecycle} prId={pr.id} />
                     ) : (
                         <div className="text-center py-8 text-slate-500">
                             لا توجد بيانات تتبع متاحة
@@ -419,11 +420,12 @@ const PurchaseRequisitionsPage: React.FC = () => {
             return matchesSearch && matchesStatus;
         });
         
-        // Sort: Newest first
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
             const dateA = a.prDate ? new Date(a.prDate).getTime() : 0;
             const dateB = b.prDate ? new Date(b.prDate).getTime() : 0;
-            return dateB - dateA;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [prs, searchTerm, statusFilter]);
 

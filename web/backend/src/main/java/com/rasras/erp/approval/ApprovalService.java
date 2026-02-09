@@ -135,12 +135,20 @@ public class ApprovalService {
     }
 
     @Transactional
-    public void processAction(Integer requestId, Integer actionByUserId, String actionType, String comments) {
+    public void processAction(Integer requestId, Integer actionByUserId, String actionType, String comments, Integer warehouseId) {
         ApprovalRequest request = requestRepo.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
 
         User actor = userRepo.findById(actionByUserId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // عند اعتماد إذن الإضافة: تحديث المخزن المختار قبل تطبيق الاعتماد
+        if ("GoodsReceiptNote".equalsIgnoreCase(request.getDocumentType()) && "Approved".equalsIgnoreCase(actionType) && warehouseId != null) {
+            grnRepo.findById(request.getDocumentId()).ifPresent(grn -> {
+                grn.setWarehouseId(warehouseId);
+                grnRepo.save(grn);
+            });
+        }
 
         // 1. Log the action
         ApprovalAction action = ApprovalAction.builder()
@@ -223,31 +231,38 @@ public class ApprovalService {
                 prRepo.save(pr);
             });
         } else if ("GoodsReceiptNote".equalsIgnoreCase(type)) {
-            grnRepo.findById(id).ifPresent(grn -> {
+            grnRepo.findByIdWithItems(id).ifPresent(grn -> {
                 grn.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
-                    grn.setStatus("Completed");
-                    supplierInvoiceService.createInvoiceFromGRN(grn.getId());
+                    grn.setStatus("Approved");
 
-                    // Policy: Stock updated only after quality acceptance (إذن إضافة)
-                    // submitGRN enforces Status=Inspected before approval; here we add accepted quantities only
-                    if (grn.getItems() != null) {
+                    // تحديث أرصدة المخزون تلقائياً عند الاعتماد (أولاً لضمان ظهور الأصناف)
+                    if (grn.getItems() != null && grn.getWarehouseId() != null) {
                         for (GRNItem item : grn.getItems()) {
-                            BigDecimal qtyToAdd = item.getAcceptedQty() != null ? item.getAcceptedQty() : java.math.BigDecimal.ZERO;
-                            if (qtyToAdd.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                            BigDecimal qtyToRecord = item.getAcceptedQty() != null ? item.getAcceptedQty() : item.getReceivedQty();
+                            if (qtyToRecord != null && qtyToRecord.compareTo(BigDecimal.ZERO) > 0) {
                                 inventoryService.updateStock(
                                         item.getItem().getId(),
                                         grn.getWarehouseId(),
-                                        qtyToAdd,
+                                        qtyToRecord,
                                         "IN",
                                         "GRN",
                                         "GoodsReceiptNote",
                                         grn.getId(),
                                         grn.getGrnNumber(),
-                                        item.getUnitCost(),
+                                        item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO,
                                         userId);
                             }
                         }
+                        grn.setStatus("Completed");
+                        grn.setUpdatedBy(userId);
+                        grn.setUpdatedAt(LocalDateTime.now());
+                    }
+
+                    try {
+                        supplierInvoiceService.createInvoiceFromGRN(grn.getId());
+                    } catch (Exception e) {
+                        // فاتورة المورد قد تفشل لكن المخزون تم تحديثه
                     }
                 }
                 grnRepo.save(grn);

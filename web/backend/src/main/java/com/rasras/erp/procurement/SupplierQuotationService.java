@@ -79,6 +79,49 @@ public class SupplierQuotationService {
                 return mapToDto(savedQuotation);
         }
 
+        @Transactional
+        public SupplierQuotationDto updateQuotation(Integer id, SupplierQuotationDto dto) {
+                SupplierQuotation quotation = quotationRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Quotation not found"));
+
+                quotation.setQuotationNumber(dto.getQuotationNumber());
+                quotation.setQuotationDate(dto.getQuotationDate());
+                quotation.setValidUntilDate(dto.getValidUntilDate());
+                quotation.setCurrency(dto.getCurrency() != null ? dto.getCurrency() : "EGP");
+                quotation.setExchangeRate(dto.getExchangeRate());
+                quotation.setPaymentTerms(dto.getPaymentTerms());
+                quotation.setDeliveryTerms(dto.getDeliveryTerms());
+                quotation.setDeliveryDays(dto.getDeliveryDays());
+                quotation.setDeliveryCost(dto.getDeliveryCost());
+                quotation.setTotalAmount(dto.getTotalAmount());
+                quotation.setNotes(dto.getNotes());
+                quotation.setSupplier(supplierRepository.findById(dto.getSupplierId())
+                                .orElseThrow(() -> new RuntimeException("Supplier not found")));
+
+                if (dto.getRfqId() != null) {
+                        quotation.setRfq(rfqRepository.findById(dto.getRfqId())
+                                        .orElseThrow(() -> new RuntimeException("RFQ not found")));
+                } else {
+                        quotation.setRfq(null);
+                }
+
+                // Replace items: remove existing and add from dto
+                if (quotation.getItems() != null) {
+                        quotation.getItems().clear();
+                } else {
+                        quotation.setItems(new ArrayList<>());
+                }
+                if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+                        List<SupplierQuotationItem> items = dto.getItems().stream()
+                                        .map(itemDto -> mapItemToEntity(itemDto, quotation))
+                                        .collect(Collectors.toList());
+                        quotation.getItems().addAll(items);
+                }
+
+                SupplierQuotation savedQuotation = quotationRepository.save(quotation);
+                return mapToDto(savedQuotation);
+        }
+
         private SupplierQuotationDto mapToDto(SupplierQuotation quotation) {
                 return SupplierQuotationDto.builder()
                                 .id(quotation.getId())

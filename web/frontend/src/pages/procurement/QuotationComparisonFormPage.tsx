@@ -21,6 +21,7 @@ import {
     RefreshCw
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
+import { formatNumber, formatDate } from '../../utils/format';
 import purchaseService, {
     type SupplierQuotation,
     type PurchaseRequisition,
@@ -607,7 +608,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 <option value="">حدد العرض الأفضل...</option>
                                 {formData.details?.map(d => (
                                     <option key={d.quotationId} value={d.quotationId}>
-                                        {d.supplierNameAr} - {d.totalPrice?.toLocaleString('ar-EG')} ج.م
+                                        {d.supplierNameAr} - {formatNumber(d.totalPrice)} ج.م
                                     </option>
                                 ))}
                             </select>
@@ -742,19 +743,32 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="text-center">
-                                                    <div className="font-bold text-brand-primary text-lg">
-                                                        {(detail.unitPrice || 0).toLocaleString()}
-                                                    </div>
-                                                    <div className="text-[10px] text-slate-400 font-semibold">
-                                                        للوحدة الواحدة
-                                                    </div>
-                                                </div>
+                                                {(() => {
+                                                    const q = quotations.find(qu => qu.id === detail.quotationId);
+                                                    const prices = q?.items?.map(i => i.unitPrice).filter((p): p is number => p != null && p > 0) ?? [];
+                                                    const hasMultiple = prices.length > 1;
+                                                    return (
+                                                        <div className="text-center">
+                                                            <div className={`font-bold text-brand-primary ${hasMultiple ? 'text-sm leading-relaxed' : 'text-lg'}`}>
+                                                                {hasMultiple
+                                                                    ? prices.map((p, i) => (
+                                                                        <span key={i}>
+                                                                            {formatNumber(p)}{i < prices.length - 1 ? ' ، ' : ''}
+                                                                        </span>
+                                                                    ))
+                                                                    : formatNumber(detail.unitPrice ?? (prices[0] ?? 0))}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400 font-semibold">
+                                                                {hasMultiple ? 'للوحدة (أصناف متعددة)' : 'للوحدة الواحدة'}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="text-center">
                                                     <div className="font-black text-emerald-600 text-xl">
-                                                        {(detail.totalPrice || 0).toLocaleString()}
+                                                        {formatNumber(detail.totalPrice ?? 0)}
                                                     </div>
                                                     <div className="text-xs text-slate-400 font-semibold mt-1">
                                                         جنيه مصري
@@ -804,7 +818,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                     <Calendar className="w-4 h-4" />
                                                     <span className="text-xs font-bold">
                                                         {detail.validUntilDate
-                                                            ? new Date(detail.validUntilDate).toLocaleDateString('ar-EG')
+                                                            ? formatDate(detail.validUntilDate)
                                                             : '-'}
                                                     </span>
                                                 </div>
@@ -812,7 +826,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                                             <td className="px-6 py-4">
                                                 <div className="text-center">
                                                     <div className="font-bold text-slate-700">
-                                                        {(detail.deliveryCost || 0).toLocaleString()}
+                                                        {formatNumber(detail.deliveryCost ?? 0)}
                                                     </div>
                                                     <div className="text-[10px] text-slate-400 font-semibold">
                                                         جنيه مصري

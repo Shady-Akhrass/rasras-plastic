@@ -25,6 +25,7 @@ import { grnService } from '../../services/grnService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 const PurchaseReturnFormPage: React.FC = () => {
@@ -446,10 +447,10 @@ const PurchaseReturnFormPage: React.FC = () => {
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-semibold text-slate-600 text-sm">
-                                                {item.taxAmount.toLocaleString()}
+                                                {formatNumber(item.taxAmount)}
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                {item.totalPrice.toLocaleString()}
+                                                {formatNumber(item.totalPrice)}
                                             </td>
                                             <td className="py-4 pr-4">
                                                 <input
@@ -507,18 +508,18 @@ const PurchaseReturnFormPage: React.FC = () => {
                         <div className="space-y-5 mt-6">
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60">قيمة البضاعة</span>
-                                <span className="font-bold text-lg">{formData.subTotal.toLocaleString()} ج.م</span>
+                                <span className="font-bold text-lg">{formatNumber(formData.subTotal)} ج.م</span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                                 <span className="text-emerald-400 font-semibold">الضريبة المستردة</span>
                                 <span className="font-bold text-lg text-emerald-400">
-                                    {formData.taxAmount.toLocaleString()} ج.م
+                                    {formatNumber(formData.taxAmount)} ج.م
                                 </span>
                             </div>
                             <div className="pt-6 border-t border-white/10">
                                 <div className="text-xs text-white/40 mb-2">إجمالي قيمة المرتجع</div>
                                 <div className="text-4xl font-black text-emerald-400">
-                                    {formData.totalAmount.toLocaleString()}
+                                    {formatNumber(formData.totalAmount)}
                                     <span className="text-sm font-bold mr-2">ج.م</span>
                                 </div>
                             </div>

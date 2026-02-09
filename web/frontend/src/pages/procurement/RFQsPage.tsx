@@ -18,6 +18,7 @@ import {
 import purchaseService, { type RFQ } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -116,7 +117,7 @@ const RFQTableRow: React.FC<{
         <td className="px-6 py-4 text-sm text-slate-600">
             <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{new Date(rfq.rfqDate || '').toLocaleDateString('ar-EG')}</span>
+                <span>{formatDate(rfq.rfqDate || '')}</span>
             </div>
         </td>
         <td className="px-6 py-4 text-sm text-slate-600">
@@ -139,7 +140,7 @@ const RFQTableRow: React.FC<{
                     new Date(rfq.responseDueDate).getTime() - new Date().getTime() < 86400000 * 2 ? 'text-amber-500' : 'text-slate-600'
                     }`}>
                     <Clock className="w-4 h-4" />
-                    <span>{new Date(rfq.responseDueDate).toLocaleDateString('ar-EG')}</span>
+                    <span>{formatDate(rfq.responseDueDate)}</span>
                 </div>
             ) : '-'}
         </td>
@@ -234,10 +235,12 @@ const RFQsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || rfq.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
+        // الأحدث في الأعلى: ترتيب تنازلي حسب التاريخ ثم حسب id
         return [...filtered].sort((a, b) => {
-            const dateA = a.rfqDate ? new Date(a.rfqDate).getTime() : (a.id ?? 0);
-            const dateB = b.rfqDate ? new Date(b.rfqDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.rfqDate ? new Date(a.rfqDate).getTime() : 0;
+            const dateB = b.rfqDate ? new Date(b.rfqDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [rfqs, searchTerm, statusFilter]);
 

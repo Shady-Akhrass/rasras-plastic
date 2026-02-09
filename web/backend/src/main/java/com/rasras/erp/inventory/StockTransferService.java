@@ -46,14 +46,18 @@ public class StockTransferService {
             throw new RuntimeException("From and to warehouse must be different");
         }
 
+        int createdBy = dto.getCreatedBy() != null ? dto.getCreatedBy() : (dto.getRequestedByUserId() != null ? dto.getRequestedByUserId() : 1);
+        LocalDateTime now = LocalDateTime.now();
         StockTransfer transfer = StockTransfer.builder()
                 .transferNumber(generateTransferNumber())
-                .transferDate(dto.getTransferDate() != null ? dto.getTransferDate() : LocalDateTime.now())
+                .transferDate(dto.getTransferDate() != null ? dto.getTransferDate() : now)
                 .fromWarehouse(fromWarehouse)
                 .toWarehouse(toWarehouse)
                 .requestedByUserId(dto.getRequestedByUserId() != null ? dto.getRequestedByUserId() : 1)
                 .status("Draft")
                 .notes(dto.getNotes())
+                .createdAt(now)
+                .createdBy(createdBy)
                 .build();
 
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
@@ -222,6 +226,7 @@ public class StockTransferService {
                 .shippedDate(entity.getShippedDate())
                 .receivedDate(entity.getReceivedDate())
                 .notes(entity.getNotes())
+                .createdBy(entity.getCreatedBy())
                 .build();
 
         if (entity.getItems() != null) {

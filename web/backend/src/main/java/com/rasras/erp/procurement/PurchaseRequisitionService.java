@@ -180,6 +180,7 @@ public class PurchaseRequisitionService {
                                                                 ? "Approved"
                                                                 : "Pending")
                                 .poNumbers(pos.stream().map(PurchaseOrder::getPoNumber).collect(Collectors.toList()))
+                                .poIds(pos.stream().map(PurchaseOrder::getId).collect(Collectors.toList()))
                                 .lastPoDate(pos.stream().map(PurchaseOrder::getPoDate).max(LocalDateTime::compareTo)
                                                 .orElse(null))
                                 .build());
@@ -194,6 +195,7 @@ public class PurchaseRequisitionService {
                                                                 : "In Progress")
                                 .grnNumbers(grns.stream().map(GoodsReceiptNote::getGrnNumber)
                                                 .collect(Collectors.toList()))
+                                .grnIds(grns.stream().map(GoodsReceiptNote::getId).collect(Collectors.toList()))
                                 .lastGrnDate(grns.stream().map(GoodsReceiptNote::getGrnDate)
                                                 .max(LocalDateTime::compareTo).orElse(null))
                                 .build());
@@ -246,6 +248,16 @@ public class PurchaseRequisitionService {
                         status = "In Progress";
                 }
 
+                Integer selectedQuotationId = null;
+                if (!comparisons.isEmpty()) {
+                        selectedQuotationId = comparisons.stream()
+                                        .filter(c -> "Approved".equals(c.getApprovalStatus()))
+                                        .map(c -> c.getSelectedQuotation() != null ? c.getSelectedQuotation().getId() : null)
+                                        .filter(java.util.Objects::nonNull)
+                                        .findFirst()
+                                        .orElse(null);
+                }
+
                 return PRLifecycleDto.SourcingStage.builder()
                                 .status(status)
                                 .rfqCount(rfqs.size())
@@ -255,6 +267,7 @@ public class PurchaseRequisitionService {
                                                 .count())
                                 .comparisonStatus(
                                                 comparisons.isEmpty() ? "None" : comparisons.get(0).getApprovalStatus())
+                                .selectedQuotationId(selectedQuotationId)
                                 .build();
         }
 

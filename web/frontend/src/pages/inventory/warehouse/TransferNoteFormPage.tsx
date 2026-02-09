@@ -6,6 +6,7 @@ import warehouseService from '../../../services/warehouseService';
 import type { WarehouseDto } from '../../../services/warehouseService';
 import { itemService } from '../../../services/itemService';
 import type { ItemDto } from '../../../services/itemService';
+import { stockBalanceService, type StockBalanceDto } from '../../../services/stockBalanceService';
 import { toast } from 'react-hot-toast';
 
 const TransferNoteFormPage: React.FC = () => {
@@ -16,6 +17,8 @@ const TransferNoteFormPage: React.FC = () => {
     const [finalizing, setFinalizing] = useState(false);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
+    const [sourceWarehouseBalances, setSourceWarehouseBalances] = useState<StockBalanceDto[]>([]);
+    const [loadingBalances, setLoadingBalances] = useState(false);
     const [stockLevels, setStockLevels] = useState<Record<number, number>>({});
     const [form, setForm] = useState<TransferNoteDto>({
         fromWarehouseId: 0,
@@ -48,6 +51,31 @@ const TransferNoteFormPage: React.FC = () => {
         }
     }, [id, isNew]);
 
+    // عند اختيار المخزن المصدر: جلب الأصناف التي لها رصيد فيه فقط
+    useEffect(() => {
+        if (!form.fromWarehouseId) {
+            setSourceWarehouseBalances([]);
+            setStockLevels({});
+            return;
+        }
+        setLoadingBalances(true);
+        stockBalanceService.getBalancesByWarehouse(form.fromWarehouseId)
+            .then((list) => {
+                setSourceWarehouseBalances(list);
+                const levels: Record<number, number> = {};
+                (list || []).forEach((b) => {
+                    const qty = b.quantityOnHand != null ? Number(b.quantityOnHand) : 0;
+                    if (b.itemId != null) levels[b.itemId] = qty;
+                });
+                setStockLevels(levels);
+            })
+            .catch(() => {
+                setSourceWarehouseBalances([]);
+                setStockLevels({});
+            })
+            .finally(() => setLoadingBalances(false));
+    }, [form.fromWarehouseId]);
+
     const addItem = () => {
         setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, quantity: 0, unitId: 0 }] }));
     };
@@ -60,36 +88,25 @@ const TransferNoteFormPage: React.FC = () => {
             const it = items.find((i) => i.id === (upd.itemId ?? arr[idx]?.itemId));
             arr[idx] = { ...arr[idx], ...upd, unitId: upd.unitId ?? it?.unitId ?? 0, unitNameAr: it?.unitName, itemNameAr: it?.itemNameAr };
 
-            // Check stock availability when item or warehouse changes
-            if ((upd.itemId || arr[idx]?.itemId) && f.fromWarehouseId) {
-                checkStockAvailability(arr[idx].itemId, f.fromWarehouseId);
-            }
-
             return { ...f, items: arr };
         });
     };
 
-    const checkStockAvailability = async (itemId: number, warehouseId: number) => {
-        if (!itemId || !warehouseId) return;
-        try {
-            const item = items.find(i => i.id === itemId);
-            if (item) {
-                setStockLevels(prev => ({ ...prev, [itemId]: item.currentStock || 0 }));
-            }
-        } catch (error) {
-            console.error('Error checking stock:', error);
+    // أصناف تظهر في القائمة: الموجودة في المخزن المصدر فقط (+ الصنف المختار حالياً في السطر عند التعديل)
+    const getItemOptionsForRow = (rowItemId?: number) => {
+        const fromSource = sourceWarehouseBalances.map((b) => ({
+            id: b.itemId,
+            itemNameAr: b.itemNameAr || '',
+            grade: b.grade,
+            itemCode: b.itemCode || ''
+        }));
+        const sourceIds = new Set(sourceWarehouseBalances.map((b) => b.itemId));
+        if (rowItemId && !sourceIds.has(rowItemId)) {
+            const fromAll = items.find((i) => i.id === rowItemId);
+            if (fromAll) fromSource.push({ id: fromAll.id!, itemNameAr: fromAll.itemNameAr, grade: fromAll.grade, itemCode: fromAll.itemCode || '' });
         }
+        return fromSource;
     };
-
-    useEffect(() => {
-        if (form.fromWarehouseId && form.items.length > 0) {
-            form.items.forEach(item => {
-                if (item.itemId) {
-                    checkStockAvailability(item.itemId, form.fromWarehouseId);
-                }
-            });
-        }
-    }, [form.fromWarehouseId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -131,11 +148,17 @@ const TransferNoteFormPage: React.FC = () => {
 
         setLoading(true);
         try {
+            // استخدام المستخدم الحالي المسجّل دخوله كـ "من طلب" و "من أنشأ"
+            const userStr = localStorage.getItem('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+            const currentUserId = user?.id ?? user?.userId ?? 1;
+            const payload = { ...form, requestedByUserId: currentUserId, createdBy: currentUserId };
+
             if (isNew) {
-                await transferNoteService.create(form);
+                await transferNoteService.create(payload);
                 toast.success('تم إنشاء إذن التحويل بنجاح');
             } else {
-                await transferNoteService.update(parseInt(id!), form);
+                await transferNoteService.update(parseInt(id!), payload);
                 toast.success('تم تحديث إذن التحويل بنجاح');
             }
             navigate('/dashboard/inventory/warehouse/transfer');
@@ -252,12 +275,17 @@ const TransferNoteFormPage: React.FC = () => {
                     <div className="flex items-center justify-between border-b pb-2 mb-4">
                         <div>
                             <h2 className="font-bold text-slate-800">البيان المحوّل</h2>
-                            <p className="text-xs text-slate-500 mt-1">تحويل أصناف من المخزن المصدر إلى المخزن الهدف</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                {form.fromWarehouseId
+                                    ? `الأصناف المعروضة هي الموجودة في المخزن المصدر فقط (${sourceWarehouseBalances.length} صنف)`
+                                    : 'اختر المخزن المصدر أولاً لعرض الأصناف المتاحة للتحويل'}
+                            </p>
                         </div>
                         <button
                             type="button"
                             onClick={addItem}
-                            className="flex items-center gap-2 px-4 py-2 bg-violet-100 text-violet-700 rounded-xl font-medium hover:bg-violet-200 transition-colors"
+                            disabled={!form.fromWarehouseId || loadingBalances}
+                            className="flex items-center gap-2 px-4 py-2 bg-violet-100 text-violet-700 rounded-xl font-medium hover:bg-violet-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Plus className="w-4 h-4" /> إضافة صنف
                         </button>
@@ -284,9 +312,18 @@ const TransferNoteFormPage: React.FC = () => {
                                                     onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })}
                                                     className="w-full min-w-[200px] px-2 py-1.5 border border-slate-300 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                                                     required
+                                                    disabled={!form.fromWarehouseId || loadingBalances}
                                                 >
-                                                    <option value="">اختر الصنف...</option>
-                                                    {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>)}
+                                                    <option value="">
+                                                        {!form.fromWarehouseId
+                                                            ? 'اختر المخزن المصدر أولاً...'
+                                                            : loadingBalances
+                                                                ? 'جاري التحميل...'
+                                                                : 'اختر الصنف...'}
+                                                    </option>
+                                                    {getItemOptionsForRow(it.itemId).map((i) => (
+                                                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>
+                                                    ))}
                                                 </select>
                                             </td>
                                             <td className="px-3 py-2">

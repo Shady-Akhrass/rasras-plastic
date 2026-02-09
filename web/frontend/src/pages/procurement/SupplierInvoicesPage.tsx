@@ -9,6 +9,7 @@ import {
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 import { grnService } from '../../services/grnService';
 import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -48,7 +49,7 @@ const StatCard: React.FC<{
                 </div>
                 <div className="flex-1">
                     <div className={`text-2xl font-bold ${active ? 'text-white' : 'text-slate-800'}`}>
-                        {typeof value === 'number' ? value.toLocaleString() : value}
+                        {typeof value === 'number' ? formatNumber(value) : value}
                         {suffix && <span className="text-sm font-medium mr-1 opacity-70">{suffix}</span>}
                     </div>
                     <div className={`text-sm ${active ? 'text-white/80' : 'text-slate-500'}`}>
@@ -219,12 +220,12 @@ const InvoiceRow: React.FC<{
             </td>
             <td className="px-6 py-4 text-center">
                 <div className="font-bold text-lg text-brand-primary">
-                    {invoice.totalAmount.toLocaleString()}
+                    {formatNumber(invoice.totalAmount)}
                     <span className="text-xs font-medium text-slate-400 mr-1">{invoice.currency}</span>
                 </div>
                 {invoice.paidAmount! > 0 && (
                     <div className="text-xs text-emerald-600 font-bold mt-0.5">
-                        مسدد: {invoice.paidAmount?.toLocaleString()}
+                        مسدد: {formatNumber(invoice.paidAmount)}
                     </div>
                 )}
             </td>
@@ -274,16 +275,16 @@ const InvoiceRow: React.FC<{
                             <div className="flex gap-4 text-xs font-bold">
                                 <div className="flex gap-1 text-slate-500">
                                     <span>الخصم:</span>
-                                    <span className="text-rose-600">{(invoice.discountAmount || 0).toLocaleString()}</span>
+                                    <span className="text-rose-600">{formatNumber(invoice.discountAmount ?? 0)}</span>
                                 </div>
                                 <div className="flex gap-1 text-slate-500">
                                     <span>الضريبة:</span>
-                                    <span className="text-amber-600">{(invoice.taxAmount || 0).toLocaleString()}</span>
+                                    <span className="text-amber-600">{formatNumber(invoice.taxAmount ?? 0)}</span>
                                 </div>
                                 {invoice.deliveryCost! > 0 && (
                                     <div className="flex gap-1 text-slate-500">
                                         <span>التوصيل:</span>
-                                        <span className="text-blue-600">{(invoice.deliveryCost || 0).toLocaleString()}</span>
+                                        <span className="text-blue-600">{formatNumber(invoice.deliveryCost ?? 0)}</span>
                                     </div>
                                 )}
                             </div>
@@ -307,7 +308,7 @@ const InvoiceRow: React.FC<{
                                             <td className="px-6 py-4 font-medium text-slate-700">{item.itemNameAr}</td>
                                             <td className="px-6 py-4 text-center font-bold text-brand-primary">{item.quantity}</td>
                                             <td className="px-6 py-4 text-center text-slate-500">{item.unitNameAr}</td>
-                                            <td className="px-6 py-4 text-center font-bold text-emerald-600">{item.unitPrice.toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-center font-bold text-emerald-600">{formatNumber(item.unitPrice)}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded text-[10px] font-bold border border-rose-100">
                                                     {item.discountPercentage || 0}%
@@ -318,7 +319,7 @@ const InvoiceRow: React.FC<{
                                                     {item.taxPercentage || 0}%
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-left font-bold text-slate-900">{item.totalPrice.toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-left font-bold text-slate-900">{formatNumber(item.totalPrice)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -384,7 +385,7 @@ const GRNRow: React.FC<{
         <td className="px-6 py-4 text-center">
             <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                {new Date(grn.grnDate!).toLocaleDateString('ar-EG')}
+                {formatDate(grn.grnDate!)}
             </span>
         </td>
         <td className="px-6 py-4 text-center">
@@ -531,10 +532,12 @@ const SupplierInvoicesPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || inv.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
-            const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : (a.id ?? 0);
-            const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0;
+            const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [invoices, searchTerm, statusFilter]);
 
@@ -544,10 +547,12 @@ const SupplierInvoicesPage: React.FC = () => {
             g.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             g.poNumber?.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
-            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : (a.id ?? 0);
-            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : 0;
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [pendingGRNs, searchTerm]);
 

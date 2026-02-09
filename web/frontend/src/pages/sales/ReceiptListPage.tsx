@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Banknote, RefreshCw, Eye, FileText } from 'lucide-react';
 import { receiptService, type ReceiptDto } from '../../services/receiptService';
 import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const RECEIPT_TYPE_LABELS: Record<string, string> = { FROM_CUSTOMER: 'من عميل', FROM_EMPLOYEE: 'من موظف', GENERAL_INCOME: 'إيراد عام', OTHER: 'أخرى' };
@@ -37,10 +38,12 @@ const ReceiptListPage: React.FC = () => {
             (r.depositorName || '').toLowerCase().includes(search.toLowerCase()) ||
             (r.invoiceNumber || '').toLowerCase().includes(search.toLowerCase())
         );
+        // الأحدث في الأعلى
         return [...f].sort((a, b) => {
-            const dateA = a.voucherDate ? new Date(a.voucherDate).getTime() : (a.id ?? 0);
-            const dateB = b.voucherDate ? new Date(b.voucherDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.voucherDate ? new Date(a.voucherDate).getTime() : 0;
+            const dateB = b.voucherDate ? new Date(b.voucherDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [list, search]);
 
@@ -120,11 +123,11 @@ const ReceiptListPage: React.FC = () => {
                                 paginated.map((r) => (
                                     <tr key={r.id} className="border-b border-slate-100 hover:bg-rose-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-rose-700">{r.voucherNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{r.voucherDate ? new Date(r.voucherDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{r.voucherDate ? formatDate(r.voucherDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{RECEIPT_TYPE_LABELS[r.receiptType || ''] || r.receiptType || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{r.depositorName || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{r.invoiceNumber || '—'}</td>
-                                        <td className="px-6 py-4 font-semibold">{(r.amount ?? 0).toLocaleString('ar-EG')} {r.currency || ''}</td>
+                                        <td className="px-6 py-4 font-semibold">{formatNumber(r.amount ?? 0)} {r.currency || ''}</td>
                                         <td className="px-6 py-4 text-slate-600">{PAYMENT_METHOD_LABELS[r.paymentMethod] || r.paymentMethod}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/receipts/${r.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>

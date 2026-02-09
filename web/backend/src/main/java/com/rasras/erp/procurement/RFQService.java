@@ -156,6 +156,7 @@ public class RFQService {
                                                 && !purchaseOrderRepository
                                                                 .findByPrId(rfq.getPurchaseRequisition().getId())
                                                                 .isEmpty())
+                                .hasQuotation(supplierQuotationRepository.existsByRfqId(rfq.getId()))
                                 .build();
         }
 
@@ -170,6 +171,7 @@ public class RFQService {
                                 .unitId(item.getUnit().getId())
                                 .unitName(item.getUnit().getUnitNameAr())
                                 .specifications(item.getSpecifications())
+                                .estimatedPrice(item.getEstimatedUnitPrice())
                                 .build();
         }
 
@@ -182,6 +184,7 @@ public class RFQService {
                                 .unit(unitRepository.findById(dto.getUnitId())
                                                 .orElseThrow(() -> new RuntimeException("Unit not found")))
                                 .specifications(dto.getSpecifications())
+                                .estimatedUnitPrice(dto.getEstimatedPrice())
                                 .build();
         }
 }

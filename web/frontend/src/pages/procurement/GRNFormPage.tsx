@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save, ArrowRight, Package, Info, Hash, FileText,
     Truck, ClipboardCheck, AlertCircle, Building2, CheckCircle2,
-    RefreshCw, Layers, CheckCircle, Eye, XCircle, Clock
+    RefreshCw, Layers, CheckCircle, Eye, XCircle, Clock, Archive, Bell
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../services/grnService';
@@ -11,6 +11,7 @@ import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto 
 import purchaseService from '../../services/purchaseService';
 import warehouseService from '../../services/warehouseService';
 import type { WarehouseDto, WarehouseLocationDto } from '../../services/warehouseService';
+import { formatNumber, formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 /**
@@ -391,11 +392,52 @@ const GRNFormPage: React.FC = () => {
         }
     };
 
+    // إشعار: جاهز للإضافة للمخزن بعد اعتماد فحص الجودة (تم الفحص أو إذن معتمد، ولم تتم الإضافة بعد)
+    const qualityApprovedReadyForStore = !isNew && form.status && ['Inspected', 'Approved'].includes(form.status) && form.status !== 'Completed';
+
+    const handleFinalizeStoreInFromPage = async () => {
+        if (!id) return;
+        if (!window.confirm('هل أنت متأكد من إضافة الشحنة للمخازن؟ سيتم تحديث أرصدة المخزون.')) return;
+        try {
+            setProcessing(true);
+            await grnService.finalizeStoreIn(parseInt(id), 1);
+            toast.success('تم إضافة الكميات للمخزون بنجاح');
+            const updated = await grnService.getGRNById(parseInt(id));
+            if (updated) setForm({ ...updated, items: updated.items || [] });
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'خطأ أثناء الإضافة للمخزن');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     // View mode for existing GRN
     if (!isNew && id) {
         const g = form as GoodsReceiptNoteDto;
         return (
             <div className="space-y-6 pb-20" dir="rtl">
+                {/* إشعار: تم اعتماد فحص الجودة — جاهز للإضافة للمخازن */}
+                {qualityApprovedReadyForStore && (
+                    <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border-2 border-emerald-200 bg-gradient-to-l from-emerald-50 to-green-50 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 rounded-xl bg-emerald-100">
+                                <Bell className="w-6 h-6 text-emerald-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-emerald-800 text-lg">تم اعتماد فحص الجودة</h3>
+                                <p className="text-emerald-700 text-sm mt-0.5">يمكنك الآن إضافة الشحنة للمخازن وتحديث الأرصدة.</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleFinalizeStoreInFromPage}
+                            disabled={processing}
+                            className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-md hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Archive className="w-5 h-5" />}
+                            <span>إضافة للمخزن</span>
+                        </button>
+                    </div>
+                )}
                 {/* Header */}
                 <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white shadow-2xl">
                     <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
@@ -461,7 +503,7 @@ const GRNFormPage: React.FC = () => {
                         </div>
                         <div>
                             <p className="text-xs text-slate-500 mb-1">التاريخ</p>
-                            <p className="font-semibold">{g.grnDate ? new Date(g.grnDate).toLocaleDateString('ar-EG') : '—'}</p>
+                            <p className="font-semibold">{g.grnDate ? formatDate(g.grnDate) : '—'}</p>
                         </div>
                         <div>
                             <p className="text-xs text-slate-500 mb-1">أمر الشراء</p>
@@ -701,7 +743,7 @@ const GRNFormPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-xs text-brand-primary mb-1">إجمالي التكلفة</p>
-                                    <p className="font-semibold text-slate-800">{totals.totalCost.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م</p>
+                                    <p className="font-semibold text-slate-800">{formatNumber(totals.totalCost, { minimumFractionDigits: 2 })} ج.م</p>
                                 </div>
                                 {!isNew && (
                                     <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-xl">
@@ -799,16 +841,16 @@ const GRNFormPage: React.FC = () => {
                                                                 disabled={isView}
                                                                 className="w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center font-bold outline-none 
-                                                                focus:border-brand-primary transition-all`}
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="text"
-                                                            value={rows[i.id!]?.lotNumber || ''}
-                                                            onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
-                                                            placeholder="LOT-XXX"
-                                                            className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                                focus:border-brand-primary transition-all"
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 px-3">
+                                                            <input
+                                                                type="text"
+                                                                value={rows[i.id!]?.lotNumber || ''}
+                                                                onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
+                                                                placeholder="LOT-XXX"
+                                                                className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                                 text-sm text-center outline-none focus:border-brand-primary transition-all"
                                                             />
                                                         </td>
@@ -928,7 +970,7 @@ const GRNFormPage: React.FC = () => {
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">إجمالي الكميات</span>
-                                <span className="font-bold text-lg text-brand-primary">{totals.totalQty.toLocaleString()}</span>
+                                <span className="font-bold text-lg text-brand-primary">{formatNumber(totals.totalQty)}</span>
                             </div>
                             <div className="p-4 bg-white/5 rounded-xl space-y-3">
                                 <label className="flex items-center gap-2 text-xs text-white/60 font-bold uppercase tracking-wider">
@@ -942,13 +984,13 @@ const GRNFormPage: React.FC = () => {
                             {!isNew && (
                                 <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                                     <span className="text-emerald-400 text-sm">تاريخ الإذن</span>
-                                    <span className="font-bold text-emerald-100">{form.grnDate ? new Date(form.grnDate).toLocaleDateString('ar-EG') : '—'}</span>
+                                    <span className="font-bold text-emerald-100">{form.grnDate ? formatDate(form.grnDate) : '—'}</span>
                                 </div>
                             )}
                             <div className="pt-6 border-t border-white/10">
                                 <div className="text-xs text-white/40 mb-2">إجمالي التكلفة</div>
                                 <div className="text-3xl font-black text-brand-primary">
-                                    {totals.totalCost.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    {formatNumber(totals.totalCost, { minimumFractionDigits: 2 })}
                                     <span className="text-sm font-bold opacity-70">ج.م</span>
                                 </div>
                             </div>

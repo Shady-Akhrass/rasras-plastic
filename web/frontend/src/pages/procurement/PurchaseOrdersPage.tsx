@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
 import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -128,7 +129,7 @@ const POTableRow: React.FC<{
         <td className="px-6 py-4 text-sm text-slate-600">
             <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{new Date(order.poDate!).toLocaleDateString('ar-EG')}</span>
+                <span>{formatDate(order.poDate!)}</span>
             </div>
         </td>
         <td className="px-6 py-4 text-sm font-medium text-slate-700">
@@ -136,7 +137,7 @@ const POTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-emerald-600">
-                {order.totalAmount.toLocaleString()} {order.currency}
+                {formatNumber(order.totalAmount)} {order.currency}
             </span>
         </td>
         <td className="px-6 py-4">
@@ -253,11 +254,12 @@ const PurchaseOrdersPage: React.FC = () => {
             const matchesPR = !prIdFilter || o.prId === parseInt(prIdFilter);
             return matchesSearch && matchesStatus && matchesPR;
         });
-        // الأحدث فوق والأقدم تحت
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
             const dateA = a.poDate ? new Date(a.poDate).getTime() : 0;
             const dateB = b.poDate ? new Date(b.poDate).getTime() : 0;
-            return dateB - dateA;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [orders, searchTerm, statusFilter, prIdFilter]);
 
@@ -274,7 +276,7 @@ const PurchaseOrdersPage: React.FC = () => {
         total: orders.length,
         pending: orders.filter(o => o.status === 'Draft' || o.status === 'Pending').length,
         active: orders.filter(o => o.status === 'PartiallyReceived').length,
-        totalValue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString()
+        totalValue: formatNumber(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0))
     }), [orders]);
 
     const handleViewOrder = (id: number) => {

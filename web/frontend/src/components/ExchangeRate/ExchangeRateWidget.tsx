@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { formatDate as formatDateEn } from '../../utils/format';
 import {
     DollarSign, TrendingUp, TrendingDown, RefreshCw,
     AlertCircle, Banknote, ArrowLeftRight
@@ -71,7 +72,7 @@ const ExchangeRateWidget = () => {
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('ar-EG', {
+        return formatDateEn(date, {
             day: 'numeric',
             month: 'long',
             year: 'numeric'

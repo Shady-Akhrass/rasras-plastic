@@ -33,10 +33,11 @@ export const approvalService = {
         }
     },
 
-    takeAction: async (requestId: number, userId: number, action: 'Approved' | 'Rejected', comments?: string) => {
-        const response = await apiClient.post('/approvals/' + requestId + '/action', null, {
-            params: { userId, action, comments }
-        });
+    takeAction: async (requestId: number, userId: number, action: 'Approved' | 'Rejected', comments?: string, warehouseId?: number) => {
+        const params: Record<string, string | number> = { userId, action };
+        if (comments) params.comments = comments;
+        if (warehouseId) params.warehouseId = warehouseId;
+        const response = await apiClient.post('/approvals/' + requestId + '/action', null, { params });
         return response.data;
     }
 };

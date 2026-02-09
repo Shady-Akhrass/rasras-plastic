@@ -25,6 +25,7 @@ import {
 import { supplierService, type SupplierOutstandingDto } from '../../services/supplierService';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
+import { formatNumber, formatDate } from '../../utils/format';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -96,29 +97,29 @@ const BalanceTableRow: React.FC<{
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span className="font-medium text-slate-600">
-                        {(summary.totalInvoiced || 0).toLocaleString()} {summary.currency || 'EGP'}
+                        {formatNumber(summary.totalInvoiced ?? 0)} {summary.currency || 'EGP'}
                     </span>
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span className="font-medium text-amber-600">
-                        {(summary.totalReturned || 0).toLocaleString()} {summary.currency || 'EGP'}
+                        {formatNumber(summary.totalReturned ?? 0)} {summary.currency || 'EGP'}
                     </span>
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span className="font-medium text-emerald-600">
-                        {(summary.totalPaid || 0).toLocaleString()} {summary.currency || 'EGP'}
+                        {formatNumber(summary.totalPaid ?? 0)} {summary.currency || 'EGP'}
                     </span>
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span className={`font-bold ${(summary.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        {Math.abs(summary.currentBalance || 0).toLocaleString()} {summary.currency || 'EGP'}
+                        {formatNumber(Math.abs(summary.currentBalance ?? 0))} {summary.currency || 'EGP'}
                         {(summary.currentBalance || 0) > 0 ? ' (لم يسدد)' : (summary.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
                     </span>
                 </td>
                 <td className="px-6 py-4 text-center">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
                         <CreditCard className="w-3 h-3" />
-                        {(summary.creditLimit || 0).toLocaleString()}
+                        {formatNumber(summary.creditLimit ?? 0)}
                     </div>
                 </td>
                 <td className="px-6 py-4">
@@ -175,10 +176,10 @@ const BalanceTableRow: React.FC<{
                                                             <span className="font-mono text-brand-primary">{inv.invoiceNumber}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-3 text-slate-600">{new Date(inv.invoiceDate).toLocaleDateString('ar-EG')}</td>
-                                                    <td className="px-4 py-3 font-medium">{inv.totalAmount.toLocaleString()}</td>
-                                                    <td className="px-4 py-3 text-emerald-600">{inv.paidAmount?.toLocaleString() || 0}</td>
-                                                    <td className="px-4 py-3 text-rose-600">{inv.remainingAmount?.toLocaleString() || 0}</td>
+                                                    <td className="px-4 py-3 text-slate-600">{formatDate(inv.invoiceDate)}</td>
+                                                    <td className="px-4 py-3 font-medium">{formatNumber(inv.totalAmount)}</td>
+                                                    <td className="px-4 py-3 text-emerald-600">{formatNumber(inv.paidAmount ?? 0)}</td>
+                                                    <td className="px-4 py-3 text-rose-600">{formatNumber(inv.remainingAmount ?? 0)}</td>
                                                     <td className="px-4 py-3 text-center">
                                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' :
                                                             inv.status === 'Partial' ? 'bg-amber-100 text-amber-700' :
@@ -213,10 +214,10 @@ const BalanceTableRow: React.FC<{
                                                                                 <td className="px-3 py-2 text-slate-700">{item.itemNameAr}</td>
                                                                                 <td className="px-3 py-2 text-center font-medium text-brand-primary">{item.quantity}</td>
                                                                                 <td className="px-3 py-2 text-center text-slate-600">{item.unitNameAr}</td>
-                                                                                <td className="px-3 py-2 text-center font-medium text-emerald-600">{item.unitPrice.toLocaleString()}</td>
+                                                                                <td className="px-3 py-2 text-center font-medium text-emerald-600">{formatNumber(item.unitPrice)}</td>
                                                                                 <td className="px-3 py-2 text-center text-rose-600">{item.discountPercentage || 0}%</td>
                                                                                 <td className="px-3 py-2 text-center text-amber-600">{item.taxPercentage || 0}%</td>
-                                                                                <td className="px-3 py-2 text-center font-bold text-slate-800">{item.totalPrice.toLocaleString()}</td>
+                                                                                <td className="px-3 py-2 text-center font-bold text-slate-800">{formatNumber(item.totalPrice)}</td>
                                                                             </tr>
                                                                         ))}
                                                                     </tbody>
@@ -263,14 +264,14 @@ const OrderTableRow: React.FC<{
             </div>
         </td>
         <td className="px-6 py-4 text-sm text-slate-600">
-            {new Date(order.poDate!).toLocaleDateString('ar-EG')}
+            {formatDate(order.poDate!)}
         </td>
         <td className="px-6 py-4 text-sm font-medium text-slate-700">
             {order.supplierNameAr}
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-emerald-600">
-                {order.totalAmount.toLocaleString()} {order.currency}
+                {formatNumber(order.totalAmount)} {order.currency}
             </span>
         </td>
         <td className="px-6 py-4 text-center">
@@ -360,7 +361,7 @@ const SupplierOutstandingPage: React.FC = () => {
     };
 
     const filteredSummaries = useMemo(() => {
-        return summaries.filter(s => {
+        const filtered = summaries.filter(s => {
             const matchesSearch =
                 s.supplierNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 s.supplierCode.toLowerCase().includes(searchTerm.toLowerCase());
@@ -372,15 +373,24 @@ const SupplierOutstandingPage: React.FC = () => {
 
             return matchesSearch && matchesFilter;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [summaries, searchTerm, filter]);
 
     const filteredOrders = useMemo(() => {
-        return orders.filter(o => {
+        const filtered = orders.filter(o => {
             const isClosed = o.status === 'Closed';
             const matchesSearch =
                 o.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 o.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
             return isClosed && matchesSearch;
+        });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => {
+            const dateA = a.poDate ? new Date(a.poDate).getTime() : 0;
+            const dateB = b.poDate ? new Date(b.poDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [orders, searchTerm]);
 
@@ -397,13 +407,13 @@ const SupplierOutstandingPage: React.FC = () => {
         const totalDelivery = allInvoices.reduce((sum, inv) => sum + (inv.deliveryCost || 0), 0);
 
         return {
-            totalOutstanding: totalOutstanding.toLocaleString(),
-            totalPaid: totalPaid.toLocaleString(),
-            totalInvoiced: totalInvoiced.toLocaleString(),
-            totalReturned: totalReturned.toLocaleString(),
-            totalTax: totalTax.toLocaleString(),
-            totalDiscount: totalDiscount.toLocaleString(),
-            totalDelivery: totalDelivery.toLocaleString(),
+            totalOutstanding: formatNumber(totalOutstanding),
+            totalPaid: formatNumber(totalPaid),
+            totalInvoiced: formatNumber(totalInvoiced),
+            totalReturned: formatNumber(totalReturned),
+            totalTax: formatNumber(totalTax),
+            totalDiscount: formatNumber(totalDiscount),
+            totalDelivery: formatNumber(totalDelivery),
             providersWithBalance
         };
     }, [summaries, allInvoices]);

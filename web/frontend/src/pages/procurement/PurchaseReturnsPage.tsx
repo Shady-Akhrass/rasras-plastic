@@ -16,6 +16,7 @@ import {
     X,
     Filter
 } from 'lucide-react';
+import { formatNumber, formatDate } from '../../utils/format';
 import { purchaseReturnService, type PurchaseReturnDto } from '../../services/purchaseReturnService';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
@@ -131,12 +132,12 @@ const ReturnTableRow: React.FC<{
         <td className="px-6 py-4 text-center">
             <div className="inline-flex items-center gap-2 text-sm text-slate-600">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{new Date(returnItem.returnDate).toLocaleDateString('ar-EG')}</span>
+                <span>{formatDate(returnItem.returnDate)}</span>
             </div>
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-rose-600">
-                {returnItem.totalAmount.toLocaleString()} ج.م
+                {formatNumber(returnItem.totalAmount)} ج.م
             </span>
         </td>
         <td className="px-6 py-4 text-center">
@@ -239,11 +240,12 @@ const PurchaseReturnsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        // الأحدث فوق والأقدم تحت
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
             const dateA = a.returnDate ? new Date(a.returnDate).getTime() : 0;
             const dateB = b.returnDate ? new Date(b.returnDate).getTime() : 0;
-            return dateB - dateA;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [returns, searchTerm, statusFilter]);
 
@@ -260,7 +262,7 @@ const PurchaseReturnsPage: React.FC = () => {
         total: returns.length,
         pending: returns.filter(r => r.status === 'Draft' || r.status === 'Pending').length,
         approved: returns.filter(r => r.status === 'Approved').length,
-        totalValue: returns.reduce((sum, r) => sum + (r.totalAmount || 0), 0).toLocaleString()
+        totalValue: formatNumber(returns.reduce((sum, r) => sum + (r.totalAmount || 0), 0))
     }), [returns]);
 
     const handleViewReturn = (id: number) => {

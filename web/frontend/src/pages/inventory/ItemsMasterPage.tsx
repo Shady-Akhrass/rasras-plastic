@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { stockBalanceService } from '../../services/stockBalanceService';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatNumber } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 // Stat Card Component
@@ -222,7 +223,7 @@ const ItemRow: React.FC<{
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
                         <span className="text-lg font-bold text-slate-800">
-                            {(item.currentStock || 0).toLocaleString()}
+                            {formatNumber(item.currentStock ?? 0)}
                         </span>
                         <StockStatusBadge
                             currentStock={item.currentStock}
@@ -255,14 +256,14 @@ const ItemRow: React.FC<{
                     <div className="flex items-center gap-2">
                         <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
                         <span className="text-sm text-slate-600">
-                            {item.lastPurchasePrice ? `${item.lastPurchasePrice.toLocaleString()}` : '---'}
+                            {item.lastPurchasePrice != null ? formatNumber(item.lastPurchasePrice) : '---'}
                         </span>
                     </div>
                     {/* Standard Cost */}
                     <div className="flex items-center gap-2">
                         <DollarSign className="w-3.5 h-3.5 text-slate-400" />
                         <span className="text-xs text-slate-400">
-                            تكلفة: {item.standardCost ? `${item.standardCost.toLocaleString()}` : '---'}
+                            تكلفة: {item.standardCost != null ? formatNumber(item.standardCost) : '---'}
                         </span>
                     </div>
                 </div>
@@ -274,7 +275,7 @@ const ItemRow: React.FC<{
                     <div className="flex items-center gap-2">
                         <ShoppingBag className="w-3.5 h-3.5 text-emerald-500" />
                         <span className="font-bold text-emerald-600">
-                            {item.lastSalePrice ? `${item.lastSalePrice.toLocaleString()}` : '---'}
+                            {item.lastSalePrice != null ? formatNumber(item.lastSalePrice) : '---'}
                         </span>
                     </div>
                     {profitMargin && (
@@ -536,7 +537,7 @@ const ItemsMasterPage: React.FC = () => {
 
     // Filtered Items
     const filteredItems = useMemo(() => {
-        return items.filter(item => {
+        const filtered = items.filter(item => {
             // Search filter
             const matchesSearch =
                 item.itemNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -569,6 +570,8 @@ const ItemsMasterPage: React.FC = () => {
 
             return matchesSearch && matchesStatus && matchesType && matchesCategory && matchesStock;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [items, searchTerm, filterStatus, filterType, filterCategory, filterStock]);
 
     // Pagination

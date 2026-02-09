@@ -28,4 +28,11 @@ public class SupplierQuotationController {
     public ResponseEntity<ApiResponse<SupplierQuotationDto>> createQuotation(@RequestBody SupplierQuotationDto dto) {
         return ResponseEntity.ok(ApiResponse.success(quotationService.createQuotation(dto)));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<SupplierQuotationDto>> updateQuotation(
+            @PathVariable Integer id,
+            @RequestBody SupplierQuotationDto dto) {
+        return ResponseEntity.ok(ApiResponse.success(quotationService.updateQuotation(id, dto)));
+    }
 }

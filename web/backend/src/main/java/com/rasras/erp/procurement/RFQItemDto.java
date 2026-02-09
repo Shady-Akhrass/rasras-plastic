@@ -21,4 +21,5 @@ public class RFQItemDto {
     private Integer unitId;
     private String unitName; // UI helper
     private String specifications;
+    private BigDecimal estimatedPrice; // السعر التقريبي من طلب الشراء/طلب السعر
 }
