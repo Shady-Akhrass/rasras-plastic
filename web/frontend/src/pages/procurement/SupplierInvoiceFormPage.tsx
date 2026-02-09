@@ -64,6 +64,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
         discountAmount: 0,
         taxAmount: 0,
         deliveryCost: 0,
+        otherCosts: 0,
         totalAmount: 0,
         status: 'Unpaid',
         items: []
@@ -99,10 +100,11 @@ const SupplierInvoiceFormPage: React.FC = () => {
             };
         });
 
-        // Logic: Delivery = Total - NetItems
+        // Logic: Delivery = Total - NetItems - Other (matching PO logic)
         const currentTotal = Number(invoice.totalAmount) || 0;
+        const otherCosts = Number(invoice.otherCosts) || 0;
         const netItems = (subTotalSum - totalDiscountSum) + totalTaxSum;
-        const derivedDelivery = Math.max(0, currentTotal - netItems);
+        const derivedDelivery = Math.max(0, currentTotal - netItems - otherCosts);
 
         return {
             ...invoice,
@@ -111,6 +113,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
             discountAmount: totalDiscountSum,
             taxAmount: totalTaxSum,
             deliveryCost: derivedDelivery,
+            otherCosts,
             totalAmount: currentTotal // Source of truth
         };
     };
@@ -199,15 +202,20 @@ const SupplierInvoiceFormPage: React.FC = () => {
                 const mappedData: SupplierInvoiceDto = {
                     ...formData,
                     poId: po.id,
+                    poNumber: po.poNumber,
                     invoiceDate: new Date().toISOString().split('T')[0],
                     supplierId: po.supplierId,
                     currency: po.currency || 'EGP',
                     exchangeRate: po.exchangeRate || 1,
                     totalAmount: po.totalAmount || 0,
+                    deliveryCost: po.shippingCost || 0,
+                    otherCosts: po.otherCosts || 0,
                     notes: `تم الإنشاء من أمر شراء رقم: ${po.poNumber}`,
                     items: (po.items || []).map(i => ({
                         itemId: i.itemId,
+                        itemNameAr: i.itemNameAr,
                         unitId: i.unitId,
+                        unitNameAr: i.unitNameAr,
                         quantity: i.orderedQty,
                         unitPrice: i.unitPrice,
                         discountPercentage: i.discountPercentage || 0,
@@ -240,7 +248,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
             setLoading(true);
             const grn = await grnService.getGRNById(gId);
             if (grn) {
-                const mappedData: SupplierInvoiceDto = {
+                let mappedData: SupplierInvoiceDto = {
                     ...formData,
                     grnId: gId,
                     grnNumber: grn.grnNumber,
@@ -248,7 +256,9 @@ const SupplierInvoiceFormPage: React.FC = () => {
                     notes: `تم الإنشاء من إذن إضافة رقم: ${grn.grnNumber}`,
                     items: grn.items.map(gItem => ({
                         itemId: gItem.itemId,
+                        itemNameAr: gItem.itemNameAr,
                         unitId: gItem.unitId,
+                        unitNameAr: gItem.unitNameAr,
                         quantity: gItem.acceptedQty || gItem.receivedQty,
                         unitPrice: gItem.unitCost || 0,
                         discountPercentage: 0,
@@ -281,13 +291,16 @@ const SupplierInvoiceFormPage: React.FC = () => {
                 const mappedData: SupplierInvoiceDto = {
                     ...formData,
                     supplierId: quotation.supplierId,
+                    quotationId: qId,
                     currency: quotation.currency || 'EGP',
                     exchangeRate: quotation.exchangeRate || 1,
                     totalAmount: quotation.totalAmount || 0,
                     notes: `تم الإنشاء من عرض سعر رقم: ${quotation.quotationNumber}.`,
                     items: quotation.items.map(qItem => ({
                         itemId: qItem.itemId,
+                        itemNameAr: qItem.itemNameAr,
                         unitId: qItem.unitId,
+                        unitNameAr: qItem.unitName,
                         quantity: qItem.offeredQty,
                         unitPrice: qItem.unitPrice,
                         discountPercentage: qItem.discountPercentage || 0,
@@ -330,8 +343,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const loadPurchaseOrders = async () => {
         try {
             const pos = await purchaseOrderService.getAllPOs();
-            const poArray = Array.isArray(pos) ? pos : pos?.data ? (Array.isArray(pos.data) ? pos.data : []) : [];
-            setPurchaseOrders(poArray);
+            setPurchaseOrders(Array.isArray(pos) ? pos : []);
         } catch (error) {
             console.error('Failed to load purchase orders:', error);
         }
@@ -406,9 +418,6 @@ const SupplierInvoiceFormPage: React.FC = () => {
     };
 
     const totalItems = optimisticData.items?.length || 0;
-    const netItemsTotal = ((optimisticData.subTotal || 0) - (optimisticData.discountAmount || 0) + (optimisticData.taxAmount || 0));
-    const finalTotal = Number(optimisticData.totalAmount) || 0;
-    const derivedDelivery = finalTotal - netItemsTotal;
 
     if (loading && (grnId || quotationId)) {
         return (
@@ -723,11 +732,21 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                 </span>
                             </div>
 
+                            {/* Other Costs */}
+                            {optimisticData.otherCosts! > 0 && (
+                                <div className="flex justify-between items-center p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                                    <span className="text-purple-400 font-semibold text-sm">مصاريف أخرى</span>
+                                    <span className="font-bold text-lg text-purple-400">
+                                        {formatNumber(optimisticData.otherCosts || 0, { minimumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                            )}
+
                             {/* Delivery Cost */}
                             <div className="flex justify-between items-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                                 <span className="text-blue-400 font-semibold text-sm">مصاريف الشحن</span>
-                                <span className={`font-bold text-lg ${derivedDelivery < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
-                                    {derivedDelivery.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                <span className={`font-bold text-lg ${optimisticData.deliveryCost! < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
+                                    {formatNumber(optimisticData.deliveryCost || 0, { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
 

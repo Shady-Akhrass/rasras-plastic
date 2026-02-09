@@ -23,10 +23,12 @@ const calculateInvoiceItemTotal = (item: SupplierInvoiceItemDto): number => {
 };
 
 // Calculates the full invoice breakdown
-// Note: TotalAmount is the Source of Truth (User Input), Delivery is Derived
+// Matching PurchaseOrderFormPage and SupplierOutstandingPage logic
 const calculateInvoiceGrandTotal = (invoice: SupplierInvoiceDto): SupplierInvoiceDto => {
     if (!invoice.items || invoice.items.length === 0) {
-        return { ...invoice, deliveryCost: invoice.totalAmount || 0 };
+        const deliveryCost = invoice.deliveryCost || 0;
+        const totalAmount = invoice.totalAmount || deliveryCost;
+        return { ...invoice, deliveryCost, totalAmount };
     }
 
     let subTotal = 0;
@@ -34,16 +36,20 @@ const calculateInvoiceGrandTotal = (invoice: SupplierInvoiceDto): SupplierInvoic
     let totalTaxAmount = 0;
 
     const updatedItems = invoice.items.map(item => {
-        const gross = item.quantity * item.unitPrice;
-        const discountAmount = (gross * (item.discountPercentage || 0)) / 100;
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const discountRate = (Number(item.discountPercentage) || 0) / 100;
+        const taxRate = (Number(item.taxPercentage) || 0) / 100;
 
-        // Net before tax
-        const taxableAmount = gross - discountAmount;
-
-        const taxAmount = (taxableAmount * (item.taxPercentage || 0)) / 100;
+        // Math: Gross -> Discount -> Tax on Taxable Amount
+        const grossAmount = qty * price;
+        const discountAmount = grossAmount * discountRate;
+        const taxableAmount = grossAmount - discountAmount;
+        const taxAmount = taxableAmount * taxRate;
         const totalPrice = taxableAmount + taxAmount;
 
-        subTotal += gross;
+        // Accumulate Global Totals
+        subTotal += grossAmount;
         totalDiscountAmount += discountAmount;
         totalTaxAmount += taxAmount;
 
@@ -55,14 +61,12 @@ const calculateInvoiceGrandTotal = (invoice: SupplierInvoiceDto): SupplierInvoic
         };
     });
 
-    // Net Items = (Gross Subtotal - Total Discount) + Total Tax
+    const otherCosts = Number(invoice.otherCosts) || 0;
+
+    // Logic: Delivery = Total - NetItems - Other (Source of truth is totalAmount)
+    const currentTotal = Number(invoice.totalAmount) || 0;
     const netItems = (subTotal - totalDiscountAmount) + totalTaxAmount;
-
-    // The stored total from the DB/Form is the Final Total
-    const currentTotal = invoice.totalAmount || 0;
-
-    // Delivery is the difference
-    const derivedDelivery = Math.max(0, currentTotal - netItems);
+    const derivedDelivery = Math.max(0, currentTotal - netItems - otherCosts);
 
     return {
         ...invoice,
@@ -71,6 +75,7 @@ const calculateInvoiceGrandTotal = (invoice: SupplierInvoiceDto): SupplierInvoic
         discountAmount: totalDiscountAmount,
         taxAmount: totalTaxAmount,
         deliveryCost: derivedDelivery,
+        otherCosts,
         totalAmount: currentTotal
     };
 };
@@ -220,7 +225,13 @@ const InvoiceRow: React.FC<{
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold border border-rose-100"><Clock className="w-3.5 h-3.5" />{invoice.dueDate}</span>
                 </td>
                 <td className="px-6 py-4 text-center">
-                    <div className="font-bold text-lg text-brand-primary">
+                    <div className="font-bold text-slate-700">
+                        {formatNumber(invoice.deliveryCost || 0)}
+                        <span className="text-[10px] font-medium text-slate-400 mr-1">{invoice.currency}</span>
+                    </div>
+                </td>
+                <td className="px-6 py-4 text-center font-bold">
+                    <div className="text-lg text-brand-primary">
                         {formatNumber(invoice.totalAmount)}
                         <span className="text-xs font-medium text-slate-400 mr-1">{invoice.currency}</span>
                     </div>
@@ -245,7 +256,7 @@ const InvoiceRow: React.FC<{
             </tr>
             {isExpanded && invoice.items && invoice.items.length > 0 && (
                 <tr>
-                    <td colSpan={7} className="px-6 py-4 bg-slate-50/50">
+                    <td colSpan={8} className="px-6 py-4 bg-slate-50/50">
                         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-fadeInUp">
                             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -261,11 +272,21 @@ const InvoiceRow: React.FC<{
                                         <span>الضريبة:</span>
                                         <span className="text-amber-600">{formatNumber(invoice.taxAmount || 0)}</span>
                                     </div>
-                                    {/* Delivery Cost shown in expanded view */}
-                                    {invoice.deliveryCost! > 0 && (
-                                        <div className="flex gap-1 text-slate-500">
-                                            <span>مصاريف الشحن:</span>
-                                            <span className="text-blue-600">{formatNumber(invoice.deliveryCost || 0)}</span>
+                                    {/* Delivery & Other Costs shown in expanded view */}
+                                    {(invoice.deliveryCost! > 0 || (invoice.otherCosts || 0) > 0) && (
+                                        <div className="flex gap-4">
+                                            {invoice.deliveryCost! > 0 && (
+                                                <div className="flex gap-1 text-slate-500">
+                                                    <span>مصاريف الشحن:</span>
+                                                    <span className="text-blue-600">{formatNumber(invoice.deliveryCost || 0)}</span>
+                                                </div>
+                                            )}
+                                            {(invoice.otherCosts || 0) > 0 && (
+                                                <div className="flex gap-1 text-slate-500">
+                                                    <span>مصاريف أخرى:</span>
+                                                    <span className="text-purple-600">{formatNumber(invoice.otherCosts || 0)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -379,9 +400,9 @@ const TableSkeleton: React.FC<{ columns: number }> = ({ columns }) => (
 );
 
 // Empty State
-const EmptyState: React.FC<{ icon: React.ElementType; title: string; description: string; action?: React.ReactNode; }> = ({ icon: Icon, title, description, action }) => (
+const EmptyState: React.FC<{ icon: React.ElementType; title: string; description: string; colSpan?: number; action?: React.ReactNode; }> = ({ icon: Icon, title, description, colSpan = 7, action }) => (
     <tr>
-        <td colSpan={7} className="px-6 py-20">
+        <td colSpan={colSpan} className="px-6 py-20">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center"><Icon className="w-12 h-12 text-slate-400" /></div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
@@ -486,6 +507,7 @@ const SupplierInvoicesPage: React.FC = () => {
         taxAmount: processedInvoices.reduce((sum, i) => sum + (i.taxAmount || 0), 0),
         discountAmount: processedInvoices.reduce((sum, i) => sum + (i.discountAmount || 0), 0),
         deliveryCost: processedInvoices.reduce((sum, i) => sum + (i.deliveryCost || 0), 0),
+        otherCosts: processedInvoices.reduce((sum, i) => sum + (i.otherCosts || 0), 0),
         totalAmount: processedInvoices.reduce((sum, i) => sum + (i.totalAmount || 0), 0),
         pendingGRNs: pendingGRNs.length,
     }), [processedInvoices, pendingGRNs]);
@@ -559,8 +581,9 @@ const SupplierInvoicesPage: React.FC = () => {
                                         <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">رقم الفاتورة</th>
                                         <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">المورد</th>
                                         <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">التاريخ</th>
-                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الاستحقاق</th>
-                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">المبلغ</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">تاريخ الاستحقاق</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">مصاريف الشحن</th>
+                                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الإجمالي النهائي</th>
                                         <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الحالة</th>
                                         <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">الإجراءات</th>
                                     </>
@@ -578,17 +601,17 @@ const SupplierInvoicesPage: React.FC = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <TableSkeleton columns={activeTab === 'invoices' ? 7 : 6} />
+                                <TableSkeleton columns={activeTab === 'invoices' ? 8 : 6} />
                             ) : activeTab === 'invoices' ? (
                                 filteredInvoices.length === 0 ? (
-                                    <EmptyState icon={Receipt} title="لا توجد فواتير" description="ابدأ بتسجيل أول فاتورة توريد بالنظام" action={<button onClick={() => navigate('/dashboard/procurement/invoices/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/30"><Plus className="w-5 h-5" />تسجيل فاتورة جديدة</button>} />
+                                    <EmptyState colSpan={8} icon={Receipt} title="لا توجد فواتير" description="ابدأ بتسجيل أول فاتورة توريد بالنظام" action={<button onClick={() => navigate('/dashboard/procurement/invoices/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/30"><Plus className="w-5 h-5" />تسجيل فاتورة جديدة</button>} />
                                 ) : (
                                     paginatedInvoices.map((inv, index) => (
                                         <InvoiceRow key={inv.id} invoice={inv} index={index} isExpanded={expandedInvoiceId === inv.id} onToggle={() => setExpandedInvoiceId(expandedInvoiceId === inv.id ? null : (inv.id ?? null))} onView={() => navigate(`/dashboard/procurement/invoices/${inv.id}`)} onApprove={() => handleApproveInvoice(inv)} />
                                     ))
                                 )
                             ) : filteredPending.length === 0 ? (
-                                <EmptyState icon={Truck} title="لا توجد توريدات بانتظار الفوترة" description="سيتم ظهور التوريدات التي تم فحصها وإضافتها للمخزن هنا" />
+                                <EmptyState colSpan={6} icon={Truck} title="لا توجد توريدات بانتظار الفوترة" description="سيتم ظهور التوريدات التي تم فحصها وإضافتها للمخزن هنا" />
                             ) : (
                                 paginatedPending.map((grn, index) => <GRNRow key={grn.id} grn={grn} index={index} onCreateInvoice={() => navigate(`/dashboard/procurement/invoices/new?grnId=${grn.id}`)} onViewPO={() => navigate(`/dashboard/procurement/po/${grn.poId}`)} />)
                             )}

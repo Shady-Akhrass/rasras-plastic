@@ -61,6 +61,7 @@ const SupplierQuotationFormPage: React.FC = () => {
         deliveryTerms: '',
         deliveryDays: 0,
         deliveryCost: 0,
+        otherCosts: 0,
         totalAmount: 0,
         notes: '',
         items: []
@@ -102,12 +103,11 @@ const SupplierQuotationFormPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getQuotationById(qId);
 
-            const itemsGrandTotal = calculateGrandTotal(data.items, 0);
-            const derivedDeliveryCost = data.totalAmount - itemsGrandTotal;
-
             setFormData({
                 ...data,
-                deliveryCost: data.deliveryCost || derivedDeliveryCost
+                deliveryCost: data.deliveryCost || 0,
+                otherCosts: data.otherCosts || 0,
+                totalAmount: data.totalAmount || 0
             });
 
             if (data.rfqId) {
@@ -177,9 +177,9 @@ const SupplierQuotationFormPage: React.FC = () => {
     };
 
     // Calculate grand total
-    const calculateGrandTotal = (items: SupplierQuotationItem[], deliveryCost: number = 0) => {
+    const calculateGrandTotal = (items: SupplierQuotationItem[], deliveryCost: number = 0, otherCosts: number = 0) => {
         const itemsTotal = items.reduce((sum, item) => sum + calculateItemTotal(item), 0);
-        return itemsTotal + deliveryCost;
+        return itemsTotal + deliveryCost + otherCosts;
     };
 
     // Item Management - Remove item only (no add)
@@ -224,7 +224,7 @@ const SupplierQuotationFormPage: React.FC = () => {
         setFormData(prev => ({
             ...prev,
             items: newItems,
-            totalAmount: calculateGrandTotal(newItems, prev.deliveryCost)
+            totalAmount: calculateGrandTotal(newItems, prev.deliveryCost, prev.otherCosts)
         }));
     };
 
@@ -279,12 +279,13 @@ const SupplierQuotationFormPage: React.FC = () => {
             setFormData(prev => {
                 const updatedItemsTotal = rfqItems.reduce((sum, item) => sum + item.totalPrice, 0);
                 const currentDeliveryCost = prev.deliveryCost || 0;
+                const currentOtherCosts = prev.otherCosts || 0;
                 return {
                     ...prev,
                     rfqId: rfqId,
                     supplierId: rfq.supplierId,
                     items: rfqItems,
-                    totalAmount: updatedItemsTotal + currentDeliveryCost
+                    totalAmount: updatedItemsTotal + currentDeliveryCost + currentOtherCosts
                 };
             });
         } catch (error) {
@@ -846,7 +847,45 @@ const SupplierQuotationFormPage: React.FC = () => {
                                             const val = parseFloat(e.target.value) || 0;
                                             const updates = {
                                                 deliveryCost: val,
-                                                totalAmount: calculateGrandTotal(optimisticData.items, val)
+                                                totalAmount: calculateGrandTotal(optimisticData.items, val, optimisticData.otherCosts)
+                                            };
+                                            addOptimisticData(updates);
+                                            startTransition(() => {
+                                                setFormData(prev => ({ ...prev, ...updates }));
+                                            });
+                                        }}
+                                        disabled={isView}
+                                        className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
+                                            text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
+                                            transition-all shadow-sm
+                                            ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                        placeholder="0.00"
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
+                                        {optimisticData.currency}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-amber-500/10 rounded-xl">
+                                        <Sparkles className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 tracking-tight">مصاريف أخرى</h4>
+                                        <p className="text-slate-500 text-xs font-medium">أي تكاليف إضافية أخرى</p>
+                                    </div>
+                                </div>
+                                <div className="relative w-full md:w-56">
+                                    <input
+                                        type="number"
+                                        value={optimisticData.otherCosts || 0}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            const updates = {
+                                                otherCosts: val,
+                                                totalAmount: calculateGrandTotal(optimisticData.items, optimisticData.deliveryCost, val)
                                             };
                                             addOptimisticData(updates);
                                             startTransition(() => {
@@ -904,6 +943,12 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     {formatNumber(optimisticData.deliveryCost ?? 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">مصاريف أخرى</span>
+                                <span className="font-bold text-lg text-white">
+                                    {formatNumber(optimisticData.otherCosts ?? 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
                         </div>
                         <div className="pt-6 border-t border-white/10">
                             <div className="text-xs text-white/40 mb-2">الإجمالي النهائي</div>
@@ -914,9 +959,9 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         value={optimisticData.totalAmount || 0}
                                         onChange={(e) => {
                                             const totalVal = parseFloat(e.target.value) || 0;
-                                            // Calculate items total + tax (without delivery)
-                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0);
-                                            const derivedDeliveryCost = totalVal - itemsGrandTotal;
+                                            // Calculate items total + tax (without delivery/other)
+                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0, 0);
+                                            const derivedDeliveryCost = totalVal - itemsGrandTotal - (optimisticData.otherCosts || 0);
 
                                             const updates = {
                                                 totalAmount: totalVal,

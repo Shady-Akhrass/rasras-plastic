@@ -135,7 +135,8 @@ public class ApprovalService {
     }
 
     @Transactional
-    public void processAction(Integer requestId, Integer actionByUserId, String actionType, String comments, Integer warehouseId) {
+    public void processAction(Integer requestId, Integer actionByUserId, String actionType, String comments,
+            Integer warehouseId) {
         ApprovalRequest request = requestRepo.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
 
@@ -143,7 +144,8 @@ public class ApprovalService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // عند اعتماد إذن الإضافة: تحديث المخزن المختار قبل تطبيق الاعتماد
-        if ("GoodsReceiptNote".equalsIgnoreCase(request.getDocumentType()) && "Approved".equalsIgnoreCase(actionType) && warehouseId != null) {
+        if ("GoodsReceiptNote".equalsIgnoreCase(request.getDocumentType()) && "Approved".equalsIgnoreCase(actionType)
+                && warehouseId != null) {
             grnRepo.findById(request.getDocumentId()).ifPresent(grn -> {
                 grn.setWarehouseId(warehouseId);
                 grnRepo.save(grn);
@@ -239,7 +241,8 @@ public class ApprovalService {
                     // تحديث أرصدة المخزون تلقائياً عند الاعتماد (أولاً لضمان ظهور الأصناف)
                     if (grn.getItems() != null && grn.getWarehouseId() != null) {
                         for (GRNItem item : grn.getItems()) {
-                            BigDecimal qtyToRecord = item.getAcceptedQty() != null ? item.getAcceptedQty() : item.getReceivedQty();
+                            BigDecimal qtyToRecord = item.getAcceptedQty() != null ? item.getAcceptedQty()
+                                    : item.getReceivedQty();
                             if (qtyToRecord != null && qtyToRecord.compareTo(BigDecimal.ZERO) > 0) {
                                 inventoryService.updateStock(
                                         item.getItem().getId(),
@@ -388,6 +391,11 @@ public class ApprovalService {
             throw new RuntimeException("Cannot create PO: Selected quotation has no supplier.");
         }
 
+        BigDecimal deliveryCost = quoted.getDeliveryCost() != null ? quoted.getDeliveryCost() : BigDecimal.ZERO;
+        BigDecimal otherCosts = quoted.getOtherCosts() != null ? quoted.getOtherCosts() : BigDecimal.ZERO;
+        BigDecimal grandTotal = quoted.getTotalAmount() != null ? quoted.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal subTotal = grandTotal.subtract(deliveryCost).subtract(otherCosts);
+
         // 1. Create the PO record
         PurchaseOrder po = PurchaseOrder.builder()
                 .poNumber(generatePONumber())
@@ -399,8 +407,10 @@ public class ApprovalService {
                         LocalDate.now().plusDays(quoted.getDeliveryDays() != null ? quoted.getDeliveryDays() : 7))
                 .currency(quoted.getCurrency())
                 .exchangeRate(quoted.getExchangeRate())
-                .subTotal(quoted.getTotalAmount())
-                .totalAmount(quoted.getTotalAmount())
+                .shippingCost(deliveryCost)
+                .otherCosts(otherCosts)
+                .subTotal(subTotal)
+                .totalAmount(grandTotal)
                 .status("Pending")
                 .approvalStatus("Pending")
                 .notes("Auto-generated from Approved Comparison: " + qc.getComparisonNumber())

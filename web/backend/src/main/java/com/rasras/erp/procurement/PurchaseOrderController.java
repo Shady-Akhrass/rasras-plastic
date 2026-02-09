@@ -20,6 +20,11 @@ public class PurchaseOrderController {
         return ResponseEntity.ok(Map.of("data", poService.getAllPOs()));
     }
 
+    @GetMapping("/waiting")
+    public ResponseEntity<Map<String, List<PurchaseOrderDto>>> getWaitingForArrivalPOs() {
+        return ResponseEntity.ok(Map.of("data", poService.getWaitingForArrivalPOs()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, PurchaseOrderDto>> getPOById(@PathVariable Integer id) {
         return ResponseEntity.ok(Map.of("data", poService.getPOById(id)));
@@ -34,5 +39,12 @@ public class PurchaseOrderController {
     public ResponseEntity<Map<String, PurchaseOrderDto>> submitForApproval(@PathVariable Integer id) {
         // Keeping Map<String, Dto> format as per other methods in this controller
         return ResponseEntity.ok(Map.of("data", poService.submitPO(id)));
+    }
+
+    @PostMapping("/{id}/mark-arrived")
+    public ResponseEntity<Map<String, com.rasras.erp.inventory.GoodsReceiptNoteDto>> markAsArrived(
+            @PathVariable Integer id,
+            @RequestParam(required = false) Integer userId) {
+        return ResponseEntity.ok(Map.of("data", poService.markAsArrived(id, userId)));
     }
 }

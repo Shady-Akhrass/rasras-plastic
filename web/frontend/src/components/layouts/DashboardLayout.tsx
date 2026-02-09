@@ -225,6 +225,7 @@ const DashboardLayout: React.FC = () => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
     const [pendingInspectionsCount, setPendingInspectionsCount] = useState(0);
+    const [waitingImportsCount, setWaitingImportsCount] = useState(0);
 
 
     const userString = localStorage.getItem('user');
@@ -271,6 +272,22 @@ const DashboardLayout: React.FC = () => {
         };
         fetchCounts();
         const interval = setInterval(fetchCounts, 10000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Fetch waiting imports count
+    useEffect(() => {
+        const fetchWaitingImports = async () => {
+            try {
+                const { purchaseOrderService } = await import('../../services/purchaseOrderService');
+                const waitingPOs = await purchaseOrderService.getWaitingForArrivalPOs();
+                setWaitingImportsCount(waitingPOs.length);
+            } catch (error) {
+                console.error('Failed to fetch waiting imports count', error);
+            }
+        };
+        fetchWaitingImports();
+        const interval = setInterval(fetchWaitingImports, 10000);
         return () => clearInterval(interval);
     }, []);
 
@@ -337,6 +354,7 @@ const DashboardLayout: React.FC = () => {
             { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement', order: 3, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
             { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض (QCS)', section: 'procurement', order: 4, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
             { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء (PO)', section: 'procurement', order: 5, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/waiting-imports', icon: Truck, label: 'الشحنات القادمة', section: 'procurement', order: 5.5, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT', badge: waitingImportsCount || undefined },
             { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن استلام / إذن إضافة (GRN)', section: 'procurement', order: 6, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
             { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement', order: 7, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
             { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement', order: 8, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },

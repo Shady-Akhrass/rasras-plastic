@@ -43,6 +43,9 @@ public class PurchaseOrder extends AuditableEntity {
     @Column(name = "ExpectedDeliveryDate")
     private LocalDate expectedDeliveryDate;
 
+    @Column(name = "DeliveryDays")
+    private Integer deliveryDays;
+
     @Column(name = "ShippingMethod", length = 50)
     private String shippingMethod;
 

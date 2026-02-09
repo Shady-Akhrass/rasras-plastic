@@ -66,6 +66,10 @@ public class SupplierInvoice extends AuditableEntity {
     @Builder.Default
     private BigDecimal deliveryCost = BigDecimal.ZERO;
 
+    @Column(name = "OtherCosts", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal otherCosts = BigDecimal.ZERO;
+
     @Column(name = "TotalAmount", precision = 18, scale = 2, nullable = false)
     private BigDecimal totalAmount;
 

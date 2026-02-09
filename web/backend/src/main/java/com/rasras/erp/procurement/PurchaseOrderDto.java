@@ -23,6 +23,7 @@ public class PurchaseOrderDto {
     private Integer supplierId;
     private String supplierNameAr; // UI helper
     private LocalDate expectedDeliveryDate;
+    private Integer deliveryDays;
     private String shippingMethod;
     private String shippingTerms;
     private String paymentTerms;

@@ -60,8 +60,19 @@ export const purchaseOrderService = {
         const response = await apiClient.get<{ data: PurchaseOrderDto }>(`/procurement/po/${id}`);
         return response.data.data;
     },
+    getWaitingForArrivalPOs: async () => {
+        const response = await apiClient.get<{ data: PurchaseOrderDto[] }>('/procurement/po/waiting');
+        return response.data.data;
+    },
     createPO: async (po: PurchaseOrderDto) => {
         const response = await apiClient.post<{ data: PurchaseOrderDto }>('/procurement/po', po);
+        return response.data.data;
+    },
+    markAsArrived: async (poId: number, userId?: number) => {
+        const url = userId != null 
+            ? `/procurement/po/${poId}/mark-arrived?userId=${userId}`
+            : `/procurement/po/${poId}/mark-arrived`;
+        const response = await apiClient.post<{ data: any }>(url);
         return response.data.data;
     }
 };

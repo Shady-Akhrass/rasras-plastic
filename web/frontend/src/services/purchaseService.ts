@@ -107,6 +107,7 @@ export interface SupplierQuotation {
     deliveryTerms?: string;
     deliveryDays?: number;
     deliveryCost?: number;
+    otherCosts?: number;
     totalAmount: number;
     status?: string;
     notes?: string;
@@ -129,6 +130,7 @@ export interface QuotationComparisonDetail {
     priceRating?: number;
     overallScore?: number;
     deliveryCost?: number;
+    otherCosts?: number;
     comments?: string;
     polymerGrade?: string;
 }

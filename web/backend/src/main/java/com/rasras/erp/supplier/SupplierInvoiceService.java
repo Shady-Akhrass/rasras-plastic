@@ -5,6 +5,9 @@ import com.rasras.erp.inventory.GoodsReceiptNote;
 import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitRepository;
+import com.rasras.erp.procurement.PurchaseOrder;
+import com.rasras.erp.procurement.PurchaseOrderItem;
+import com.rasras.erp.procurement.PurchaseOrderRepository;
 import com.rasras.erp.supplier.dto.SupplierInvoiceDto;
 import com.rasras.erp.supplier.dto.SupplierInvoiceItemDto;
 import com.rasras.erp.supplier.service.SupplierInvoicePdfService;
@@ -13,8 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +31,7 @@ public class SupplierInvoiceService {
         private final ItemRepository itemRepository;
         private final UnitRepository unitRepository;
         private final GoodsReceiptNoteRepository grnRepo;
+        private final PurchaseOrderRepository poRepo;
         private final SupplierInvoicePdfService pdfService;
 
         @Transactional(readOnly = true)
@@ -65,6 +71,7 @@ public class SupplierInvoiceService {
                                                 : BigDecimal.ZERO)
                                 .taxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO)
                                 .deliveryCost(dto.getDeliveryCost() != null ? dto.getDeliveryCost() : BigDecimal.ZERO)
+                                .otherCosts(dto.getOtherCosts() != null ? dto.getOtherCosts() : BigDecimal.ZERO)
                                 .totalAmount(dto.getTotalAmount())
                                 .paidAmount(BigDecimal.ZERO)
                                 .status("Unpaid")
@@ -124,6 +131,7 @@ public class SupplierInvoiceService {
                                 .taxAmount(entity.getTaxAmount())
                                 .totalAmount(entity.getTotalAmount())
                                 .deliveryCost(entity.getDeliveryCost())
+                                .otherCosts(entity.getOtherCosts())
                                 .paidAmount(entity.getPaidAmount())
                                 .remainingAmount(entity.getTotalAmount().subtract(entity.getPaidAmount()))
                                 .status(entity.getStatus())
@@ -186,69 +194,110 @@ public class SupplierInvoiceService {
                         return; // Already invoiced
                 }
 
+                // Get Purchase Order to get pricing and discount/tax info
+                PurchaseOrder po = grn.getPurchaseOrder();
+                if (po == null) {
+                        throw new RuntimeException("GRN has no associated Purchase Order");
+                }
+
+                // Create a map of PO items by ID for quick lookup
+                Map<Integer, PurchaseOrderItem> poItemsMap = po.getItems().stream()
+                                .collect(Collectors.toMap(PurchaseOrderItem::getId, item -> item));
+
                 SupplierInvoice invoice = SupplierInvoice.builder()
                                 .invoiceNumber(generateInvoiceNumber())
                                 .supplierInvoiceNo(grn.getSupplierInvoiceNo() != null ? grn.getSupplierInvoiceNo()
                                                 : "AUTO-" + grn.getGrnNumber())
                                 .invoiceDate(LocalDate.now())
                                 .dueDate(LocalDate.now().plusDays(30)) // Default credit term
-                                .poId(grn.getPurchaseOrder().getId())
+                                .poId(po.getId())
                                 .grnId(grn.getId())
                                 .supplier(grn.getSupplier())
-                                .currency("EGP")
-                                .exchangeRate(BigDecimal.ONE)
+                                .currency(po.getCurrency() != null ? po.getCurrency() : "EGP")
+                                .exchangeRate(po.getExchangeRate() != null ? po.getExchangeRate() : BigDecimal.ONE)
                                 .status("Unpaid")
                                 .approvalStatus("Approved") // Inherited approval
                                 .notes("Generated automatically from " + grn.getGrnNumber())
                                 .build();
 
-                List<SupplierInvoiceItem> items = grn.getItems().stream()
-                                .filter(gi -> {
-                                        BigDecimal qty = gi.getAcceptedQty() != null ? gi.getAcceptedQty()
-                                                        : gi.getReceivedQty();
-                                        return qty != null && qty.compareTo(BigDecimal.ZERO) > 0;
-                                })
-                                .map(gi -> {
-                                        BigDecimal acceptedQty = gi.getAcceptedQty() != null ? gi.getAcceptedQty()
-                                                        : gi.getReceivedQty();
-                                        BigDecimal unitCost = gi.getUnitCost() != null ? gi.getUnitCost()
-                                                        : BigDecimal.ZERO;
-                                        BigDecimal taxRate = new BigDecimal("0.14"); // Standard VAT
-                                        BigDecimal subTotal = acceptedQty.multiply(unitCost);
-                                        BigDecimal taxAmount = subTotal.multiply(taxRate);
+                // Calculate totals using PO-style calculation: Gross -> Discount -> Tax on
+                // Taxable Amount
+                BigDecimal totalSubTotal = BigDecimal.ZERO;
+                BigDecimal totalDiscountAmount = BigDecimal.ZERO;
+                BigDecimal totalTaxAmount = BigDecimal.ZERO;
+                java.util.ArrayList<SupplierInvoiceItem> items = new java.util.ArrayList<>();
 
-                                        return SupplierInvoiceItem.builder()
-                                                        .invoice(invoice)
-                                                        .grnItemId(gi.getId())
-                                                        .item(gi.getItem())
-                                                        .unit(gi.getUnit())
-                                                        .description(gi.getItem().getItemNameAr())
-                                                        .quantity(acceptedQty)
-                                                        .unitPrice(unitCost)
-                                                        .taxPercentage(taxRate.multiply(new BigDecimal("100")))
-                                                        .taxAmount(taxAmount)
-                                                        .totalPrice(subTotal.add(taxAmount))
-                                                        .build();
-                                })
-                                .collect(Collectors.toList());
+                for (com.rasras.erp.inventory.GRNItem gi : grn.getItems()) {
+                        BigDecimal qty = gi.getAcceptedQty() != null ? gi.getAcceptedQty() : gi.getReceivedQty();
+                        if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
+                                continue;
+                        }
+
+                        // Get corresponding PO item to get pricing, discount, and tax info
+                        PurchaseOrderItem poItem = poItemsMap.get(gi.getPoItemId());
+                        if (poItem == null) {
+                                throw new RuntimeException("PO Item not found for GRN Item: " + gi.getId());
+                        }
+
+                        // Use PO unit price, discount, and tax percentages
+                        BigDecimal unitPrice = poItem.getUnitPrice() != null ? poItem.getUnitPrice()
+                                        : (gi.getUnitCost() != null ? gi.getUnitCost() : BigDecimal.ZERO);
+                        BigDecimal discountPercentage = poItem.getDiscountPercentage() != null
+                                        ? poItem.getDiscountPercentage()
+                                        : BigDecimal.ZERO;
+                        BigDecimal taxPercentage = poItem.getTaxPercentage() != null
+                                        ? poItem.getTaxPercentage()
+                                        : BigDecimal.ZERO;
+
+                        // Calculate: Gross -> Discount -> Tax on Taxable Amount
+                        BigDecimal grossAmount = qty.multiply(unitPrice);
+                        BigDecimal discountAmount = grossAmount.multiply(discountPercentage)
+                                        .divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+                        BigDecimal taxableAmount = grossAmount.subtract(discountAmount);
+                        BigDecimal taxAmount = taxableAmount.multiply(taxPercentage)
+                                        .divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+                        BigDecimal totalPrice = taxableAmount.add(taxAmount);
+
+                        // Accumulate totals
+                        totalSubTotal = totalSubTotal.add(grossAmount);
+                        totalDiscountAmount = totalDiscountAmount.add(discountAmount);
+                        totalTaxAmount = totalTaxAmount.add(taxAmount);
+
+                        items.add(SupplierInvoiceItem.builder()
+                                        .invoice(invoice)
+                                        .grnItemId(gi.getId())
+                                        .item(gi.getItem())
+                                        .unit(gi.getUnit())
+                                        .description(gi.getItem().getItemNameAr())
+                                        .quantity(qty)
+                                        .unitPrice(unitPrice)
+                                        .discountPercentage(discountPercentage)
+                                        .discountAmount(discountAmount.setScale(2, RoundingMode.HALF_UP))
+                                        .taxPercentage(taxPercentage)
+                                        .taxAmount(taxAmount.setScale(2, RoundingMode.HALF_UP))
+                                        .totalPrice(totalPrice.setScale(2, RoundingMode.HALF_UP))
+                                        .build());
+                }
 
                 invoice.setItems(items);
 
-                BigDecimal subTotal = items.stream().map(SupplierInvoiceItem::getTotalPrice)
-                                .reduce(BigDecimal.ZERO, BigDecimal::subtract)
-                                .add(items.stream().map(SupplierInvoiceItem::getTotalPrice).reduce(BigDecimal.ZERO,
-                                                BigDecimal::add));
-                // Wait, better re-calc
-                BigDecimal totalSub = items.stream()
-                                .map(i -> i.getQuantity().multiply(i.getUnitPrice()))
-                                .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal totalTax = items.stream()
-                                .map(i -> i.getTaxAmount())
-                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                // Set calculated totals
+                invoice.setSubTotal(totalSubTotal.setScale(2, RoundingMode.HALF_UP));
+                invoice.setDiscountAmount(totalDiscountAmount.setScale(2, RoundingMode.HALF_UP));
+                invoice.setTaxAmount(totalTaxAmount.setScale(2, RoundingMode.HALF_UP));
 
-                invoice.setSubTotal(totalSub);
-                invoice.setTaxAmount(totalTax);
-                invoice.setTotalAmount(totalSub.add(totalTax));
+                // Get costs from PO
+                BigDecimal deliveryCost = po.getShippingCost() != null ? po.getShippingCost() : BigDecimal.ZERO;
+                BigDecimal otherCosts = po.getOtherCosts() != null ? po.getOtherCosts() : BigDecimal.ZERO;
+                invoice.setDeliveryCost(deliveryCost);
+                invoice.setOtherCosts(otherCosts);
+
+                // Final Calculation: (Subtotal - Discount) + Tax + Delivery + Other
+                BigDecimal grandTotal = totalSubTotal.subtract(totalDiscountAmount)
+                                .add(totalTaxAmount)
+                                .add(deliveryCost)
+                                .add(otherCosts);
+                invoice.setTotalAmount(grandTotal.setScale(2, RoundingMode.HALF_UP));
 
                 invoiceRepo.save(invoice);
 

@@ -10,6 +10,7 @@ export interface SupplierInvoiceDto {
     poNumber?: string;
     grnId?: number;
     grnNumber?: string;
+    quotationId?: number;
     supplierId: number;
     supplierNameAr?: string;
     currency: string;
@@ -18,6 +19,7 @@ export interface SupplierInvoiceDto {
     discountAmount?: number;
     taxAmount?: number;
     deliveryCost?: number;
+    otherCosts?: number;
     totalAmount: number;
     paidAmount?: number;
     remainingAmount?: number;

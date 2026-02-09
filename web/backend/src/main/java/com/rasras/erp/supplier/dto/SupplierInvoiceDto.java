@@ -25,6 +25,7 @@ public class SupplierInvoiceDto {
     private BigDecimal discountAmount;
     private BigDecimal taxAmount;
     private BigDecimal deliveryCost;
+    private BigDecimal otherCosts;
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;
     private BigDecimal remainingAmount;

@@ -678,7 +678,7 @@ public class SupplierInvoicePdfService {
 
         String display = formatMoney(value);
         if (isGrand)
-            display += "  ر.س";
+            display += "  ج.م";
 
         PdfPCell vCell = new PdfPCell(new Phrase(display, vf));
         vCell.setBorder(border);

@@ -19,7 +19,8 @@ import {
     ShoppingCart,
     Eye,
     XCircle,
-    RefreshCw
+    RefreshCw,
+    Sparkles
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import { formatNumber, formatDate } from '../../utils/format';
@@ -172,14 +173,19 @@ const QuotationComparisonFormPage: React.FC = () => {
 
             setQuotations(relevantQuotes);
 
-            // Function to derive delivery cost if not explicitly set
-            const getFinalDeliveryCost = (q: SupplierQuotation) => {
-                if (q.deliveryCost !== undefined && q.deliveryCost !== null && q.deliveryCost > 0) {
-                    return q.deliveryCost;
+            // Helper to get costs if not explicitly set
+            const getFinalCosts = (q: SupplierQuotation) => {
+                const delivery = q.deliveryCost !== undefined && q.deliveryCost !== null ? q.deliveryCost : 0;
+                const other = q.otherCosts !== undefined && q.otherCosts !== null ? q.otherCosts : 0;
+
+                // If both are 0 but totalAmount > itemsTotal, we might have legacy data
+                if (delivery === 0 && other === 0) {
+                    const itemsTotal = q.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
+                    const diff = q.totalAmount - itemsTotal;
+                    return { delivery: diff > 0 ? diff : 0, other: 0 };
                 }
-                const itemsTotal = q.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
-                const derived = q.totalAmount - itemsTotal;
-                return derived > 0 ? derived : 0;
+
+                return { delivery, other };
             };
 
             if (formData.details?.length === 0 && relevantQuotes.length > 0) {
@@ -193,7 +199,8 @@ const QuotationComparisonFormPage: React.FC = () => {
                         unitPrice: firstItem ? firstItem.unitPrice : 0,
                         totalPrice: q.totalAmount,
                         deliveryDays: q.deliveryDays,
-                        deliveryCost: getFinalDeliveryCost(q),
+                        deliveryCost: getFinalCosts(q).delivery,
+                        otherCosts: getFinalCosts(q).other,
                         paymentTerms: q.paymentTerms,
                         validUntilDate: q.validUntilDate,
                         qualityRating: 0,
@@ -217,13 +224,18 @@ const QuotationComparisonFormPage: React.FC = () => {
                 setFormData(prev => ({
                     ...prev,
                     details: prev.details?.map(d => {
-                        if (d.deliveryCost === undefined || d.deliveryCost === null || d.deliveryCost === 0) {
-                            const q = relevantQuotes.find(quote => quote.id === d.quotationId);
-                            if (q) {
-                                return { ...d, deliveryCost: getFinalDeliveryCost(q) };
-                            }
-                        }
-                        return d;
+                        const costs = d.deliveryCost === undefined || d.deliveryCost === null || d.deliveryCost === 0
+                            ? (() => {
+                                const q = relevantQuotes.find(quote => quote.id === d.quotationId);
+                                return q ? getFinalCosts(q) : { delivery: d.deliveryCost || 0, other: d.otherCosts || 0 };
+                            })()
+                            : { delivery: d.deliveryCost || 0, other: d.otherCosts || 0 };
+
+                        return {
+                            ...d,
+                            deliveryCost: costs.delivery,
+                            otherCosts: costs.other
+                        };
                     })
                 }));
             }
@@ -774,6 +786,12 @@ const QuotationComparisonFormPage: React.FC = () => {
                                     </th>
                                     <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
                                         <div className="flex items-center justify-center gap-2">
+                                            <Sparkles className="w-4 h-4 text-amber-500" />
+                                            مصاريف أخرى
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 border-b-2 border-slate-200 text-center">
+                                        <div className="flex items-center justify-center gap-2">
                                             <Clock className="w-4 h-4" />
                                             مدة التوريد
                                         </div>
@@ -898,9 +916,15 @@ const QuotationComparisonFormPage: React.FC = () => {
                                                     <div className="font-bold text-slate-700">
                                                         {formatNumber(detail.deliveryCost ?? 0)}
                                                     </div>
-                                                    <div className="text-[10px] text-slate-400 font-semibold">
-                                                        جنيه مصري
+                                                    <div className="text-[10px] text-slate-400 font-semibold italic">شحن</div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-center">
+                                                    <div className="font-bold text-slate-700">
+                                                        {formatNumber(detail.otherCosts ?? 0)}
                                                     </div>
+                                                    <div className="text-[10px] text-slate-400 font-semibold italic">أخرى</div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">

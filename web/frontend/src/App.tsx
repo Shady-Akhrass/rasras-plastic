@@ -68,6 +68,7 @@ import QualityInspectionPage from './pages/inventory/QualityInspectionPage';
 import ApprovalsInbox from './pages/procurement/ApprovalsInbox';
 import PurchaseOrdersPage from './pages/procurement/PurchaseOrdersPage';
 import PurchaseOrderFormPage from './pages/procurement/PurchaseOrderFormPage';
+import WaitingImportsPage from './pages/procurement/WaitingImportsPage';
 import GRNsPage from './pages/procurement/GRNsPage';
 import ProcurementGRNFormPage from './pages/procurement/GRNFormPage';
 import SupplierInvoicesPage from './pages/procurement/SupplierInvoicesPage';
@@ -224,6 +225,7 @@ function App() {
               <Route path="new" element={<PurchaseOrderFormPage />} />
               <Route path=":id" element={<PurchaseOrderFormPage />} />
             </Route>
+            <Route path="waiting-imports" element={<WaitingImportsPage />} />
             <Route path="grn">
               <Route index element={<GRNsPage />} />
               <Route path="new" element={<ProcurementGRNFormPage />} />

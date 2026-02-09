@@ -47,6 +47,7 @@ public class SupplierQuotationService {
                 quotation.setDeliveryTerms(dto.getDeliveryTerms());
                 quotation.setDeliveryDays(dto.getDeliveryDays());
                 quotation.setDeliveryCost(dto.getDeliveryCost());
+                quotation.setOtherCosts(dto.getOtherCosts() != null ? dto.getOtherCosts() : java.math.BigDecimal.ZERO);
                 quotation.setTotalAmount(dto.getTotalAmount());
                 quotation.setStatus("Received");
                 quotation.setNotes(dto.getNotes());
@@ -93,6 +94,7 @@ public class SupplierQuotationService {
                 quotation.setDeliveryTerms(dto.getDeliveryTerms());
                 quotation.setDeliveryDays(dto.getDeliveryDays());
                 quotation.setDeliveryCost(dto.getDeliveryCost());
+                quotation.setOtherCosts(dto.getOtherCosts() != null ? dto.getOtherCosts() : java.math.BigDecimal.ZERO);
                 quotation.setTotalAmount(dto.getTotalAmount());
                 quotation.setNotes(dto.getNotes());
                 quotation.setSupplier(supplierRepository.findById(dto.getSupplierId())
@@ -134,6 +136,7 @@ public class SupplierQuotationService {
                                 .deliveryTerms(quotation.getDeliveryTerms())
                                 .deliveryDays(quotation.getDeliveryDays())
                                 .deliveryCost(quotation.getDeliveryCost())
+                                .otherCosts(quotation.getOtherCosts())
                                 .totalAmount(quotation.getTotalAmount())
                                 .status(quotation.getStatus())
                                 .notes(quotation.getNotes())
