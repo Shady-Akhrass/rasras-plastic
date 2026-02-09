@@ -834,7 +834,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         <Truck className="w-5 h-5 text-brand-primary" />
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-slate-800 tracking-tight">اسعار التوصيل</h4>
+                                        <h4 className="font-bold text-slate-800 tracking-tight">مصاريف الشحن</h4>
                                         <p className="text-slate-500 text-xs font-medium">تكلفة الشحن والتوصيل لهذا العرض</p>
                                     </div>
                                 </div>
@@ -899,7 +899,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                <span className="text-white/60 text-sm">اسعار التوصيل</span>
+                                <span className="text-white/60 text-sm">مصاريف الشحن</span>
                                 <span className="font-bold text-lg text-white">
                                     {formatNumber(optimisticData.deliveryCost ?? 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
@@ -915,7 +915,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         onChange={(e) => {
                                             const totalVal = parseFloat(e.target.value) || 0;
                                             // Calculate items total + tax (without delivery)
-                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0); 
+                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0);
                                             const derivedDeliveryCost = totalVal - itemsGrandTotal;
 
                                             const updates = {

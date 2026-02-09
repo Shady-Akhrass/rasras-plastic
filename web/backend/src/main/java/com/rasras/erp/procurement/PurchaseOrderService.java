@@ -98,10 +98,8 @@ public class PurchaseOrderService {
         }
 
         private String generatePONumber() {
-                // Simple generation for now: PO-YYYY-MM-count
                 long count = poRepo.count() + 1;
-                LocalDateTime now = LocalDateTime.now();
-                return String.format("PO-%d%02d-%03d", now.getYear(), now.getMonthValue(), count);
+                return "#PO-" + count;
         }
 
         private PurchaseOrderItem mapToItemEntity(PurchaseOrder po, PurchaseOrderItemDto dto) {

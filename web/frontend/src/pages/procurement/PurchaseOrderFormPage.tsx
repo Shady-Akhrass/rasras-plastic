@@ -40,7 +40,7 @@ const calculateOrderTotals = (po: PurchaseOrderDto): PurchaseOrderDto => {
         const discountRate = (Number(item.discountPercentage) || 0) / 100;
         const taxRate = (Number(item.taxPercentage) || 0) / 100;
 
-        // Math: Gross -> Discount -> Tax
+        // Math: Gross -> Discount -> Tax on Taxable Amount
         const grossAmount = qty * price;
         const discountAmount = grossAmount * discountRate;
         const taxableAmount = grossAmount - discountAmount;
@@ -63,7 +63,7 @@ const calculateOrderTotals = (po: PurchaseOrderDto): PurchaseOrderDto => {
     const shipping = Number(po.shippingCost) || 0;
     const other = Number(po.otherCosts) || 0;
 
-    // Final Calculation
+    // Final Calculation: (Subtotal - Discount) + Tax + Shipping + Other
     const grandTotal = (subTotal - totalDiscountAmount) + totalTaxAmount + shipping + other;
 
     return {
@@ -83,6 +83,7 @@ const PurchaseOrderFormPage: React.FC = () => {
     const isEdit = !!id;
     const queryParams = new URLSearchParams(location.search);
     const quotationId = queryParams.get('quotationId');
+    const comparisonId = queryParams.get('comparisonId');
     const isView = queryParams.get('mode') === 'view';
     const approvalId = queryParams.get('approvalId');
 
@@ -122,10 +123,33 @@ const PurchaseOrderFormPage: React.FC = () => {
         let newState = { ...state };
         switch (action.type) {
             case 'SET_DATA':
-                newState = action.payload;
+                newState = { ...action.payload };
+                // Derivation on load: if saved total > items total and shipping is 0, assign diff to shipping
+                const savedTotal = Number(newState.totalAmount) || 0;
+                const itemsT = (newState.items || []).reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+                const other = Number(newState.otherCosts) || 0;
+
+                if (savedTotal > itemsT + other && (!newState.shippingCost || newState.shippingCost === 0)) {
+                    const diff = savedTotal - (itemsT + other);
+                    newState.shippingCost = Math.round(diff * 100) / 100;
+                }
                 break;
             case 'UPDATE_FIELD':
-                newState = { ...newState, [action.field]: action.value };
+                if (action.field === 'totalAmount') {
+                    const newTotal = parseFloat(action.value) || 0;
+                    // Derivation: Total - (Net Items + Tax)
+                    const subT = Number(newState.subTotal) || 0;
+                    const disc = Number(newState.discountAmount) || 0;
+                    const tax = Number(newState.taxAmount) || 0;
+                    const otherCosts = Number(newState.otherCosts) || 0;
+
+                    const itemsTotal = (subT - disc) + tax;
+                    const derivedShipping = newTotal - itemsTotal - otherCosts;
+                    newState.shippingCost = Math.round(derivedShipping * 100) / 100;
+                    newState.totalAmount = newTotal;
+                } else {
+                    newState = { ...newState, [action.field]: action.value };
+                }
                 break;
             case 'UPDATE_ITEM':
                 const newItems = [...(newState.items || [])];
@@ -213,6 +237,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                     ...formData,
                     supplierId: quotation.supplierId,
                     quotationId: quotation.id,
+                    comparisonId: comparisonId ? parseInt(comparisonId) : undefined,
                     currency: quotation.currency || 'EGP',
                     shippingCost: finalShippingCost,
                     deliveryDays: comparisonDetail?.deliveryDays || quotation.deliveryDays || 0,
@@ -247,8 +272,27 @@ const PurchaseOrderFormPage: React.FC = () => {
         }
         try {
             setSaving(true);
-            await purchaseOrderService.createPO(optimisticPO);
-            toast.success(isEdit ? 'تم تحديث أمر الشراء بنجاح' : 'تم حفظ أمر الشراء وإرساله للاعتماد بنجاح');
+            const savedPO = await purchaseOrderService.createPO(optimisticPO);
+            toast.success(isEdit ? 'تم تحديث أمر الشراء بنجاح' : 'تم حفظ أمر الشراء وإرساله للااعتماد بنجاح');
+
+            // If caller requested chaining to invoice or outstanding creation, navigate accordingly
+            const createInvoice = queryParams.get('createInvoice') === 'true';
+            const createOutstanding = queryParams.get('createOutstanding') === 'true';
+
+            const poId = savedPO?.id || undefined;
+            const qId = savedPO?.quotationId || optimisticPO.quotationId;
+            const compId = savedPO?.comparisonId || optimisticPO.comparisonId;
+
+            if (createInvoice && poId) {
+                navigate(`/dashboard/procurement/invoice/create?poId=${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''}`);
+                return;
+            }
+
+            if (createOutstanding && poId) {
+                navigate(`/dashboard/procurement/outstanding/create?poId=${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''}`);
+                return;
+            }
+
             navigate('/dashboard/procurement/po');
         } catch (err) { toast.error('فشل حفظ أمر الشراء'); }
         finally { setSaving(false); }
@@ -572,14 +616,14 @@ const PurchaseOrderFormPage: React.FC = () => {
 
                         <div className="space-y-4 mt-6">
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                                <span className="text-white/60">تكلفة الأصناف (الصافي)</span>
+                                <span className="text-white/60">إجمالي الأصناف (صافي)</span>
                                 <span className="font-bold text-lg text-white/90">
                                     {formatNumber(optimisticPO.totalAmount - (optimisticPO.shippingCost || 0))} {optimisticPO.currency}
                                 </span>
                             </div>
 
                             <div className="flex justify-between items-center p-4 bg-brand-primary/10 rounded-xl border border-brand-primary/20">
-                                <span className="text-brand-primary-light font-semibold">اسعار التوصيل</span>
+                                <span className="text-brand-primary-light font-semibold">مصاريف الشحن</span>
                                 <input
                                     type="number"
                                     disabled={isView}
@@ -594,9 +638,16 @@ const PurchaseOrderFormPage: React.FC = () => {
                             <div className="pt-4 mt-2 border-t border-white/10">
                                 <div className="flex justify-between items-center p-5 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20">
                                     <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
-                                    <span className="font-black text-2xl text-white">
-                                        {formatNumber(optimisticPO.totalAmount)} {optimisticPO.currency}
-                                    </span>
+                                    <input
+                                        type="number"
+                                        disabled={isView}
+                                        value={optimisticPO.totalAmount}
+                                        onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'totalAmount', value: e.target.value })}
+                                        className={`w-36 px-3 py-2 bg-white/10 border-2 border-white/20 rounded-xl 
+                                            text-white font-black text-xl text-right outline-none focus:border-white/50 transition-all
+                                            ${isView ? 'cursor-not-allowed opacity-70' : 'hover:bg-white/20'}`}
+                                    />
+                                    <span className="mr-2 font-bold">{optimisticPO.currency}</span>
                                 </div>
                             </div>
 
@@ -617,45 +668,46 @@ const PurchaseOrderFormPage: React.FC = () => {
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Notes */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '300ms' }}>
-                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-blue-100 rounded-xl">
-                                    <FileText className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
+                {/* Notes */}
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '300ms' }}>
+                    <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-blue-100 rounded-xl">
+                                <FileText className="w-5 h-5 text-blue-600" />
                             </div>
-                        </div>
-                        <div className="p-6">
-                            <textarea
-                                value={optimisticPO.notes || ''}
-                                disabled={isView}
-                                onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'notes', value: e.target.value })}
-                                className={`w-full p-4 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all text-sm leading-relaxed h-40 resize-none ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
-                                placeholder={isView ? '' : "اكتب أي ملاحظات أو تعليمات خاصة للمورد..."}
-                            />
+                            <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
                         </div>
                     </div>
+                    <div className="p-6">
+                        <textarea
+                            value={optimisticPO.notes || ''}
+                            disabled={isView}
+                            onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'notes', value: e.target.value })}
+                            className={`w-full p-4 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all text-sm leading-relaxed h-40 resize-none ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                            placeholder={isView ? '' : "اكتب أي ملاحظات أو تعليمات خاصة للمورد..."}
+                        />
+                    </div>
+                </div>
 
-                    {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 flex gap-4 animate-slide-in shadow-lg" style={{ animationDelay: '400ms' }}>
-                        <div className="p-3 bg-blue-100 rounded-xl h-fit">
-                            <AlertCircle className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
-                            <p className="text-sm leading-relaxed text-blue-700">
-                                سيتم إرسال أمر الشراء للمورد فور الاعتماد. تأكد من مراجعة
-                                <strong> الكميات والأسعار</strong> قبل الحفظ.
-                            </p>
-                        </div>
+                {/* Info Alert */}
+                <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 flex gap-4 animate-slide-in shadow-lg" style={{ animationDelay: '400ms' }}>
+                    <div className="p-3 bg-blue-100 rounded-xl h-fit">
+                        <AlertCircle className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
+                        <p className="text-sm leading-relaxed text-blue-700">
+                            سيتم إرسال أمر الشراء للمورد فور الاعتماد. تأكد من مراجعة
+                            <strong> الكميات والأسعار</strong> قبل الحفظ.
+                        </p>
                     </div>
                 </div>
             </form>
         </div>
     );
 };
+
 
 export default PurchaseOrderFormPage;

@@ -7,6 +7,7 @@ import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.supplier.dto.SupplierInvoiceDto;
 import com.rasras.erp.supplier.dto.SupplierInvoiceItemDto;
+import com.rasras.erp.supplier.service.SupplierInvoicePdfService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class SupplierInvoiceService {
         private final ItemRepository itemRepository;
         private final UnitRepository unitRepository;
         private final GoodsReceiptNoteRepository grnRepo;
+        private final SupplierInvoicePdfService pdfService;
 
         @Transactional(readOnly = true)
         public List<SupplierInvoiceDto> getAllInvoices() {
@@ -62,6 +64,7 @@ public class SupplierInvoiceService {
                                 .discountAmount(dto.getDiscountAmount() != null ? dto.getDiscountAmount()
                                                 : BigDecimal.ZERO)
                                 .taxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO)
+                                .deliveryCost(dto.getDeliveryCost() != null ? dto.getDeliveryCost() : BigDecimal.ZERO)
                                 .totalAmount(dto.getTotalAmount())
                                 .paidAmount(BigDecimal.ZERO)
                                 .status("Unpaid")
@@ -116,11 +119,37 @@ public class SupplierInvoiceService {
                                 .supplierId(entity.getSupplier().getId())
                                 .supplierNameAr(entity.getSupplier().getSupplierNameAr())
                                 .currency(entity.getCurrency())
+                                .subTotal(entity.getSubTotal())
+                                .discountAmount(entity.getDiscountAmount())
+                                .taxAmount(entity.getTaxAmount())
                                 .totalAmount(entity.getTotalAmount())
+                                .deliveryCost(entity.getDeliveryCost())
                                 .paidAmount(entity.getPaidAmount())
                                 .remainingAmount(entity.getTotalAmount().subtract(entity.getPaidAmount()))
                                 .status(entity.getStatus())
                                 .approvalStatus(entity.getApprovalStatus())
+                                .items(entity.getItems() != null ? entity.getItems().stream()
+                                                .map(this::mapToItemDto)
+                                                .collect(Collectors.toList()) : null)
+                                .build();
+        }
+
+        private SupplierInvoiceItemDto mapToItemDto(SupplierInvoiceItem entity) {
+                return SupplierInvoiceItemDto.builder()
+                                .id(entity.getId())
+                                .itemId(entity.getItem().getId())
+                                .itemNameAr(entity.getItem().getItemNameAr())
+                                .description(entity.getDescription())
+                                .quantity(entity.getQuantity())
+                                .unitId(entity.getUnit().getId())
+                                .unitNameAr(entity.getUnit().getUnitNameAr())
+                                .unitPrice(entity.getUnitPrice())
+                                .discountPercentage(entity.getDiscountPercentage())
+                                .discountAmount(entity.getDiscountAmount())
+                                .taxPercentage(entity.getTaxPercentage())
+                                .taxAmount(entity.getTaxAmount())
+                                .totalPrice(entity.getTotalPrice())
+                                .grnItemId(entity.getGrnItemId())
                                 .build();
         }
 
@@ -238,7 +267,14 @@ public class SupplierInvoiceService {
                 supplierRepo.save(supplier);
         }
 
+        @Transactional(readOnly = true)
+        public byte[] generateInvoicePdf(Integer id) {
+                SupplierInvoiceDto invoice = getInvoiceById(id);
+                return pdfService.generateInvoicePdf(invoice);
+        }
+
         private String generateInvoiceNumber() {
-                return "INV-" + System.currentTimeMillis();
+                long count = invoiceRepo.count() + 1;
+                return "#INV-" + count;
         }
 }

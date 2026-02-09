@@ -157,7 +157,9 @@ public class GRNService {
                 .orElseThrow(() -> new RuntimeException("GRN not found"));
 
         if (!"Inspected".equals(grn.getStatus())) {
-            throw new RuntimeException("GRN must be inspected by Quality before submission for approval. Current status: " + grn.getStatus());
+            throw new RuntimeException(
+                    "GRN must be inspected by Quality before submission for approval. Current status: "
+                            + grn.getStatus());
         }
 
         // Policy: No material may enter warehouse without quality report
@@ -230,8 +232,7 @@ public class GRNService {
 
     private String generateGRNNumber() {
         long count = grnRepo.count() + 1;
-        LocalDateTime now = LocalDateTime.now();
-        return String.format("GRN-%d%02d-%03d", now.getYear(), now.getMonthValue(), count);
+        return "#GRN-" + count;
     }
 
     private GRNItem mapToItemEntity(GoodsReceiptNote grn, GRNItemDto dto) {
