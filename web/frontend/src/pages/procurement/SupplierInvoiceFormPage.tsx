@@ -26,6 +26,7 @@ import { grnService } from '../../services/grnService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import purchaseService from '../../services/purchaseService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 const SupplierInvoiceFormPage: React.FC = () => {
@@ -663,7 +664,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                {(item.totalPrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                                {formatNumber(item.totalPrice ?? 0, { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="py-4 pl-6 text-left">
                                                 <button
@@ -707,19 +708,19 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">الإجمالي قبل الضريبة (الصافي)</span>
                                 <span className="font-bold text-lg">
-                                    {(optimisticData.totalAmount - (optimisticData.taxAmount || 0) - (optimisticData.deliveryCost || 0)).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.totalAmount - (optimisticData.taxAmount || 0) - (optimisticData.deliveryCost || 0), { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-rose-500/10 rounded-xl border border-rose-500/20">
                                 <span className="text-rose-400 font-semibold text-sm">إجمالي الخصم</span>
                                 <span className="font-bold text-lg text-rose-400">
-                                    {optimisticData.discountAmount?.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.discountAmount ?? 0, { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                                 <span className="text-emerald-400 font-semibold text-sm">ضريبة القيمة المضافة</span>
                                 <span className="font-bold text-lg text-emerald-400">
-                                    {optimisticData.taxAmount?.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.taxAmount ?? 0, { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
@@ -739,7 +740,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             <div className="pt-6 border-t border-white/10">
                                 <div className="text-xs text-white/40 mb-2">إجمالي الفاتورة النهائي</div>
                                 <div className="text-4xl font-black text-emerald-400">
-                                    {optimisticData.totalAmount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.totalAmount, { minimumFractionDigits: 2 })}
                                     <span className="text-sm font-bold mr-2">{optimisticData.currency}</span>
                                 </div>
                             </div>

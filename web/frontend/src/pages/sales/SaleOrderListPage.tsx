@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, FileText, RefreshCw, Eye } from 'lucide-react';
 import { saleOrderService, type SaleOrderDto } from '../../services/saleOrderService';
 import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const SaleOrderListPage: React.FC = () => {
@@ -33,10 +34,12 @@ const SaleOrderListPage: React.FC = () => {
             (o.soNumber || '').toLowerCase().includes(search.toLowerCase()) ||
             (o.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
         );
+        // الأحدث في الأعلى
         return [...f].sort((a, b) => {
-            const dateA = a.soDate ? new Date(a.soDate).getTime() : (a.id ?? 0);
-            const dateB = b.soDate ? new Date(b.soDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.soDate ? new Date(a.soDate).getTime() : 0;
+            const dateB = b.soDate ? new Date(b.soDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [list, search]);
 
@@ -112,10 +115,10 @@ const SaleOrderListPage: React.FC = () => {
                                 paginated.map((o) => (
                                     <tr key={o.id} className="border-b border-slate-100 hover:bg-emerald-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-emerald-700">{o.soNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{o.soDate ? new Date(o.soDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{o.soDate ? formatDate(o.soDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{o.customerNameAr || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{o.expectedDeliveryDate ? new Date(o.expectedDeliveryDate).toLocaleDateString('ar-EG') : '—'}</td>
-                                        <td className="px-6 py-4">{(o.totalAmount ?? 0).toLocaleString('ar-EG')} {o.currency || ''}</td>
+                                        <td className="px-6 py-4 text-slate-600">{o.expectedDeliveryDate ? formatDate(o.expectedDeliveryDate) : '—'}</td>
+                                        <td className="px-6 py-4">{formatNumber(o.totalAmount ?? 0)} {o.currency || ''}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/orders/${o.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
                                         </td>

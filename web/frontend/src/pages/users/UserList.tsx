@@ -9,6 +9,7 @@ import userService from '../../services/userService';
 import UserForm from './UserForm';
 import usePageTitle from '../../hooks/usePageTitle';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatDate } from '../../utils/format';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -157,7 +158,7 @@ const UserCard: React.FC<{
                     <span>آخر دخول: </span>
                     <span className="text-slate-700 font-medium">
                         {user.lastLoginAt
-                            ? new Date(user.lastLoginAt).toLocaleDateString('ar-EG', {
+                            ? formatDate(user.lastLoginAt, {
                                 year: 'numeric',
                                 month: 'short',
                                 day: 'numeric'
@@ -287,7 +288,7 @@ const UserTableRow: React.FC<{
                     <Clock className="w-4 h-4" />
                     <span>
                         {user.lastLoginAt
-                            ? new Date(user.lastLoginAt).toLocaleDateString('ar-EG', {
+                            ? formatDate(user.lastLoginAt, {
                                 year: 'numeric',
                                 month: 'short',
                                 day: 'numeric'
@@ -472,7 +473,7 @@ const UserList: React.FC = () => {
 
     // Filtered and computed data
     const filteredUsers = useMemo(() => {
-        return users.filter(user => {
+        const filtered = users.filter(user => {
             const displayName = user.displayNameAr || user.username;
             const roleDisplay = user.roleNameAr || user.roleName;
             const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -486,6 +487,8 @@ const UserList: React.FC = () => {
 
             return matchesSearch && matchesFilter;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [users, searchTerm, filterStatus]);
 
     const stats = useMemo(() => ({

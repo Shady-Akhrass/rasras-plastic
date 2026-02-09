@@ -16,7 +16,11 @@ public class StockBalanceController {
     private final StockBalanceService stockService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<StockBalanceDto>>> getAllBalances() {
+    public ResponseEntity<ApiResponse<List<StockBalanceDto>>> getAllBalances(
+            @RequestParam(required = false) Integer warehouseId) {
+        if (warehouseId != null) {
+            return ResponseEntity.ok(ApiResponse.success(stockService.getByWarehouseId(warehouseId)));
+        }
         return ResponseEntity.ok(ApiResponse.success(stockService.getAllBalances()));
     }
 

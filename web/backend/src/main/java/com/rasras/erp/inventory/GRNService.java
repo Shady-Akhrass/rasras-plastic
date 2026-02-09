@@ -129,15 +129,16 @@ public class GRNService {
 
     @Transactional
     public GoodsReceiptNoteDto finalizeStoreIn(Integer grnId, Integer userId) {
-        GoodsReceiptNote grn = grnRepo.findById(grnId)
+        GoodsReceiptNote grn = grnRepo.findByIdWithItems(grnId)
                 .orElseThrow(() -> new RuntimeException("GRN not found"));
 
-        if (!"Inspected".equals(grn.getStatus()) && !"Approved".equals(grn.getStatus())) {
-            throw new RuntimeException("GRN must be inspected and approved before store-in");
+        // الإضافة للمخزن تكون فقط لاعتماد فحص الجودة: تم الفحص (Inspected) أو إذن معتمد (Approved)
+        if ("Completed".equals(grn.getStatus())) {
+            throw new RuntimeException("GRN already added to warehouse");
         }
-
-        if (!"Approved".equals(grn.getApprovalStatus())) {
-            throw new RuntimeException("GRN must be approved before store-in");
+        boolean qcApproved = "Inspected".equals(grn.getStatus()) || "Approved".equals(grn.getStatus());
+        if (!qcApproved) {
+            throw new RuntimeException("GRN must have approved quality inspection before store-in");
         }
 
         // Step 9: Addition Note -> Update Inventory
@@ -266,6 +267,8 @@ public class GRNService {
                 .receivedByUserId(entity.getReceivedByUserId())
                 .status(entity.getStatus())
                 .approvalStatus(entity.getApprovalStatus())
+                .qualityStatus(entity.getQualityStatus())
+                .totalReceivedQty(entity.getTotalReceivedQty())
                 .notes(entity.getNotes())
                 .items(entity.getItems() != null ? entity.getItems().stream()
                         .map(this::mapToItemDto)
@@ -282,11 +285,13 @@ public class GRNService {
                 .orderedQty(item.getOrderedQty())
                 .receivedQty(item.getReceivedQty())
                 .acceptedQty(item.getAcceptedQty())
+                .rejectedQty(item.getRejectedQty())
                 .unitId(item.getUnit().getId())
                 .unitNameAr(item.getUnit().getUnitNameAr())
                 .unitCost(item.getUnitCost())
                 .totalCost(item.getTotalCost())
                 .lotNumber(item.getLotNumber())
+                .qualityStatus(item.getQualityStatus())
                 .build();
     }
 }

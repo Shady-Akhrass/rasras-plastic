@@ -14,6 +14,7 @@ import {
     CheckCircle2
 } from 'lucide-react';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -90,14 +91,14 @@ const ItemTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-center">
             <span className="font-bold text-emerald-600">
-                {item.lastPrice ? `${item.lastPrice.toLocaleString()} EGP` : '-'}
+                {item.lastPrice ? `${formatNumber(item.lastPrice)} EGP` : '-'}
             </span>
         </td>
         <td className="px-6 py-4 text-center text-sm text-slate-500">
             {item.lastPriceDate || '-'}
         </td>
         <td className="px-6 py-4 text-center text-sm text-slate-600">
-            {item.minOrderQty?.toLocaleString() || '-'}
+            {item.minOrderQty != null ? formatNumber(item.minOrderQty) : '-'}
         </td>
         <td className="px-6 py-4 text-center text-sm text-slate-600">
             {item.leadTimeDays ? `${item.leadTimeDays} يوم` : '-'}
@@ -241,11 +242,13 @@ const SupplierItemsPage: React.FC = () => {
     };
 
     const filteredItems = useMemo(() => {
-        return items.filter(item =>
+        const filtered = items.filter(item =>
             item.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.supplierItemCode?.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [items, searchTerm]);
 
     const stats = useMemo(() => ({

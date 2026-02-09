@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Package, RefreshCw, Eye, CheckCircle } from 'lucide-react';
 import { stockIssueNoteService, type StockIssueNoteDto } from '../../services/stockIssueNoteService';
 import Pagination from '../../components/common/Pagination';
+import { formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const StockIssueNoteListPage: React.FC = () => {
@@ -48,10 +49,12 @@ const StockIssueNoteListPage: React.FC = () => {
             (n.soNumber || '').toLowerCase().includes(search.toLowerCase()) ||
             (n.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
         );
+        // الأحدث في الأعلى
         return [...f].sort((a, b) => {
-            const dateA = a.issueDate ? new Date(a.issueDate).getTime() : (a.id ?? 0);
-            const dateB = b.issueDate ? new Date(b.issueDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.issueDate ? new Date(a.issueDate).getTime() : 0;
+            const dateB = b.issueDate ? new Date(b.issueDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [list, search]);
 
@@ -129,7 +132,7 @@ const StockIssueNoteListPage: React.FC = () => {
                                 paginated.map((n) => (
                                     <tr key={n.id} className="border-b border-slate-100 hover:bg-amber-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-amber-700">{n.issueNoteNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{n.issueDate ? new Date(n.issueDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{n.issueDate ? formatDate(n.issueDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{n.soNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{n.customerNameAr || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{n.warehouseNameAr || '—'}</td>

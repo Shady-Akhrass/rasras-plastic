@@ -23,6 +23,7 @@ import { approvalService } from '../../services/approvalService';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 const SupplierQuotationFormPage: React.FC = () => {
@@ -259,14 +260,16 @@ const SupplierQuotationFormPage: React.FC = () => {
 
             const rfqItems = rfq.items.map(ri => {
                 const catalogPrice = fetchedItems.find(si => si.itemId === ri.itemId)?.lastPrice || 0;
+                const estimatedPrice = ri.estimatedPrice || 0;
+                const unitPrice = estimatedPrice > 0 ? estimatedPrice : catalogPrice;
                 const qty = ri.requestedQty;
-                const gross = qty * catalogPrice;
+                const gross = qty * unitPrice;
                 const taxAmount = gross * 0.14;
                 return {
                     itemId: ri.itemId,
                     offeredQty: qty,
                     unitId: ri.unitId,
-                    unitPrice: catalogPrice,
+                    unitPrice,
                     discountPercentage: 0,
                     taxPercentage: 14,
                     totalPrice: gross + taxAmount,
@@ -314,6 +317,11 @@ const SupplierQuotationFormPage: React.FC = () => {
             return;
         }
 
+        if (!formData.deliveryDays || formData.deliveryDays <= 0) {
+            toast.error('يرجى إدخال مدة التوريد أكبر من صفر');
+            return;
+        }
+
         if (formData.items.length === 0) {
             toast.error('يرجى إضافة صنف واحد على الأقل');
             return;
@@ -348,8 +356,12 @@ const SupplierQuotationFormPage: React.FC = () => {
         try {
             setSaving(true);
 
-            // 1. Save the quotation
-            await purchaseService.createQuotation(formData);
+            // 1. Save the quotation (create or update)
+            if (isEdit && id) {
+                await purchaseService.updateQuotation(parseInt(id), formData);
+            } else {
+                await purchaseService.createQuotation(formData);
+            }
 
             // 2. Update supplier item prices in the catalog
             for (const item of formData.items) {
@@ -633,9 +645,9 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 <input
                                     type="number"
                                     value={formData.deliveryDays}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, deliveryDays: parseInt(e.target.value) }))}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, deliveryDays: parseInt(e.target.value) || 0 }))}
                                     required
-                                    min="0"
+                                    min="1"
                                     disabled={isView}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
@@ -787,7 +799,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                {item.totalPrice.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                {formatNumber(item.totalPrice, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="py-4 pl-6 text-left">
                                                 {!isView && (
@@ -873,24 +885,23 @@ const SupplierQuotationFormPage: React.FC = () => {
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">الإجمالي قبل الضريبة</span>
                                 <span className="font-bold text-lg">
-                                    {optimisticData.items.reduce((sum, i) => sum + (i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100)), 0)
-                                        .toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.items.reduce((sum, i) => sum + (i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100)), 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                                 <span className="text-emerald-400 font-semibold text-sm">ضريبة القيمة المضافة</span>
                                 <span className="font-bold text-lg text-emerald-400">
-                                    {optimisticData.items.reduce((sum, i) => {
+                                    {formatNumber(optimisticData.items.reduce((sum, i) => {
                                         const beforeTax = i.offeredQty * i.unitPrice * (1 - (i.discountPercentage || 0) / 100);
                                         const taxAmount = beforeTax * ((i.taxPercentage || 0) / 100);
                                         return sum + taxAmount;
-                                    }, 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    }, 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">اسعار التوصيل</span>
                                 <span className="font-bold text-lg text-white">
-                                    {(optimisticData.deliveryCost || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.deliveryCost ?? 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
                         </div>

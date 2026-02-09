@@ -317,7 +317,7 @@ const EmployeeList: React.FC = () => {
 
     // Filtered and computed data
     const filteredEmployees = useMemo(() => {
-        return employees.filter(emp => {
+        const filtered = employees.filter(emp => {
             const matchesSearch = emp.fullNameAr.includes(searchTerm) ||
                 emp.employeeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (emp.email && emp.email.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -328,6 +328,8 @@ const EmployeeList: React.FC = () => {
 
             return matchesSearch && matchesFilter;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [employees, searchTerm, filterStatus]);
 
     // Pagination

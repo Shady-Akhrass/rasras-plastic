@@ -25,6 +25,7 @@ import purchaseService from '../../services/purchaseService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 // --- Logic: Centralized Calculation Helper ---
@@ -515,7 +516,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                {(item.totalPrice || 0).toLocaleString()}
+                                                {formatNumber(item.totalPrice ?? 0)}
                                             </td>
                                             <td className="py-4 pl-6 text-left">
                                                 {!isView && (
@@ -573,7 +574,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
                                 <span className="text-white/60">تكلفة الأصناف (الصافي)</span>
                                 <span className="font-bold text-lg text-white/90">
-                                    {(optimisticPO.totalAmount - (optimisticPO.shippingCost || 0)).toLocaleString()} {optimisticPO.currency}
+                                    {formatNumber(optimisticPO.totalAmount - (optimisticPO.shippingCost || 0))} {optimisticPO.currency}
                                 </span>
                             </div>
 
@@ -594,7 +595,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                                 <div className="flex justify-between items-center p-5 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20">
                                     <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
                                     <span className="font-black text-2xl text-white">
-                                        {optimisticPO.totalAmount.toLocaleString()} {optimisticPO.currency}
+                                        {formatNumber(optimisticPO.totalAmount)} {optimisticPO.currency}
                                     </span>
                                 </div>
                             </div>
@@ -603,15 +604,15 @@ const PurchaseOrderFormPage: React.FC = () => {
                             <div className="mt-4 p-4 border border-white/5 rounded-2xl bg-white/5 space-y-3">
                                 <div className="flex justify-between text-xs text-white/40">
                                     <span>المجموع (قبل الخصم)</span>
-                                    <span>{(optimisticPO.subTotal || 0).toLocaleString()} {optimisticPO.currency}</span>
+                                    <span>{formatNumber(optimisticPO.subTotal ?? 0)} {optimisticPO.currency}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-rose-400/60">
                                     <span>إجمالي الخصم</span>
-                                    <span>- {(optimisticPO.discountAmount || 0).toLocaleString()} {optimisticPO.currency}</span>
+                                    <span>- {formatNumber(optimisticPO.discountAmount ?? 0)} {optimisticPO.currency}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-emerald-400/60">
                                     <span>إجمالي الضريبة</span>
-                                    <span>{(optimisticPO.taxAmount || 0).toLocaleString()} {optimisticPO.currency}</span>
+                                    <span>{formatNumber(optimisticPO.taxAmount ?? 0)} {optimisticPO.currency}</span>
                                 </div>
                             </div>
                         </div>

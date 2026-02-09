@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart3, ChevronRight, ClipboardCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import stockAdjustmentService, { type StockAdjustmentDto } from '../../../services/stockAdjustmentService';
+import { formatNumber } from '../../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const VarianceReportPage: React.FC = () => {
@@ -92,15 +93,15 @@ const VarianceReportPage: React.FC = () => {
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-slate-100">
                         <div className="text-sm text-slate-500 mb-1">فروقات زائدة (قيمة)</div>
-                        <p className="text-2xl font-bold text-emerald-600">{totalSurplus.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</p>
+                        <p className="text-2xl font-bold text-emerald-600">{formatNumber(totalSurplus, { maximumFractionDigits: 0 })}</p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-slate-100">
                         <div className="text-sm text-slate-500 mb-1">فروقات ناقصة (قيمة)</div>
-                        <p className="text-2xl font-bold text-rose-600">{totalShortage.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</p>
+                        <p className="text-2xl font-bold text-rose-600">{formatNumber(totalShortage, { maximumFractionDigits: 0 })}</p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-slate-100">
                         <div className="text-sm text-slate-500 mb-1">صافي الفروقات</div>
-                        <p className="text-2xl font-bold text-slate-800">{(totalSurplus - totalShortage).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</p>
+                        <p className="text-2xl font-bold text-slate-800">{formatNumber(totalSurplus - totalShortage, { maximumFractionDigits: 0 })}</p>
                     </div>
                 </div>
             )}
@@ -152,7 +153,7 @@ const VarianceReportPage: React.FC = () => {
                                             <td className={`px-6 py-3 font-mono ${q > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                 {q > 0 ? '+' : ''}{q}
                                             </td>
-                                            <td className="px-6 py-3">{(Number(i.adjustmentValue) || 0).toLocaleString('ar-EG')}</td>
+                                            <td className="px-6 py-3">{formatNumber(Number(i.adjustmentValue) || 0)}</td>
                                         </tr>
                                     );
                                 })}

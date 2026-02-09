@@ -7,6 +7,7 @@ import {
     Building, Hash, Landmark, ImageIcon
 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
+import { formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 interface CompanyInfo {
@@ -569,7 +570,7 @@ const CompanyInfoPage: React.FC = () => {
 
     const monthOptions = Array.from({ length: 12 }, (_, i) => ({
         value: i + 1,
-        label: new Date(2024, i).toLocaleDateString('ar-EG', { month: 'long' })
+        label: formatDate(new Date(2024, i), { month: 'long' })
     }));
 
     // Loading Skeleton
@@ -780,7 +781,7 @@ const CompanyInfoPage: React.FC = () => {
                                 <InfoCard
                                     icon={<Calendar className="w-5 h-5" />}
                                     label="بداية السنة المالية"
-                                    value={new Date(2024, formData.fiscalYearStartMonth - 1).toLocaleDateString('ar-EG', { month: 'long' })}
+                                    value={formatDate(new Date(2024, formData.fiscalYearStartMonth - 1), { month: 'long' })}
                                 />
                             </div>
                         </div>

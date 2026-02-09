@@ -33,10 +33,12 @@ const TransferNoteListPage: React.FC = () => {
     };
 
     const filtered = useMemo(() => {
+        // الأحدث في الأعلى
         return [...list].sort((a, b) => {
-            const dateA = (a as any).transferDate ? new Date((a as any).transferDate).getTime() : (a.id ?? 0);
-            const dateB = (b as any).transferDate ? new Date((b as any).transferDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = (a as any).transferDate ? new Date((a as any).transferDate).getTime() : 0;
+            const dateB = (b as any).transferDate ? new Date((b as any).transferDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [list]);
 

@@ -43,6 +43,7 @@ public class PRLifecycleDto {
         private Integer rfqCount;
         private Integer quotationCount;
         private String comparisonStatus;
+        private Integer selectedQuotationId; // من المقارنة المعتمدة - لإنشاء أمر الشراء
     }
 
     @Data
@@ -50,6 +51,7 @@ public class PRLifecycleDto {
     public static class OrderingStage {
         private String status;
         private List<String> poNumbers;
+        private List<Integer> poIds;
         private LocalDateTime lastPoDate;
     }
 
@@ -58,6 +60,7 @@ public class PRLifecycleDto {
     public static class ReceivingStage {
         private String status;
         private List<String> grnNumbers;
+        private List<Integer> grnIds;
         private LocalDateTime lastGrnDate;
     }
 

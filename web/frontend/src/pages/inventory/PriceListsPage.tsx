@@ -7,6 +7,7 @@ import {
 import { priceListService, type PriceListDto, type PriceListItemDto } from '../../services/priceListService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 // Stat Card Component
@@ -109,14 +110,14 @@ const PriceListRow: React.FC<{
         {/* Valid From */}
         <td className="px-6 py-4">
             <span className="text-slate-600 text-sm">
-                {list.validFrom ? new Date(list.validFrom).toLocaleDateString('ar-EG') : <span className="text-slate-300">---</span>}
+                {list.validFrom ? formatDate(list.validFrom) : <span className="text-slate-300">---</span>}
             </span>
         </td>
 
         {/* Valid To */}
         <td className="px-6 py-4">
             <span className="text-slate-600 text-sm">
-                {list.validTo ? new Date(list.validTo).toLocaleDateString('ar-EG') : <span className="text-slate-300">غير محدد</span>}
+                {list.validTo ? formatDate(list.validTo) : <span className="text-slate-300">غير محدد</span>}
             </span>
         </td>
 
@@ -624,9 +625,11 @@ const PriceListsPage: React.FC = () => {
     };
 
     const filteredLists = useMemo(() => {
-        return priceLists.filter(list =>
+        const filtered = priceLists.filter(list =>
             list.priceListName.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [priceLists, searchTerm]);
 
     const stats = useMemo(() => ({

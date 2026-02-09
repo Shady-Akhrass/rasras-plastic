@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supplierService, type SupplierItemDto, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 // Form Input Component
@@ -503,7 +504,7 @@ const SupplierItemFormPage: React.FC = () => {
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">آخر سعر</div>
                                     <div className="text-lg font-bold text-slate-800">
-                                        {(formData.lastPrice || 0).toLocaleString()} ج.م
+                                        {formatNumber(formData.lastPrice ?? 0)} ج.م
                                     </div>
                                 </div>
                             </div>
@@ -521,7 +522,7 @@ const SupplierItemFormPage: React.FC = () => {
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">أقل كمية</div>
                                     <div className="text-lg font-bold text-slate-800">
-                                        {(formData.minOrderQty || 0).toLocaleString()}
+                                        {formatNumber(formData.minOrderQty ?? 0)}
                                     </div>
                                 </div>
                             </div>
@@ -555,7 +556,7 @@ const SupplierItemFormPage: React.FC = () => {
                                     <div>
                                         <div className="text-xs text-slate-500 font-medium">قيمة أقل طلب</div>
                                         <div className="text-lg font-bold text-brand-primary">
-                                            {((formData.lastPrice || 0) * (formData.minOrderQty || 0)).toLocaleString()} ج.م
+                                            {formatNumber((formData.lastPrice ?? 0) * (formData.minOrderQty ?? 0))} ج.م
                                         </div>
                                     </div>
                                 </div>

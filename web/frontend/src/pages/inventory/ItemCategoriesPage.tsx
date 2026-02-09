@@ -555,11 +555,13 @@ const ItemCategoriesPage: React.FC = () => {
     };
 
     const filteredCategories = useMemo(() => {
-        return categories.filter(category =>
+        const filtered = categories.filter(category =>
             category.categoryNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
             category.categoryCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (category.categoryNameEn && category.categoryNameEn.toLowerCase().includes(searchTerm.toLowerCase()))
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [categories, searchTerm]);
 
     const stats = useMemo(() => ({

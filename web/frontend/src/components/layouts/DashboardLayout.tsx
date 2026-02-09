@@ -13,6 +13,7 @@ import { approvalService } from '../../services/approvalService';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
 import { grnService } from '../../services/grnService';
 import { canAccessPath } from '../../utils/permissionUtils';
+import { formatDate, formatTime } from '../../utils/format';
 
 // Sidebar Link Component
 const SidebarLink = ({
@@ -257,22 +258,19 @@ const DashboardLayout: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Fetch pending inspections count
+    // Fetch pending inspections count (فحص الجودة)
     useEffect(() => {
         const fetchCounts = async () => {
             try {
-                // Pending Inspections
                 const grns = await grnService.getAllGRNs();
                 const inspections = grns.filter(g => g.status === 'Pending Inspection').length;
                 setPendingInspectionsCount(inspections);
-
-                setPendingInspectionsCount(inspections);
             } catch (error) {
-                console.error('Failed to fetch counts', error);
+                console.error('Failed to fetch pending inspections count', error);
             }
         };
         fetchCounts();
-        const interval = setInterval(fetchCounts, 10000); // Faster refresh (10s)
+        const interval = setInterval(fetchCounts, 10000);
         return () => clearInterval(interval);
     }, []);
 
@@ -322,54 +320,60 @@ const DashboardLayout: React.FC = () => {
     const ROLES_CRM = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
     const ROLES_SYSTEM = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN'];
 
+    // ترتيب العناصر حسب الدورات المستندية
     const navItems: Array<{
         to: string; icon: React.ElementType; label: string; section: string;
         roles?: readonly string[]; requiredPermission?: string;
-        warehouseGroup?: string; search?: string; badge?: number;
+        warehouseGroup?: string; search?: string; badge?: number; order?: number;
     }> = [
-            { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            // الرئيسية
             { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
+            { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
             { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main', requiredPermission: 'SECTION_USERS' },
             { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main', requiredPermission: 'SECTION_EMPLOYEES' },
-            { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
-            { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations', roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
-            { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/stocks', icon: Package, label: 'أرصدة المخزون', section: 'warehouse', warehouseGroup: 'management', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/reports/stagnant', icon: Clock, label: 'الأصناف الراكدة', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/reports/movement', icon: Activity, label: 'حركة الصنف التفصيلية', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/count', icon: ClipboardCheck, label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/count', icon: AlertTriangle, label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports', search: '?mode=surprise', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2, label: 'تقرير المخزون الدوري', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/inventory/reports/variance', icon: GitCompare, label: 'تقرير الفروقات', section: 'warehouse', warehouseGroup: 'reports', roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
-            { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
-            { to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
-            { to: '/dashboard/sales/orders', icon: ClipboardList, label: 'أوامر البيع', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
-            { to: '/dashboard/sales/issue-notes', icon: Package, label: 'إذونات الصرف', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
-            { to: '/dashboard/sales/delivery-orders', icon: Truck, label: 'أوامر التوصيل', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
-            { to: '/dashboard/sales/invoices', icon: FileText, label: 'فواتير المبيعات', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
-            { to: '/dashboard/sales/receipts', icon: Receipt, label: 'إيصالات الدفع', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
-            { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales', roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            // قسم المشتريات: PR → RFQ → عروض → مقارنة → PO → إذن استلام GRN → فاتورة مورد → إشعار دفع
+            { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء (PR)', section: 'procurement', order: 1, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', order: 2, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement', order: 3, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض (QCS)', section: 'procurement', order: 4, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء (PO)', section: 'procurement', order: 5, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/grn', icon: ArrowDownToLine, label: 'إذن استلام / إذن إضافة (GRN)', section: 'procurement', order: 6, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement', order: 7, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement', order: 8, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement', order: 9, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement', order: 10, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement', order: 11, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
+            // قسم المبيعات: طلب عميل → عرض سعر → أمر بيع → إذن صرف → فاتورة → تحصيل
+            { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'قسم  المبيعات', section: 'sales', order: 1, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار', section: 'sales', order: 2, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/orders', icon: ClipboardList, label: 'أوامر البيع (SO)', section: 'sales', order: 3, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/issue-notes', icon: Package, label: 'إذونات الصرف', section: 'sales', order: 4, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/delivery-orders', icon: Truck, label: 'أوامر التوصيل', section: 'sales', order: 5, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/invoices', icon: FileText, label: 'فواتير المبيعات', section: 'sales', order: 6, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/receipts', icon: Receipt, label: 'إيصالات الدفع', section: 'sales', order: 7, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales', order: 8, roles: ROLES_SALES, requiredPermission: 'SECTION_SALES' },
+            // إدارة العملاء (طلب عميل)
             { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm', roles: ROLES_CRM, requiredPermission: 'SECTION_CRM' },
-            { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/rfq', icon: FileText, label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/comparison', icon: Scale, label: 'مقارنة العروض', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'procurement', badge: pendingInspectionsCount || undefined, roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/po', icon: ShoppingCart, label: 'أوامر الشراء', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/grn', icon: Package, label: 'إذن إضافة (GRN)', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign, label: 'الأرصدة المستحقة', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/suppliers/items', icon: Package, label: 'أصناف الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/invoices', icon: FileText, label: 'فواتير الموردين', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/procurement/returns', icon: Undo2, label: 'مرتجعات الشراء', section: 'procurement', roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT' },
-            { to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات', section: 'main', badge: pendingApprovalsCount || undefined },
+            // قسم المخازن: إذن إضافة + إذن صرف + تقارير
+            { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management', order: 1, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management', order: 2, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/stocks', icon: Package, label: 'أرصدة المخزون', section: 'warehouse', warehouseGroup: 'management', order: 3, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle', order: 4, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle', order: 5, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports', order: 6, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/stagnant', icon: Clock, label: 'الأصناف الراكدة', section: 'warehouse', warehouseGroup: 'reports', order: 7, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/movement', icon: Activity, label: 'حركة الصنف التفصيلية', section: 'warehouse', warehouseGroup: 'reports', order: 8, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/count', icon: ClipboardCheck, label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports', order: 9, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/count', icon: AlertTriangle, label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports', search: '?mode=surprise', order: 10, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2, label: 'تقرير المخزون الدوري', section: 'warehouse', warehouseGroup: 'reports', order: 11, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            { to: '/dashboard/inventory/reports/variance', icon: GitCompare, label: 'تقرير الفروقات', section: 'warehouse', warehouseGroup: 'reports', order: 12, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE' },
+            // العمليات (الجودة + بيانات أساسية)
+            { to: '/dashboard/inventory/quality-inspection', icon: Microscope, label: 'فحص الجودة', section: 'operations', badge: pendingInspectionsCount || undefined, order: 1, roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations', order: 2, roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'operations', order: 3, roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف', section: 'operations', order: 4, roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations', order: 5, roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS' },
+            // النظام
             { to: '/dashboard/settings/company', icon: Building2, label: 'بيانات الشركة', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
             { to: '/dashboard/settings/units', icon: Ruler, label: 'وحدات القياس', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
             { to: '/dashboard/settings/system', icon: Settings, label: 'إعدادات النظام', section: 'system', roles: ROLES_SYSTEM, requiredPermission: 'SECTION_SYSTEM' },
@@ -403,7 +407,7 @@ const DashboardLayout: React.FC = () => {
     const MANAGER_ROLES = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'MANAGER', 'WAREHOUSE_MANAGER', 'WH_MANAGER'];
     const isManagerRole = MANAGER_ROLES.includes(userRole.toUpperCase());
 
-    const sectionIds = ['main', 'operations', 'sales', 'crm', 'warehouse', 'procurement', 'system'] as const;
+    const sectionIds = ['main', 'procurement', 'sales', 'crm', 'warehouse', 'operations', 'system'] as const;
     const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
         const path = location.pathname;
         const initial: Record<string, boolean> = {};
@@ -564,10 +568,62 @@ const DashboardLayout: React.FC = () => {
                             hasActiveChild={filteredNavItems.filter(i => i.section === 'procurement').some(item =>
                                 location.pathname.startsWith(item.to)
                             )}
-                            badge={pendingInspectionsCount || undefined}
-                            blink={pendingInspectionsCount > 0}
                         >
-                            {filteredNavItems.filter(i => i.section === 'procurement').map((item) => (
+                            {filteredNavItems.filter(i => i.section === 'procurement').sort((a, b) => ((a as { order?: number }).order ?? 99) - ((b as { order?: number }).order ?? 99)).map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
+                                    badge={(item as { badge?: number }).badge}
+                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
+                                />
+                            ))}
+                        </SidebarDropdownSection>
+                    )}
+                    {/* قسم المبيعات */}
+                    {filteredNavItems.some(i => i.section === 'sales') && (
+                        <SidebarDropdownSection
+                            id="sales"
+                            title="قسم المبيعات"
+                            icon={ShoppingCart}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.sales ?? false}
+                            onToggle={() => toggleSection('sales')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'sales').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                        >
+                            {filteredNavItems.filter(i => i.section === 'sales').sort((a, b) => ((a as { order?: number }).order ?? 99) - ((b as { order?: number }).order ?? 99)).map((item) => (
+                                <SidebarLink
+                                    key={item.to}
+                                    to={item.to}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname.startsWith(item.to)}
+                                    collapsed={sidebarCollapsed}
+                                    badge={(item as { badge?: number }).badge}
+                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
+                                />
+                            ))}
+                        </SidebarDropdownSection>
+                    )}
+                    {/* إدارة العملاء */}
+                    {filteredNavItems.some(i => i.section === 'crm') && (
+                        <SidebarDropdownSection
+                            id="crm"
+                            title="إدارة العملاء"
+                            icon={Users}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.crm ?? false}
+                            onToggle={() => toggleSection('crm')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'crm').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                        >
+                            {filteredNavItems.filter(i => i.section === 'crm').map((item) => (
                                 <SidebarLink
                                     key={item.to}
                                     to={item.to}
@@ -598,6 +654,7 @@ const DashboardLayout: React.FC = () => {
                             <SidebarSubGroupTitle title="وحدة إدارة الأصناف والمخزون" collapsed={sidebarCollapsed} />
                             {filteredNavItems
                                 .filter(i => i.section === 'warehouse' && (i as { warehouseGroup?: string }).warehouseGroup === 'management')
+                                .sort((a, b) => ((a as { order?: number }).order ?? 99) - ((b as { order?: number }).order ?? 99))
                                 .map((item) => (
                                     <SidebarLink
                                         key={item.to}
@@ -608,10 +665,11 @@ const DashboardLayout: React.FC = () => {
                                         collapsed={sidebarCollapsed}
                                     />
                                 ))}
-                            {/* دورة المخزن */}
-                            <SidebarSubGroupTitle title="دورة المخزن" collapsed={sidebarCollapsed} />
+                            {/* قسم المخزن */}
+                            <SidebarSubGroupTitle title="قسم المخزن" collapsed={sidebarCollapsed} />
                             {filteredNavItems
                                 .filter(i => i.section === 'warehouse' && (i as { warehouseGroup?: string }).warehouseGroup === 'cycle')
+                                .sort((a, b) => ((a as { order?: number }).order ?? 99) - ((b as { order?: number }).order ?? 99))
                                 .map((item) => (
                                     <SidebarLink
                                         key={item.to}
@@ -626,6 +684,7 @@ const DashboardLayout: React.FC = () => {
                             <SidebarSubGroupTitle title="التقارير والجرد" collapsed={sidebarCollapsed} />
                             {filteredNavItems
                                 .filter(i => i.section === 'warehouse' && (i as { warehouseGroup?: string }).warehouseGroup === 'reports')
+                                .sort((a, b) => ((a as { order?: number }).order ?? 99) - ((b as { order?: number }).order ?? 99))
                                 .map((item) => (
                                     <SidebarLink
                                         key={(item as { search?: string }).search ? `${item.to}${(item as { search?: string }).search}` : item.to}
@@ -640,36 +699,6 @@ const DashboardLayout: React.FC = () => {
                                 ))}
                         </SidebarDropdownSection>
                     )}
-
-                    {/* قسم المبيعات */}
-                    {filteredNavItems.some(i => i.section === 'sales') && (
-                        <SidebarDropdownSection
-                            id="sales"
-                            title="قسم المبيعات"
-                            icon={ShoppingCart}
-                            collapsed={sidebarCollapsed}
-                            isOpen={openSections.sales ?? false}
-                            onToggle={() => toggleSection('sales')}
-                            hasActiveChild={filteredNavItems.filter(i => i.section === 'sales').some(item =>
-                                location.pathname.startsWith(item.to)
-                            )}
-                        >
-                            {filteredNavItems.filter(i => i.section === 'sales').map((item) => (
-                                <SidebarLink
-                                    key={item.to}
-                                    to={item.to}
-                                    icon={item.icon}
-                                    label={item.label}
-                                    active={location.pathname.startsWith(item.to)}
-                                    collapsed={sidebarCollapsed}
-                                    badge={(item as { badge?: number }).badge}
-                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
-                                />
-                            ))}
-                        </SidebarDropdownSection>
-                    )}
-
-
 
                     {/* العمليات */}
                     {filteredNavItems.some(i => i.section === 'operations') && (
@@ -686,35 +715,7 @@ const DashboardLayout: React.FC = () => {
                             badge={pendingInspectionsCount || undefined}
                             blink={pendingInspectionsCount > 0}
                         >
-                            {filteredNavItems.filter(i => i.section === 'operations').map((item) => (
-                                <SidebarLink
-                                    key={item.to}
-                                    to={item.to}
-                                    icon={item.icon}
-                                    label={item.label}
-                                    active={location.pathname.startsWith(item.to)}
-                                    collapsed={sidebarCollapsed}
-                                    badge={(item as { badge?: number }).badge}
-                                    blink={!!(item as { badge?: number }).badge && (item.to.includes('approvals') || item.to.includes('quality-inspection'))}
-                                />
-                            ))}
-                        </SidebarDropdownSection>
-                    )}
-
-                    {/* إدارة العملاء */}
-                    {filteredNavItems.some(i => i.section === 'crm') && (
-                        <SidebarDropdownSection
-                            id="crm"
-                            title="إدارة العملاء"
-                            icon={Users}
-                            collapsed={sidebarCollapsed}
-                            isOpen={openSections.crm ?? false}
-                            onToggle={() => toggleSection('crm')}
-                            hasActiveChild={filteredNavItems.filter(i => i.section === 'crm').some(item =>
-                                location.pathname.startsWith(item.to)
-                            )}
-                        >
-                            {filteredNavItems.filter(i => i.section === 'crm').map((item) => (
+                            {filteredNavItems.filter(i => i.section === 'operations').sort((a, b) => ((a as { order?: number }).order ?? 99) - ((b as { order?: number }).order ?? 99)).map((item) => (
                                 <SidebarLink
                                     key={item.to}
                                     to={item.to}
@@ -842,12 +843,12 @@ const DashboardLayout: React.FC = () => {
                         <div className="hidden xl:flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl">
                             <div className="flex items-center gap-2 text-slate-500 text-sm">
                                 <Calendar className="w-4 h-4" />
-                                <span>{currentTime.toLocaleDateString('ar-EG', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+                                <span>{formatDate(currentTime, { weekday: 'long', month: 'short', day: 'numeric' })}</span>
                             </div>
                             <div className="w-px h-4 bg-slate-200" />
                             <div className="flex items-center gap-2 text-slate-500 text-sm">
                                 <Clock className="w-4 h-4" />
-                                <span>{currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                                <span>{formatTime(currentTime)}</span>
                             </div>
                         </div>
 

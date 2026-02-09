@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
 import apiClient from '../../services/apiClient';
+import { formatDate as formatDateEn } from '../../utils/format';
 import ExchangeRateWidget from '../../components/ExchangeRate/ExchangeRateWidget';
 import ExchangeRateCompact from '../../components/ExchangeRate/ExchangeRateCompact';
 
@@ -368,7 +369,7 @@ const DashboardHome: React.FC = () => {
     };
 
     const formatDate = () => {
-        return currentTime.toLocaleDateString('ar-EG', {
+        return formatDateEn(currentTime, {
             weekday: 'long',
             year: 'numeric',
             month: 'long',

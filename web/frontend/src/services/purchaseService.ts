@@ -220,6 +220,10 @@ const purchaseService = {
         const response = await apiClient.post<{ data: SupplierQuotation }>('/procurement/quotation', quotation);
         return response.data.data;
     },
+    updateQuotation: async (id: number, quotation: SupplierQuotation) => {
+        const response = await apiClient.put<{ data: SupplierQuotation }>(`/procurement/quotation/${id}`, quotation);
+        return response.data.data;
+    },
     deleteQuotation: async (id: number) => {
         await apiClient.post(`/procurement/quotation/${id}/delete`);
     },
@@ -277,9 +281,9 @@ const purchaseService = {
 export interface PRLifecycle {
     requisition: { status: string; date: string; prNumber: string };
     approval: { status: string; currentStep: string; lastActionDate?: string };
-    sourcing: { status: string; rfqCount: number; quotationCount: number; comparisonStatus: string };
-    ordering: { status: string; poNumbers: string[]; lastPoDate?: string };
-    receiving: { status: string; grnNumbers: string[]; lastGrnDate?: string };
+    sourcing: { status: string; rfqCount: number; quotationCount: number; comparisonStatus: string; selectedQuotationId?: number };
+    ordering: { status: string; poNumbers: string[]; poIds?: number[]; lastPoDate?: string };
+    receiving: { status: string; grnNumbers: string[]; grnIds?: number[]; lastGrnDate?: string };
     quality: { status: string; result: string; inspectionDate?: string };
 }
 

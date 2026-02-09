@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     ClipboardList,
     CheckCircle2,
@@ -7,7 +8,9 @@ import {
     PackageCheck,
     ShieldCheck,
     Clock,
-    ChevronRight
+    ChevronRight,
+    FileText,
+    Plus
 } from 'lucide-react';
 import { type PRLifecycle } from '../../services/purchaseService';
 
@@ -22,9 +25,18 @@ interface PRStep {
 
 interface PRLifecycleTrackerProps {
     lifecycle: PRLifecycle;
+    prId?: number;
 }
 
-const PRLifecycleTracker: React.FC<PRLifecycleTrackerProps> = ({ lifecycle }) => {
+const PRLifecycleTracker: React.FC<PRLifecycleTrackerProps> = ({ lifecycle, prId }) => {
+    const navigate = useNavigate();
+    const receiving = lifecycle.receiving;
+    const hasGrns = (receiving.grnNumbers?.length ?? 0) > 0;
+    const grnIds = receiving.grnIds ?? [];
+    const orderingApproved = lifecycle.ordering?.status === 'Approved';
+    const sourcingCompleted = lifecycle.sourcing?.status === 'Completed';
+    const needsCreatePO = sourcingCompleted && !orderingApproved;
+
     const steps: PRStep[] = [
         {
             id: 'requisition',
@@ -65,11 +77,11 @@ const PRLifecycleTracker: React.FC<PRLifecycleTrackerProps> = ({ lifecycle }) =>
         {
             id: 'receiving',
             label: 'الاستلام',
-            description: lifecycle.receiving.grnNumbers.length > 0 ? `تم استلام ${lifecycle.receiving.grnNumbers.length} إشعار` : 'بانتظار الاستلام',
+            description: hasGrns ? `تم استلام ${receiving.grnNumbers!.length} إذن إضافة` : 'بانتظار الاستلام',
             icon: PackageCheck,
-            status: lifecycle.receiving.status === 'Completed' ? 'Completed' :
-                lifecycle.receiving.status === 'In Progress' ? 'Current' : 'None',
-            details: lifecycle.receiving.grnNumbers.join(', ')
+            status: receiving.status === 'Completed' ? 'Completed' :
+                receiving.status === 'In Progress' ? 'Current' : 'None',
+            details: hasGrns ? (receiving.grnNumbers?.join(', ') ?? '') : ''
         },
         {
             id: 'quality',
@@ -126,6 +138,69 @@ const PRLifecycleTracker: React.FC<PRLifecycleTrackerProps> = ({ lifecycle }) =>
                                     {step.description}
                                 </p>
                             </div>
+
+                            {/* أمر الشراء: زر إنشاء أمر شراء عند اعتماد المقارنة */}
+                            {step.id === 'ordering' && needsCreatePO && (
+                                <div className="mt-2 w-full max-w-[140px] mx-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const qId = lifecycle.sourcing?.selectedQuotationId;
+                                            const params = new URLSearchParams();
+                                            if (qId) params.set('quotationId', String(qId));
+                                            if (prId) params.set('prId', String(prId));
+                                            const qs = params.toString();
+                                            navigate(`/dashboard/procurement/po/new${qs ? '?' + qs : ''}`);
+                                        }}
+                                        className="w-full flex items-center justify-center gap-1.5 text-xs text-brand-primary hover:bg-brand-primary/10 rounded-xl px-3 py-2 font-bold border border-brand-primary/30"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        <span>إنشاء أمر شراء</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* إشعار الاستلام: روابط لأذونات الإضافة أو إنشاء إذن جديد */}
+                            {step.id === 'receiving' && (
+                                <div className="mt-2 w-full max-w-[140px] mx-auto">
+                                    {hasGrns ? (
+                                        <div className="rounded-xl bg-slate-50 border border-slate-100 p-2 space-y-1">
+                                            <p className="text-[10px] font-bold text-slate-500 mb-1">إشعار الاستلام</p>
+                                            {(receiving.grnNumbers ?? []).map((num, i) => {
+                                                const grnId = grnIds[i];
+                                                return grnId != null ? (
+                                                    <button
+                                                        key={grnId}
+                                                        type="button"
+                                                        onClick={() => navigate(`/dashboard/procurement/grn/${grnId}`)}
+                                                        className="w-full flex items-center gap-1 text-xs text-brand-primary hover:bg-brand-primary/10 rounded-lg px-2 py-1 text-right font-medium"
+                                                    >
+                                                        <FileText className="w-3 h-3 shrink-0" />
+                                                        <span className="truncate">{num}</span>
+                                                    </button>
+                                                ) : (
+                                                    <span key={i} className="block text-xs text-slate-500 truncate px-2">{num}</span>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : orderingApproved ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const poIds = lifecycle.ordering?.poIds ?? [];
+                                                const firstPoId = poIds.length > 0 ? poIds[0] : null;
+                                                navigate(firstPoId != null
+                                                    ? `/dashboard/procurement/grn/new?poId=${firstPoId}`
+                                                    : '/dashboard/procurement/grn');
+                                            }}
+                                            className="w-full flex items-center justify-center gap-1.5 text-xs text-brand-primary hover:bg-brand-primary/10 rounded-xl px-3 py-2 font-bold border border-brand-primary/30"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>إنشاء إذن إضافة</span>
+                                        </button>
+                                    ) : null}
+                                </div>
+                            )}
 
                             {/* Tooltip-like detail */}
                             {step.details && step.details !== 'None' && step.details !== 'Draft' && (

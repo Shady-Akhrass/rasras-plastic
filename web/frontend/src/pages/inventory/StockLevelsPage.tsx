@@ -16,6 +16,7 @@ import {
 import { stockBalanceService, type StockBalanceDto } from '../../services/stockBalanceService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
+import { formatNumber, formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -96,15 +97,15 @@ const StockTableRow: React.FC<{
             </span>
         </td>
         <td className="px-6 py-4 text-center text-slate-600 font-medium">
-            {(stock.averageCost || 0).toLocaleString()} ج.م
+            {formatNumber(stock.averageCost ?? 0)} ج.م
         </td>
         <td className="px-6 py-4 text-center">
             <span className="font-bold text-brand-primary">
-                {((stock.quantityOnHand || 0) * (stock.averageCost || 0)).toLocaleString()} ج.م
+                {formatNumber((stock.quantityOnHand ?? 0) * (stock.averageCost ?? 0))} ج.م
             </span>
         </td>
         <td className="px-6 py-4 text-center text-xs text-slate-400">
-            {stock.lastMovementDate ? new Date(stock.lastMovementDate).toLocaleDateString('ar-EG') : '-'}
+            {stock.lastMovementDate ? formatDate(stock.lastMovementDate) : '-'}
         </td>
         <td className="px-6 py-4">
             <div className="flex items-center justify-center gap-2">
@@ -268,12 +269,14 @@ const StockLevelsPage: React.FC = () => {
 
 
     const filteredStocks = useMemo(() => {
-        return stocks.filter(s => {
+        const filtered = stocks.filter(s => {
             const matchesSearch = (s.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
                 (s.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
             const matchesWarehouse = warehouseFilter === 'all' || s.warehouseId === warehouseFilter;
             return matchesSearch && matchesWarehouse;
         });
+        // الأحدث في الأعلى (بالـ id)
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [stocks, searchTerm, warehouseFilter]);
 
     const stats = useMemo(() => {
@@ -284,9 +287,9 @@ const StockLevelsPage: React.FC = () => {
 
         return {
             totalItems,
-            totalValue: totalValue.toLocaleString(),
+            totalValue: formatNumber(totalValue),
             lowStock,
-            totalQuantity: totalQuantity.toLocaleString()
+            totalQuantity: formatNumber(totalQuantity)
         };
     }, [stocks]);
 

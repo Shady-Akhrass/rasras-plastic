@@ -224,12 +224,14 @@ const PermissionsPage: React.FC = () => {
     };
 
     const filteredPermissions = useMemo(() => {
-        return permissions.filter(perm =>
+        const filtered = permissions.filter(perm =>
             perm.permissionNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
             perm.permissionNameEn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             perm.permissionCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
             perm.moduleName?.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [permissions, searchTerm]);
 
     const groupedPermissions = useMemo(() => {

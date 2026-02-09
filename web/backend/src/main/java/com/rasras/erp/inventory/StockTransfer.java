@@ -61,6 +61,12 @@ public class StockTransfer {
     @Column(name = "Notes", length = 1000)
     private String notes;
 
+    @Column(name = "CreatedAt")
+    private LocalDateTime createdAt;
+
+    @Column(name = "CreatedBy", nullable = false)
+    private Integer createdBy;
+
     @OneToMany(mappedBy = "stockTransfer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StockTransferItem> items;
 }

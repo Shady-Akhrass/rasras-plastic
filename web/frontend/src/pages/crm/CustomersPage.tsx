@@ -8,6 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import customerService, { type Customer } from '../../services/customerService';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatNumber } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 // Stat Card Component
@@ -117,12 +118,12 @@ const CustomerRow: React.FC<{
             <td className="px-4 py-4">
                 <div className="space-y-1 text-right">
                     <div className="flex items-center justify-end gap-2 text-lg font-bold text-slate-800">
-                        {customer.currentBalance?.toLocaleString()}
+                        {formatNumber(customer.currentBalance)}
                         <span className="text-[10px] text-slate-400 font-normal">{customer.currency}</span>
                     </div>
                     {customer.creditLimit && (
                         <div className="text-[10px] text-slate-400">
-                            حد الائتمان: {customer.creditLimit.toLocaleString()}
+                            حد الائتمان: {formatNumber(customer.creditLimit)}
                         </div>
                     )}
                 </div>
@@ -241,7 +242,7 @@ const CustomersPage: React.FC = () => {
 
     // Filtered Customers
     const filteredCustomers = useMemo(() => {
-        return customers.filter(c => {
+        const filtered = customers.filter(c => {
             const matchesSearch =
                 c.customerNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 c.customerCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -258,6 +259,8 @@ const CustomersPage: React.FC = () => {
 
             return matchesSearch && matchesStatus && matchesType && matchesClass;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [customers, searchTerm, filterStatus, filterType, filterClass]);
 
     // Pagination
@@ -325,7 +328,7 @@ const CustomersPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <StatCard icon={Users} value={stats.total} label="إجمالي العملاء" color="primary" />
                 <StatCard icon={CheckCircle2} value={stats.active} label="عميل نشط" color="success" />
-                <StatCard icon={DollarSign} value={stats.totalBalance.toLocaleString()} label="إجمالي المستحقات" color="purple" />
+                <StatCard icon={DollarSign} value={formatNumber(stats.totalBalance)} label="إجمالي المستحقات" color="purple" />
                 <StatCard icon={AlertTriangle} value={stats.overLimit} label="عملاء فوق حد الائتمان" color="danger" />
             </div>
 

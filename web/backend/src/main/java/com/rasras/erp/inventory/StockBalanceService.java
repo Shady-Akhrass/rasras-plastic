@@ -27,6 +27,16 @@ public class StockBalanceService {
                 .collect(Collectors.toList());
     }
 
+    /** أرصدة صنف/مخزن: لأصناف ذات رصيد فعلي في المخزن (للقوائم المنسدلة في التحويل) */
+    @Transactional(readOnly = true)
+    public List<StockBalanceDto> getByWarehouseId(Integer warehouseId) {
+        if (warehouseId == null) return Collections.emptyList();
+        return balanceRepo.findByWarehouseId(warehouseId).stream()
+                .filter(b -> b.getQuantityOnHand() != null && b.getQuantityOnHand().compareTo(java.math.BigDecimal.ZERO) > 0)
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
     @Transactional(readOnly = true)
     public StockBalanceDto getBalanceById(Integer id) {
         return balanceRepo.findById(id)

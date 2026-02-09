@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supplierService, type SupplierDto, type SupplierItemDto, type SupplierBankDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
+import { formatNumber } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 type Tab = 'basic' | 'financial' | 'contact' | 'items';
@@ -373,7 +374,7 @@ const ItemRow: React.FC<{
         </td>
         <td className="p-4">
             <span className="font-bold text-slate-800">
-                {item.lastPrice?.toLocaleString()} {currency}
+                {formatNumber(item.lastPrice)} {currency}
             </span>
         </td>
         <td className="p-4">

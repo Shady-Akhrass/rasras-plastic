@@ -1,75 +1,238 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
-    Plus, Save, Trash2, Package, Truck, Calendar, FileText,
+    Save, Trash2, Package, Truck, Calendar, FileText,
     ArrowRight, Sparkles, X, RefreshCw, ChevronRight, DollarSign,
-    Hash, Layers, ClipboardList, CheckCircle2, Users, Eye
+    Hash, Layers, ClipboardList, CheckCircle2, Check, Search, Users, Eye
 } from 'lucide-react';
 import purchaseService, { type RFQ, type RFQItem, type Supplier } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import { approvalService } from '../../services/approvalService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
-// Form Select Component
-const FormSelect: React.FC<{
+// ─── Multi Select Dropdown Component ────────────────────────────────────────────
+const MultiSelectDropdown: React.FC<{
     label: string;
-    value: number | string;
-    onChange: (value: string) => void;
+    options: { value: number; label: string; code?: string }[];
+    selectedValues: number[];
+    onChange: (values: number[]) => void;
     icon?: React.ElementType;
-    options: { value: number | string; label: string }[];
     placeholder?: string;
     required?: boolean;
     loading?: boolean;
-    helperText?: React.ReactNode;
-}> = ({ label, value, onChange, icon: Icon, options, placeholder, required, loading, helperText }) => {
-    const [isFocused, setIsFocused] = useState(false);
+    disabled?: boolean;
+}> = ({ label, options, selectedValues, onChange, icon: Icon, placeholder, required, loading, disabled }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredOptions = useMemo(() => {
+        return options.filter(opt =>
+            opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (opt.code && opt.code.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+    }, [options, searchTerm]);
+
+    const toggleOption = (value: number) => {
+        if (selectedValues.includes(value)) {
+            onChange(selectedValues.filter(v => v !== value));
+        } else {
+            onChange([...selectedValues, value]);
+        }
+    };
+
+    const selectAll = () => {
+        onChange(filteredOptions.map(opt => opt.value));
+    };
+
+    const deselectAll = () => {
+        onChange([]);
+    };
+
+    const selectedLabels = options
+        .filter(opt => selectedValues.includes(opt.value))
+        .map(opt => opt.label);
 
     return (
         <div className="space-y-2">
             <label className={`block text-sm font-semibold transition-colors duration-200
-                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
+                ${isOpen ? 'text-brand-primary' : 'text-slate-700'}`}>
                 {label}
                 {required && <span className="text-rose-500 mr-1">*</span>}
             </label>
             <div className="relative">
                 {Icon && (
-                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200
-                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200 z-10
+                        ${isOpen ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
                 )}
-                <select
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    required={required}
-                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none
-                        appearance-none bg-white cursor-pointer
+
+                <button
+                    type="button"
+                    onClick={() => !disabled && setIsOpen(!isOpen)}
+                    disabled={disabled}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none 
+                        text-right bg-white flex items-center justify-between
                         ${Icon ? 'pr-12' : ''}
-                        ${isFocused
+                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                        ${isOpen
                             ? 'border-brand-primary shadow-lg shadow-brand-primary/10'
                             : 'border-slate-200 hover:border-slate-300'}`}
                 >
-                    {placeholder && <option value={0}>{placeholder}</option>}
-                    {options.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                </select>
-                {loading ? (
-                    <RefreshCw className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-primary animate-spin" />
-                ) : (
-                    <ChevronRight className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 rotate-90" />
+                    <div className="flex-1 truncate">
+                        {selectedValues.length === 0 ? (
+                            <span className="text-slate-400">{placeholder || 'اختر...'}</span>
+                        ) : selectedValues.length === 1 ? (
+                            <span className="text-slate-800">{selectedLabels[0]}</span>
+                        ) : (
+                            <span className="text-slate-800">
+                                تم اختيار {selectedValues.length} مورد
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {selectedValues.length > 0 && (
+                            <span className="px-2 py-0.5 bg-brand-primary/10 text-brand-primary text-xs font-bold rounded-full">
+                                {selectedValues.length}
+                            </span>
+                        )}
+                        {loading ? (
+                            <RefreshCw className="w-5 h-5 text-brand-primary animate-spin" />
+                        ) : (
+                            <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform duration-200
+                                ${isOpen ? '-rotate-90' : 'rotate-90'}`} />
+                        )}
+                    </div>
+                </button>
+
+                {isOpen && (
+                    <>
+                        <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setIsOpen(false)}
+                        />
+                        <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border-2 border-slate-200 
+                            shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="p-3 border-b border-slate-100">
+                                <div className="relative">
+                                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        placeholder="بحث في الموردين..."
+                                        className="w-full pr-10 pl-4 py-2 rounded-lg border border-slate-200 
+                                            focus:border-brand-primary outline-none text-sm"
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                <span className="text-xs text-slate-500">
+                                    {filteredOptions.length} مورد متاح
+                                </span>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={selectAll}
+                                        className="px-2 py-1 text-xs font-semibold text-brand-primary 
+                                            hover:bg-brand-primary/10 rounded transition-colors"
+                                    >
+                                        تحديد الكل
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={deselectAll}
+                                        className="px-2 py-1 text-xs font-semibold text-slate-500 
+                                            hover:bg-slate-100 rounded transition-colors"
+                                    >
+                                        إلغاء الكل
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="max-h-64 overflow-y-auto">
+                                {filteredOptions.length > 0 ? (
+                                    filteredOptions.map(opt => {
+                                        const isSelected = selectedValues.includes(opt.value);
+                                        return (
+                                            <div
+                                                key={opt.value}
+                                                onClick={() => toggleOption(opt.value)}
+                                                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all
+                                                    ${isSelected
+                                                        ? 'bg-brand-primary/5 border-r-4 border-brand-primary'
+                                                        : 'hover:bg-slate-50 border-r-4 border-transparent'}`}
+                                            >
+                                                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center
+                                                    transition-all duration-200
+                                                    ${isSelected
+                                                        ? 'bg-brand-primary border-brand-primary text-white'
+                                                        : 'border-slate-300 bg-white'}`}>
+                                                    {isSelected && <Check className="w-3.5 h-3.5" />}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className={`font-medium ${isSelected ? 'text-brand-primary' : 'text-slate-800'}`}>
+                                                        {opt.label}
+                                                    </div>
+                                                    {opt.code && (
+                                                        <div className="text-xs text-slate-400 font-mono">{opt.code}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="px-4 py-8 text-center text-slate-400 text-sm">
+                                        لا توجد نتائج
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
-            {helperText && (
-                <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">{helperText}</p>
+
+            {selectedValues.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                    {options
+                        .filter(opt => selectedValues.includes(opt.value))
+                        .slice(0, 5)
+                        .map(opt => (
+                            <span
+                                key={opt.value}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-brand-primary/10 
+                                    text-brand-primary text-xs font-semibold rounded-lg"
+                            >
+                                {opt.label}
+                                {!disabled && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleOption(opt.value);
+                                        }}
+                                        className="hover:bg-brand-primary/20 rounded-full p-0.5 transition-colors"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </span>
+                        ))}
+                    {selectedValues.length > 5 && (
+                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg">
+                            +{selectedValues.length - 5} آخرين
+                        </span>
+                    )}
+                </div>
             )}
         </div>
     );
 };
 
-// Form Input Component
+// ─── Form Input Component ───────────────────────────────────────────────────────
 const FormInput: React.FC<{
     label: string;
     value: string | number;
@@ -115,7 +278,7 @@ const FormInput: React.FC<{
     );
 };
 
-// Form Textarea Component
+// ─── Form Textarea Component ────────────────────────────────────────────────────
 const FormTextarea: React.FC<{
     label: string;
     value: string;
@@ -158,7 +321,7 @@ const FormTextarea: React.FC<{
     );
 };
 
-// Item Row Component
+// ─── Item Row Component ─────────────────────────────────────────────────────────
 const ItemRow: React.FC<{
     item: RFQItem;
     index: number;
@@ -167,10 +330,11 @@ const ItemRow: React.FC<{
     usedItemIds: number[];
     supplierPrice?: number;
     disabled?: boolean;
+    /** عند true: تعطيل تعديل الصنف والكمية والوحدة فقط (يُسمح بالسعر المتوقع والملاحظات) */
+    lockItemFields?: boolean;
     onUpdate: (field: keyof RFQItem, value: any) => void;
     onRemove: () => void;
-}> = ({ item, index, items, units, usedItemIds, supplierPrice, disabled, onUpdate, onRemove }) => {
-    // Filter out already-used items (except the current item's selection)
+}> = ({ item, index, items, units, usedItemIds, supplierPrice, disabled, lockItemFields, onUpdate, onRemove }) => {
     const availableItems = items.filter(i =>
         i.id === item.itemId || !usedItemIds.includes(i.id!)
     );
@@ -196,24 +360,24 @@ const ItemRow: React.FC<{
                 </button>
             )}
 
-        <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
-            flex items-center justify-center text-sm font-bold shadow-lg">
+            <div className="absolute -right-2 -top-2 w-8 h-8 bg-brand-primary text-white rounded-lg
+                flex items-center justify-center text-sm font-bold shadow-lg">
                 {index + 1}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
-                <div className="md:col-span-4 space-y-2">
+                <div className="md:col-span-3 space-y-2">
                     <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
                         <Package className="w-3.5 h-3.5" />
                         الصنف
                     </label>
                     <select
                         value={item.itemId}
-                        disabled={disabled}
+                        disabled={disabled || lockItemFields}
                         onChange={(e) => onUpdate('itemId', parseInt(e.target.value))}
                         className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
                         focus:border-brand-primary outline-none font-medium transition-all
-                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                        ${(disabled || lockItemFields) ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                     >
                         <option value={0}>اختر صنف...</option>
                         {availableItems.map(i => (
@@ -230,43 +394,62 @@ const ItemRow: React.FC<{
                     <input
                         type="number"
                         value={item.requestedQty}
-                        disabled={disabled}
+                        disabled={disabled || lockItemFields}
                         onChange={(e) => onUpdate('requestedQty', parseFloat(e.target.value))}
                         className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
                         focus:border-brand-primary outline-none font-medium transition-all
-                        ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                        ${(disabled || lockItemFields) ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                         min="0"
                         step="0.01"
                     />
                 </div>
 
-            {/* Expected Price */}
-            <div className="md:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <DollarSign className="w-3.5 h-3.5" />
-                    السعر المتوقع
-                    {supplierPrice && (
-                        <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
-                            كتالوج
-                        </span>
-                    )}
-                </label>
-                <input
-                    type="number"
-                    value={item.estimatedPrice || ''}
-                    disabled={readOnly}
-                    onChange={(e) => onUpdate('estimatedPrice', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className={`w-full px-4 py-2.5 rounded-xl border-2 outline-none font-medium transition-all
-                        ${supplierPrice
-                            ? 'border-emerald-200 bg-emerald-50/50 focus:border-emerald-400'
-                            : 'border-slate-200 focus:border-brand-primary ' + (readOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white')}`}
-                    min="0"
-                    step="0.01"
-                />
-            </div>
+                <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5" />
+                        الوحدة
+                    </label>
+                    <select
+                        value={item.unitId}
+                        disabled={disabled || lockItemFields}
+                        onChange={(e) => onUpdate('unitId', parseInt(e.target.value))}
+                        className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-200 
+                        focus:border-brand-primary outline-none font-medium transition-all
+                            ${(disabled || lockItemFields) ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                    >
+                        <option value={0}>الوحدة...</option>
+                        {units.map(u => (
+                            <option key={u.id} value={u.id}>{u.unitNameAr}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <DollarSign className="w-3.5 h-3.5" />
+                        السعر المتوقع
+                        {supplierPrice && (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
+                                كتالوج
+                            </span>
+                        )}
+                    </label>
+                    <input
+                        type="number"
+                        value={item.estimatedPrice || ''}
+                        disabled={disabled}
+                        onChange={(e) => onUpdate('estimatedPrice', parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className={`w-full px-4 py-2.5 rounded-xl border-2 outline-none font-medium transition-all
+                            ${supplierPrice
+                                ? 'border-emerald-200 bg-emerald-50/50 focus:border-emerald-400'
+                                : 'border-slate-200 focus:border-brand-primary ' + (disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white')}`}
+                        min="0"
+                        step="0.01"
+                    />
+                </div>
+
+                <div className="md:col-span-3 space-y-2">
                     <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
                         <FileText className="w-3.5 h-3.5" />
                         مواصفات
@@ -284,33 +467,10 @@ const ItemRow: React.FC<{
                 </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
-// Empty Items State
-const EmptyItemsState: React.FC<{ onAdd: () => void }> = ({ onAdd }) => (
-    <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-        <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-            <Package className="w-10 h-10 text-slate-300" />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-2">لا توجد بنود مضافة</h3>
-        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">
-            ابدأ بالضغط على زر إضافة صنف لإضافة بنود طلب عرض السعر
-        </p>
-        <button
-            type="button"
-            onClick={onAdd}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white 
-                rounded-xl font-bold hover:bg-brand-primary/90 transition-all
-                shadow-lg shadow-brand-primary/30"
-        >
-            <Plus className="w-5 h-5" />
-            إضافة صنف الآن
-        </button>
-    </div>
-);
-
-// Loading Skeleton
+// ─── Loading Skeleton ───────────────────────────────────────────────────────────
 const FormSkeleton: React.FC = () => (
     <div className="space-y-6 animate-pulse">
         <div className="h-32 bg-slate-200 rounded-3xl" />
@@ -335,6 +495,7 @@ const FormSkeleton: React.FC = () => (
     </div>
 );
 
+// ─── Main Page Component ────────────────────────────────────────────────────────
 const RFQFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -355,15 +516,16 @@ const RFQFormPage: React.FC = () => {
     const [units, setUnits] = useState<UnitDto[]>([]);
     const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
     const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
-    const [supplierIds, setSupplierIds] = useState<number[]>([]);
     const [availablePRs, setAvailablePRs] = useState<{ id: number; prNumber: string; items: any[] }[]>([]);
 
-    const [formData, setFormData] = useState<Omit<RFQ, 'supplierId'> & { supplierId?: number }>({
+    // Multi-supplier selection
+    const [selectedSupplierIds, setSelectedSupplierIds] = useState<number[]>([]);
+
+    const [formData, setFormData] = useState<Omit<RFQ, 'supplierId'>>({
         rfqDate: new Date().toISOString().split('T')[0],
         responseDueDate: '',
         notes: '',
-        items: [],
-        supplierId: 0
+        items: []
     });
 
     useEffect(() => {
@@ -386,13 +548,11 @@ const RFQFormPage: React.FC = () => {
             setSuppliers(suppliersData);
             setItems(itemsData.data || []);
             setUnits(unitsData.data || []);
-            setUnits(unitsData.data || []);
-            // Filter enabled PRs: Approved AND No Active Orders (not fully processed)
-            const availablePRsList = prsData.filter((pr: any) =>
+
+            const approvedPRs = prsData.filter((pr: any) =>
                 pr.status === 'Approved' && !pr.hasActiveOrders
             );
-
-            setAvailablePRs(availablePRsList.map((pr: any) => ({
+            setAvailablePRs(approvedPRs.map((pr: any) => ({
                 id: pr.id,
                 prNumber: pr.prNumber,
                 items: pr.items || []
@@ -417,7 +577,8 @@ const RFQFormPage: React.FC = () => {
                         itemId: pi.itemId,
                         requestedQty: pi.requestedQty,
                         unitId: pi.unitId,
-                        specifications: pi.specifications || ''
+                        specifications: pi.specifications || '',
+                        estimatedPrice: pi.estimatedUnitPrice || 0
                     }))
                 }));
                 toast.success('تم تحميل بيانات طلب الشراء', { icon: '📋' });
@@ -434,6 +595,7 @@ const RFQFormPage: React.FC = () => {
         try {
             setLoading(true);
             const data = await purchaseService.getRFQById(rfqId);
+            setSelectedSupplierIds([data.supplierId]);
             setFormData(data);
         } catch (error) {
             console.error('Failed to load RFQ:', error);
@@ -443,31 +605,24 @@ const RFQFormPage: React.FC = () => {
         }
     };
 
-    const handleSupplierChange = async (supplierId: number) => {
-        setFormData(prev => ({ ...prev, supplierId }));
-        if (supplierId === 0) {
+    const handleSuppliersChange = async (supplierIds: number[]) => {
+        setSelectedSupplierIds(supplierIds);
+
+        if (supplierIds.length === 0) {
             setSupplierItems([]);
             return;
         }
+
+        // Load catalog items for the first selected supplier (for price suggestions)
         try {
             setLoadingSupplierItems(true);
-            const result = await supplierService.getSupplierItems(supplierId);
+            const result = await supplierService.getSupplierItems(supplierIds[0]);
             setSupplierItems(result.data || []);
         } catch (error) {
             console.error('Failed to load supplier items:', error);
         } finally {
             setLoadingSupplierItems(false);
         }
-    };
-
-    const addItem = () => {
-        const newItem: RFQItem = {
-            itemId: 0,
-            requestedQty: 1,
-            unitId: 0,
-            specifications: ''
-        };
-        setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
     };
 
     const removeItem = (index: number) => {
@@ -499,13 +654,14 @@ const RFQFormPage: React.FC = () => {
         return supplierItems.find(si => si.itemId === itemId)?.lastPrice;
     };
 
-    // Submit - Create RFQ for each selected supplier
+    // Submit — create one RFQ per selected supplier
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const hasSuppliers = prIdFromUrl
-            ? supplierIds.length > 0
-            : (formData.supplierId ?? 0) > 0;
+        if (selectedSupplierIds.length === 0) {
+            toast.error('يرجى اختيار مورد واحد على الأقل');
+            return;
+        }
 
         if (!formData.prId) {
             toast.error('يرجى اختيار طلب شراء (PR)');
@@ -521,19 +677,45 @@ const RFQFormPage: React.FC = () => {
             setSaving(true);
 
             if (isEdit) {
-                // Update single RFQ
                 await purchaseService.updateRFQ(parseInt(id!), {
                     ...formData,
                     supplierId: selectedSupplierIds[0]
                 } as RFQ);
                 toast.success('تم تحديث طلب عرض السعر بنجاح', { icon: '🎉' });
             } else {
-                await purchaseService.createRFQ({
-                    ...formData,
-                    supplierId: formData.supplierId ?? 0
-                });
-                toast.success('تم حفظ طلب عرض السعر بنجاح', { icon: '🎉' });
-                navigate('/dashboard/procurement/rfq');
+                let successCount = 0;
+                const errors: string[] = [];
+
+                for (const supplierId of selectedSupplierIds) {
+                    try {
+                        await purchaseService.createRFQ({
+                            ...formData,
+                            supplierId
+                        } as RFQ);
+                        successCount++;
+
+                        if (selectedSupplierIds.indexOf(supplierId) < selectedSupplierIds.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    } catch (err) {
+                        const supplierName = suppliers.find(s => s.id === supplierId)?.supplierNameAr || `#${supplierId}`;
+                        console.error(`Failed to create RFQ for supplier ${supplierName}:`, err);
+                        errors.push(supplierName);
+                    }
+                }
+
+                if (successCount > 0) {
+                    toast.success(
+                        `تم إنشاء ${successCount} طلب عرض سعر بنجاح`,
+                        { icon: '🎉', duration: 4000 }
+                    );
+                }
+                if (errors.length > 0) {
+                    toast.error(
+                        `فشل إنشاء طلب لـ: ${errors.join('، ')}`,
+                        { duration: 5000 }
+                    );
+                }
             }
 
             navigate('/dashboard/procurement/rfq');
@@ -573,17 +755,12 @@ const RFQFormPage: React.FC = () => {
         <div className="space-y-6">
             <style>{`
                 @keyframes fadeInUp {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
+                    from { opacity: 0; transform: translateY(20px); }
+                    to   { opacity: 1; transform: translateY(0); }
                 }
             `}</style>
 
+            {/* ── Header ──────────────────────────────────────────────── */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
                 rounded-3xl p-8 text-white">
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
@@ -603,12 +780,18 @@ const RFQFormPage: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">
-                                {isEdit ? `تعديل طلب عرض سعر #${formData.rfqNumber}` : 'إنشاء طلب عرض سعر جديد'}
+                                {isView
+                                    ? `عرض طلب عرض سعر #${formData.rfqNumber}`
+                                    : isEdit
+                                        ? `تعديل طلب عرض سعر #${formData.rfqNumber}`
+                                        : 'إنشاء طلب عرض سعر جديد'}
                             </h1>
                             <p className="text-white/70 text-lg">
-                                {isEdit
-                                    ? 'تعديل تفاصيل الطلب والبنود المطلوبة'
-                                    : 'اختر الموردين وأدخل البنود المطلوبة - سيتم إنشاء طلب منفصل لكل مورد'}
+                                {isView
+                                    ? 'عرض تفاصيل الطلب والبنود'
+                                    : isEdit
+                                        ? 'تعديل تفاصيل الطلب والبنود المطلوبة'
+                                        : 'اختر الموردين وأدخل البنود المطلوبة - سيتم إنشاء طلب منفصل لكل مورد'}
                             </p>
                         </div>
                     </div>
@@ -641,8 +824,8 @@ const RFQFormPage: React.FC = () => {
                                         ? 'جاري الحفظ...'
                                         : isEdit
                                             ? 'حفظ التعديلات'
-                                            : prIdFromUrl && supplierIds.length > 1
-                                                ? `إنشاء ${supplierIds.length} طلبات`
+                                            : selectedSupplierIds.length > 1
+                                                ? `إنشاء ${selectedSupplierIds.length} طلبات`
                                                 : 'حفظ الطلب'}
                                 </span>
                             </button>
@@ -683,19 +866,21 @@ const RFQFormPage: React.FC = () => {
                 </div>
             </div>
 
-            {!isEdit && prIdFromUrl && supplierIds.length > 1 && (
+            {/* ── Multi-supplier banner ───────────────────────────────── */}
+            {!isEdit && selectedSupplierIds.length > 1 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
                     <div className="p-2 bg-amber-100 rounded-xl">
                         <Users className="w-5 h-5 text-amber-600" />
                     </div>
                     <div className="flex-1">
                         <span className="text-amber-700 font-semibold">سيتم إنشاء </span>
-                        <span className="text-amber-800 font-bold">{supplierIds.length} طلب عرض سعر</span>
+                        <span className="text-amber-800 font-bold">{selectedSupplierIds.length} طلب عرض سعر</span>
                         <span className="text-amber-700 font-semibold"> منفصل - واحد لكل مورد محدد، بنفس البنود والتفاصيل</span>
                     </div>
                 </div>
             )}
 
+            {/* ── PR link badge ────────────────────────────────────────── */}
             {formData.prNumber && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
                     <div className="p-2 bg-emerald-100 rounded-xl">
@@ -708,7 +893,9 @@ const RFQFormPage: React.FC = () => {
                 </div>
             )}
 
+            {/* ── Form ─────────────────────────────────────────────────── */}
             <form className="space-y-6" onSubmit={handleSubmit}>
+                {/* Request Info */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
                         <div className="p-2 bg-brand-primary/10 rounded-xl">
@@ -717,25 +904,10 @@ const RFQFormPage: React.FC = () => {
                         <h2 className="text-lg font-bold text-slate-800">معلومات الطلب</h2>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {prIdFromUrl ? (
-                            <div className="md:col-span-2">
-                                <FormMultiSelect
-                                    label="الموردون (اختيار من متعدد)"
-                                    value={supplierIds}
-                                    onChange={setSupplierIds}
-                                    icon={Truck}
-                                    options={supplierOptions}
-                                    placeholder="اختر الموردين..."
-                                    required
-                                />
-                            </div>
-                        ) : (
-                            <FormSelect
-                                label="المورد"
-                                value={formData.supplierId ?? 0}
-                                onChange={(v: string) => handleSupplierChange(parseInt(v) || 0)}
-                                icon={Truck}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="lg:col-span-2">
+                            <MultiSelectDropdown
+                                label={isEdit ? 'المورد' : 'الموردين'}
                                 options={supplierOptions}
                                 selectedValues={selectedSupplierIds}
                                 onChange={handleSuppliersChange}
@@ -773,8 +945,9 @@ const RFQFormPage: React.FC = () => {
                         />
                     </div>
 
+                    {/* PR Selection */}
                     <div className="mt-6">
-                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                        <label className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                             <Package className="w-4 h-4 text-slate-500" />
                             طلب الشراء (PR) <span className="text-rose-500">*</span>
                         </label>
@@ -792,11 +965,19 @@ const RFQFormPage: React.FC = () => {
                                 ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : ''}`}
                         >
                             <option value="">اختر طلب شراء...</option>
-                            {availablePRs.map((pr: { id: number; prNumber: string; items: any[] }) => (
-                                <option key={pr.id} value={pr.id}>
-                                    #{pr.prNumber} ({pr.items.length} صنف)
-                                </option>
-                            ))}
+                            {availablePRs.map(pr => {
+                                const itemNames = (pr.items || [])
+                                    .map((pi: any) => pi.itemNameAr || pi.itemCode || 'صنف')
+                                    .filter(Boolean);
+                                const namesLabel = itemNames.length > 0
+                                    ? (itemNames.length <= 2 ? itemNames.join('، ') : `${itemNames.slice(0, 2).join('، ')} +${itemNames.length - 2}`)
+                                    : '—';
+                                return (
+                                    <option key={pr.id} value={pr.id}>
+                                        #{pr.prNumber} ({namesLabel})
+                                    </option>
+                                );
+                            })}
                         </select>
                         {formData.prNumber && (
                             <p className="text-xs text-emerald-600 flex items-center gap-1 mt-2">
@@ -806,6 +987,7 @@ const RFQFormPage: React.FC = () => {
                         )}
                     </div>
 
+                    {/* Notes */}
                     <div className="mt-6">
                         <FormTextarea
                             label="ملاحظات"
@@ -819,6 +1001,7 @@ const RFQFormPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* ── Items Section (read-only, populated from PR) ──────── */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
                         <div className="flex items-center gap-3">
@@ -830,18 +1013,6 @@ const RFQFormPage: React.FC = () => {
                                 <p className="text-sm text-slate-500">{formData.items.length} بند</p>
                             </div>
                         </div>
-                        {!isView && (
-                            <button
-                                type="button"
-                                onClick={addItem}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 text-brand-primary 
-                                    bg-brand-primary/10 hover:bg-brand-primary hover:text-white
-                                    rounded-xl font-bold transition-all duration-200"
-                            >
-                                <Plus className="w-5 h-5" />
-                                <span>إضافة صنف</span>
-                            </button>
-                        )}
                     </div>
 
                     <div className="space-y-4">
@@ -852,20 +1023,30 @@ const RFQFormPage: React.FC = () => {
                                 index={index}
                                 items={items}
                                 units={units}
-                                usedItemIds={formData.items.map(i => i.itemId).filter(id => id !== 0)}
+                                usedItemIds={formData.items.map(i => i.itemId).filter(iid => iid !== 0)}
                                 supplierPrice={getSupplierPrice(item.itemId)}
                                 disabled={isView}
+                                lockItemFields={!isEdit}
                                 onUpdate={(field, value) => updateItem(index, field, value)}
                                 onRemove={() => removeItem(index)}
                             />
                         ))}
 
                         {formData.items.length === 0 && (
-                            <EmptyItemsState onAdd={addItem} />
+                            <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                                <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                                    <Package className="w-10 h-10 text-slate-300" />
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">لا توجد بنود مضافة</h3>
+                                <p className="text-slate-500 text-sm max-w-md mx-auto">
+                                    اختر طلب شراء (PR) من الأعلى لتحميل البنود تلقائياً
+                                </p>
+                            </div>
                         )}
                     </div>
                 </div>
 
+                {/* ── Summary ──────────────────────────────────────────── */}
                 {formData.items.length > 0 && (
                     <div className="bg-gradient-to-l from-brand-primary/5 to-slate-50 p-6 rounded-2xl border border-slate-200">
                         <div className="flex flex-wrap items-center gap-6">
@@ -875,9 +1056,7 @@ const RFQFormPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">عدد الموردين</div>
-                                    <div className="text-lg font-bold text-slate-800">
-                                        {prIdFromUrl ? supplierIds.length : ((formData.supplierId ?? 0) ? 1 : 0)}
-                                    </div>
+                                    <div className="text-lg font-bold text-slate-800">{selectedSupplierIds.length}</div>
                                 </div>
                             </div>
 
@@ -902,7 +1081,7 @@ const RFQFormPage: React.FC = () => {
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">إجمالي الكميات</div>
                                     <div className="text-lg font-bold text-slate-800">
-                                        {formData.items.reduce((sum, i) => sum + (i.requestedQty || 0), 0).toLocaleString()}
+                                        {formatNumber(formData.items.reduce((sum, i) => sum + (i.requestedQty || 0), 0))}
                                     </div>
                                 </div>
                             </div>
@@ -917,16 +1096,14 @@ const RFQFormPage: React.FC = () => {
                                         <div>
                                             <div className="text-xs text-slate-500 font-medium">القيمة التقديرية</div>
                                             <div className="text-lg font-bold text-brand-primary">
-                                                {formData.items
-                                                    .reduce((sum, i) => sum + ((i.estimatedPrice || 0) * (i.requestedQty || 0)), 0)
-                                                    .toLocaleString()} EGP
+                                                {formatNumber(formData.items.reduce((sum, i) => sum + ((i.estimatedPrice || 0) * (i.requestedQty || 0)), 0))} EGP
                                             </div>
                                         </div>
                                     </div>
                                 </>
                             )}
 
-                            {!isEdit && prIdFromUrl && supplierIds.length > 1 && (
+                            {!isEdit && selectedSupplierIds.length > 1 && (
                                 <>
                                     <div className="w-px h-10 bg-slate-200" />
                                     <div className="flex items-center gap-3">
@@ -936,7 +1113,7 @@ const RFQFormPage: React.FC = () => {
                                         <div>
                                             <div className="text-xs text-slate-500 font-medium">طلبات سيتم إنشاؤها</div>
                                             <div className="text-lg font-bold text-blue-600">
-                                                {supplierIds.length} طلب
+                                                {selectedSupplierIds.length} طلب
                                             </div>
                                         </div>
                                     </div>

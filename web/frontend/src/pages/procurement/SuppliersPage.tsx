@@ -144,7 +144,7 @@ const SuppliersPage: React.FC = () => {
     };
 
     const filteredSuppliers = useMemo(() => {
-        return suppliers.filter(s => {
+        const filtered = suppliers.filter(s => {
             const matchesSearch =
                 s.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 s.supplierCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -152,6 +152,8 @@ const SuppliersPage: React.FC = () => {
             const matchesType = typeFilter === 'All' || s.supplierType === typeFilter;
             return matchesSearch && matchesType;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [suppliers, searchTerm, typeFilter]);
 
     const stats = useMemo(() => ({

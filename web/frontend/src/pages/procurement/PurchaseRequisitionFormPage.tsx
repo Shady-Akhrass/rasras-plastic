@@ -23,6 +23,7 @@ import { itemService } from '../../services/itemService';
 import { unitService } from '../../services/unitService';
 import employeeService, { type Department } from '../../services/employeeService';
 import toast from 'react-hot-toast';
+import { formatNumber } from '../../utils/format';
 import PRLifecycleTracker from '../../components/procurement/PRLifecycleTracker';
 import { type PRLifecycle } from '../../services/purchaseService';
 
@@ -367,7 +368,7 @@ const PurchaseRequisitionFormPage = () => {
             </div>
 
             {isViewMode && lifecycle && (
-                <PRLifecycleTracker lifecycle={lifecycle} />
+                <PRLifecycleTracker lifecycle={lifecycle} prId={formData.id} />
             )}
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -652,7 +653,7 @@ const PurchaseRequisitionFormPage = () => {
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">إجمالي الكميات</span>
                                 <span className="font-bold text-lg text-emerald-400" dir="ltr">
-                                    {totalQuantity.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    {formatNumber(totalQuantity, { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="pt-6 border-t border-white/10">

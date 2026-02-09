@@ -16,12 +16,33 @@ import {
     Filter,
     RefreshCw,
     XCircle, CheckCircle2,
-    RotateCcw
+    RotateCcw,
+    Warehouse
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
+import { formatNumber, formatDate } from '../../utils/format';
+import { grnService } from '../../services/grnService';
+import warehouseService from '../../services/warehouseService';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
+
+// تعريب أسماء مسارات الاعتماد والخطوات (قادمة من الباكند بالإنجليزي)
+const WORKFLOW_NAME_AR: Record<string, string> = {
+    'Purchase Requisition Approval': 'اعتماد طلب الشراء',
+    'Purchase Order Approval': 'اعتماد أمر الشراء',
+    'Supplier Approval': 'اعتماد المورد',
+    'Goods Receipt Note Approval': 'اعتماد إذن الاستلام',
+    'Purchase Return Approval': 'اعتماد مرتجع المشتريات',
+    'Quotation Comparison Approval': 'اعتماد مقارنة العروض',
+};
+const STEP_NAME_AR: Record<string, string> = {
+    'Procurement Manager Approval': 'اعتماد مدير المشتريات',
+    'Finance Manager Approval': 'اعتماد المدير المالي',
+    'General Manager Approval': 'اعتماد المدير العام',
+};
+const tr = (en: string | undefined, map: Record<string, string>) =>
+    (en && map[en]) ? map[en] : (en || '');
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -62,19 +83,19 @@ const StatCard: React.FC<{
 const RequestCard: React.FC<{
     request: ApprovalRequestDto;
     index: number;
-    onApprove: (id: number) => void;
+    onApprove: (request: ApprovalRequestDto) => void;
     onReject: (id: number) => void;
     processing: boolean;
 }> = ({ request, index, onApprove, onReject, processing }) => {
     const getDocTypeConfig = (type: string) => {
-        const configs: Record<string, { label?: string; shortLabel?: string; bg: string; text: string; border?: string; icon: React.ElementType }> = {
-            'PurchaseRequisition': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
-            'PR': { bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
-            'RFQ': { bg: 'bg-amber-50', text: 'text-amber-600', icon: FileText },
-            'SupplierQuotation': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
-            'SQ': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
-            'QuotationComparison': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
-            'QC': { bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
+        const configs: Record<string, { label: string; shortLabel?: string; bg: string; text: string; border?: string; icon: React.ElementType }> = {
+            'PurchaseRequisition': { label: 'طلب شراء', bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
+            'PR': { label: 'طلب شراء', bg: 'bg-purple-50', text: 'text-purple-600', icon: FileText },
+            'RFQ': { label: 'طلب عروض أسعار', bg: 'bg-amber-50', text: 'text-amber-600', icon: FileText },
+            'SupplierQuotation': { label: 'عرض مورد', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
+            'SQ': { label: 'عرض مورد', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Tag },
+            'QuotationComparison': { label: 'مقارنة عروض', bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
+            'QC': { label: 'مقارنة عروض', bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Scale },
             'PurchaseOrder': {
                 label: 'أمر شراء',
                 shortLabel: 'PO',
@@ -83,7 +104,7 @@ const RequestCard: React.FC<{
                 border: 'border-blue-200',
                 icon: ShoppingCart,
             },
-            'PO': { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
+            'PO': { label: 'أمر شراء', bg: 'bg-blue-50', text: 'text-blue-600', icon: ShoppingCart },
             'PurchaseReturn': {
                 label: 'مرتجع مشتريات',
                 shortLabel: 'PRN',
@@ -92,18 +113,19 @@ const RequestCard: React.FC<{
                 border: 'border-rose-100',
                 icon: RotateCcw,
             },
-            'GoodsReceiptNote': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
-            'GRN': { bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
-            'SupplierInvoice': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
-            'SINV': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
-            'SalesOrder': { bg: 'bg-sky-50', text: 'text-sky-600', icon: ShoppingCart },
-            'SO': { bg: 'bg-sky-50', text: 'text-sky-600', icon: ShoppingCart },
-            'PaymentVoucher': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
-            'PV': { bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
-            'ReceiptVoucher': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign },
-            'RV': { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign },
+            'GoodsReceiptNote': { label: 'إذن إضافة', bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
+            'GRN': { label: 'إذن إضافة', bg: 'bg-cyan-50', text: 'text-cyan-600', icon: Package },
+            'SupplierInvoice': { label: 'فاتورة مورد', bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'SINV': { label: 'فاتورة مورد', bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'SalesOrder': { label: 'أمر بيع', bg: 'bg-sky-50', text: 'text-sky-600', icon: ShoppingCart },
+            'SO': { label: 'أمر بيع', bg: 'bg-sky-50', text: 'text-sky-600', icon: ShoppingCart },
+            'PaymentVoucher': { label: 'سند صرف', bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'PV': { label: 'سند صرف', bg: 'bg-rose-50', text: 'text-rose-600', icon: DollarSign },
+            'ReceiptVoucher': { label: 'سند قبض', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign },
+            'RV': { label: 'سند قبض', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign },
+            'Supplier': { label: 'مورد', bg: 'bg-slate-50', text: 'text-slate-600', icon: Package },
         };
-        return configs[type] || configs['PurchaseOrder'];
+        return configs[type] || { label: type || 'طلب', bg: 'bg-slate-50', text: 'text-slate-600', icon: FileText };
     };
 
     const config = getDocTypeConfig(request.documentType);
@@ -156,7 +178,7 @@ const RequestCard: React.FC<{
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-600 
                                 rounded-lg text-xs font-bold">
-                                {request.documentType}
+                                {config.label}
                             </span>
                             <span className="text-xs font-mono text-slate-400">#{request.documentNumber}</span>
                             {request.priority === 'High' && (
@@ -169,7 +191,7 @@ const RequestCard: React.FC<{
                         </div>
                         <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-bold text-slate-800 text-lg group-hover:text-brand-primary transition-colors">
-                                {request.workflowName}
+                                {tr(request.workflowName, WORKFLOW_NAME_AR)}
                             </h3>
                             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">
                                 {request.documentNumber}
@@ -182,11 +204,11 @@ const RequestCard: React.FC<{
                             </div>
                             <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-slate-400" />
-                                <span>{new Date(request.requestedDate).toLocaleDateString('ar-EG')}</span>
+                                <span>{formatDate(request.requestedDate)}</span>
                             </div>
                             <div className="flex items-center gap-2 text-brand-primary font-bold">
                                 <Clock className="w-4 h-4" />
-                                <span>{request.currentStepName}</span>
+                                <span>{tr(request.currentStepName, STEP_NAME_AR)}</span>
                             </div>
                         </div>
                     </div>
@@ -197,7 +219,7 @@ const RequestCard: React.FC<{
                     lg:border-x border-slate-100 min-w-[140px]">
                     <div className="text-xs text-slate-400 font-medium mb-1">إجمالي القيمة</div>
                     <div className="text-2xl font-bold text-slate-800">
-                        {(request.totalAmount || 0).toLocaleString()}
+                        {formatNumber(request.totalAmount ?? 0)}
                     </div>
                     <div className="text-xs text-slate-400">ج.م</div>
                 </div>
@@ -214,7 +236,7 @@ const RequestCard: React.FC<{
                         <span>عرض</span>
                     </button>
                     <button
-                        onClick={() => onApprove(request.id)}
+                        onClick={() => onApprove(request)}
                         disabled={processing}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 
                             bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 
@@ -301,6 +323,8 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
     </div>
 );
 
+const isGRNType = (t: string) => t === 'GoodsReceiptNote' || t === 'GRN';
+
 const ApprovalsInbox: React.FC = () => {
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
@@ -311,6 +335,15 @@ const ApprovalsInbox: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>(initialType);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+    // نافذة اختيار المخزن عند اعتماد إذن الإضافة
+    const [warehouseModal, setWarehouseModal] = useState<{
+        show: boolean;
+        request: ApprovalRequestDto | null;
+        warehouses: { id: number; warehouseNameAr: string }[];
+        selectedWarehouseId: number;
+        loading: boolean;
+    }>({ show: false, request: null, warehouses: [], selectedWarehouseId: 0, loading: false });
 
     // Mock User ID (from auth context in production)
     const currentUserId = 1;
@@ -332,22 +365,54 @@ const ApprovalsInbox: React.FC = () => {
         }
     };
 
-    const handleAction = async (requestId: number, action: 'Approved' | 'Rejected') => {
-        // Optimistic Update
+    const handleAction = async (requestId: number, action: 'Approved' | 'Rejected', warehouseId?: number) => {
         const originalRequests = [...requests];
         setRequests(prev => prev.filter(r => r.id !== requestId));
         const toastId = toast.loading('جاري تنفيذ الإجراء...');
 
         try {
-            // We don't really need a loading state for the specific card since it's removed
-            // setProcessingId(requestId); 
-            await approvalService.takeAction(requestId, currentUserId, action);
+            await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId);
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح ✅' : 'تم رفض الطلب', { id: toastId });
         } catch (error) {
-            // Revert on failure
             setRequests(originalRequests);
             toast.error('فشل تنفيذ الإجراء', { id: toastId });
         }
+    };
+
+    const handleApproveClick = async (request: ApprovalRequestDto) => {
+        if (isGRNType(request.documentType)) {
+            setWarehouseModal(prev => ({ ...prev, show: true, request, loading: true }));
+            try {
+                const [whRes, grn] = await Promise.all([
+                    warehouseService.getActive().catch(() => warehouseService.getAll()),
+                    grnService.getGRNById(request.documentId)
+                ]);
+                const whList = (whRes as any)?.data ?? whRes ?? [];
+                const arr = Array.isArray(whList) ? whList : [];
+                const currentWhId = grn?.warehouseId ?? (arr[0]?.id ?? 0);
+                setWarehouseModal(prev => ({
+                    ...prev,
+                    warehouses: arr.map((w: any) => ({ id: w.id, warehouseNameAr: w.warehouseNameAr || w.warehouseNameEn || '' })),
+                    selectedWarehouseId: currentWhId || (arr[0]?.id ?? 0),
+                    loading: false
+                }));
+            } catch (e) {
+                toast.error('فشل تحميل قائمة المخازن');
+                setWarehouseModal(prev => ({ ...prev, show: false, loading: false }));
+            }
+        } else {
+            handleAction(request.id, 'Approved');
+        }
+    };
+
+    const handleWarehouseModalConfirm = () => {
+        const { request, selectedWarehouseId } = warehouseModal;
+        if (!request || !selectedWarehouseId) {
+            toast.error('الرجاء اختيار المخزن');
+            return;
+        }
+        setWarehouseModal(prev => ({ ...prev, show: false, request: null }));
+        handleAction(request.id, 'Approved', selectedWarehouseId);
     };
 
     const filteredRequests = useMemo(() => {
@@ -359,11 +424,12 @@ const ApprovalsInbox: React.FC = () => {
             const matchesType = typeFilter === 'All' || req.documentType === typeFilter;
             return matchesSearch && matchesType;
         });
-        // الأحدث فوق والأقدم تحت
+        // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
-            const dateA = a.requestedDate ? new Date(a.requestedDate).getTime() : (a.id ?? 0);
-            const dateB = b.requestedDate ? new Date(b.requestedDate).getTime() : (b.id ?? 0);
-            return dateB - dateA;
+            const dateA = a.requestedDate ? new Date(a.requestedDate).getTime() : 0;
+            const dateB = b.requestedDate ? new Date(b.requestedDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
         });
     }, [requests, searchTerm, typeFilter]);
 
@@ -419,7 +485,12 @@ const ApprovalsInbox: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">بريد الاعتمادات</h1>
-                            <p className="text-white/70 text-lg">لديك {requests.length} طلبات تنتظر مراجعتك</p>
+                            <p className="text-white/70 text-lg">
+                                {requests.length === 0 && 'لا توجد طلبات تنتظر مراجعتك'}
+                                {requests.length === 1 && 'لديك طلب واحد ينتظر مراجعتك'}
+                                {requests.length === 2 && 'لديك طلبان ينتظران مراجعتك'}
+                                {requests.length > 2 && `لديك ${requests.length} طلبات تنتظر مراجعتك`}
+                            </p>
                         </div>
                     </div>
 
@@ -508,6 +579,7 @@ const ApprovalsInbox: React.FC = () => {
                                 onChange={(e) => setTypeFilter(e.target.value)}
                                 className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
                             >
+                                <option value="All">كل الطلبات</option>
                                 <option value="PR">طلبات شراء</option>
                                 <option value="RFQ">طلبات عروض أسعار</option>
                                 <option value="SQ">عروض موردين</option>
@@ -547,8 +619,8 @@ const ApprovalsInbox: React.FC = () => {
                             key={req.id}
                             request={req}
                             index={index}
-                            onApprove={() => handleAction(req.id, 'Approved')}
-                            onReject={() => handleAction(req.id, 'Rejected')}
+                            onApprove={handleApproveClick}
+                            onReject={(id) => handleAction(id, 'Rejected')}
                             processing={false}
                         />
                     ))
@@ -562,6 +634,63 @@ const ApprovalsInbox: React.FC = () => {
                     onPageChange={setCurrentPage}
                     onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
                 />
+            )}
+
+            {/* نافذة اختيار المخزن عند اعتماد إذن الإضافة */}
+            {warehouseModal.show && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 border border-slate-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-3 bg-cyan-50 rounded-xl">
+                                <Warehouse className="w-6 h-6 text-cyan-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">اختيار المخزن للتخزين</h3>
+                                <p className="text-sm text-slate-500">حدد المخزن الذي سيتم تخزين الأصناف فيه</p>
+                            </div>
+                        </div>
+                        {warehouseModal.loading ? (
+                            <div className="py-8 text-center text-slate-500">جاري تحميل المخازن...</div>
+                        ) : (
+                            <>
+                                <div className="mb-6">
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">المخزن</label>
+                                    <select
+                                        value={warehouseModal.selectedWarehouseId}
+                                        onChange={(e) => setWarehouseModal(prev => ({
+                                            ...prev,
+                                            selectedWarehouseId: parseInt(e.target.value, 10)
+                                        }))}
+                                        className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 
+                                            focus:border-brand-primary outline-none transition-colors"
+                                    >
+                                        <option value={0}>-- اختر المخزن --</option>
+                                        {warehouseModal.warehouses.map(w => (
+                                            <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex gap-3 justify-end">
+                                    <button
+                                        onClick={() => setWarehouseModal(prev => ({ ...prev, show: false, request: null }))}
+                                        className="px-4 py-2.5 rounded-xl border-2 border-slate-200 
+                                            text-slate-600 font-bold hover:bg-slate-50"
+                                    >
+                                        إلغاء
+                                    </button>
+                                    <button
+                                        onClick={handleWarehouseModalConfirm}
+                                        disabled={!warehouseModal.selectedWarehouseId}
+                                        className="px-6 py-2.5 rounded-xl bg-emerald-500 text-white font-bold 
+                                            hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        اعتماد وتحديد المخزن
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
             )}
         </div>
     );
