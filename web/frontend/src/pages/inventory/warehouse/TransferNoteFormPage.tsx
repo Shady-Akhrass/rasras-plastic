@@ -26,6 +26,7 @@ const TransferNoteFormPage: React.FC = () => {
         reason: 'REDISTRIBUTION',
         reasonOther: '',
         notes: '',
+        transferCostAmount: undefined,
         items: []
     });
 
@@ -264,6 +265,19 @@ const TransferNoteFormPage: React.FC = () => {
                                 <input type="text" value={form.reasonOther || ''} onChange={(e) => setForm((f) => ({ ...f, reasonOther: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
                             </div>
                         )}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">تكلفة النقل (مصاريف تشغيلية)</label>
+                        <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={form.transferCostAmount ?? ''}
+                            onChange={(e) => setForm((f) => ({ ...f, transferCostAmount: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                            placeholder="0.00"
+                            className="w-full max-w-xs px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-violet-500 outline-none"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">اختياري — تُسجّل كمصروف تشغيلي ولا تُضاف إلى تكلفة الصنف</p>
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">ملاحظات</label>

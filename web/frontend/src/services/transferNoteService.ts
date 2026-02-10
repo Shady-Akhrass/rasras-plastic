@@ -37,6 +37,8 @@ export interface TransferNoteDto {
     reason: TransferReason;
     reasonOther?: string;
     notes?: string;
+    /** تكلفة النقل — مصاريف تشغيلية (اختياري) */
+    transferCostAmount?: number;
     status?: string;
     items: TransferItemDto[];
 }

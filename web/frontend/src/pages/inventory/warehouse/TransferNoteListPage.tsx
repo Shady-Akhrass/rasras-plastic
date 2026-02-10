@@ -75,14 +75,15 @@ const TransferNoteListPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">من</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">إلى</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">السبب</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">تكلفة النقل</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الإجراء</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                [...Array(3)].map((_, i) => <tr key={i} className="border-b animate-pulse"><td colSpan={5} className="px-6 py-4"><div className="h-4 bg-slate-200 rounded" /></td></tr>)
+                                [...Array(3)].map((_, i) => <tr key={i} className="border-b animate-pulse"><td colSpan={6} className="px-6 py-4"><div className="h-4 bg-slate-200 rounded" /></td></tr>)
                             ) : list.length === 0 ? (
-                                <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-500">
+                                <tr><td colSpan={6} className="px-6 py-16 text-center text-slate-500">
                                     <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                                     <p>لا توجد أذونات تحويل.</p>
                                     <button onClick={() => navigate('/dashboard/inventory/warehouse/transfer/new')} className="mt-4 text-brand-primary font-medium hover:underline">إنشاء إذن تحويل</button>
@@ -94,6 +95,7 @@ const TransferNoteListPage: React.FC = () => {
                                         <td className="px-6 py-4">{t.fromWarehouseNameAr || '—'}</td>
                                         <td className="px-6 py-4">{t.toWarehouseNameAr || '—'}</td>
                                         <td className="px-6 py-4">{reasonLabel[t.reason as string] || t.reason || t.status || (t.notes ? String(t.notes).slice(0, 25) + (String(t.notes).length > 25 ? '…' : '') : '—')}</td>
+                                        <td className="px-6 py-4">{t.transferCostAmount != null && t.transferCostAmount > 0 ? `${Number(t.transferCostAmount).toFixed(2)} ج.م` : '—'}</td>
                                         <td className="px-6 py-4">
                                             <button
                                                 onClick={() => navigate(`/dashboard/inventory/warehouse/transfer/${t.id}`)}
