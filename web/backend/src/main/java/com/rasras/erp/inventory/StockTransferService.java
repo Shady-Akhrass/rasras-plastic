@@ -56,6 +56,7 @@ public class StockTransferService {
                 .requestedByUserId(dto.getRequestedByUserId() != null ? dto.getRequestedByUserId() : 1)
                 .status("Draft")
                 .notes(dto.getNotes())
+                .transferCostAmount(dto.getTransferCostAmount())
                 .createdAt(now)
                 .createdBy(createdBy)
                 .build();
@@ -99,6 +100,9 @@ public class StockTransferService {
 
         transfer.setNotes(dto.getNotes());
         transfer.setTransferDate(dto.getTransferDate() != null ? dto.getTransferDate() : transfer.getTransferDate());
+        if (dto.getTransferCostAmount() != null) {
+            transfer.setTransferCostAmount(dto.getTransferCostAmount());
+        }
 
         if (dto.getItems() != null) {
             transfer.getItems().clear();
@@ -226,6 +230,7 @@ public class StockTransferService {
                 .shippedDate(entity.getShippedDate())
                 .receivedDate(entity.getReceivedDate())
                 .notes(entity.getNotes())
+                .transferCostAmount(entity.getTransferCostAmount())
                 .createdBy(entity.getCreatedBy())
                 .build();
 

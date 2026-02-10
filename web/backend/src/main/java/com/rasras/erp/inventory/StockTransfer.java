@@ -3,6 +3,7 @@ package com.rasras.erp.inventory;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -60,6 +61,10 @@ public class StockTransfer {
 
     @Column(name = "Notes", length = 1000)
     private String notes;
+
+    /** تكلفة النقل — مصاريف تشغيلية (لا تُضاف إلى تكلفة الصنف) */
+    @Column(name = "TransferCostAmount", precision = 18, scale = 4)
+    private BigDecimal transferCostAmount;
 
     @Column(name = "CreatedAt")
     private LocalDateTime createdAt;

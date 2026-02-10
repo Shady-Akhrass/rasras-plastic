@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,6 +29,8 @@ public class StockTransferDto {
     private LocalDateTime shippedDate;
     private LocalDateTime receivedDate;
     private String notes;
+    /** تكلفة النقل — مصاريف تشغيلية */
+    private BigDecimal transferCostAmount;
     private Integer createdBy;
     private List<StockTransferItemDto> items;
 }
