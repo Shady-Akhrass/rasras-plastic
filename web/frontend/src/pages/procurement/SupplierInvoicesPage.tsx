@@ -4,7 +4,7 @@ import {
     Search, Plus, FileText, Truck, Calendar, ArrowLeft, RefreshCw,
     Eye, CheckCircle2, Clock, DollarSign, XCircle,
     Receipt, Package, Hash, Layers,
-    ExternalLink, Ban, Wallet, Trash2
+    ExternalLink, Ban, Trash2
 } from 'lucide-react';
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 import { grnService } from '../../services/grnService';
@@ -222,19 +222,17 @@ const TabButton: React.FC<{
 }> = ({ active, onClick, icon: Icon, label, badge }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300 ${
-            active
+        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300 ${active
                 ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30'
                 : 'bg-white text-slate-600 border border-slate-200 hover:border-brand-primary/30 hover:bg-brand-primary/5'
-        }`}
+            }`}
     >
         <Icon className="w-5 h-5" />
         <span>{label}</span>
         {badge !== undefined && badge > 0 && (
             <span
-                className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                    active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
-                }`}
+                className={`px-2 py-0.5 rounded-full text-xs font-bold ${active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
+                    }`}
             >
                 {badge}
             </span>
@@ -280,9 +278,8 @@ const InvoiceRow: React.FC<{
     return (
         <>
             <tr
-                className={`group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0 cursor-pointer ${
-                    isExpanded ? 'bg-brand-primary/5' : ''
-                }`}
+                className={`group hover:bg-brand-primary/5 transition-colors duration-200 border-b border-slate-100 last:border-0 cursor-pointer ${isExpanded ? 'bg-brand-primary/5' : ''
+                    }`}
                 onClick={onToggle}
                 style={{
                     animationDelay: `${index * 30}ms`,
@@ -400,25 +397,25 @@ const InvoiceRow: React.FC<{
                                     </div>
                                     {(invoice.deliveryCost! > 0 ||
                                         (invoice.otherCosts || 0) > 0) && (
-                                        <div className="flex gap-4">
-                                            {invoice.deliveryCost! > 0 && (
-                                                <div className="flex gap-1 text-slate-500">
-                                                    <span>مصاريف الشحن:</span>
-                                                    <span className="text-blue-600">
-                                                        {formatNumber(invoice.deliveryCost || 0)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {(invoice.otherCosts || 0) > 0 && (
-                                                <div className="flex gap-1 text-slate-500">
-                                                    <span>مصاريف أخرى:</span>
-                                                    <span className="text-purple-600">
-                                                        {formatNumber(invoice.otherCosts || 0)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                            <div className="flex gap-4">
+                                                {invoice.deliveryCost! > 0 && (
+                                                    <div className="flex gap-1 text-slate-500">
+                                                        <span>مصاريف الشحن:</span>
+                                                        <span className="text-blue-600">
+                                                            {formatNumber(invoice.deliveryCost || 0)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {(invoice.otherCosts || 0) > 0 && (
+                                                    <div className="flex gap-1 text-slate-500">
+                                                        <span>مصاريف أخرى:</span>
+                                                        <span className="text-purple-600">
+                                                            {formatNumber(invoice.otherCosts || 0)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                 </div>
                             </div>
                             <div className="overflow-x-auto">
@@ -965,11 +962,10 @@ const SupplierInvoicesPage: React.FC = () => {
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="relative flex-1">
                         <Search
-                            className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-200 ${
-                                isSearchFocused
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-200 ${isSearchFocused
                                     ? 'text-brand-primary'
                                     : 'text-slate-400'
-                            }`}
+                                }`}
                         />
                         <input
                             type="text"
@@ -982,11 +978,10 @@ const SupplierInvoicesPage: React.FC = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
                             onBlur={() => setIsSearchFocused(false)}
-                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none bg-slate-50 ${
-                                isSearchFocused
+                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none bg-slate-50 ${isSearchFocused
                                     ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
                                     : 'border-transparent hover:border-slate-200'
-                            }`}
+                                }`}
                         />
                         {searchTerm && (
                             <button

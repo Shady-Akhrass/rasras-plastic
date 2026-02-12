@@ -7,7 +7,6 @@ import {
     Calendar, Clock, Activity
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
-import { grnService } from '../../services/grnService';
 import { purchaseOrderService } from '../../services/purchaseOrderService';
 import purchaseService from '../../services/purchaseService';
 import { approvalService } from '../../services/approvalService';
@@ -270,8 +269,8 @@ const ProcurementDashboard: React.FC = () => {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${po.status === 'Pending Approval' || po.approvalStatus === 'Pending' ? 'bg-amber-100 text-amber-700' :
-                                                            po.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                                                                'bg-slate-100 text-slate-600'
+                                                        po.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                                                            'bg-slate-100 text-slate-600'
                                                         }`}>
                                                         {po.approvalStatus === 'Pending' ? 'بانتظار الاعتماد' :
                                                             po.status === 'Completed' ? 'مكتمل' : po.status || '-'}

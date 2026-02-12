@@ -83,12 +83,16 @@ const GRNFormPage: React.FC = () => {
                 const poList = Array.isArray(poRes) ? poRes : (poRes as any)?.data ?? [];
                 const whList = (whRes as any)?.data ?? (whRes as any) ?? [];
                 const finalWhList = Array.isArray(whList) ? whList : [];
-                setPos(poList.filter((p: PurchaseOrderDto) => p.status !== 'Closed'));
+                const filteredPos = poList.filter((p: PurchaseOrderDto) =>
+                    p.status !== 'Closed' && p.status !== 'FullyReceived'
+                );
+                setPos(filteredPos);
                 setWarehouses(finalWhList);
 
                 if (finalWhList.length === 1 && isNew) {
                     setForm(prev => ({ ...prev, warehouseId: finalWhList[0].id }));
                 }
+
             } catch (e) {
                 toast.error('فشل تحميل البيانات');
             }
@@ -131,6 +135,8 @@ const GRNFormPage: React.FC = () => {
     useEffect(() => {
         if (preselectedPoId && isNew && pos.length > 0) {
             handleSelectPo(parseInt(preselectedPoId));
+        } else if (isNew && pos.length === 1) {
+            handleSelectPo(pos[0].id!);
         }
     }, [preselectedPoId, isNew, pos]);
 

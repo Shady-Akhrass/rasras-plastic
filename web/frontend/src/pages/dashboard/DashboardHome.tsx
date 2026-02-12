@@ -534,9 +534,9 @@ const DashboardHome: React.FC = () => {
                         title="نسبة النمو"
                         value={`${stats?.employeeGrowthRate || 0}%`}
                         icon={TrendingUp}
-                        trend={stats?.employeeGrowthRate >= 0 ? 'up' : 'down'}
-                        trendValue={`${stats?.employeeGrowthRate || 0}%`}
-                        color={stats?.employeeGrowthRate >= 0 ? 'success' : 'danger'}
+                        trend={(stats?.employeeGrowthRate ?? 0) >= 0 ? 'up' : 'down'}
+                        trendValue={`${stats?.employeeGrowthRate ?? 0}%`}
+                        color={(stats?.employeeGrowthRate ?? 0) >= 0 ? 'success' : 'danger'}
                         subtitle="مقارنة بالشهر الماضي"
                     />
                 </motion.div>

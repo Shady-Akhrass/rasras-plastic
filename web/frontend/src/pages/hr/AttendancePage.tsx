@@ -372,7 +372,7 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
           <div>
             <p className="font-bold text-slate-800">{selectedEmployee.fullNameAr}</p>
             <p className="text-xs text-slate-500">
-              {selectedEmployee.jobTitle || 'موظف'} • {selectedEmployee.department || ''}
+              {selectedEmployee.jobTitle || 'موظف'} • {selectedEmployee.departmentNameAr || ''}
             </p>
           </div>
         </div>
@@ -793,7 +793,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
   const [filterDept, setFilterDept] = useState('ALL');
 
   const departments = useMemo(() => {
-    const depts = new Set(employees.map(e => e.department).filter(Boolean));
+    const depts = new Set(employees.map(e => e.departmentNameAr).filter(Boolean));
     return Array.from(depts) as string[];
   }, [employees]);
 
@@ -917,13 +917,13 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
         const q = searchQuery.toLowerCase();
         const name = (r.employee.fullNameAr || '').toLowerCase();
         const nameEn = (r.employee.fullNameEn || '').toLowerCase();
-        const empNo = (r.employee.employeeNumber || '').toLowerCase();
+        const empNo = (r.employee.employeeCode || '').toLowerCase();
         if (!name.includes(q) && !nameEn.includes(q) && !empNo.includes(q))
           return false;
       }
       if (filterStatus !== 'ALL' && r.attendance.status !== filterStatus)
         return false;
-      if (filterDept !== 'ALL' && r.employee.department !== filterDept)
+      if (filterDept !== 'ALL' && r.employee.departmentNameAr !== filterDept)
         return false;
       return true;
     });
@@ -1233,16 +1233,16 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                               )}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              {row.employee.employeeNumber && (
+                              {row.employee.employeeCode && (
                                 <span className="text-[11px] text-slate-400 font-mono">
-                                  #{row.employee.employeeNumber}
+                                  #{row.employee.employeeCode}
                                 </span>
                               )}
-                              {row.employee.department && (
+                              {row.employee.departmentNameAr && (
                                 <span className="text-[11px] text-slate-400 
                                   flex items-center gap-0.5">
                                   <Building2 className="w-3 h-3" />
-                                  {row.employee.department}
+                                  {row.employee.departmentNameAr}
                                 </span>
                               )}
                             </div>
@@ -1418,15 +1418,15 @@ const AttendancePage: React.FC = () => {
   const tabs: {
     id: TabId; label: string; icon: React.ElementType; description: string;
   }[] = [
-    {
-      id: 'daily', label: 'الحضور اليومي', icon: ListChecks,
-      description: 'تسجيل حضور جميع الموظفين ليوم واحد',
-    },
-    {
-      id: 'individual', label: 'سجل الحضور', icon: ClipboardList,
-      description: 'تتبع حضور موظف محدد عبر فترة زمنية',
-    },
-  ];
+      {
+        id: 'daily', label: 'الحضور اليومي', icon: ListChecks,
+        description: 'تسجيل حضور جميع الموظفين ليوم واحد',
+      },
+      {
+        id: 'individual', label: 'سجل الحضور', icon: ClipboardList,
+        description: 'تتبع حضور موظف محدد عبر فترة زمنية',
+      },
+    ];
 
   return (
     <div className="space-y-6" dir="rtl">

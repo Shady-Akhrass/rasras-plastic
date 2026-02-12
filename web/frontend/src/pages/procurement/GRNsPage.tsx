@@ -84,14 +84,9 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
             label: 'تمت الإضافة'
         },
-        'Draft': {
-            icon: FileText,
-            className: 'bg-slate-50 text-slate-700 border-slate-200',
-            label: 'مسودة'
-        }
     };
 
-    const { icon: Icon, className, label } = config[statusKey] || config[statusKey.charAt(0).toUpperCase() + statusKey.slice(1).toLowerCase()] || config['Draft'];
+    const { icon: Icon, className, label } = config[statusKey] || config[statusKey.charAt(0).toUpperCase() + statusKey.slice(1).toLowerCase()] || config['Pending Inspection'];
 
     return (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
@@ -148,6 +143,9 @@ const GRNTableRow: React.FC<{
                 <span className="text-slate-900 font-bold">{formatNumber(receipt.totalAmount || 0)} ج.م</span>
                 <span className="text-xs text-slate-400 font-medium">إجمالي القيمة</span>
             </div>
+        </td>
+        <td className="px-6 py-4 text-sm font-medium text-slate-700">
+            {formatDate(receipt.grnDate)}
         </td>
         <td className="px-6 py-4">
             <div className="flex flex-col gap-1">
@@ -589,6 +587,7 @@ const GRNsPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم إذن الإضافة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">أمر الشراء</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجمالي القيمة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>

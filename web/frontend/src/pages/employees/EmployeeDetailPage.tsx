@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import {
     ChevronRight, Edit2, Users, Building2, Mail, Phone, Briefcase,
     Calendar, DollarSign, User, Loader2, CheckCircle2, XCircle
@@ -26,7 +26,6 @@ const DataRow = ({ label, value, icon: Icon }: { label: string; value: string | 
 
 const EmployeeDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [loading, setLoading] = useState(true);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -82,86 +81,86 @@ const EmployeeDetailPage: React.FC = () => {
 
     return (
         <>
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white">
-                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
-                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-5">
-                        <Link
-                            to="/dashboard/employees"
-                            className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
-                        >
-                            <ChevronRight className="w-6 h-6" />
-                        </Link>
-                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${getAvatarColor(employee.fullNameAr)} flex items-center justify-center text-2xl font-bold text-white shadow-lg`}>
-                            {employee.fullNameAr?.slice(0, 2) || '—'}
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold mb-1">{employee.fullNameAr}</h1>
-                            <p className="text-white/80">{employee.employeeCode} • {employee.departmentNameAr || '—'}</p>
-                            <span className={`inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full text-sm font-medium
+            <div className="space-y-6">
+                {/* Header */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white">
+                    <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                    <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="flex items-center gap-5">
+                            <Link
+                                to="/dashboard/employees"
+                                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                            >
+                                <ChevronRight className="w-6 h-6" />
+                            </Link>
+                            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${getAvatarColor(employee.fullNameAr)} flex items-center justify-center text-2xl font-bold text-white shadow-lg`}>
+                                {employee.fullNameAr?.slice(0, 2) || '—'}
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold mb-1">{employee.fullNameAr}</h1>
+                                <p className="text-white/80">{employee.employeeCode} • {employee.departmentNameAr || '—'}</p>
+                                <span className={`inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full text-sm font-medium
                                 ${employee.isActive ? 'bg-white/20' : 'bg-slate-500/30'}`}>
-                                {employee.isActive ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                                {employee.isActive ? 'نشط' : 'غير نشط'}
-                            </span>
+                                    {employee.isActive ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                                    {employee.isActive ? 'نشط' : 'غير نشط'}
+                                </span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setIsEditOpen(true)}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-brand-primary rounded-xl font-bold hover:bg-white/90 transition-all"
+                        >
+                            <Edit2 className="w-5 h-5" />
+                            تعديل البيانات
+                        </button>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* البيانات الأساسية */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                            <div className="p-2 bg-brand-primary/10 rounded-lg">
+                                <User className="w-5 h-5 text-brand-primary" />
+                            </div>
+                            <h3 className="font-bold text-slate-800">البيانات الأساسية</h3>
+                        </div>
+                        <div className="p-6">
+                            <DataRow label="كود الموظف" value={employee.employeeCode} icon={Users} />
+                            <DataRow label="الاسم بالعربي" value={employee.fullNameAr} icon={User} />
+                            <DataRow label="الاسم بالإنجليزي" value={employee.fullNameEn} />
+                            <DataRow label="البريد الإلكتروني" value={employee.email} icon={Mail} />
+                            <DataRow label="الهاتف" value={employee.phone} icon={Phone} />
+                            <DataRow label="الموبايل" value={employee.mobile} icon={Phone} />
                         </div>
                     </div>
-                    <button
-                        onClick={() => setIsEditOpen(true)}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-white text-brand-primary rounded-xl font-bold hover:bg-white/90 transition-all"
-                    >
-                        <Edit2 className="w-5 h-5" />
-                        تعديل البيانات
-                    </button>
+
+                    {/* البيانات الوظيفية */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                            <div className="p-2 bg-brand-primary/10 rounded-lg">
+                                <Briefcase className="w-5 h-5 text-brand-primary" />
+                            </div>
+                            <h3 className="font-bold text-slate-800">البيانات الوظيفية</h3>
+                        </div>
+                        <div className="p-6">
+                            <DataRow label="القسم" value={employee.departmentNameAr} icon={Building2} />
+                            <DataRow label="المسمى الوظيفي" value={employee.jobTitle} icon={Briefcase} />
+                            <DataRow label="تاريخ التعيين" value={employee.hireDate ? formatDate(employee.hireDate) : null} icon={Calendar} />
+                            <DataRow label="الراتب الأساسي" value={employee.basicSalary != null ? `${formatNumber(employee.basicSalary)} ج.م` : null} icon={DollarSign} />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* البيانات الأساسية */}
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                        <div className="p-2 bg-brand-primary/10 rounded-lg">
-                            <User className="w-5 h-5 text-brand-primary" />
-                        </div>
-                        <h3 className="font-bold text-slate-800">البيانات الأساسية</h3>
-                    </div>
-                    <div className="p-6">
-                        <DataRow label="كود الموظف" value={employee.employeeCode} icon={Users} />
-                        <DataRow label="الاسم بالعربي" value={employee.fullNameAr} icon={User} />
-                        <DataRow label="الاسم بالإنجليزي" value={employee.fullNameEn} />
-                        <DataRow label="البريد الإلكتروني" value={employee.email} icon={Mail} />
-                        <DataRow label="الهاتف" value={employee.phone} icon={Phone} />
-                        <DataRow label="الموبايل" value={employee.mobile} icon={Phone} />
-                    </div>
-                </div>
-
-                {/* البيانات الوظيفية */}
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                        <div className="p-2 bg-brand-primary/10 rounded-lg">
-                            <Briefcase className="w-5 h-5 text-brand-primary" />
-                        </div>
-                        <h3 className="font-bold text-slate-800">البيانات الوظيفية</h3>
-                    </div>
-                    <div className="p-6">
-                        <DataRow label="القسم" value={employee.departmentNameAr} icon={Building2} />
-                        <DataRow label="المسمى الوظيفي" value={employee.jobTitle} icon={Briefcase} />
-                        <DataRow label="تاريخ التعيين" value={employee.hireDate ? formatDate(employee.hireDate) : null} icon={Calendar} />
-                        <DataRow label="الراتب الأساسي" value={employee.basicSalary != null ? `${formatNumber(employee.basicSalary)} ج.م` : null} icon={DollarSign} />
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {isEditOpen && (
-            <EmployeeForm
-                employee={employee}
-                onClose={() => setIsEditOpen(false)}
-                onSuccess={handleEditSuccess}
-            />
-        )}
+            {isEditOpen && (
+                <EmployeeForm
+                    employee={employee}
+                    onClose={() => setIsEditOpen(false)}
+                    onSuccess={handleEditSuccess}
+                />
+            )}
         </>
     );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import {
     Truck,
     Clock,
@@ -259,7 +259,6 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
 );
 
 const WaitingImportsPage: React.FC = () => {
-    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [pos, setPos] = useState<PurchaseOrderDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');

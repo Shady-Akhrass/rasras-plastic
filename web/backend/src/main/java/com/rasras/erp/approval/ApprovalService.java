@@ -1,6 +1,5 @@
 package com.rasras.erp.approval;
 
-import com.rasras.erp.approval.ApprovalLimitRepository;
 import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
 import com.rasras.erp.inventory.GRNItem;
 import com.rasras.erp.inventory.InventoryService;
@@ -15,7 +14,6 @@ import com.rasras.erp.procurement.PurchaseOrder;
 import com.rasras.erp.procurement.PurchaseOrderItem;
 import com.rasras.erp.procurement.PurchaseReturnRepository;
 import com.rasras.erp.procurement.SupplierQuotation;
-import com.rasras.erp.procurement.SupplierQuotationItem;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.WarehouseRepository;

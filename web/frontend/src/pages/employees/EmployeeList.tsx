@@ -336,7 +336,7 @@ const EmployeeList: React.FC = () => {
             return matchesSearch && matchesFilter;
         });
         // الأحدث في الأعلى
-        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+        return [...filtered].sort((a, b) => b.employeeId - a.employeeId);
     }, [employees, searchTerm, filterStatus]);
 
     // Pagination

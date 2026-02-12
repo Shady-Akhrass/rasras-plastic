@@ -231,7 +231,7 @@ const PermissionsPage: React.FC = () => {
             perm.moduleName?.toLowerCase().includes(searchTerm.toLowerCase())
         );
         // الأحدث في الأعلى
-        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+        return [...filtered].sort((a, b) => b.permissionId - a.permissionId);
     }, [permissions, searchTerm]);
 
     const groupedPermissions = useMemo(() => {

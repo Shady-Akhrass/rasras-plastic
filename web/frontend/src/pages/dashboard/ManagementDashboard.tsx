@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     Shield, Bell, Users, User, Building2, Settings, ChevronLeft,
-    BarChart3, TrendingUp, FileText, Target, Loader2,
+    BarChart3, TrendingUp, Target, Loader2,
     Calendar, Clock, Award, Zap
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';

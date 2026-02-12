@@ -23,7 +23,6 @@ import { approvalService } from '../../services/approvalService';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
-import { Calendar } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
@@ -617,7 +616,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 )}
                             </div>
 
-                                                       <div className="space-y-2">
+                            <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <FileText className="w-4 h-4 text-brand-primary" />
                                     رقم عرض السعر (عند المورد) <span className="text-rose-500">*</span>

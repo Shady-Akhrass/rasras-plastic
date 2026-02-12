@@ -15,10 +15,7 @@ import {
     Receipt,
     CheckCircle2,
     Eye,
-    XCircle,
-    RefreshCw
 } from 'lucide-react';
-import { approvalService } from '../../services/approvalService';
 import { supplierInvoiceService, type SupplierInvoiceDto, type SupplierInvoiceItemDto } from '../../services/supplierInvoiceService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { purchaseOrderService } from '../../services/purchaseOrderService';
@@ -37,10 +34,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const queryParams = new URLSearchParams(location.search);
     const quotationId = queryParams.get('quotationId');
     const poId = queryParams.get('poId');
-    const comparisonId = queryParams.get('comparisonId');
     const grnId = queryParams.get('grnId');
     const isView = queryParams.get('mode') === 'view';
-    const approvalId = queryParams.get('approvalId');
 
     // Data State
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
@@ -49,7 +44,6 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [processing, setProcessing] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<SupplierInvoiceDto>({
@@ -225,7 +219,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                 };
 
                 handleUpdate({ type: 'SET_DATA', payload: calculateInvoiceTotals(mappedData) });
-                toast.success(`تم تحميل ${mappedData.items.length} صنف من أمر الشراء`);
+                toast.success(`تم تحميل ${(mappedData.items || []).length} صنف من أمر الشراء`);
             }
         } catch (error) {
             console.error('Failed to load PO data:', error);
@@ -398,22 +392,6 @@ const SupplierInvoiceFormPage: React.FC = () => {
             toast.error(error.response?.data?.message || 'فشل حفظ الفاتورة');
         } finally {
             setSaving(false);
-        }
-    };
-
-    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
-        if (!approvalId) return;
-        try {
-            setProcessing(true);
-            const toastId = toast.loading('جاري تنفيذ الإجراء...');
-            await approvalService.takeAction(parseInt(approvalId), 1, action);
-            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
-            navigate('/dashboard/procurement/approvals');
-        } catch (error) {
-            console.error('Failed to take action:', error);
-            toast.error('فشل تنفيذ الإجراء');
-        } finally {
-            setProcessing(false);
         }
     };
 

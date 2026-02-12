@@ -488,7 +488,7 @@ const UserList: React.FC = () => {
             return matchesSearch && matchesFilter;
         });
         // الأحدث في الأعلى
-        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+        return [...filtered].sort((a, b) => b.userId - a.userId);
     }, [users, searchTerm, filterStatus]);
 
     const stats = useMemo(() => ({
