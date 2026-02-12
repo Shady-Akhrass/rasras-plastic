@@ -4,17 +4,12 @@ import LoginPage from './pages/auth/LoginPage';
 import DashboardLayout from './components/layouts/DashboardLayout';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import EmployeeList from './pages/employees/EmployeeList';
-<<<<<<< Updated upstream
-import EmployeeDetailPage from './pages/employees/EmployeeDetailPage';
-import ProfilePage from './pages/employees/ProfilePage';
-=======
 import LeaveTypesPage from './pages/hr/LeaveTypesPage';
 import WorkShiftsPage from './pages/hr/WorkShiftsPage';
 import HolidaysPage from './pages/hr/HolidaysPage';
 import EmployeeShiftsPage from './pages/hr/EmployeeShiftsPage';
 import AttendancePage from './pages/hr/AttendancePage';
 import PayrollPage from './pages/hr/PayrollPage';
->>>>>>> Stashed changes
 import UserList from './pages/users/UserList';
 import SettingsPage from './pages/settings/SettingsPage';
 import CompanyInfoPage from './pages/settings/CompanyInfoPage';
@@ -117,12 +112,6 @@ function App() {
         }>
           <Route index element={<DashboardHome />} />
           <Route path="approvals" element={<ApprovalsInbox />} />
-<<<<<<< Updated upstream
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="employees">
-            <Route index element={<EmployeeList />} />
-            <Route path=":id" element={<EmployeeDetailPage />} />
-=======
           <Route path="employees" element={<EmployeeList />} />
           <Route path="hr">
             <Route path="leave-types" element={<LeaveTypesPage />} />
@@ -131,7 +120,6 @@ function App() {
             <Route path="employee-shifts" element={<EmployeeShiftsPage />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="payroll" element={<PayrollPage />} />
->>>>>>> Stashed changes
           </Route>
           <Route path="users" element={<UserList />} />
           <Route path="settings">
