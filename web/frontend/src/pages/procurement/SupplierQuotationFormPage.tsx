@@ -8,7 +8,6 @@ import {
     Sparkles,
     FileText,
     Building2,
-    Calendar,
     DollarSign,
     Package,
     Truck,
@@ -17,12 +16,14 @@ import {
     CheckCircle2,
     Eye,
     XCircle,
-    RefreshCw
+    RefreshCw,
+    Lock
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
+import { Calendar } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
@@ -49,6 +50,7 @@ const SupplierQuotationFormPage: React.FC = () => {
     const [rfqItems, setRfqItems] = useState<any[]>([]);
     const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
     const [processing, setProcessing] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
 
     const [formData, setFormData] = useState<SupplierQuotation>({
         quotationNumber: '',
@@ -115,11 +117,27 @@ const SupplierQuotationFormPage: React.FC = () => {
                     setRfqItems(rfq.items);
                 }).catch(err => console.error('Failed to load linked RFQ:', err));
             }
+
+            // Check if this quotation is part of a comparison
+            checkIfQuotationIsLocked(qId);
         } catch (error) {
             console.error('Failed to load quotation:', error);
             navigate('/dashboard/procurement/quotation');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const checkIfQuotationIsLocked = async (quotationId: number) => {
+        try {
+            const comparisons = await purchaseService.getAllComparisons();
+            const isLocked = comparisons.some(comp =>
+                comp.details && comp.details.some(detail => detail.quotationId === quotationId)
+            );
+            setIsLocked(isLocked);
+        } catch (error) {
+            console.error('Failed to check if quotation is locked:', error);
+            setIsLocked(false);
         }
     };
 
@@ -464,7 +482,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                             <p className="text-white/80 text-lg">أدخل تفاصيل عرض السعر المستلم من المورد</p>
                         </div>
                     </div>
-                    {!isView && (
+                    {!isView && !isLocked && (
                         <button
                             onClick={handleSubmit}
                             disabled={saving}
@@ -516,6 +534,19 @@ const SupplierQuotationFormPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Locked Banner */}
+                {isLocked && (
+                    <div className="lg:col-span-3 mb-6 bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="p-2 bg-rose-100 rounded-xl">
+                            <Lock className="w-6 h-6 text-rose-600" />
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="font-bold text-rose-800">عرض السعر مغلق للتعديل</h4>
+                            <p className="text-sm text-rose-700">تم استخدام هذا العرض في مقارنة عروض الأسعار، ولا يمكن تعديله الآن</p>
+                        </div>
+                    </div>
+                )}
+
                 <div className="lg:col-span-2 space-y-6">
                     {/* Basic Information */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
@@ -539,11 +570,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 <select
                                     value={formData.rfqId || 0}
                                     onChange={(e) => handleRFQLink(parseInt(e.target.value))}
-                                    disabled={isView}
+                                    disabled={isView || isLocked}
                                     required
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
-                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
                                     <option value={0}>اختر طلب السعر...</option>
                                     {rfqs.filter(r => ((!r.hasActiveOrders && !r.hasQuotation && r.prId) || r.id === formData.rfqId)).map(r => (
@@ -565,7 +596,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         disabled={true} // Auto-assigned from RFQ
                                         className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                             focus:border-brand-primary outline-none transition-all font-semibold
-                                            ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                            ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                     >
                                         <option value={0}>اختر المورد...</option>
                                         {suppliers.map(s => (
@@ -586,7 +617,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 )}
                             </div>
 
-                            <div className="space-y-2">
+                                                       <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <FileText className="w-4 h-4 text-brand-primary" />
                                     رقم عرض السعر (عند المورد) <span className="text-rose-500">*</span>
@@ -596,17 +627,16 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     value={formData.quotationNumber || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, quotationNumber: e.target.value }))}
                                     required
-                                    disabled={isView}
+                                    disabled={isView || isLocked}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
-                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
-                                    placeholder={isView ? '' : "INV-XXX"}
+                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                    placeholder={isView || isLocked ? '' : "INV-XXX"}
                                 />
                             </div>
 
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-brand-primary" />
                                     تاريخ العرض <span className="text-rose-500">*</span>
                                 </label>
                                 <input
@@ -614,16 +644,16 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     value={formData.quotationDate}
                                     onChange={(e) => setFormData(prev => ({ ...prev, quotationDate: e.target.value }))}
                                     required
-                                    disabled={true}
+                                    disabled={false} // Changed from true to false
+                                    min={new Date().toISOString().split('T')[0]}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
-                                        ${true ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                        ${false ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
 
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-rose-500" />
                                     صالح حتى <span className="text-rose-500">*</span>
                                 </label>
                                 <input
@@ -631,10 +661,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     value={formData.validUntilDate || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, validUntilDate: e.target.value }))}
                                     required
-                                    disabled={isView}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    disabled={isView || isLocked}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
-                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
 
@@ -649,10 +680,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     onChange={(e) => setFormData(prev => ({ ...prev, deliveryDays: parseInt(e.target.value) || 0 }))}
                                     required
                                     min="1"
-                                    disabled={isView}
+                                    disabled={isView || isLocked}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
-                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
 
@@ -665,10 +696,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                     type="text"
                                     value={formData.paymentTerms || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                                    disabled={isView}
+                                    disabled={isView || isLocked}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
-                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                     placeholder={isView ? '' : "مثلاً: كاش، 50% مقدم، ..."}
                                 />
                             </div>
@@ -717,10 +748,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     value={item.itemId}
                                                     onChange={(e) => updateItem(index, 'itemId', parseInt(e.target.value))}
                                                     required
-                                                    disabled={isView}
+                                                    disabled={isView || isLocked}
                                                     className={`w-full min-w-[200px] px-3 py-2 border-2 border-slate-200 
                                                         rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all
-                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 >
                                                     <option value={0}>اختر صنف...</option>
                                                     {items.map(i => (
@@ -736,11 +767,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     required
                                                     min="0.01"
                                                     step="0.01"
-                                                    disabled={isView}
+                                                    disabled={isView || isLocked}
                                                     className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-brand-primary outline-none 
                                                         focus:border-brand-primary transition-all
-                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -751,11 +782,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     required
                                                     min="0.01"
                                                     step="0.01"
-                                                    disabled={isView}
+                                                    disabled={isView || isLocked}
                                                     className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-emerald-600 outline-none 
                                                         focus:border-brand-primary transition-all
-                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -763,11 +794,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     type="text"
                                                     value={item.polymerGrade || ''}
                                                     onChange={(e) => updateItem(index, 'polymerGrade', e.target.value)}
-                                                    disabled={isView}
+                                                    disabled={isView || isLocked}
                                                     className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-semibold outline-none 
                                                         focus:border-brand-primary transition-all
-                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                     placeholder={isView ? '' : "Grade"}
                                                 />
                                             </td>
@@ -779,10 +810,10 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     min="0"
                                                     max="100"
                                                     step="0.01"
-                                                    disabled={isView}
+                                                    disabled={isView || isLocked}
                                                     className={`w-20 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all
-                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -793,17 +824,17 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                     min="0"
                                                     max="100"
                                                     step="0.01"
-                                                    disabled={isView}
+                                                    disabled={isView || isLocked}
                                                     className={`w-20 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-semibold outline-none focus:border-brand-primary transition-all
-                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
                                                 {formatNumber(item.totalPrice, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="py-4 pl-6 text-left">
-                                                {!isView && (
+                                                {!isView && !isLocked && (
                                                     <button
                                                         type="button"
                                                         onClick={() => removeItem(index)}
@@ -854,11 +885,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 setFormData(prev => ({ ...prev, ...updates }));
                                             });
                                         }}
-                                        disabled={isView}
+                                        disabled={isView || isLocked}
                                         className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
                                             text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
                                             transition-all shadow-sm
-                                            ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                            ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                         placeholder="0.00"
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
@@ -892,11 +923,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 setFormData(prev => ({ ...prev, ...updates }));
                                             });
                                         }}
-                                        disabled={isView}
+                                        disabled={isView || isLocked}
                                         className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
                                             text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
                                             transition-all shadow-sm
-                                            ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                            ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                         placeholder="0.00"
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
@@ -973,7 +1004,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                                                 setFormData(prev => ({ ...prev, ...updates }));
                                             });
                                         }}
-                                        disabled={isView}
+                                        disabled={isView || isLocked}
                                         className={`w-full border rounded-xl px-4 py-2 text-2xl font-black outline-none transition-all text-right
                                             ${isView
                                                 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400/70 cursor-not-allowed'
@@ -1006,11 +1037,11 @@ const SupplierQuotationFormPage: React.FC = () => {
                                         setFormData(prev => ({ ...prev, notes: val }));
                                     });
                                 }}
-                                disabled={isView}
+                                disabled={isView || isLocked}
                                 className={`w-full p-4 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all 
                                         text-sm leading-relaxed h-40 resize-none
-                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
+                                        ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 placeholder={isView ? '' : "أي ملاحظات حول العرض أو شروط خاصة..."}
                             />
                         </div>

@@ -12,7 +12,8 @@ import {
     RefreshCw,
     X,
     Edit3,
-    Trash2
+    Trash2,
+    Filter
 } from 'lucide-react';
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
@@ -96,7 +97,6 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         </span>
     );
 };
-
 // Table Row Component
 const ComparisonTableRow: React.FC<{
     comparison: QuotationComparison;
@@ -128,12 +128,8 @@ const ComparisonTableRow: React.FC<{
                     <Scale className="w-5 h-5 text-brand-primary" />
                 </div>
                 <div>
-                    <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors block">
-                        {comparison.comparisonNumber || 'بدون رقم'}
-                    </span>
-                    {comparison.prNumber && (
-                        <span className="text-xs text-slate-400">طلب شراء #{comparison.prNumber}</span>
-                    )}
+                    <div className="text-sm font-bold text-slate-800">{comparison.comparisonNumber}</div>
+                    <div className="text-xs text-slate-500 font-medium">{comparison.prNumber}</div>
                 </div>
             </div>
         </td>
@@ -162,18 +158,23 @@ const ComparisonTableRow: React.FC<{
             <div className="flex items-center justify-end gap-2">
                 <button
                     onClick={() => onView(comparison.id!)}
-                    className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
-                    title="تعديل"
+                    className={`p-2 rounded-lg transition-all ${comparison.status === 'Approved'
+                        ? 'text-blue-500 hover:bg-blue-50'
+                        : 'text-brand-primary hover:bg-brand-primary/10'
+                        }`}
+                    title={comparison.status === 'Approved' ? 'عرض' : 'تعديل'}
                 >
                     <Edit3 className="w-4 h-4" />
                 </button>
-                <button
-                    onClick={() => onDelete(comparison)}
-                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                    title="حذف"
-                >
-                    <Trash2 className="w-4 h-4" />
-                </button>
+                {comparison.status !== 'Approved' && (
+                    <button
+                        onClick={() => onDelete(comparison)}
+                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                        title="حذف"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                )}
             </div>
         </td>
     </tr>
@@ -212,23 +213,23 @@ const TableSkeleton: React.FC = () => (
 );
 
 // Empty State
-const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
+const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
         <td colSpan={7} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
-                    {searchTerm ? (
+                    {searchTerm || statusFilter !== 'All' ? (
                         <Search className="w-12 h-12 text-slate-400" />
                     ) : (
                         <Scale className="w-12 h-12 text-slate-400" />
                     )}
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">
-                    {searchTerm ? 'لا توجد نتائج' : 'لا توجد مقارنات'}
+                    {searchTerm || statusFilter !== 'All' ? 'لا توجد نتائج' : 'لا توجد مقارنات'}
                 </h3>
                 <p className="text-slate-500 max-w-md mx-auto">
-                    {searchTerm
-                        ? `لم يتم العثور على مقارنات تطابق "${searchTerm}"`
+                    {searchTerm || statusFilter !== 'All'
+                        ? `لم يتم العثور على مقارنات تطابق معايير البحث`
                         : 'ابدأ بإنشاء مقارنة جديدة لعروض الأسعار'}
                 </p>
             </div>
@@ -241,6 +242,7 @@ const QuotationComparisonPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [comparisons, setComparisons] = useState<QuotationComparison[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
@@ -255,7 +257,7 @@ const QuotationComparisonPage: React.FC = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, statusFilter]);
 
     const fetchComparisons = async () => {
         try {
@@ -271,14 +273,16 @@ const QuotationComparisonPage: React.FC = () => {
 
     const filteredComparisons = useMemo(() => {
         const filtered = comparisons.filter(comp => {
-            return comp.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            const matchesSearch = comp.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.selectedSupplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.comparisonNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = statusFilter === 'All' || comp.status === statusFilter;
+            return matchesSearch && matchesStatus;
         });
         // الأحدث فوق والأقدم تحت
         return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
-    }, [comparisons, searchTerm]);
+    }, [comparisons, searchTerm, statusFilter]);
 
     const paginatedComparisons = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
@@ -453,15 +457,35 @@ const QuotationComparisonPage: React.FC = () => {
                         )}
                     </div>
 
-                    <button
-                        onClick={fetchComparisons}
-                        disabled={loading}
-                        className="p-3 rounded-xl border border-slate-200 text-slate-600 
-                            hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
-                            disabled:opacity-50"
-                    >
-                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent
+                            hover:border-slate-200 transition-all duration-200">
+                            <Filter className="text-slate-400 w-5 h-5" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                            >
+                                <option value="All">جميع الحالات</option>
+                                <option value="Draft">مسودة</option>
+                                <option value="Pending Finance">مراجعة مالية</option>
+                                <option value="Pending Management">اعتماد الإدارة</option>
+                                <option value="Pending Approval">بانتظار الاعتماد</option>
+                                <option value="Approved">معتمد</option>
+                                <option value="Rejected">مرفوض</option>
+                            </select>
+                        </div>
+
+                        <button
+                            onClick={() => { fetchComparisons(); }}
+                            disabled={loading}
+                            className="p-3 rounded-xl border border-slate-200 text-slate-600 
+                                hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
+                                disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -505,7 +529,7 @@ const QuotationComparisonPage: React.FC = () => {
                             {loading ? (
                                 <TableSkeleton />
                             ) : filteredComparisons.length === 0 ? (
-                                <EmptyState searchTerm={searchTerm} />
+                                <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
                             ) : (
                                 paginatedComparisons.map((comparison, index) => (
                                     <ComparisonTableRow

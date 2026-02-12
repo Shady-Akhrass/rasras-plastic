@@ -160,18 +160,16 @@ const POCard: React.FC<{
                 )}
 
                 {daysRemaining !== null && (
-                    <div className={`p-3 rounded-xl border-2 ${
-                        isOverdue 
-                            ? 'bg-rose-50 border-rose-200' 
-                            : isDueSoon 
-                                ? 'bg-amber-50 border-amber-200' 
-                                : 'bg-emerald-50 border-emerald-200'
-                    }`}>
+                    <div className={`p-3 rounded-xl border-2 ${isOverdue
+                        ? 'bg-rose-50 border-rose-200'
+                        : isDueSoon
+                            ? 'bg-amber-50 border-amber-200'
+                            : 'bg-emerald-50 border-emerald-200'
+                        }`}>
                         <div className="flex items-center justify-between">
-                            <span className={`text-sm font-medium ${
-                                isOverdue ? 'text-rose-700' : isDueSoon ? 'text-amber-700' : 'text-emerald-700'
-                            }`}>
-                                {isOverdue 
+                            <span className={`text-sm font-medium ${isOverdue ? 'text-rose-700' : isDueSoon ? 'text-amber-700' : 'text-emerald-700'
+                                }`}>
+                                {isOverdue
                                     ? `متأخر ${Math.abs(daysRemaining)} يوم`
                                     : daysRemaining === 0
                                         ? 'يصل اليوم'
@@ -209,7 +207,7 @@ const POCard: React.FC<{
                     ) : (
                         <>
                             <CheckCircle2 className="w-4 h-4" />
-                            <span>تم الوصول - الانتقال للفحص</span>
+                            <span>تم الوصول</span>
                         </>
                     )}
                 </button>
@@ -289,25 +287,26 @@ const WaitingImportsPage: React.FC = () => {
 
     const handleMarkArrived = async (po: PurchaseOrderDto) => {
         if (!po.id) return;
-        
+
         try {
             setProcessingId(po.id);
-            
+
             // Get current user ID
             const userString = localStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
             const userId = user?.id || user?.userId || 1;
-            
+
             // Mark PO as arrived and create GRN automatically
             await purchaseOrderService.markAsArrived(po.id, userId);
-            
+
             toast.success('تم تسجيل وصول الشحنة وإنشاء إذن الاستلام بنجاح');
-            
+
             // Remove from local list
             setPos(prev => prev.filter(p => p.id !== po.id));
-            
+
             // Navigate to Quality Inspection Page
-            navigate('/dashboard/inventory/quality-inspection');
+            // navigate('/dashboard/inventory/quality-inspection');
+            // Notification handled globally by DashboardLayout polling
         } catch (error: any) {
             console.error('Failed to mark as arrived:', error);
             toast.error(error?.response?.data?.message || 'فشل تسجيل وصول الشحنة');
@@ -342,7 +341,7 @@ const WaitingImportsPage: React.FC = () => {
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         const overdue = pos.filter(po => {
             if (!po.expectedDeliveryDate) return false;
             const deliveryDate = new Date(po.expectedDeliveryDate);

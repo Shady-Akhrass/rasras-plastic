@@ -143,10 +143,10 @@ const GRNTableRow: React.FC<{
         <td className="px-6 py-4 text-sm font-medium text-slate-700">
             {receipt.supplierNameAr}
         </td>
-        <td className="px-6 py-4 text-sm text-slate-600">
-            <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{formatDate(receipt.grnDate!)}</span>
+        <td className="px-6 py-4">
+            <div className="flex flex-col">
+                <span className="text-slate-900 font-bold">{formatNumber(receipt.totalAmount || 0)} ج.م</span>
+                <span className="text-xs text-slate-400 font-medium">إجمالي القيمة</span>
             </div>
         </td>
         <td className="px-6 py-4">
@@ -329,7 +329,8 @@ const GRNsPage: React.FC = () => {
             total: activeReceipts.length,
             readyForStore: readyForStore.length,
             today: activeReceipts.filter(r => new Date(r.grnDate!).toDateString() === new Date().toDateString()).length,
-            totalQty: formatNumber(activeReceipts.reduce((sum, r) => sum + (r.totalReceivedQty || 0), 0))
+            totalQty: formatNumber(activeReceipts.reduce((sum, r) => sum + (r.totalReceivedQty || 0), 0)),
+            totalValue: formatNumber(activeReceipts.reduce((sum, r) => sum + (r.totalAmount || 0), 0))
         };
     }, [receipts]);
 
@@ -490,8 +491,8 @@ const GRNsPage: React.FC = () => {
                 />
                 <StatCard
                     icon={Package}
-                    value={stats.totalQty}
-                    label="إجمالي الكميات المستلمة"
+                    value={stats.totalValue as any}
+                    label="إجمالي قيمة التوريدات"
                     color="purple"
                 />
             </div>

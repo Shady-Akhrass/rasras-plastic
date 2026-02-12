@@ -25,6 +25,11 @@ public class PurchaseOrderController {
         return ResponseEntity.ok(Map.of("data", poService.getWaitingForArrivalPOs()));
     }
 
+    @GetMapping("/uninvoiced")
+    public ResponseEntity<Map<String, List<PurchaseOrderDto>>> getUninvoicedPOs() {
+        return ResponseEntity.ok(Map.of("data", poService.getUninvoicedPOs()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, PurchaseOrderDto>> getPOById(@PathVariable Integer id) {
         return ResponseEntity.ok(Map.of("data", poService.getPOById(id)));

@@ -38,7 +38,7 @@ const QuotationComparisonFormPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
-    const isView = queryParams.get('mode') === 'view';
+    const isViewParam = queryParams.get('mode') === 'view';
     const approvalId = queryParams.get('approvalId');
     const isEdit = !!id;
 
@@ -58,6 +58,11 @@ const QuotationComparisonFormPage: React.FC = () => {
         status: 'Draft',
         selectionReason: ''
     });
+
+    // Computed view mode - true if URL param is 'view' OR if comparison status is 'Approved'
+    const isView = useMemo(() => {
+        return isViewParam || formData.status === 'Approved';
+    }, [isViewParam, formData.status]);
 
     // Load Initial Data
     useEffect(() => {
@@ -173,18 +178,14 @@ const QuotationComparisonFormPage: React.FC = () => {
 
             setQuotations(relevantQuotes);
 
-            // Helper to get costs if not explicitly set
             const getFinalCosts = (q: SupplierQuotation) => {
                 const delivery = q.deliveryCost !== undefined && q.deliveryCost !== null ? q.deliveryCost : 0;
                 const other = q.otherCosts !== undefined && q.otherCosts !== null ? q.otherCosts : 0;
-
-                // If both are 0 but totalAmount > itemsTotal, we might have legacy data
                 if (delivery === 0 && other === 0) {
                     const itemsTotal = q.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
                     const diff = q.totalAmount - itemsTotal;
                     return { delivery: diff > 0 ? diff : 0, other: 0 };
                 }
-
                 return { delivery, other };
             };
 
@@ -210,9 +211,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                         polymerGrade: firstItem?.polymerGrade || ''
                     };
                 });
-
                 const detailsWithRating = calculateRatings(initialDetails);
-
                 setFormData(prev => ({
                     ...prev,
                     details: detailsWithRating,
@@ -220,7 +219,6 @@ const QuotationComparisonFormPage: React.FC = () => {
                     selectionReason: 'أفضل عرض متكامل (سعر وتوريد)'
                 }));
             } else if (formData.details && formData.details.length > 0) {
-                // Enrich existing details with delivery cost if they have 0
                 setFormData(prev => ({
                     ...prev,
                     details: prev.details?.map(d => {
@@ -230,7 +228,6 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 return q ? getFinalCosts(q) : { delivery: d.deliveryCost || 0, other: d.otherCosts || 0 };
                             })()
                             : { delivery: d.deliveryCost || 0, other: d.otherCosts || 0 };
-
                         return {
                             ...d,
                             deliveryCost: costs.delivery,
@@ -254,12 +251,9 @@ const QuotationComparisonFormPage: React.FC = () => {
                 }
                 return d;
             }) || [];
-
-            // If we updated a value that affects ratings, recalculate everything
             const finalDetails = (field === 'deliveryDays' || field === 'unitPrice' || field === 'totalPrice')
                 ? calculateRatings(updatedDetails)
                 : updatedDetails;
-
             return {
                 ...prev,
                 details: finalDetails
@@ -300,7 +294,6 @@ const QuotationComparisonFormPage: React.FC = () => {
         toast.success('تم تحديد العرض صاحب أعلى تقييم');
     };
 
-    // Save comparison and return saved comparison
     const saveComparison = async () => {
         try {
             if (requireThreeQuotations && quotations.length < 3) {
@@ -315,7 +308,6 @@ const QuotationComparisonFormPage: React.FC = () => {
                 toast.error('يرجى ذكر سبب الاختيار');
                 return null;
             }
-
             setSaving(true);
             const dataToSave = {
                 ...formData,
@@ -329,10 +321,7 @@ const QuotationComparisonFormPage: React.FC = () => {
             } else {
                 savedComp = await purchaseService.createComparison(dataToSave);
             }
-
-            // Automatically submit for approval workflow
             await purchaseService.submitComparison(savedComp.id!);
-
             toast.success('تم حفظ المقارنة وإرسالها للاعتماد بنجاح');
             navigate('/dashboard/procurement/comparison');
             return savedComp;
@@ -344,11 +333,10 @@ const QuotationComparisonFormPage: React.FC = () => {
             setSaving(false);
         }
     };
+
     const handleSave = () => { saveComparison(); };
 
-    // Attempt to save (if dirty) and then create PO only if comparison is approved
     const handleSaveAndCreatePO = async () => {
-        // If form already has approved status, skip saving and go create PO
         if (formData.status === 'Approved') {
             const qId = formData.selectedQuotationId;
             const compId = (formData as any).id || undefined;
@@ -357,8 +345,6 @@ const QuotationComparisonFormPage: React.FC = () => {
             }
             return;
         }
-
-        // Otherwise, save current state first and then check status
         const saved = await saveComparison();
         if (!saved) return;
         if (saved.status === 'Approved') {
@@ -391,11 +377,9 @@ const QuotationComparisonFormPage: React.FC = () => {
             toast.error('لا يمكن إنشاء مقارنة جديدة بدون تحديد طلب شراء');
             return;
         }
-        // Navigate to create new comparison page with the same PR
         navigate(`/dashboard/procurement/comparison/new?prId=${prId}`);
         toast.success('تم فتح نموذج مقارنة جديد بنفس طلب الشراء');
     };
-
 
     if (loading) return (
         <div className="flex items-center justify-center h-96">
@@ -405,6 +389,100 @@ const QuotationComparisonFormPage: React.FC = () => {
             </div>
         </div>
     );
+
+    const renderHeaderActions = () => {
+        if (isView) {
+            return (
+                <div className="flex items-center gap-3">
+                    {approvalId && (
+                        <>
+                            <button
+                                onClick={() => handleApprovalAction('Approved')}
+                                disabled={processing}
+                                className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                <span>اعتماد</span>
+                            </button>
+                            <button
+                                onClick={() => handleApprovalAction('Rejected')}
+                                disabled={processing}
+                                className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                <span>رفض</span>
+                            </button>
+                        </>
+                    )}
+                    <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                        <Eye className="w-5 h-5" />
+                        <span className="font-bold">وضع العرض فقط</span>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex items-center gap-3">
+                {isEdit && formData.status === 'Rejected' && (
+                    <button
+                        onClick={handleCreateNewComparison}
+                        className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl font-bold shadow-lg hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
+                        title="إنشاء مقارنة جديدة بنفس طلب الشراء"
+                    >
+                        <RefreshCw className="w-5 h-5" />
+                        <span>إنشاء مقارنة جديدة</span>
+                    </button>
+                )}
+
+                <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                    {saving ? (
+                        <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                    ) : (
+                        <Save className="w-5 h-5" />
+                    )}
+                    <span>{saving ? 'جاري الحفظ...' : 'حفظ المقارنة'}</span>
+                </button>
+
+                {formData.selectedQuotationId && formData.status === 'Approved' && (
+                    <button
+                        onClick={handleSaveAndCreatePO}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-bold shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                        <ShoppingCart className="w-4 h-4" />
+                        <span>حفظ وإنشاء أمر شراء</span>
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const renderStatusBadge = () => {
+        if (isEdit && formData.status === 'Rejected') {
+            return (
+                <div className="px-5 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-bold flex items-center gap-2 border border-rose-100 italic">
+                    <XCircle className="w-5 h-5" />
+                    <span>مرفوض</span>
+                </div>
+            );
+        }
+
+        if (isEdit && formData.status !== 'Draft' && formData.status !== 'Approved' && formData.status !== 'Rejected') {
+            return (
+                <div className="px-5 py-2.5 bg-amber-50 text-amber-600 rounded-xl font-bold flex items-center gap-2 border border-amber-100 italic">
+                    <Clock className="w-5 h-5" />
+                    <span>بانتظار الاعتماد</span>
+                </div>
+            );
+        }
+
+        return null;
+    };
 
     return (
         <div className="space-y-6 pb-20" dir="rtl">
@@ -441,96 +519,18 @@ const QuotationComparisonFormPage: React.FC = () => {
                         >
                             <ArrowRight className="w-5 h-5" />
                         </button>
-                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-                            <TrendingUp className="w-10 h-10" />
-                        </div>
                         <div>
-                            <h1 className="text-3xl font-bold mb-2">
-                                {isEdit ? `تعديل مقارنة: ${formData.comparisonNumber}` : 'مقارنة عروض أسعار جديدة'}
+                            <h1 className="text-3xl font-black tracking-tight">
+                                {isEdit ? 'تعديل مقارنة عروض الأسعار' : 'مقارنة عروض أسعار جديدة'}
                             </h1>
-                            <p className="text-white/80 text-lg">حدد طلب عرض السعر، الصنف، ثم قارن العروض المتاحة</p>
+                            <p className="text-white/80 text-sm font-semibold mt-1">
+                                تحليل شامل واختيار العرض الأفضل بناءً على السعر والجودة
+                            </p>
                         </div>
                     </div>
-                    <div className="flex gap-3">
-                        {isEdit && formData.status === 'Rejected' && (
-                            <button
-                                onClick={handleCreateNewComparison}
-                                className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl 
-                                    font-bold shadow-lg hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
-                                title="إنشاء مقارنة جديدة بنفس طلب الشراء"
-                            >
-                                <RefreshCw className="w-5 h-5" />
-                                <span>إنشاء مقارنة جديدة</span>
-                            </button>
-                        )}
-                        {isEdit && formData.status !== 'Draft' && formData.status !== 'Approved' && formData.status !== 'Rejected' && (
-                            <div className="px-5 py-2.5 bg-amber-50 text-amber-600 rounded-xl font-bold flex items-center gap-2 border border-amber-100 italic">
-                                <Clock className="w-5 h-5" />
-                                <span>بانتظار الاعتماد</span>
-                            </div>
-                        )}
-                        {!isView && (
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={handleSave}
-                                    disabled={saving}
-                                    className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                                        font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                                        disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                                >
-                                    {saving ? (
-                                        <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                                    ) : (
-                                        <Save className="w-5 h-5" />
-                                    )}
-                                    <span>{saving ? 'جاري الحفظ...' : 'حفظ المقارنة'}</span>
-                                </button>
 
-                                {formData.selectedQuotationId && formData.status === 'Approved' && (
-                                    <button
-                                        onClick={handleSaveAndCreatePO}
-                                        disabled={saving}
-                                        className="flex items-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-bold shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                                    >
-                                        <ShoppingCart className="w-4 h-4" />
-                                        <span>حفظ وإنشاء أمر شراء</span>
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                        {isView && (
-                            <div className="flex items-center gap-3">
-                                {approvalId && (
-                                    <>
-                                        <button
-                                            onClick={() => handleApprovalAction('Approved')}
-                                            disabled={processing}
-                                            className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
-                                                font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
-                                                disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                                            <span>اعتماد</span>
-                                        </button>
-                                        <button
-                                            onClick={() => handleApprovalAction('Rejected')}
-                                            disabled={processing}
-                                            className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
-                                                font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
-                                                disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
-                                            <span>رفض</span>
-                                        </button>
-                                    </>
-                                )}
-                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
-                                    <Eye className="w-5 h-5" />
-                                    <span className="font-bold">وضع العرض فقط</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    {renderStatusBadge()}
+                    {renderHeaderActions()}
                 </div>
             </div>
 
@@ -598,13 +598,12 @@ const QuotationComparisonFormPage: React.FC = () => {
                         )}
 
                         {selectedPr && (
-                            <div className={`p - 5 rounded - 2xl border - 2 ${quotations.length < 3
+                            <div className={`p-5 rounded-2xl border-2 ${quotations.length < 3
                                 ? 'bg-gradient-to-br from-rose-50 to-orange-50 border-rose-200'
                                 : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'
-                                } `}>
+                                }`}>
                                 <div className="flex items-start gap-3">
-                                    <div className={`p - 3 rounded - xl ${quotations.length < 3 ? 'bg-rose-100' : 'bg-emerald-100'
-                                        } `}>
+                                    <div className={`p-3 rounded-xl ${quotations.length < 3 ? 'bg-rose-100' : 'bg-emerald-100'}`}>
                                         {quotations.length < 3 ? (
                                             <AlertCircle className="w-6 h-6 text-rose-600" />
                                         ) : (
@@ -612,12 +611,10 @@ const QuotationComparisonFormPage: React.FC = () => {
                                         )}
                                     </div>
                                     <div>
-                                        <h4 className={`font - bold mb - 1 ${quotations.length < 3 ? 'text-rose-800' : 'text-emerald-800'
-                                            } `}>
+                                        <h4 className={`font-bold mb-1 ${quotations.length < 3 ? 'text-rose-800' : 'text-emerald-800'}`}>
                                             {quotations.length < 3 ? 'عدد العروض غير كافٍ' : 'جاهز للمقارنة'}
                                         </h4>
-                                        <p className={`text - sm leading - relaxed ${quotations.length < 3 ? 'text-rose-700' : 'text-emerald-700'
-                                            } `}>
+                                        <p className={`text-sm leading-relaxed ${quotations.length < 3 ? 'text-rose-700' : 'text-emerald-700'}`}>
                                             تم العثور على <strong>{quotations.length}</strong> عروض سعر صالحة وغير منتهية
                                             {requireThreeQuotations && quotations.length < 3 && (
                                                 <> - يتطلب النظام <strong>3 عروض على الأقل</strong> لبدء الترسية</>
@@ -634,43 +631,45 @@ const QuotationComparisonFormPage: React.FC = () => {
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
                     style={{ animationDelay: '100ms' }}>
                     <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-emerald-100 rounded-xl">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-emerald-100 rounded-xl">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">قرار الترسية</h3>
+                                    <p className="text-slate-500 text-sm">اختر العرض الأفضل وحدد سبب الاختيار</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-bold text-slate-800 text-lg">قرار الترسية</h3>
-                                <p className="text-slate-500 text-sm">اختر العرض الأفضل وحدد سبب الاختيار</p>
-                            </div>
+                            {!isView && (
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={selectLowestPrice}
+                                        className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                        title="اختيار أقل سعر"
+                                    >
+                                        <DollarSign className="w-3.5 h-3.5 inline ml-1" />
+                                        الأرخص
+                                    </button>
+                                    <button
+                                        onClick={selectFastestDelivery}
+                                        className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+                                        title="اختيار أسرع توريد"
+                                    >
+                                        <Clock className="w-3.5 h-3.5 inline ml-1" />
+                                        الأسرع
+                                    </button>
+                                    <button
+                                        onClick={selectHighestScore}
+                                        className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold border border-purple-100 hover:bg-purple-100 transition-colors"
+                                        title="اختيار أعلى تقييم"
+                                    >
+                                        <Star className="w-3.5 h-3.5 inline ml-1" />
+                                        الأفضل تقييماً
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        {!isView && (
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={selectLowestPrice}
-                                    className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                                    title="اختيار أقل سعر"
-                                >
-                                    <DollarSign className="w-3.5 h-3.5 inline ml-1" />
-                                    الأرخص
-                                </button>
-                                <button
-                                    onClick={selectFastestDelivery}
-                                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
-                                    title="اختيار أسرع توريد"
-                                >
-                                    <Clock className="w-3.5 h-3.5 inline ml-1" />
-                                    الأسرع
-                                </button>
-                                <button
-                                    onClick={selectHighestScore}
-                                    className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold border border-purple-100 hover:bg-purple-100 transition-colors"
-                                    title="اختيار أعلى تقييم"
-                                >
-                                    <Star className="w-3.5 h-3.5 inline ml-1" />
-                                    الأفضل تقييماً
-                                </button>
-                            </div>
-                        )}
                     </div>
 
                     <div className="p-6 space-y-6">
@@ -810,10 +809,10 @@ const QuotationComparisonFormPage: React.FC = () => {
                                     return (
                                         <tr
                                             key={detail.quotationId}
-                                            className={`transition - all ${isWinner
+                                            className={`transition-all ${isWinner
                                                 ? 'bg-gradient-to-l from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100'
                                                 : 'hover:bg-slate-50/80'
-                                                } `}
+                                                }`}
                                         >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">

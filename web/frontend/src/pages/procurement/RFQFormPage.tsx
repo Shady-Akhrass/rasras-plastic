@@ -307,7 +307,8 @@ const FormInput: React.FC<{
     required?: boolean;
     type?: string;
     disabled?: boolean;
-}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', disabled }) => {
+    min?: string;
+}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', disabled, min }) => {
     const [isFocused, setIsFocused] = useState(false);
     return (
         <div className="space-y-2">
@@ -326,7 +327,7 @@ const FormInput: React.FC<{
                     onChange={(e) => onChange(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder={placeholder} required={required} disabled={disabled}
+                    placeholder={placeholder} required={required} disabled={disabled} min={min}
                     className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all duration-200 outline-none
                         ${Icon ? 'pr-12' : ''}
                         ${disabled ? 'bg-slate-100 cursor-not-allowed opacity-70' : ''}
@@ -1196,11 +1197,12 @@ const RFQFormPage: React.FC = () => {
                         <FormInput label="تاريخ الطلب" type="date"
                             value={formData.rfqDate?.split('T')[0] || ''}
                             onChange={(v) => setFormData(prev => ({ ...prev, rfqDate: v }))}
-                            icon={Calendar} required disabled={isView} />
+                            min={new Date().toISOString().split('T')[0]}
+                            required disabled={isView} />
                         <FormInput label="تاريخ استحقاق الرد" type="date"
                             value={formData.responseDueDate || ''}
                             onChange={(v) => setFormData(prev => ({ ...prev, responseDueDate: v }))}
-                            icon={Calendar} disabled={isView} />
+                            min={new Date().toISOString().split('T')[0]} disabled={isView} />
                     </div>
 
                     {/* PR Selection */}

@@ -60,6 +60,8 @@ public class GRNService {
                 .supplierInvoiceNo(dto.getSupplierInvoiceNo())
                 .receivedByUserId(dto.getReceivedByUserId())
                 .inspectedByUserId(dto.getInspectedByUserId())
+                .shippingCost(dto.getShippingCost())
+                .otherCosts(dto.getOtherCosts())
                 .status("Pending Inspection") // Step 7: Initial Receipt
                 .qualityStatus("Pending")
                 .notes(dto.getNotes())
@@ -80,6 +82,12 @@ public class GRNService {
             grn.setTotalReceivedQty(grn.getItems().stream()
                     .map(GRNItem::getReceivedQty)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
+
+            BigDecimal subTotal = grn.getItems().stream()
+                    .map(item -> item.getTotalCost() != null ? item.getTotalCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            grn.setTotalAmount(subTotal.add(grn.getShippingCost() != null ? grn.getShippingCost() : BigDecimal.ZERO)
+                    .add(grn.getOtherCosts() != null ? grn.getOtherCosts() : BigDecimal.ZERO));
         }
 
         return mapToDto(grnRepo.save(grn));
@@ -113,6 +121,8 @@ public class GRNService {
 
         grn.setDeliveryNoteNo(dto.getDeliveryNoteNo());
         grn.setSupplierInvoiceNo(dto.getSupplierInvoiceNo());
+        grn.setShippingCost(dto.getShippingCost());
+        grn.setOtherCosts(dto.getOtherCosts());
         grn.setNotes(dto.getNotes());
 
         if (dto.getItems() != null) {
@@ -124,6 +134,12 @@ public class GRNService {
             grn.setTotalReceivedQty(grn.getItems().stream()
                     .map(GRNItem::getReceivedQty)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
+
+            BigDecimal subTotal = grn.getItems().stream()
+                    .map(item -> item.getTotalCost() != null ? item.getTotalCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            grn.setTotalAmount(subTotal.add(grn.getShippingCost() != null ? grn.getShippingCost() : BigDecimal.ZERO)
+                    .add(grn.getOtherCosts() != null ? grn.getOtherCosts() : BigDecimal.ZERO));
         }
 
         return mapToDto(grnRepo.save(grn));
@@ -134,7 +150,8 @@ public class GRNService {
         GoodsReceiptNote grn = grnRepo.findByIdWithItems(grnId)
                 .orElseThrow(() -> new RuntimeException("GRN not found"));
 
-        // الإضافة للمخزن تكون فقط لاعتماد فحص الجودة: تم الفحص (Inspected) أو إذن معتمد (Approved)
+        // الإضافة للمخزن تكون فقط لاعتماد فحص الجودة: تم الفحص (Inspected) أو إذن معتمد
+        // (Approved)
         if ("Completed".equals(grn.getStatus())) {
             throw new RuntimeException("GRN already added to warehouse");
         }
@@ -180,7 +197,7 @@ public class GRNService {
 
         // Initiate approval workflow
         approvalService.initiateApproval("GRN_APPROVAL", "GoodsReceiptNote", saved.getId(),
-                saved.getGrnNumber(), userId, saved.getTotalReceivedQty());
+                saved.getGrnNumber(), userId, saved.getTotalAmount());
 
         return mapToDto(saved);
     }
@@ -299,6 +316,9 @@ public class GRNService {
                 .approvalStatus(entity.getApprovalStatus())
                 .qualityStatus(entity.getQualityStatus())
                 .totalReceivedQty(entity.getTotalReceivedQty())
+                .shippingCost(entity.getShippingCost())
+                .otherCosts(entity.getOtherCosts())
+                .totalAmount(entity.getTotalAmount())
                 .notes(entity.getNotes())
                 .items(entity.getItems() != null ? entity.getItems().stream()
                         .map(this::mapToItemDto)

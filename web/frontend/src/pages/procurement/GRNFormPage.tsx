@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save, ArrowRight, Package, Info, Hash, FileText,
     Truck, ClipboardCheck, AlertCircle, Building2, CheckCircle2,
-    RefreshCw, Layers, CheckCircle, Eye, XCircle, Clock, Archive, Bell
+    RefreshCw, Layers, CheckCircle, Eye, XCircle, Archive, Bell, Lock
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../services/grnService';
@@ -24,6 +24,10 @@ const GRNFormPage: React.FC = () => {
     const isView = queryParams.get('mode') === 'view';
     const approvalId = queryParams.get('approvalId');
 
+    // Determine if form is read-only
+    const isReadOnly = isView || !isNew;
+
+
     // Data State
     const [saving, setSaving] = useState(false);
     const [pos, setPos] = useState<PurchaseOrderDto[]>([]);
@@ -39,9 +43,14 @@ const GRNFormPage: React.FC = () => {
         warehouseId: 0,
         deliveryNoteNo: '',
         supplierInvoiceNo: '',
+        shippingCost: 0,
+        otherCosts: 0,
         notes: '',
         items: []
     });
+
+    // Allow warehouse edit if in approval mode and not completed
+    const canEditWarehouse = !isReadOnly || (isView && !!approvalId && form.status !== 'Completed');
 
     // Row-level state
     const [rows, setRows] = useState<Record<number, {
@@ -93,7 +102,12 @@ const GRNFormPage: React.FC = () => {
                 try {
                     const g = await grnService.getGRNById(parseInt(id));
                     if (g) {
-                        setForm({ ...g, items: g.items || [] });
+                        setForm({
+                            ...g,
+                            items: g.items || [],
+                            shippingCost: g.shippingCost || 0,
+                            otherCosts: g.otherCosts || 0
+                        });
                         setSelectedPo({
                             supplierId: g.supplierId!,
                             supplierNameAr: g.supplierNameAr,
@@ -303,10 +317,16 @@ const GRNFormPage: React.FC = () => {
     const totals = useMemo(() => {
         const items = buildItems();
         const totalQty = items.reduce((sum: number, item: GRNItemDto) => sum + (item.receivedQty || 0), 0);
-        const totalOrderedQty = items.reduce((sum: number, item: GRNItemDto) => sum + (item.orderedQty || 0), 0);
-        const totalCost = items.reduce((sum: number, item: GRNItemDto) => sum + (item.totalCost || 0), 0);
-        return { totalQty, totalOrderedQty, totalCost, itemCount: items.length };
-    }, [rows, selectedPo, form.items, isNew]);
+        const subTotal = items.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+        const grandTotal = subTotal + (form.shippingCost || 0) + (form.otherCosts || 0);
+
+        return {
+            itemCount: items.length,
+            totalQty: totalQty,
+            totalCost: subTotal,
+            grandTotal: grandTotal
+        };
+    }, [rows, selectedPo, form.items, isNew, form.shippingCost, form.otherCosts]);
 
     // Max remaining quantity
     const maxRem = (i: PurchaseOrderItemDto) => (Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0);
@@ -341,6 +361,8 @@ const GRNFormPage: React.FC = () => {
                     warehouseId: form.warehouseId,
                     deliveryNoteNo: form.deliveryNoteNo || undefined,
                     supplierInvoiceNo: form.supplierInvoiceNo || undefined,
+                    shippingCost: form.shippingCost || 0,
+                    otherCosts: form.otherCosts || 0,
                     receivedByUserId,
                     notes: form.notes || undefined,
                     items
@@ -381,6 +403,19 @@ const GRNFormPage: React.FC = () => {
         }
     };
 
+    // ─── Shared input class generator ───
+    const inputClass = (extra = '', forceReadOnly = isReadOnly) =>
+        `w-full px-4 py-3 border-2 rounded-xl outline-none transition-all font-semibold ${forceReadOnly
+            ? 'bg-slate-50 border-slate-200 text-slate-700 cursor-default pointer-events-none select-text'
+            : 'bg-slate-50 border-transparent focus:border-brand-primary focus:bg-white'
+        } ${extra}`;
+
+    const smallInputClass = (extra = '') =>
+        `px-3 py-2 border-2 rounded-xl text-sm outline-none transition-all ${isReadOnly
+            ? 'bg-slate-50 border-slate-200 cursor-default pointer-events-none select-text'
+            : 'bg-white border-slate-200 focus:border-brand-primary'
+        } ${extra}`;
+
     // إشعار: جاهز للإضافة للمخزن بعد اعتماد فحص الجودة (تم الفحص أو إذن معتمد، ولم تتم الإضافة بعد)
     const qualityApprovedReadyForStore = !isNew && form.status && ['Inspected', 'Approved'].includes(form.status) && form.status !== 'Completed';
 
@@ -400,160 +435,8 @@ const GRNFormPage: React.FC = () => {
         }
     };
 
-    // ─── View/Edit Existing GRN ─────────────────────────────────────────────
-    if (!isNew && id) {
-        const g = form as GoodsReceiptNoteDto;
-        return (
-            <div className="space-y-6 pb-20" dir="rtl">
-                {/* إشعار: تم اعتماد فحص الجودة — جاهز للإضافة للمخازن */}
-                {qualityApprovedReadyForStore && (
-                    <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border-2 border-emerald-200 bg-gradient-to-l from-emerald-50 to-green-50 shadow-sm">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-xl bg-emerald-100">
-                                <Bell className="w-6 h-6 text-emerald-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-emerald-800 text-lg">تم اعتماد فحص الجودة</h3>
-                                <p className="text-emerald-700 text-sm mt-0.5">يمكنك الآن إضافة الشحنة للمخازن وتحديث الأرصدة.</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleFinalizeStoreInFromPage}
-                            disabled={processing}
-                            className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-md hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Archive className="w-5 h-5" />}
-                            <span>إضافة للمخزن</span>
-                        </button>
-                    </div>
-                )}
-                {/* Header */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white shadow-2xl">
-                    <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
-                    <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div className="flex items-center gap-5">
-                            <button
-                                onClick={() => navigate('/dashboard/procurement/grn')}
-                                className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
-                                    hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
-                            >
-                                <ArrowRight className="w-5 h-5" />
-                            </button>
-                            <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-                                <ClipboardCheck className="w-10 h-10" />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-bold mb-2">إذن الإضافة {g.grnNumber}</h1>
-                                <p className="text-white/80 text-lg">عرض تفاصيل إذن الإضافة</p>
-                            </div>
-                        </div>
-                        {isView && (
-                            <div className="flex items-center gap-3">
-                                {approvalId && (
-                                    <>
-                                        <button
-                                            onClick={() => handleApprovalAction('Approved')}
-                                            disabled={processing}
-                                            className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
-                                                font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
-                                                disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                                            <span>اعتماد</span>
-                                        </button>
-                                        <button
-                                            onClick={() => handleApprovalAction('Rejected')}
-                                            disabled={processing}
-                                            className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
-                                                font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
-                                                disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
-                                            <span>رفض</span>
-                                        </button>
-                                    </>
-                                )}
-                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
-                                    <Eye className="w-5 h-5" />
-                                    <span className="font-bold">وضع العرض فقط</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
 
-                {/* Details Card */}
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden">
-                    <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                        <h3 className="font-bold text-slate-800 text-lg">البيانات الأساسية</h3>
-                    </div>
-                    <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">رقم الإذن</p>
-                            <p className="font-bold text-lg">{g.grnNumber}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">التاريخ</p>
-                            <p className="font-semibold">{g.grnDate ? formatDate(g.grnDate) : '—'}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">أمر الشراء</p>
-                            <p className="font-semibold">{g.poNumber}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">المورد</p>
-                            <p className="font-semibold">{g.supplierNameAr}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">رقم بوليصة الشحن</p>
-                            <p className="font-semibold">{g.deliveryNoteNo || '—'}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 mb-1">رقم فاتورة المورد</p>
-                            <p className="font-semibold">{g.supplierInvoiceNo || '—'}</p>
-                        </div>
-                        <div className="col-span-2">
-                            <p className="text-xs text-slate-500 mb-1">ملاحظات</p>
-                            <p className="font-semibold">{g.notes || '—'}</p>
-                        </div>
-                    </div>
-                </div>
 
-                {/* Items Table */}
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden">
-                    <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                        <h3 className="font-bold text-slate-800 text-lg">البنود المستلمة</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="bg-slate-50 border-b">
-                                    <th className="text-right py-3 px-4">الصنف</th>
-                                    <th className="text-right py-3 px-4">المطلوب</th>
-                                    <th className="text-right py-3 px-4">المستلم</th>
-                                    <th className="text-right py-3 px-4">المقبول</th>
-                                    <th className="text-right py-3 px-4">الوحدة</th>
-                                    <th className="text-right py-3 px-4">اللوت</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(g.items || []).map((it) => (
-                                    <tr key={it.poItemId} className="border-b hover:bg-slate-50">
-                                        <td className="py-3 px-4 font-semibold">{it.itemNameAr}</td>
-                                        <td className="py-3 px-4">{it.orderedQty}</td>
-                                        <td className="py-3 px-4 text-brand-primary font-bold">{it.receivedQty}</td>
-                                        <td className="py-3 px-4">{it.acceptedQty || it.receivedQty}</td>
-                                        <td className="py-3 px-4">{it.unitNameAr}</td>
-                                        <td className="py-3 px-4 text-slate-500">{it.lotNumber || '—'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     // ─── Create Form ────────────────────────────────────────────────────────
     return (
@@ -565,6 +448,29 @@ const GRNFormPage: React.FC = () => {
                 }
                 .animate-slide-in { animation: slideInRight 0.4s ease-out; }
             `}</style>
+
+            {/* إشعار: تم اعتماد فحص الجودة — جاهز للإضافة للمخازن */}
+            {qualityApprovedReadyForStore && (
+                <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl border-2 border-emerald-200 bg-gradient-to-l from-emerald-50 to-green-50 shadow-sm animate-slide-in">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-xl bg-emerald-100">
+                            <Bell className="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-emerald-800 text-lg">تم اعتماد فحص الجودة</h3>
+                            <p className="text-emerald-700 text-sm mt-0.5">يمكنك الآن إضافة الشحنة للمخازن وتحديث الأرصدة.</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleFinalizeStoreInFromPage}
+                        disabled={processing}
+                        className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-md hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Archive className="w-5 h-5" />}
+                        <span>إضافة للمخزن</span>
+                    </button>
+                </div>
+            )}
 
             {/* Header */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
@@ -586,30 +492,91 @@ const GRNFormPage: React.FC = () => {
                             <ClipboardCheck className="w-10 h-10" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold mb-2">
-                                {isNew ? 'إذن إضافة جديد (GRN)' : `إذن الإضافة ${form.grnNumber || ''}`}
-                            </h1>
+                            <div className="flex items-center gap-3 mb-2">
+                                <h1 className="text-3xl font-bold">
+                                    {isNew ? 'إذن إضافة جديد (GRN)' : `إذن الإضافة ${form.grnNumber || ''}`}
+                                </h1>
+                                {isReadOnly && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20">
+                                        <Lock className="w-3 h-3" />
+                                        للعرض فقط
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-white/80 text-lg">
-                                {isNew ? 'استلام المواد من المورد وتحديث أرصدة المخزون' : 'عرض وتدقيق تفاصيل إذن الاستلام'}
+                                {isReadOnly
+                                    ? 'عرض تفاصيل إذن الإضافة — البيانات محمية من التعديل'
+                                    : 'استلام المواد من المورد وتحديث أرصدة المخزون'}
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={saving || totals.itemCount === 0}
-                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                        {saving ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <Save className="w-5 h-5" />
+                    <div className="flex gap-3 flex-wrap">
+                        {isReadOnly && (
+                            <div className="flex items-center gap-3">
+                                {approvalId && (
+                                    <>
+                                        <button
+                                            onClick={() => handleApprovalAction('Approved')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                                font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                                disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                            <span>اعتماد</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleApprovalAction('Rejected')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                                font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                                disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                            <span>رفض</span>
+                                        </button>
+                                    </>
+                                )}
+                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
+                                    <Eye className="w-5 h-5" />
+                                    <span className="font-bold">وضع العرض فقط</span>
+                                </div>
+                            </div>
                         )}
-                        <span>{saving ? 'جاري الحفظ...' : 'حفظ إذن الإضافة'}</span>
-                    </button>
+                        {!isReadOnly && (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={saving || totals.itemCount === 0}
+                                className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                                    font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                    disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                                {saving ? (
+                                    <RefreshCw className="w-5 h-5 animate-spin" />
+                                ) : (
+                                    <Save className="w-5 h-5" />
+                                )}
+                                <span>{saving ? 'جاري الحفظ...' : 'حفظ إذن الإضافة'}</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            {/* Read-only banner */}
+            {isReadOnly && (
+                <div className="flex items-center gap-4 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl animate-slide-in">
+                    <div className="p-2.5 bg-amber-100 rounded-xl flex-shrink-0">
+                        <Lock className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-amber-800 font-bold text-sm">
+                            أنت في وضع العرض — جميع الحقول مقفلة ولا يمكن تعديلها
+                        </p>
+                    </div>
+                </div>
+            )}
+
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content (2/3) */}
@@ -633,36 +600,51 @@ const GRNFormPage: React.FC = () => {
                                     <Hash className="w-4 h-4 text-brand-primary" />
                                     أمر الشراء *
                                 </label>
-                                <select
-                                    value={form.poId || ''}
-                                    onChange={(e) => handleSelectPo(parseInt(e.target.value) || 0)}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
-                                    required
-                                >
-                                    <option value="">اختر أمر الشراء...</option>
-                                    {pos.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.poNumber} — {p.supplierNameAr}</option>
-                                    ))}
-                                </select>
+                                {isReadOnly ? (
+                                    <div className={inputClass()}>
+                                        {pos.find(p => p.id === form.poId)?.poNumber || form.poNumber || '—'}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={form.poId || ''}
+                                        onChange={(e) => handleSelectPo(parseInt(e.target.value) || 0)}
+                                        className={inputClass()}
+                                        required
+                                    >
+                                        <option value="">اختر أمر الشراء...</option>
+                                        {pos.map((p) => (
+                                            <option key={p.id} value={p.id}>{p.poNumber} — {p.supplierNameAr}</option>
+                                        ))}
+                                    </select>
+                                )}
+
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <Building2 className="w-4 h-4 text-brand-primary" />
                                     المستودع المستلم *
                                 </label>
-                                <select
-                                    value={form.warehouseId || ''}
-                                    onChange={(e) => setForm((f) => ({ ...f, warehouseId: parseInt(e.target.value) || 0 }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
-                                    required
-                                >
-                                    <option value="">اختر المستودع...</option>
-                                    {warehouses.map((w) => (
-                                        <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
-                                    ))}
-                                </select>
+                                {!canEditWarehouse ? (
+                                    <div className={inputClass()}>
+                                        {warehouses.find(w => w.id === form.warehouseId)?.warehouseNameAr || '—'}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={form.warehouseId || ''}
+                                        onChange={(e) => {
+                                            setForm((f) => ({ ...f, warehouseId: parseInt(e.target.value) || 0 }));
+                                            setWarehouseChanged(true);
+                                        }}
+                                        className={inputClass('', !canEditWarehouse)}
+                                        required
+                                    >
+                                        <option value="">اختر المستودع...</option>
+                                        {warehouses.map((w) => (
+                                            <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
+                                        ))}
+                                    </select>
+                                )}
+
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
@@ -671,12 +653,13 @@ const GRNFormPage: React.FC = () => {
                                 </label>
                                 <input
                                     type="text"
+                                    readOnly={isReadOnly}
                                     value={form.deliveryNoteNo || ''}
                                     onChange={(e) => setForm((f) => ({ ...f, deliveryNoteNo: e.target.value }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
-                                    placeholder="DN-XXX"
+                                    className={inputClass()}
+                                    placeholder={isReadOnly ? '—' : 'DN-XXX'}
                                 />
+
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
@@ -685,12 +668,41 @@ const GRNFormPage: React.FC = () => {
                                 </label>
                                 <input
                                     type="text"
+                                    readOnly={isReadOnly}
                                     value={form.supplierInvoiceNo || ''}
                                     onChange={(e) => setForm((f) => ({ ...f, supplierInvoiceNo: e.target.value }))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
-                                    placeholder="INV-XXX"
+                                    className={inputClass()}
+                                    placeholder={isReadOnly ? '—' : 'INV-XXX'}
                                 />
+
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 block">مصاريف الشحن</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            value={form.shippingCost}
+                                            onChange={(e) => setForm({ ...form, shippingCost: parseFloat(e.target.value) || 0 })}
+                                            className={inputClass('pl-12')}
+                                            readOnly={isReadOnly}
+                                        />
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">EGP</div>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 block">مصاريف أخرى</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            value={form.otherCosts}
+                                            onChange={(e) => setForm({ ...form, otherCosts: parseFloat(e.target.value) || 0 })}
+                                            className={inputClass('pl-12')}
+                                            readOnly={isReadOnly}
+                                        />
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">EGP</div>
+                                    </div>
+                                </div>
                             </div>
                             <div className="md:col-span-2 space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
@@ -699,12 +711,13 @@ const GRNFormPage: React.FC = () => {
                                 </label>
                                 <textarea
                                     value={form.notes || ''}
+                                    readOnly={isReadOnly}
                                     onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                                     rows={2}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold resize-none"
-                                    placeholder="أي ملاحظات إضافية..."
+                                    className={inputClass('resize-none')}
+                                    placeholder={isReadOnly ? '—' : 'أي ملاحظات إضافية...'}
                                 />
+
                             </div>
                         </div>
                     </div>
@@ -734,7 +747,7 @@ const GRNFormPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-xs text-brand-primary mb-1">إجمالي التكلفة</p>
-                                    <p className="font-semibold text-slate-800">{formatNumber(totals.totalCost, { minimumFractionDigits: 2 })} ج.م</p>
+                                    <p className="font-semibold text-slate-800">{formatNumber(totals.grandTotal, { minimumFractionDigits: 2 })} ج.م</p>
                                 </div>
                             </div>
                         </div>
@@ -778,88 +791,96 @@ const GRNFormPage: React.FC = () => {
                                             <th className="py-4 px-3 text-center">تاريخ الإنتاج</th>
                                             <th className="py-4 px-3 text-center">الصلاحية</th>
                                             <th className="py-4 pl-6 text-center">الموقع</th>
+                                            {!isNew && isReadOnly && <th className="py-4 px-3 text-center font-bold">التكلفة</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {selectedPo.items
-                                            ?.filter((i) => maxRem(i) > 0)
-                                            .map((i) => (
-                                                <tr key={i.id} className="group hover:bg-slate-50/50 transition-colors">
-                                                    <td className="py-4 pr-6">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-2 h-2 rounded-full ${(rows[i.id!]?.receivedQty || 0) > 0 ? 'bg-brand-primary' : 'bg-slate-300'}`} />
-                                                            <span className="font-bold text-slate-800">{i.itemNameAr}</span>
+                                        {(isNew ? selectedPo?.items?.filter(i => maxRem(i) > 0) : form.items)?.map((i: any) => (
+
+                                            <tr key={i.id} className="group hover:bg-slate-50/50 transition-colors">
+                                                <td className="py-4 pr-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-2 h-2 rounded-full ${(rows[i.id!]?.receivedQty || 0) > 0 ? 'bg-brand-primary' : 'bg-slate-300'}`} />
+                                                        <span className="font-bold text-slate-800">{i.itemNameAr}</span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-1 mr-5">{i.unitNameAr}</div>
+                                                </td>
+                                                <td className="py-4 px-3 text-center">
+                                                    <span className="px-3 py-1 bg-slate-100 rounded-lg text-slate-600 font-semibold text-sm">
+                                                        {isNew ? maxRem(i) : (i.orderedQty || '—')}
+                                                    </span>
+                                                </td>
+
+                                                <td className="py-4 px-3">
+                                                    <input
+                                                        type="number"
+                                                        readOnly={isReadOnly}
+                                                        min={0}
+                                                        max={isNew ? maxRem(i) : undefined}
+                                                        step="0.001"
+                                                        value={isNew ? (rows[i.id!]?.receivedQty ?? maxRem(i)) : i.receivedQty}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value) || 0;
+                                                            updateRow(i.id!, { receivedQty: val, acceptedQty: val }, i);
+                                                        }}
+                                                        className={smallInputClass('w-24 text-center font-bold text-brand-primary')}
+                                                    />
+
+                                                </td>
+                                                <td className="py-4 px-3">
+                                                    <input
+                                                        type="number"
+                                                        readOnly={isReadOnly}
+                                                        min={0}
+                                                        max={isNew ? (rows[i.id!]?.receivedQty ?? maxRem(i)) : undefined}
+                                                        step="0.001"
+                                                        value={isNew ? (rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)) : i.acceptedQty}
+                                                        onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 }, i)}
+                                                        className={smallInputClass('w-24 text-center font-bold')}
+                                                    />
+
+                                                </td>
+                                                <td className="py-4 px-3">
+                                                    <input
+                                                        type="text"
+                                                        readOnly={isReadOnly}
+                                                        value={isNew ? (rows[i.id!]?.lotNumber || '') : (i.lotNumber || '')}
+                                                        onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
+                                                        placeholder={isReadOnly ? '—' : 'LOT-XXX'}
+                                                        className={smallInputClass('w-28 text-center')}
+                                                    />
+
+                                                </td>
+                                                <td className="py-4 px-3">
+                                                    <input
+                                                        type="date"
+                                                        readOnly={isReadOnly}
+                                                        value={isNew ? (rows[i.id!]?.manufactureDate || '') : (i.manufactureDate || '')}
+                                                        onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
+                                                        className={smallInputClass('w-36 text-center')}
+                                                    />
+
+                                                </td>
+                                                <td className="py-4 px-3">
+                                                    <input
+                                                        type="date"
+                                                        readOnly={isReadOnly}
+                                                        value={isNew ? (rows[i.id!]?.expiryDate || '') : (i.expiryDate || '')}
+                                                        onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined }, i)}
+                                                        className={smallInputClass('w-36 text-center')}
+                                                    />
+
+                                                </td>
+                                                <td className="py-4 pl-6">
+                                                    {isReadOnly ? (
+                                                        <div className={smallInputClass('w-32 text-center')}>
+                                                            {locations.find(l => l.id === (isNew ? rows[i.id!]?.locationId : i.locationId))?.locationCode || '—'}
                                                         </div>
-                                                        <div className="text-xs text-slate-500 mt-1 mr-5">{i.unitNameAr}</div>
-                                                    </td>
-                                                    <td className="py-4 px-3 text-center">
-                                                        <span className="px-3 py-1 bg-slate-100 rounded-lg text-slate-600 font-semibold text-sm">
-                                                            {maxRem(i)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            max={maxRem(i)}
-                                                            step="0.001"
-                                                            value={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                            onChange={(e) => {
-                                                                const val = parseFloat(e.target.value) || 0;
-                                                                updateRow(i.id!, { receivedQty: val, acceptedQty: val }, i);
-                                                            }}
-                                                            className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm text-center font-bold text-brand-primary outline-none 
-                                                                focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            max={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                            step="0.001"
-                                                            value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                            onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 }, i)}
-                                                            className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm text-center font-bold outline-none 
-                                                                focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="text"
-                                                            value={rows[i.id!]?.lotNumber || ''}
-                                                            onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value.trim() || undefined })}
-                                                            placeholder="LOT-XXX"
-                                                            className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm text-center outline-none focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="date"
-                                                            value={rows[i.id!]?.manufactureDate || ''}
-                                                            onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
-                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm outline-none focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <input
-                                                            type="date"
-                                                            value={rows[i.id!]?.expiryDate || ''}
-                                                            onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined }, i)}
-                                                            className="w-36 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm outline-none focus:border-brand-primary transition-all"
-                                                        />
-                                                    </td>
-                                                    <td className="py-4 pl-6">
+                                                    ) : (
                                                         <select
                                                             value={rows[i.id!]?.locationId || ''}
                                                             onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
-                                                            className="w-32 px-2 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                                text-sm outline-none focus:border-brand-primary transition-all"
+                                                            className={smallInputClass('w-32')}
                                                         >
                                                             <option value="">اختر الموقع</option>
                                                             {locations.map((l) => (
@@ -868,9 +889,16 @@ const GRNFormPage: React.FC = () => {
                                                                 </option>
                                                             ))}
                                                         </select>
+                                                    )}
+                                                </td>
+                                                {!isNew && isReadOnly && (
+                                                    <td className="py-4 px-3 text-center font-bold text-slate-800 tabular-nums">
+                                                        {formatNumber(i.totalCost || 0)}
                                                     </td>
-                                                </tr>
-                                            ))}
+                                                )}
+                                            </tr>
+                                        ))}
+
                                     </tbody>
                                 </table>
                             </div>
@@ -938,7 +966,7 @@ const GRNFormPage: React.FC = () => {
                             <div className="pt-6 border-t border-white/10">
                                 <div className="text-xs text-white/40 mb-2">إجمالي التكلفة</div>
                                 <div className="text-3xl font-black text-brand-primary">
-                                    {formatNumber(totals.totalCost, { minimumFractionDigits: 2 })}
+                                    {formatNumber(totals.grandTotal, { minimumFractionDigits: 2 })}
                                     <span className="text-sm font-bold opacity-70"> ج.م</span>
                                 </div>
                             </div>
@@ -972,21 +1000,7 @@ const GRNFormPage: React.FC = () => {
                     )}
 
                     {/* Status Alert */}
-                    {!isNew && (
-                        <div className={`p-5 rounded-2xl border-2 flex gap-4 animate-slide-in shadow-lg
-                            ${form.status === 'Finalized' ? 'bg-emerald-50 border-emerald-200' : 'bg-blue-50 border-blue-200'}`}
-                            style={{ animationDelay: '400ms' }}>
-                            <div className={`p-3 rounded-xl h-fit ${form.status === 'Finalized' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
-                                {form.status === 'Finalized' ? <CheckCircle className="w-6 h-6 text-emerald-600" /> : <Clock className="w-6 h-6 text-blue-600" />}
-                            </div>
-                            <div>
-                                <h4 className={`font-bold mb-1 ${form.status === 'Finalized' ? 'text-emerald-800' : 'text-blue-800'}`}>حالة المستند</h4>
-                                <p className={`text-sm leading-relaxed ${form.status === 'Finalized' ? 'text-emerald-700' : 'text-blue-700'}`}>
-                                    {form.status === 'Finalized' ? 'تمت إضافة الكميات للمخزون وإغلاق إذن الإضافة.' : 'إذن الإضافة محفوظ بانتظار الاعتماد أو الإضافة للمخزون.'}
-                                </p>
-                            </div>
-                        </div>
-                    )}
+
 
                     {/* FIFO Info */}
                     <div className="p-5 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl border-2 border-blue-200 

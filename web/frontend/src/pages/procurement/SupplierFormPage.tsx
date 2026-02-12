@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
-    Save, ArrowRight, Building2, DollarSign, MapPin, Phone, Mail,
+    ArrowRight, Building2, DollarSign, MapPin, Phone, Mail,
     FileText, Globe, CreditCard, ShieldCheck, Package, Trash2, Plus,
     X, RefreshCw, CheckCircle2, User, Clock, Star, Tag, Layers,
     ChevronRight, Send, Hash, Calendar, Landmark,
@@ -25,7 +25,8 @@ const FormInput: React.FC<{
     type?: string;
     dir?: string;
     hint?: string;
-}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', dir, hint }) => {
+    disabled?: boolean;
+}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', dir, hint, disabled }) => {
     const [isFocused, setIsFocused] = useState(false);
 
     return (
@@ -49,11 +50,13 @@ const FormInput: React.FC<{
                     placeholder={placeholder}
                     required={required}
                     dir={dir}
+                    disabled={disabled}
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none
                         ${Icon ? 'pr-12' : ''}
-                        ${isFocused
-                            ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
-                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+                        ${disabled ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' :
+                            isFocused
+                                ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
                 />
             </div>
             {hint && (
@@ -74,7 +77,8 @@ const FormSelect: React.FC<{
     icon?: React.ElementType;
     options: { value: string | number; label: string }[];
     required?: boolean;
-}> = ({ label, value, onChange, icon: Icon, options, required }) => {
+    disabled?: boolean;
+}> = ({ label, value, onChange, icon: Icon, options, required, disabled }) => {
     const [isFocused, setIsFocused] = useState(false);
 
     return (
@@ -94,12 +98,14 @@ const FormSelect: React.FC<{
                     onChange={(e) => onChange(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
+                    disabled={disabled}
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none 
                         appearance-none bg-white cursor-pointer
                         ${Icon ? 'pr-12' : ''}
-                        ${isFocused
-                            ? 'border-brand-primary shadow-lg shadow-brand-primary/10'
-                            : 'border-slate-200 hover:border-slate-300'}`}
+                        ${disabled ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' :
+                            isFocused
+                                ? 'border-brand-primary shadow-lg shadow-brand-primary/10'
+                                : 'border-slate-200 hover:border-slate-300'}`}
                 >
                     {options.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -119,7 +125,8 @@ const FormTextarea: React.FC<{
     icon?: React.ElementType;
     placeholder?: string;
     rows?: number;
-}> = ({ label, value, onChange, icon: Icon, placeholder, rows = 3 }) => {
+    disabled?: boolean;
+}> = ({ label, value, onChange, icon: Icon, placeholder, rows = 4, disabled }) => {
     const [isFocused, setIsFocused] = useState(false);
 
     return (
@@ -140,11 +147,13 @@ const FormTextarea: React.FC<{
                     onBlur={() => setIsFocused(false)}
                     placeholder={placeholder}
                     rows={rows}
+                    disabled={disabled}
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none resize-none
                         ${Icon ? 'pr-12' : ''}
-                        ${isFocused
-                            ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
-                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+                        ${disabled ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' :
+                            isFocused
+                                ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
                 />
             </div>
         </div>
@@ -159,7 +168,8 @@ const ToggleCard: React.FC<{
     onChange: (checked: boolean) => void;
     icon: React.ElementType;
     activeColor?: 'emerald' | 'blue' | 'amber';
-}> = ({ label, description, checked, onChange, icon: Icon, activeColor = 'emerald' }) => {
+    disabled?: boolean;
+}> = ({ label, description, checked, onChange, icon: Icon, activeColor = 'emerald', disabled }) => {
     const colors = {
         emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-600', activeBg: 'bg-emerald-500' },
         blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', activeBg: 'bg-blue-500' },
@@ -168,11 +178,15 @@ const ToggleCard: React.FC<{
     const c = colors[activeColor];
 
     return (
-        <div
-            onClick={() => onChange(!checked)}
-            className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer
-                transition-all duration-300 group
-                ${checked ? `${c.bg} ${c.border}` : 'bg-slate-50 border-slate-100 hover:border-slate-200'}`}
+        <button
+            type="button"
+            onClick={() => !disabled && onChange(!checked)}
+            disabled={disabled}
+            className={`w-full p-4 rounded-2xl border-2 transition-all duration-300 text-right
+                ${disabled ? 'bg-slate-100 border-slate-200 opacity-70 cursor-not-allowed' :
+                    checked
+                        ? `${c.bg} ${c.border} shadow-md shadow-${activeColor}-500/10`
+                        : 'bg-white border-slate-100 hover:border-slate-200'}`}
         >
             <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300
@@ -191,7 +205,7 @@ const ToggleCard: React.FC<{
                 <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300
                     ${checked ? 'right-1' : 'left-1'}`} />
             </div>
-        </div>
+        </button>
     );
 };
 
@@ -261,7 +275,7 @@ const Modal: React.FC<{
                     className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
                     onClick={onClose}
                 />
-                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl 
+                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl
                     transform transition-all animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
                     <div className={`p-6 ${headerColor} text-white flex items-center justify-between`}>
                         <div className="flex items-center gap-3">
@@ -343,19 +357,17 @@ const FormSkeleton: React.FC = () => (
 const ItemRow: React.FC<{
     item: SupplierItemDto;
     currency: string;
-    onUnlink: () => void;
+    onUnlink?: () => void | Promise<void>;
     index: number;
-}> = ({ item, currency, onUnlink, index }) => (
+    disabled?: boolean;
+}> = ({ item, currency, onUnlink, index, disabled }) => (
     <tr
-        className="group hover:bg-brand-primary/5 transition-colors border-b border-slate-100 last:border-0"
-        style={{
-            animationDelay: `${index * 30}ms`,
-            animation: 'fadeInUp 0.3s ease-out forwards'
-        }}
+        className="group border-b border-slate-50 hover:bg-slate-50/50 transition-colors animate-in fade-in slide-in-from-right duration-300"
+        style={{ animationDelay: `${index * 50}ms` }}
     >
         <td className="p-4">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10
                     rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Package className="w-5 h-5 text-brand-primary" />
                 </div>
@@ -385,7 +397,7 @@ const ItemRow: React.FC<{
         </td>
         <td className="p-4">
             {item.isPreferred && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-600 
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-600
                     rounded-lg text-xs font-bold border border-amber-200">
                     <Star className="w-3.5 h-3.5" />
                     مفضل
@@ -393,14 +405,16 @@ const ItemRow: React.FC<{
             )}
         </td>
         <td className="p-4">
-            <button
-                type="button"
-                onClick={onUnlink}
-                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
-                    rounded-lg transition-all opacity-0 group-hover:opacity-100"
-            >
-                <Trash2 className="w-4 h-4" />
-            </button>
+            {!disabled && (
+                <button
+                    type="button"
+                    onClick={onUnlink}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50
+                        rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            )}
         </td>
     </tr>
 );
@@ -408,9 +422,10 @@ const ItemRow: React.FC<{
 // Bank Card Component
 const BankCard: React.FC<{
     bank: SupplierBankDto;
-    onRemove: () => void;
-}> = ({ bank, onRemove }) => (
-    <div className="p-4 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-between 
+    onRemove?: () => void | Promise<void>;
+    disabled?: boolean;
+}> = ({ bank, onRemove, disabled }) => (
+    <div className="p-4 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-between
         hover:border-blue-200 hover:shadow-md transition-all group">
         <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center
@@ -435,7 +450,8 @@ const BankCard: React.FC<{
         <button
             type="button"
             onClick={onRemove}
-            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
+            disabled={disabled}
+            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50
                 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
         >
             <Trash2 className="w-5 h-5" />
@@ -446,7 +462,12 @@ const BankCard: React.FC<{
 const SupplierFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const isEdit = !!id;
+    const queryParams = new URLSearchParams(location.search);
+    const isView = queryParams.get('mode') === 'view';
+
+    const isReadOnly = isView;
 
     const [activeTab, setActiveTab] = useState<Tab>('basic');
     const [loading, setLoading] = useState(false);
@@ -575,17 +596,24 @@ const SupplierFormPage: React.FC = () => {
 
         try {
             setSaving(true);
+            let sId: number;
+
             if (isEdit) {
-                await supplierService.updateSupplier(parseInt(id), formData);
-                toast.success('تمت تحديث بيانات المورد بنجاح', { icon: '🎉' });
+                sId = parseInt(id);
+                await supplierService.updateSupplier(sId, formData);
             } else {
-                await supplierService.createSupplier(formData);
-                toast.success('تمت إضافة المورد بنجاح', { icon: '🎉' });
+                const response = await supplierService.createSupplier(formData);
+                sId = response.data.id!;
             }
+
+            // Automatically submit for approval
+            await supplierService.submitForApproval(sId);
+            toast.success('تم حفظ البيانات وإرسالها للاعتماد بنجاح', { icon: '🚀' });
+
             navigate('/dashboard/procurement/suppliers');
         } catch (error: any) {
-            console.error('Failed to save supplier:', error);
-            toast.error(error.response?.data?.message || 'فشل في حفظ البيانات');
+            console.error('Failed to save and submit supplier:', error);
+            toast.error(error.response?.data?.message || 'فشل في حفظ البيانات أو إرسال طلب الاعتماد');
         } finally {
             setSaving(false);
         }
@@ -669,21 +697,6 @@ const SupplierFormPage: React.FC = () => {
         } catch (error) {
             console.error('Failed to remove bank:', error);
             toast.error('فشل في حذف الحساب البنكي');
-        }
-    };
-
-    const handleSubmitForApproval = async () => {
-        if (!isEdit) return;
-        try {
-            setSaving(true);
-            await supplierService.submitForApproval(parseInt(id!));
-            toast.success('تم إرسال طلب الاعتماد بنجاح', { icon: '📤' });
-            loadSupplier(parseInt(id!));
-        } catch (error) {
-            console.error('Failed to submit for approval:', error);
-            toast.error('فشل في إرسال طلب الاعتماد');
-        } finally {
-            setSaving(false);
         }
     };
 
@@ -776,19 +789,7 @@ const SupplierFormPage: React.FC = () => {
                     </div>
 
                     <div className="flex gap-3">
-                        {isEdit && formData.status === 'DRAFT' && (
-                            <button
-                                type="button"
-                                onClick={handleSubmitForApproval}
-                                disabled={saving}
-                                className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white 
-                                    rounded-xl font-bold hover:bg-amber-600 transition-all
-                                    shadow-lg shadow-amber-500/30 disabled:opacity-50"
-                            >
-                                <Send className="w-5 h-5" />
-                                إرسال للاعتماد
-                            </button>
-                        )}
+                        {/* The Submit for Approval button is now integrated into the main Save action */}
                         <button
                             type="button"
                             onClick={() => navigate('/dashboard/procurement/suppliers')}
@@ -798,20 +799,22 @@ const SupplierFormPage: React.FC = () => {
                             <X className="w-5 h-5 inline-block ml-2" />
                             إلغاء
                         </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={saving}
-                            className="flex items-center gap-2 px-8 py-3 bg-white text-brand-primary 
-                                rounded-xl font-bold hover:bg-white/90 transition-all
-                                shadow-lg shadow-black/10 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
-                        >
-                            {saving ? (
-                                <RefreshCw className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <Save className="w-5 h-5" />
-                            )}
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ البيانات'}</span>
-                        </button>
+                        {!isReadOnly && (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-8 py-3 bg-white text-brand-primary 
+                                    rounded-xl font-bold hover:bg-white/90 transition-all
+                                    shadow-lg shadow-black/10 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
+                            >
+                                {saving ? (
+                                    <RefreshCw className="w-5 h-5 animate-spin" />
+                                ) : (
+                                    <Send className="w-5 h-5" />
+                                )}
+                                <span>{saving ? 'جاري المعالجة...' : 'حفظ وإرسال للاعتماد'}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -860,6 +863,7 @@ const SupplierFormPage: React.FC = () => {
                                 icon={Building2}
                                 placeholder="شركة المثال للصناعة"
                                 required
+                                disabled={isReadOnly}
                             />
                             <FormInput
                                 label="اسم المورد (English)"
@@ -868,6 +872,7 @@ const SupplierFormPage: React.FC = () => {
                                 icon={Globe}
                                 placeholder="Example Industry Co."
                                 dir="ltr"
+                                disabled={isReadOnly}
                             />
                             <FormSelect
                                 label="نوع المورد"
@@ -875,6 +880,7 @@ const SupplierFormPage: React.FC = () => {
                                 onChange={(v) => handleChange('supplierType', v)}
                                 icon={Layers}
                                 options={supplierTypeOptions}
+                                disabled={isReadOnly}
                             />
                             <FormInput
                                 label="السجل التجاري"
@@ -882,6 +888,7 @@ const SupplierFormPage: React.FC = () => {
                                 onChange={(v) => handleChange('commercialRegNo', v)}
                                 icon={FileText}
                                 placeholder="123456"
+                                disabled={isReadOnly}
                             />
                             <FormInput
                                 label="رقم التسجيل الضريبي"
@@ -889,6 +896,7 @@ const SupplierFormPage: React.FC = () => {
                                 onChange={(v) => handleChange('taxRegistrationNo', v)}
                                 icon={ShieldCheck}
                                 placeholder="987-654-321"
+                                disabled={isReadOnly}
                             />
                             <div className="flex items-end">
                                 <ToggleCard
@@ -897,6 +905,7 @@ const SupplierFormPage: React.FC = () => {
                                     onChange={(v) => handleChange('isActive', v)}
                                     icon={CheckCircle2}
                                     activeColor="emerald"
+                                    disabled={isReadOnly}
                                 />
                             </div>
                         </div>
@@ -912,6 +921,7 @@ const SupplierFormPage: React.FC = () => {
                                 onChange={(v) => handleChange('contactPerson', v)}
                                 icon={User}
                                 placeholder="الاسم الكامل"
+                                disabled={isReadOnly}
                             />
                             <FormInput
                                 label="هاتف المسئول"
@@ -919,6 +929,7 @@ const SupplierFormPage: React.FC = () => {
                                 onChange={(v) => handleChange('contactPhone', v)}
                                 icon={Phone}
                                 placeholder="+20 xxx xxx xxxx"
+                                disabled={isReadOnly}
                             />
                             <FormInput
                                 label="البريد الإلكتروني"
@@ -927,12 +938,14 @@ const SupplierFormPage: React.FC = () => {
                                 icon={Mail}
                                 placeholder="info@company.com"
                                 type="email"
+                                disabled={isReadOnly}
                             />
                             <FormInput
                                 label="الهاتف الأرضي / الفاكس"
                                 value={formData.phone || ''}
                                 onChange={(v) => handleChange('phone', v)}
                                 icon={Phone}
+                                disabled={isReadOnly}
                             />
                             <div className="md:col-span-2">
                                 <FormTextarea
@@ -941,6 +954,7 @@ const SupplierFormPage: React.FC = () => {
                                     onChange={(v) => handleChange('address', v)}
                                     icon={MapPin}
                                     rows={3}
+                                    disabled={isReadOnly}
                                 />
                             </div>
                             <FormInput
@@ -948,12 +962,14 @@ const SupplierFormPage: React.FC = () => {
                                 value={formData.city || ''}
                                 onChange={(v) => handleChange('city', v)}
                                 icon={MapPin}
+                                disabled={isReadOnly}
                             />
                             <FormInput
                                 label="الدولة"
                                 value={formData.country || ''}
                                 onChange={(v) => handleChange('country', v)}
                                 icon={Globe}
+                                disabled={isReadOnly}
                             />
                         </div>
                     </SectionCard>
@@ -969,6 +985,7 @@ const SupplierFormPage: React.FC = () => {
                                     onChange={(v) => handleChange('currency', v)}
                                     icon={DollarSign}
                                     options={currencyOptions}
+                                    disabled={isReadOnly}
                                 />
                                 <FormInput
                                     label="شروط الدفع (أيام)"
@@ -977,6 +994,7 @@ const SupplierFormPage: React.FC = () => {
                                     icon={Calendar}
                                     type="number"
                                     hint="عدد أيام السماح للدفع"
+                                    disabled={isReadOnly}
                                 />
                                 <FormSelect
                                     label="تصنيف المورد"
@@ -984,6 +1002,7 @@ const SupplierFormPage: React.FC = () => {
                                     onChange={(v) => handleChange('rating', v)}
                                     icon={Star}
                                     options={ratingOptions}
+                                    disabled={isReadOnly}
                                 />
                             </div>
 
@@ -995,6 +1014,7 @@ const SupplierFormPage: React.FC = () => {
                                     onChange={(v) => handleChange('isApproved', v)}
                                     icon={BadgeCheck}
                                     activeColor="blue"
+                                    disabled={isReadOnly}
                                 />
                             </div>
                         </SectionCard>
@@ -1004,7 +1024,7 @@ const SupplierFormPage: React.FC = () => {
                             <SectionCard
                                 title="الحسابات البنكية"
                                 icon={Landmark}
-                                action={
+                                action={!isReadOnly && (
                                     <button
                                         type="button"
                                         onClick={() => setIsBankModalOpen(true)}
@@ -1015,7 +1035,7 @@ const SupplierFormPage: React.FC = () => {
                                         <Plus className="w-4 h-4" />
                                         إضافة حساب
                                     </button>
-                                }
+                                )}
                             >
                                 {loadingBanks ? (
                                     <div className="text-center py-8 text-slate-400">
@@ -1034,7 +1054,8 @@ const SupplierFormPage: React.FC = () => {
                                             <BankCard
                                                 key={bank.id}
                                                 bank={bank}
-                                                onRemove={() => handleRemoveBank(bank.id!)}
+                                                onRemove={!isReadOnly ? () => handleRemoveBank(bank.id!) : undefined}
+                                                disabled={isReadOnly}
                                             />
                                         ))}
                                     </div>
@@ -1048,7 +1069,7 @@ const SupplierFormPage: React.FC = () => {
                     <SectionCard
                         title="قائمة الأصناف الموردة"
                         icon={Package}
-                        action={
+                        action={!isReadOnly && (
                             <button
                                 type="button"
                                 onClick={() => setIsLinkModalOpen(true)}
@@ -1058,7 +1079,7 @@ const SupplierFormPage: React.FC = () => {
                                 <Plus className="w-4 h-4" />
                                 إضافة صنف
                             </button>
-                        }
+                        )}
                     >
                         {loadingItems ? (
                             <div className="text-center py-8 text-slate-400">
@@ -1072,16 +1093,18 @@ const SupplierFormPage: React.FC = () => {
                                 <p className="text-slate-400 text-sm mt-1 mb-6">
                                     اربط المورد بالأصناف التي يوفرها لتسهيل عمليات الشراء
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsLinkModalOpen(true)}
-                                    className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white 
-                                        rounded-xl font-bold hover:bg-brand-primary/90 transition-all
-                                        shadow-lg shadow-brand-primary/30"
-                                >
-                                    <Plus className="w-5 h-5" />
-                                    ربط صنف الآن
-                                </button>
+                                {!isReadOnly && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLinkModalOpen(true)}
+                                        className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white 
+                                            rounded-xl font-bold hover:bg-brand-primary/90 transition-all
+                                            shadow-lg shadow-brand-primary/30"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        ربط صنف الآن
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div className="overflow-hidden border border-slate-100 rounded-2xl">
@@ -1102,8 +1125,9 @@ const SupplierFormPage: React.FC = () => {
                                                 key={item.id}
                                                 item={item}
                                                 currency={formData.currency || 'EGP'}
-                                                onUnlink={() => handleUnlinkItem(item.id!)}
+                                                onUnlink={!isReadOnly ? () => handleUnlinkItem(item.id!) : undefined}
                                                 index={index}
+                                                disabled={isReadOnly}
                                             />
                                         ))}
                                     </tbody>
@@ -1122,6 +1146,7 @@ const SupplierFormPage: React.FC = () => {
                             onChange={(v) => handleChange('notes', v)}
                             placeholder="أي ملاحظات أو معلومات إضافية عن المورد..."
                             rows={3}
+                            disabled={isReadOnly}
                         />
                     </SectionCard>
                 </div>

@@ -22,6 +22,7 @@ function getRequiredPermissionForPath(path: string): string | null {
   if (PUBLIC_PATHS.some((p) => path === p || (p !== '/dashboard' && path.startsWith(p)))) return null;
   if (path.startsWith('/dashboard/users') || path === '/dashboard/users') return 'SECTION_USERS';
   if (path.startsWith('/dashboard/employees') || path === '/dashboard/employees') return 'SECTION_EMPLOYEES';
+  if (path.startsWith('/dashboard/hr')) return 'SECTION_EMPLOYEES';
   if (path.startsWith('/dashboard/settings')) return 'SECTION_SYSTEM';
   if (path.startsWith('/dashboard/procurement')) return 'SECTION_PROCUREMENT';
   if (path.startsWith('/dashboard/sales')) return 'SECTION_SALES';
@@ -41,6 +42,7 @@ export function getRequiredRolesForPath(path: string): string[] | null {
   if (path.startsWith('/dashboard/settings')) return [...SECTION_ROLES.system];
   if (path.startsWith('/dashboard/users') || path === '/dashboard/users') return [...SECTION_ROLES.users];
   if (path.startsWith('/dashboard/employees') || path === '/dashboard/employees') return [...SECTION_ROLES.employees];
+  if (path.startsWith('/dashboard/hr')) return [...SECTION_ROLES.employees];
   if (path.startsWith('/dashboard/inventory')) {
     if (path.includes('quality-parameters') || path.includes('price-lists') || path.includes('units')) return [...SECTION_ROLES.operations];
     return [...SECTION_ROLES.warehouse];

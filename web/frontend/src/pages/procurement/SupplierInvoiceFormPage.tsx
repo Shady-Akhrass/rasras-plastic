@@ -342,7 +342,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
     const loadPurchaseOrders = async () => {
         try {
-            const pos = await purchaseOrderService.getAllPOs();
+            const pos = await purchaseOrderService.getUninvoicedPOs();
             setPurchaseOrders(Array.isArray(pos) ? pos : []);
         } catch (error) {
             console.error('Failed to load purchase orders:', error);

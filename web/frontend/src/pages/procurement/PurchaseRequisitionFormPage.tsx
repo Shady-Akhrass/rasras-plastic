@@ -389,7 +389,6 @@ const PurchaseRequisitionFormPage = () => {
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-slate-400" />
                                     تاريخ الطلب
                                 </label>
                                 <input
@@ -404,13 +403,13 @@ const PurchaseRequisitionFormPage = () => {
 
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-brand-primary" />
                                     تاريخ الاحتياج <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                     type="date"
                                     name="requiredDate"
                                     required
+                                    min={new Date().toISOString().split('T')[0]}
                                     disabled={isViewMode}
                                     value={formData.requiredDate ? new Date(formData.requiredDate).toISOString().split('T')[0] : ''}
                                     onChange={handleInputChange}

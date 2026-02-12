@@ -74,6 +74,15 @@ public class GoodsReceiptNote {
     @Column(name = "TotalRejectedQty", precision = 18, scale = 3)
     private BigDecimal totalRejectedQty;
 
+    @Column(name = "ShippingCost", precision = 18, scale = 2)
+    private BigDecimal shippingCost;
+
+    @Column(name = "OtherCosts", precision = 18, scale = 2)
+    private BigDecimal otherCosts;
+
+    @Column(name = "TotalAmount", precision = 18, scale = 2)
+    private BigDecimal totalAmount;
+
     @Column(name = "Notes", length = 1000)
     private String notes;
 
