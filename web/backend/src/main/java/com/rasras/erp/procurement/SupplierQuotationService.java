@@ -124,6 +124,13 @@ public class SupplierQuotationService {
                 return mapToDto(savedQuotation);
         }
 
+        @Transactional
+        public void deleteQuotation(Integer id) {
+                SupplierQuotation quotation = quotationRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Quotation not found"));
+                quotationRepository.delete(quotation);
+        }
+
         private SupplierQuotationDto mapToDto(SupplierQuotation quotation) {
                 return SupplierQuotationDto.builder()
                                 .id(quotation.getId())

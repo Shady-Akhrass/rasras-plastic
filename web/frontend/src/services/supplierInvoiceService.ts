@@ -75,5 +75,9 @@ export const supplierInvoiceService = {
             responseType: 'blob'
         });
         return response.data;
+    },
+
+    deleteInvoice: async (id: number) => {
+        await apiClient.post(`/suppliers/invoices/${id}/delete`);
     }
 };

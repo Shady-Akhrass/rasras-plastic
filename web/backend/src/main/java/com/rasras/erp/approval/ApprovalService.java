@@ -1,5 +1,6 @@
 package com.rasras.erp.approval;
 
+import com.rasras.erp.approval.ApprovalLimitRepository;
 import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
 import com.rasras.erp.inventory.GRNItem;
 import com.rasras.erp.inventory.InventoryService;
@@ -37,6 +38,7 @@ public class ApprovalService {
     private final ApprovalRequestRepository requestRepo;
     private final ApprovalActionRepository actionRepo;
     private final UserRepository userRepo;
+    private final ApprovalLimitRepository limitRepo;
 
     private final PurchaseOrderRepository poRepo;
     private final SupplierRepository supplierRepo;
@@ -81,10 +83,50 @@ public class ApprovalService {
                 .requestedByUser(requester)
                 .totalAmount(amount)
                 .status("Pending")
-                .currentStep(steps.get(0)) // Start at first step
+                .currentStep(resolveInitialStep(workflowCode, steps, amount)) // الخطوة الأولى وفق حدود الاعتماد
                 .build();
 
         return requestRepo.save(request);
+    }
+
+    /**
+     * يحدد أول خطوة اعتماد بناءً على حدود الموافقة (ApprovalLimit) والمبلغ الكلي.
+     * إذا لم توجد حدود أو لم تنطبق أي منها، يتم استخدام أول خطوة في سير العمل كافتراض.
+     */
+    private ApprovalWorkflowStep resolveInitialStep(String workflowCode, List<ApprovalWorkflowStep> steps,
+            BigDecimal amount) {
+        if (amount == null) {
+            return steps.get(0);
+        }
+
+        // نستخدم workflowCode كنشاط (ActivityType) في حدود الموافقة (مثل PO_APPROVAL)
+        List<ApprovalLimit> limits = limitRepo.findByActivityTypeAndIsActiveTrue(workflowCode);
+        if (limits == null || limits.isEmpty()) {
+            return steps.get(0);
+        }
+
+        for (ApprovalWorkflowStep step : steps) {
+            if (step.getApproverRole() == null) {
+                continue;
+            }
+            Integer roleId = step.getApproverRole().getRoleId();
+            boolean matches = limits.stream().anyMatch(limit -> {
+                if (limit.getRole() == null || !roleId.equals(limit.getRole().getRoleId())) {
+                    return false;
+                }
+                BigDecimal min = limit.getMinAmount() != null ? limit.getMinAmount() : BigDecimal.ZERO;
+                BigDecimal max = limit.getMaxAmount();
+                boolean gteMin = amount.compareTo(min) >= 0;
+                boolean lteMax = (max == null) || amount.compareTo(max) <= 0;
+                return gteMin && lteMax;
+            });
+            if (matches) {
+                return step;
+            }
+        }
+
+        // إذا لم تنطبق أي حدود على أي خطوة، نعود لأول خطوة كافتراض
+        return steps.get(0);
     }
 
     @Transactional(readOnly = true)
@@ -186,16 +228,45 @@ public class ApprovalService {
             }
         }
 
-        if (currentIdx != -1 && currentIdx < steps.size() - 1) {
-            // Move to next step
-            request.setCurrentStep(steps.get(currentIdx + 1));
-            request.setStatus("InProgress");
-        } else {
-            // No more steps, fully approved
-            request.setStatus("Approved");
-            request.setCompletedDate(LocalDateTime.now());
-            updateLinkedDocumentStatus(request, "Approved", userId);
+        BigDecimal amount = request.getTotalAmount();
+        List<ApprovalLimit> limits = null;
+        if (amount != null) {
+            limits = limitRepo.findByActivityTypeAndIsActiveTrue(request.getWorkflow().getWorkflowCode());
         }
+
+        // ابحث عن أول خطوة تالية تنطبق عليها حدود الموافقة للمبلغ الحالي
+        if (currentIdx != -1) {
+            for (int i = currentIdx + 1; i < steps.size(); i++) {
+                ApprovalWorkflowStep candidate = steps.get(i);
+                if (amount != null && limits != null && !limits.isEmpty() && candidate.getApproverRole() != null) {
+                    Integer roleId = candidate.getApproverRole().getRoleId();
+                    boolean matches = limits.stream().anyMatch(limit -> {
+                        if (limit.getRole() == null || !roleId.equals(limit.getRole().getRoleId())) {
+                            return false;
+                        }
+                        BigDecimal min = limit.getMinAmount() != null ? limit.getMinAmount() : BigDecimal.ZERO;
+                        BigDecimal max = limit.getMaxAmount();
+                        boolean gteMin = amount.compareTo(min) >= 0;
+                        boolean lteMax = (max == null) || amount.compareTo(max) <= 0;
+                        return gteMin && lteMax;
+                    });
+                    if (!matches) {
+                        // هذه الخطوة ليست ضمن حدود المبلغ — يتم تجاوزها
+                        continue;
+                    }
+                }
+
+                // وجدنا خطوة مناسبة تالية
+                request.setCurrentStep(candidate);
+                request.setStatus("InProgress");
+                return;
+            }
+        }
+
+        // لا مزيد من الخطوات المطلوبة، الطلب معتمد بالكامل
+        request.setStatus("Approved");
+        request.setCompletedDate(LocalDateTime.now());
+        updateLinkedDocumentStatus(request, "Approved", userId);
     }
 
     private void updateLinkedDocumentStatus(ApprovalRequest request, String status, Integer userId) {

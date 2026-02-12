@@ -4,6 +4,8 @@ import LoginPage from './pages/auth/LoginPage';
 import DashboardLayout from './components/layouts/DashboardLayout';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import EmployeeList from './pages/employees/EmployeeList';
+import EmployeeDetailPage from './pages/employees/EmployeeDetailPage';
+import ProfilePage from './pages/employees/ProfilePage';
 import UserList from './pages/users/UserList';
 import SettingsPage from './pages/settings/SettingsPage';
 import CompanyInfoPage from './pages/settings/CompanyInfoPage';
@@ -103,7 +105,11 @@ function App() {
         }>
           <Route index element={<DashboardHome />} />
           <Route path="approvals" element={<ApprovalsInbox />} />
-          <Route path="employees" element={<EmployeeList />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="employees">
+            <Route index element={<EmployeeList />} />
+            <Route path=":id" element={<EmployeeDetailPage />} />
+          </Route>
           <Route path="users" element={<UserList />} />
           <Route path="settings">
             <Route index element={<SettingsPage />} />

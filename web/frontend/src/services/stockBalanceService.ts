@@ -59,8 +59,28 @@ export const stockBalanceService = {
         if (warehouseId) params.append('warehouseId', String(warehouseId));
         const response = await apiClient.get<ApiResponse<PeriodicReportRow[]>>(`/inventory/stocks/reports/periodic?${params}`);
         return (response.data as any)?.data ?? [];
+    },
+
+    getItemsBelowMin: async (warehouseId?: number): Promise<ItemBelowMinDto[]> => {
+        const params = warehouseId ? `?warehouseId=${warehouseId}` : '';
+        const response = await apiClient.get<ApiResponse<ItemBelowMinDto[]>>(`/inventory/stocks/reports/below-min${params}`);
+        return (response.data as any)?.data ?? [];
     }
 };
+
+export interface ItemBelowMinDto {
+    itemId: number;
+    itemCode?: string;
+    itemNameAr?: string;
+    grade?: string;
+    unitId?: number;
+    unitName?: string;
+    totalQuantityOnHand: number;
+    minStockLevel: number;
+    reorderLevel?: number;
+    maxStockLevel?: number;
+    diff: number;
+}
 
 export interface PeriodicReportRow {
     itemId: number;

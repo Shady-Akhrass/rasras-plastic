@@ -34,4 +34,16 @@ public class PurchaseReturnController {
     public ResponseEntity<ApiResponse<PurchaseReturnDto>> approveReturn(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(returnService.approveReturn(id, 1))); // Placeholder user ID
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteReturn(@PathVariable Integer id) {
+        returnService.deleteReturn(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<ApiResponse<Void>> deleteReturnPost(@PathVariable Integer id) {
+        returnService.deleteReturn(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }

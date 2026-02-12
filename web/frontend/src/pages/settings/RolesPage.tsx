@@ -2,9 +2,10 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
     Shield, Search, Plus, Edit2, Trash2, X, Save, RefreshCw,
     CheckCircle2, XCircle, LayoutGrid,
-    Tag, Type, FileText, Users, Key, Lock
+    Tag, Type, FileText, Users, Key, Lock, DollarSign
 } from 'lucide-react';
 import { roleService, type RoleDto, type PermissionDto } from '../../services/roleService';
+import { approvalLimitService, type ApprovalLimitDto } from '../../services/approvalLimitService';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/common/ConfirmModal';
 
@@ -19,6 +20,13 @@ function getApiErrorMessage(error: any, fallback: string): string {
 
 /** Use when deleting a role: if API returns the generic "related data" message, show the role-specific one */
 const ROLE_DELETE_FALLBACK = 'لا يمكن حذف الدور لأنه مرتبط بمستخدمين. قم بتغيير دور المستخدمين أولاً.';
+
+/** تسميات أنشطة حدود الموافقة */
+const ACTIVITY_LABELS: Record<string, string> = {
+    PO_APPROVAL: 'موافقة على المشتريات',
+    PAYMENT_APPROVAL: 'اعتماد صرف فواتير الموردين',
+    SALES_DISCOUNT: 'خصم المبيعات',
+};
 function getRoleDeleteErrorMessage(error: any): string {
     const msg = getApiErrorMessage(error, ROLE_DELETE_FALLBACK);
     if (msg.includes('التصنيف') || msg.includes('وحدة القياس') || msg.includes('البيانات المرتبطة غير صحيحة')) {
@@ -535,6 +543,14 @@ const RolesPage: React.FC = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
+    // Approval Limits
+    const [approvalLimits, setApprovalLimits] = useState<ApprovalLimitDto[]>([]);
+    const [limitsLoading, setLimitsLoading] = useState(false);
+    const [showLimitModal, setShowLimitModal] = useState(false);
+    const [editingLimit, setEditingLimit] = useState<ApprovalLimitDto | null>(null);
+    const [limitForm, setLimitForm] = useState<{ minAmount?: number; maxAmount?: number | null; minPercentage?: number; maxPercentage?: number | null; isActive: boolean }>({ isActive: true });
+    const [isSavingLimit, setIsSavingLimit] = useState(false);
+
     const [formData, setFormData] = useState<RoleDto>({
         roleCode: '',
         roleNameAr: '',
@@ -562,6 +578,58 @@ const RolesPage: React.FC = () => {
             toast.error('فشل في تحميل البيانات');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchApprovalLimits = async () => {
+        try {
+            setLimitsLoading(true);
+            const res = await approvalLimitService.getAll();
+            setApprovalLimits(res.data || []);
+        } catch (error) {
+            console.error('Error fetching approval limits:', error);
+            toast.error('فشل في تحميل حدود الموافقة');
+        } finally {
+            setLimitsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchApprovalLimits();
+    }, []);
+
+    const handleOpenLimitEdit = (limit: ApprovalLimitDto) => {
+        setEditingLimit(limit);
+        setLimitForm({
+            minAmount: limit.minAmount ?? undefined,
+            maxAmount: limit.maxAmount ?? undefined,
+            minPercentage: limit.minPercentage ?? undefined,
+            maxPercentage: limit.maxPercentage ?? undefined,
+            isActive: limit.isActive ?? true,
+        });
+        setShowLimitModal(true);
+    };
+
+    const handleSaveLimit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingLimit?.id) return;
+        try {
+            setIsSavingLimit(true);
+            await approvalLimitService.update(editingLimit.id, {
+                minAmount: limitForm.minAmount,
+                maxAmount: limitForm.maxAmount ?? undefined,
+                minPercentage: limitForm.minPercentage,
+                maxPercentage: limitForm.maxPercentage ?? undefined,
+                isActive: limitForm.isActive,
+            });
+            toast.success('تم تحديث حد الموافقة بنجاح');
+            setShowLimitModal(false);
+            setEditingLimit(null);
+            fetchApprovalLimits();
+        } catch (error: any) {
+            toast.error(getApiErrorMessage(error, 'فشل تحديث حد الموافقة'));
+        } finally {
+            setIsSavingLimit(false);
         }
     };
 
@@ -659,7 +727,7 @@ const RolesPage: React.FC = () => {
             (role.roleNameEn && role.roleNameEn.toLowerCase().includes(searchTerm.toLowerCase()))
         );
         // الأحدث في الأعلى
-        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+        return [...filtered].sort((a, b) => (b.roleId ?? 0) - (a.roleId ?? 0));
     }, [roles, searchTerm]);
 
     const stats = useMemo(() => ({
@@ -718,23 +786,93 @@ const RolesPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* توزيع الأقسام على الأدوار - للمرجع */}
+            {/* توزيع الأقسام وحدود الاعتماد - للمرجع */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                 <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                     <LayoutGrid className="w-4 h-4 text-brand-primary" />
-                    ربط الأقسام بالأدوار (ظهور القوائم في الشريط الجانبي)
+                    الأدوار: وصول الأقسام وحدود الاعتماد المالية
                 </h3>
                 <p className="text-xs text-slate-600 mb-3">
-                    المستخدم يرى في القائمة الجانبية فقط الأقسام المرتبطة بدوره. رمز الدور (Role Code) هو المعتمد.
+                    الأدوار تحكم وصول الأقسام (ظهور القوائم في الشريط الجانبي) وحدود الاعتماد المالية (مصفوفة الصلاحيات). انظر الدورة المستندية الشاملة للمزيد.
                 </p>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-slate-600">
-                    <li><strong className="text-slate-800">دورة المشتريات:</strong> PM, BUYER, ADMIN, GM, SYS_ADMIN</li>
-                    <li><strong className="text-slate-800">دورة المبيعات:</strong> SM, ADMIN, GM, SYS_ADMIN</li>
-                    <li><strong className="text-slate-800">المخازن والأصناف:</strong> ADMIN, GM, SYS_ADMIN</li>
-                    <li><strong className="text-slate-800">العمليات (جودة، وحدات، أسعار):</strong> ADMIN, GM, SM, SYS_ADMIN</li>
-                    <li><strong className="text-slate-800">العملاء (CRM):</strong> SM, ADMIN, GM, SYS_ADMIN</li>
-                    <li><strong className="text-slate-800">الإعدادات:</strong> ADMIN, SYS_ADMIN</li>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-slate-600 mb-2">
+                    <li><strong className="text-slate-800">دورة المشتريات:</strong> PM, BUYER, ADMIN, GM</li>
+                    <li><strong className="text-slate-800">دورة المبيعات:</strong> SM, ADMIN, GM</li>
+                    <li><strong className="text-slate-800">المخازن والأصناف:</strong> ADMIN, GM</li>
+                    <li><strong className="text-slate-800">العمليات (جودة، وحدات، أسعار):</strong> ADMIN, GM, SM</li>
+                    <li><strong className="text-slate-800">العملاء (CRM):</strong> SM, ADMIN, GM</li>
+                    <li><strong className="text-slate-800">الإعدادات:</strong> ADMIN</li>
                 </ul>
+                <p className="text-xs text-slate-500">مصفوفة حدود الموافقة: المشتريات (PM/FM/GM)، الشيكات/الدفع (ACC/FM/GM)، الخصم (SM/FM/GM)</p>
+            </div>
+
+            {/* مصفوفة حدود الموافقة */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-gradient-to-l from-slate-50 to-white">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                <DollarSign className="w-6 h-6 text-brand-primary" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">مصفوفة حدود الموافقة</h3>
+                                <p className="text-sm text-slate-500">حدود الاعتماد المالية لكل دور (أوامر الشراء، اعتماد الدفع، خصم المبيعات)</p>
+                            </div>
+                        </div>
+                        <button onClick={fetchApprovalLimits} disabled={limitsLoading} className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                            <RefreshCw className={`w-5 h-5 ${limitsLoading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                <th className="px-6 py-3 text-right font-semibold">النشاط</th>
+                                <th className="px-6 py-3 text-right font-semibold">الدور</th>
+                                <th className="px-6 py-3 text-center font-semibold">الحد الأدنى</th>
+                                <th className="px-6 py-3 text-center font-semibold">الحد الأقصى</th>
+                                <th className="px-6 py-3 text-center font-semibold">نشط</th>
+                                <th className="px-6 py-3 text-center font-semibold">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {limitsLoading ? (
+                                <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400">جاري التحميل...</td></tr>
+                            ) : approvalLimits.length === 0 ? (
+                                <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400">لا توجد حدود موافقة معرّفة</td></tr>
+                            ) : (
+                                approvalLimits.map((limit) => {
+                                    const isPercent = limit.activityType === 'SALES_DISCOUNT';
+                                    const minVal = isPercent ? (limit.minPercentage ?? 0) : (limit.minAmount ?? 0);
+                                    const maxVal = isPercent ? (limit.maxPercentage ?? null) : (limit.maxAmount ?? null);
+                                    const suffix = isPercent ? '%' : '';
+                                    return (
+                                        <tr key={limit.id} className="hover:bg-slate-50/50">
+                                            <td className="px-6 py-4 font-medium text-slate-700">{ACTIVITY_LABELS[limit.activityType] || limit.activityType}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="font-mono text-brand-primary font-semibold">{limit.roleCode}</span>
+                                                <span className="text-slate-500 mr-1"> — {limit.roleNameAr}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-bold text-slate-700">{minVal}{suffix}</td>
+                                            <td className="px-6 py-4 text-center font-bold text-slate-700">{maxVal != null ? `${maxVal}${suffix}` : 'بلا حد'}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${limit.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {limit.isActive ? 'نشط' : 'معطل'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <button onClick={() => handleOpenLimitEdit(limit)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all" title="تعديل">
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Stats Grid */}
@@ -1007,11 +1145,55 @@ const RolesPage: React.FC = () => {
                 </div>
             </Modal>
 
+            {/* Edit Approval Limit Modal */}
+            <Modal isOpen={showLimitModal} onClose={() => { setShowLimitModal(false); setEditingLimit(null); }} title="تعديل حد الموافقة" subtitle={editingLimit ? `${ACTIVITY_LABELS[editingLimit.activityType] || editingLimit.activityType} — ${editingLimit.roleNameAr}` : undefined}>
+                {editingLimit && (
+                    <form onSubmit={handleSaveLimit} className="p-6 space-y-6">
+                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <p className="text-sm text-slate-600">النشاط: <strong>{ACTIVITY_LABELS[editingLimit.activityType] || editingLimit.activityType}</strong></p>
+                            <p className="text-sm text-slate-600">الدور: <strong>{editingLimit.roleNameAr} ({editingLimit.roleCode})</strong></p>
+                        </div>
+                        {editingLimit.activityType === 'SALES_DISCOUNT' ? (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-semibold text-slate-700">الحد الأدنى (%)</label>
+                                    <input type="number" step="0.01" value={limitForm.minPercentage ?? ''} onChange={(e) => setLimitForm({ ...limitForm, minPercentage: e.target.value ? Number(e.target.value) : undefined })} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-semibold text-slate-700">الحد الأقصى (%) — اترك فارغاً لـ «بلا حد»</label>
+                                    <input type="number" step="0.01" value={limitForm.maxPercentage ?? ''} onChange={(e) => setLimitForm({ ...limitForm, maxPercentage: e.target.value ? Number(e.target.value) : null })} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" placeholder="بلا حد" />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-semibold text-slate-700">الحد الأدنى</label>
+                                    <input type="number" step="0.01" value={limitForm.minAmount ?? ''} onChange={(e) => setLimitForm({ ...limitForm, minAmount: e.target.value ? Number(e.target.value) : undefined })} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-semibold text-slate-700">الحد الأقصى — اترك فارغاً لـ «بلا حد»</label>
+                                    <input type="number" step="0.01" value={limitForm.maxAmount ?? ''} onChange={(e) => setLimitForm({ ...limitForm, maxAmount: e.target.value ? Number(e.target.value) : null })} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" placeholder="بلا حد" />
+                                </div>
+                            </div>
+                        )}
+                        <ToggleSwitch label="نشط" checked={limitForm.isActive} onChange={(v) => setLimitForm({ ...limitForm, isActive: v })} />
+                        <div className="flex gap-3 pt-4 border-t border-slate-100">
+                            <button type="button" onClick={() => { setShowLimitModal(false); setEditingLimit(null); }} className="flex-1 px-4 py-3 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium flex items-center justify-center gap-2">
+                                <X className="w-5 h-5" /> إلغاء
+                            </button>
+                            <button type="submit" disabled={isSavingLimit} className="flex-1 px-4 py-3 bg-brand-primary text-white hover:bg-brand-primary/90 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+                                {isSavingLimit ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} حفظ التعديلات
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+
             {/* Delete Confirmation */}
             <ConfirmModal
                 isOpen={isDeleteModalOpen}
                 title="حذف دور"
-                message="هل أنت متأكد من حذف هذا الدور؟ سيتم إزالة جميع الصلاحيات المرتبطة به."
+                message="هل أنت متأكد من حذف هذا الدور؟ سيتم إزالة جميع الصلاحيات المرتبطة به. إذا كان الدور مستخدماً في حدود الموافقة أو سير العمل، سيتم رفض الحذف."
                 confirmText="حذف"
                 cancelText="إلغاء"
                 onConfirm={handleDeleteConfirm}

@@ -78,6 +78,9 @@ public class ItemService {
                         throw new org.springframework.web.server.ResponseStatusException(
                                         org.springframework.http.HttpStatus.BAD_REQUEST, "الاسم العربي مطلوب");
                 }
+
+                validateStockLevels(dto);
+                validatePriceFields(dto);
                 Item item = Item.builder()
                                 .itemCode(generateItemCode())
                                 .itemNameAr(dto.getItemNameAr())
@@ -107,13 +110,21 @@ public class ItemService {
                                 .isPurchasable(dto.getIsPurchasable() != null ? dto.getIsPurchasable() : true)
                                 .createdAt(java.time.LocalDateTime.now())
                                 .build();
-                return mapToDto(itemRepository.save(item));
+                try {
+                        return mapToDto(itemRepository.save(item));
+                } catch (DataIntegrityViolationException e) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "البيانات المرتبطة غير صحيحة - تحقق من الحقول المرتبطة (مندوب المبيعات، قائمة الأسعار، التصنيف، أو وحدة القياس)");
+                }
         }
 
         @Transactional
         public ItemDto updateItem(Integer id, ItemDto dto) {
                 Item item = itemRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
+
+                validateStockLevels(dto);
+                validatePriceFields(dto);
 
                 item.setItemNameAr(dto.getItemNameAr());
                 item.setItemNameEn(dto.getItemNameEn());
@@ -141,7 +152,56 @@ public class ItemService {
                 item.setIsSellable(dto.getIsSellable());
                 item.setIsPurchasable(dto.getIsPurchasable());
 
-                return mapToDto(itemRepository.save(item));
+                try {
+                        return mapToDto(itemRepository.save(item));
+                } catch (DataIntegrityViolationException e) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "البيانات المرتبطة غير صحيحة - تحقق من الحقول المرتبطة (مندوب المبيعات، قائمة الأسعار، التصنيف، أو وحدة القياس)");
+                }
+        }
+
+        private void validateStockLevels(ItemDto dto) {
+                BigDecimal min = dto.getMinStockLevel();
+                BigDecimal reorder = dto.getReorderLevel();
+                BigDecimal max = dto.getMaxStockLevel();
+
+                if (min == null || reorder == null || max == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "مستويات المخزون (الحد الأدنى، حد إعادة الطلب، الحد الأقصى) مطلوبة");
+                }
+
+                if (min.compareTo(BigDecimal.ZERO) <= 0
+                                || reorder.compareTo(BigDecimal.ZERO) <= 0
+                                || max.compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "مستويات المخزون يجب أن تكون أكبر من صفر");
+                }
+
+                if (min.compareTo(reorder) > 0 || reorder.compareTo(max) > 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الحد الأدنى يجب أن يكون ≤ حد إعادة الطلب ≤ الحد الأقصى");
+                }
+        }
+
+        private void validatePriceFields(ItemDto dto) {
+                BigDecimal standardCost = dto.getStandardCost();
+                BigDecimal lastPurchasePrice = dto.getLastPurchasePrice();
+                BigDecimal lastSalePrice = dto.getLastSalePrice();
+                BigDecimal replacementPrice = dto.getReplacementPrice();
+
+                if (standardCost == null || lastPurchasePrice == null
+                                || lastSalePrice == null || replacementPrice == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الأسعار والتكاليف (التكلفة المعيارية، آخر سعر شراء، آخر سعر بيع، السعر الاستبدالي) مطلوبة");
+                }
+
+                if (standardCost.compareTo(BigDecimal.ZERO) <= 0
+                                || lastPurchasePrice.compareTo(BigDecimal.ZERO) <= 0
+                                || lastSalePrice.compareTo(BigDecimal.ZERO) <= 0
+                                || replacementPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الأسعار والتكاليف يجب أن تكون أكبر من صفر");
+                }
         }
 
         @Transactional
@@ -163,7 +223,8 @@ public class ItemService {
                         List<GRNItem> grnItems = grnItemRepository.findByItemId(id);
                         List<Integer> grnItemIds = grnItems.stream().map(GRNItem::getId).toList();
                         if (!grnItemIds.isEmpty()) {
-                                List<PurchaseReturnItem> returnItems = purchaseReturnItemRepository.findByGrnItemIdIn(grnItemIds);
+                                List<PurchaseReturnItem> returnItems = purchaseReturnItemRepository
+                                                .findByGrnItemIdIn(grnItemIds);
                                 purchaseReturnItemRepository.deleteAll(returnItems);
                         }
                         grnItemRepository.deleteAll(grnItems);
@@ -173,7 +234,7 @@ public class ItemService {
                         itemRepository.delete(item);
                 } catch (DataIntegrityViolationException e) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                        "لا يمكن حذف الصنف لوجود استخدامات له في مستندات (إذن استلام، تحويل، قوائم أسعار، إلخ).");
+                                        "لا يمكن حذف الصنف لوجود استخدامات له في مستندات أخرى (مثل عروض الأسعار، أوامر الشراء/البيع، قوائم الأسعار، ...). يرجى مراجعة المستندات المرتبطة أولاً.");
                 }
         }
 

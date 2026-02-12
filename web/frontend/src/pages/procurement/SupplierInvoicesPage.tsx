@@ -4,23 +4,16 @@ import {
     Search, Plus, FileText, Truck, Calendar, ArrowLeft, RefreshCw,
     Eye, CheckCircle2, Clock, DollarSign, XCircle,
     Receipt, Package, Hash, Layers,
-    ExternalLink, Ban, Wallet
+    ExternalLink, Ban, Wallet, Trash2
 } from 'lucide-react';
-import { supplierInvoiceService, type SupplierInvoiceDto, type SupplierInvoiceItemDto } from '../../services/supplierInvoiceService';
+import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 import { grnService } from '../../services/grnService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 // --- Calculation Helpers ---
-
-// Calculates the total for a single item line (Gross - Discount + Tax)
-const calculateInvoiceItemTotal = (item: SupplierInvoiceItemDto): number => {
-    const gross = item.quantity * item.unitPrice;
-    const discountAmount = (gross * (item.discountPercentage || 0)) / 100;
-    const taxAmount = ((gross - discountAmount) * (item.taxPercentage || 0)) / 100;
-    return gross - discountAmount + taxAmount;
-};
 
 // Calculates the full invoice breakdown
 // Matching PurchaseOrderFormPage and SupplierOutstandingPage logic
@@ -175,7 +168,10 @@ const InvoiceRow: React.FC<{
     onToggle: () => void;
     onView: () => void;
     onApprove: () => void;
-}> = ({ invoice, index, isExpanded, onToggle, onView, onApprove }) => {
+    onDelete: (invoice: SupplierInvoiceDto) => void;
+    isSelected: boolean;
+    onToggleSelect: (id: number) => void;
+}> = ({ invoice, index, isExpanded, onToggle, onView, onApprove, onDelete, isSelected, onToggleSelect }) => {
     const handleDownloadPdf = async (invoice: SupplierInvoiceDto) => {
         try {
             const toastId = toast.loading('جاري تحميل الفاتورة...');
@@ -201,6 +197,14 @@ const InvoiceRow: React.FC<{
                 onClick={onToggle}
                 style={{ animationDelay: `${index * 30}ms`, animation: 'fadeInUp 0.3s ease-out forwards' }}
             >
+                <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                        checked={isSelected}
+                        onChange={() => invoice.id != null && onToggleSelect(invoice.id)}
+                    />
+                </td>
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -250,13 +254,14 @@ const InvoiceRow: React.FC<{
                         {invoice.status === 'Unpaid' && invoice.approvalStatus === 'Pending' && (
                             <button onClick={(e) => { e.stopPropagation(); onApprove(); }} className="p-2.5 text-emerald-500 hover:text-white hover:bg-emerald-500 rounded-xl transition-all duration-200" title="اعتماد الصرف"><CheckCircle2 className="w-4 h-4" /></button>
                         )}
+                        <button onClick={(e) => { e.stopPropagation(); onDelete(invoice); }} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all duration-200" title="حذف"><Trash2 className="w-4 h-4" /></button>
                         <button className={`p-2.5 rounded-xl transition-all duration-200 ${isExpanded ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-300'}`}><Plus className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-45' : ''}`} /></button>
                     </div>
                 </td>
             </tr>
             {isExpanded && invoice.items && invoice.items.length > 0 && (
                 <tr>
-                    <td colSpan={8} className="px-6 py-4 bg-slate-50/50">
+                    <td colSpan={9} className="px-6 py-4 bg-slate-50/50">
                         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-fadeInUp">
                             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -382,17 +387,22 @@ const GRNRow: React.FC<{ grn: any; index: number; onCreateInvoice: () => void; o
 );
 
 // Skeleton
-const TableSkeleton: React.FC<{ columns: number }> = ({ columns }) => (
+const TableSkeleton: React.FC<{ columns: number; withCheckbox?: boolean }> = ({ columns, withCheckbox }) => (
     <>
         {[1, 2, 3, 4, 5].map(i => (
             <tr key={i} className="animate-pulse border-b border-slate-100">
+                {withCheckbox && (
+                    <td className="px-4 py-4 text-center">
+                        <div className="w-4 h-4 bg-slate-100 rounded mx-auto" />
+                    </td>
+                )}
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-xl" />
                         <div className="space-y-2"><div className="h-4 w-28 bg-slate-200 rounded" /><div className="h-3 w-20 bg-slate-100 rounded" /></div>
                     </div>
                 </td>
-                {Array.from({ length: columns - 2 }).map((_, j) => (<td key={j} className="px-6 py-4"><div className="h-6 bg-slate-100 rounded-lg" /></td>))}
+                {Array.from({ length: columns - (withCheckbox ? 3 : 2) }).map((_, j) => (<td key={j} className="px-6 py-4"><div className="h-6 bg-slate-100 rounded-lg" /></td>))}
                 <td className="px-6 py-4"><div className="flex gap-2 justify-center"><div className="h-9 w-9 bg-slate-100 rounded-xl" /><div className="h-9 w-9 bg-slate-100 rounded-xl" /></div></td>
             </tr>
         ))}
@@ -425,6 +435,10 @@ const SupplierInvoicesPage: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
     const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [invoiceToDelete, setInvoiceToDelete] = useState<SupplierInvoiceDto | null>(null);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (activeTab === 'invoices') fetchInvoices(); else fetchPendingGRNs();
@@ -455,6 +469,57 @@ const SupplierInvoicesPage: React.FC = () => {
                 fetchInvoices();
                 toast.success('تم اعتماد الصرف بنجاح', { icon: '✅' });
             } catch (e) { toast.error('فشل الاعتماد'); }
+        }
+    };
+
+    const handleDeleteClick = (invoice: SupplierInvoiceDto) => {
+        setInvoiceToDelete(invoice);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleToggleSelect = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAllPage = () => {
+        const pageIds = paginatedInvoices.map(inv => inv.id!).filter(Boolean);
+        const allSelected = pageIds.every(id => selectedIds.includes(id));
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+        }
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (selectedIds.length === 0) {
+            toast.error('يرجى اختيار فواتير أولاً');
+            return;
+        }
+        setInvoiceToDelete(null);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        const idsToDelete = invoiceToDelete?.id != null ? [invoiceToDelete.id] : selectedIds;
+        if (!idsToDelete.length) return;
+        setIsDeleting(true);
+        try {
+            for (const id of idsToDelete) {
+                await supplierInvoiceService.deleteInvoice(id);
+            }
+            toast.success(idsToDelete.length === 1 ? 'تم حذف الفاتورة بنجاح' : 'تم حذف الفواتير بنجاح');
+            fetchInvoices();
+            setIsDeleteModalOpen(false);
+            setInvoiceToDelete(null);
+            setSelectedIds([]);
+        } catch (error: any) {
+            const apiMessage = error?.response?.data?.message as string | undefined;
+            toast.error(apiMessage || 'فشل حذف الفاتورة');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -578,6 +643,14 @@ const SupplierInvoicesPage: React.FC = () => {
                             <tr className="bg-slate-50 border-b border-slate-100">
                                 {activeTab === 'invoices' ? (
                                     <>
+                                        <th className="px-4 py-4 text-center text-sm font-semibold text-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                                                checked={paginatedInvoices.length > 0 && paginatedInvoices.every(inv => inv.id != null && selectedIds.includes(inv.id))}
+                                                onChange={handleToggleSelectAllPage}
+                                            />
+                                        </th>
                                         <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">رقم الفاتورة</th>
                                         <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">المورد</th>
                                         <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">التاريخ</th>
@@ -601,13 +674,24 @@ const SupplierInvoicesPage: React.FC = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <TableSkeleton columns={activeTab === 'invoices' ? 8 : 6} />
+                                <TableSkeleton columns={activeTab === 'invoices' ? 9 : 6} withCheckbox={activeTab === 'invoices'} />
                             ) : activeTab === 'invoices' ? (
                                 filteredInvoices.length === 0 ? (
-                                    <EmptyState colSpan={8} icon={Receipt} title="لا توجد فواتير" description="ابدأ بتسجيل أول فاتورة توريد بالنظام" action={<button onClick={() => navigate('/dashboard/procurement/invoices/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/30"><Plus className="w-5 h-5" />تسجيل فاتورة جديدة</button>} />
+                                    <EmptyState colSpan={9} icon={Receipt} title="لا توجد فواتير" description="ابدأ بتسجيل أول فاتورة توريد بالنظام" action={<button onClick={() => navigate('/dashboard/procurement/invoices/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/30"><Plus className="w-5 h-5" />تسجيل فاتورة جديدة</button>} />
                                 ) : (
                                     paginatedInvoices.map((inv, index) => (
-                                        <InvoiceRow key={inv.id} invoice={inv} index={index} isExpanded={expandedInvoiceId === inv.id} onToggle={() => setExpandedInvoiceId(expandedInvoiceId === inv.id ? null : (inv.id ?? null))} onView={() => navigate(`/dashboard/procurement/invoices/${inv.id}`)} onApprove={() => handleApproveInvoice(inv)} />
+                                        <InvoiceRow
+                                            key={inv.id}
+                                            invoice={inv}
+                                            index={index}
+                                            isExpanded={expandedInvoiceId === inv.id}
+                                            onToggle={() => setExpandedInvoiceId(expandedInvoiceId === inv.id ? null : (inv.id ?? null))}
+                                            onView={() => navigate(`/dashboard/procurement/invoices/${inv.id}`)}
+                                            onApprove={() => handleApproveInvoice(inv)}
+                                            onDelete={handleDeleteClick}
+                                            isSelected={inv.id != null && selectedIds.includes(inv.id)}
+                                            onToggleSelect={handleToggleSelect}
+                                        />
                                     ))
                                 )
                             ) : filteredPending.length === 0 ? (
@@ -619,9 +703,46 @@ const SupplierInvoicesPage: React.FC = () => {
                     </table>
                 </div>
                 {!loading && (activeTab === 'invoices' ? filteredInvoices.length : filteredPending.length) > 0 && (
-                    <Pagination currentPage={currentPage} totalItems={activeTab === 'invoices' ? filteredInvoices.length : filteredPending.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                        {activeTab === 'invoices' ? (
+                            <>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={handleBulkDeleteClick}
+                                        disabled={selectedIds.length === 0 || isDeleting}
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        حذف المحدد ({selectedIds.length})
+                                    </button>
+                                </div>
+                                <Pagination currentPage={currentPage} totalItems={filteredInvoices.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                            </>
+                        ) : (
+                            <>
+                                <div />
+                                <Pagination currentPage={currentPage} totalItems={filteredPending.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                            </>
+                        )}
+                    </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف فاتورة مورد"
+                message={
+                    invoiceToDelete
+                        ? `هل أنت متأكد من حذف الفاتورة ${invoiceToDelete.invoiceNumber}؟ قد لا يمكن الحذف إذا كانت مرتبطة بسندات صرف أو مدفوعات.`
+                        : `هل أنت متأكد من حذف عدد ${selectedIds.length} من الفواتير؟`
+                }
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setInvoiceToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

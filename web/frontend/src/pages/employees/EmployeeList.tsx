@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Search, Edit2, Trash2, UserPlus, Users, UserCheck,
     UserX, RefreshCw, CheckCircle2, XCircle,
@@ -60,8 +61,9 @@ const EmployeeTableRow: React.FC<{
     employee: Employee;
     onEdit: (emp: Employee) => void;
     onDelete: (id: number) => void;
+    onView: (emp: Employee) => void;
     index: number;
-}> = ({ employee, onEdit, onDelete, index }) => {
+}> = ({ employee, onEdit, onDelete, onView, index }) => {
     const getInitials = (name: string) => name.slice(0, 2);
 
     const getAvatarColor = (name: string) => {
@@ -103,9 +105,9 @@ const EmployeeTableRow: React.FC<{
                             ${employee.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     </div>
                     <div>
-                        <p className="font-semibold text-slate-900 group-hover:text-brand-primary transition-colors">
+                        <button onClick={() => onView(employee)} className="font-semibold text-slate-900 group-hover:text-brand-primary transition-colors text-right">
                             {employee.fullNameAr}
-                        </p>
+                        </button>
                         <div className="flex items-center gap-1 text-xs text-slate-400">
                             <Mail className="w-3 h-3" />
                             <span>{employee.email || 'لا يوجد بريد'}</span>
@@ -247,6 +249,7 @@ const TableSkeleton: React.FC = () => (
 );
 
 const EmployeeList: React.FC = () => {
+    const navigate = useNavigate();
     usePageTitle('إدارة الموظفين');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -292,6 +295,10 @@ const EmployeeList: React.FC = () => {
     const handleEdit = (emp: Employee) => {
         setSelectedEmployee(emp);
         setIsFormOpen(true);
+    };
+
+    const handleView = (emp: Employee) => {
+        navigate(`/dashboard/employees/${emp.employeeId}`);
     };
 
     const handleDeleteClick = (id: number) => {
@@ -589,6 +596,7 @@ const EmployeeList: React.FC = () => {
                                         employee={emp}
                                         onEdit={handleEdit}
                                         onDelete={handleDeleteClick}
+                                        onView={handleView}
                                         index={index}
                                     />
                                 ))

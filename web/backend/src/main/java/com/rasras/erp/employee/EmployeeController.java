@@ -2,6 +2,8 @@ package com.rasras.erp.employee;
 
 import com.rasras.erp.employee.dto.*;
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.exception.ResourceNotFoundException;
+import com.rasras.erp.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -12,6 +14,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +27,40 @@ import java.util.List;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
+
+    @GetMapping("/me")
+    @Operation(summary = "Get current user's employee", description = "Returns the authenticated user's own employee record")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<EmployeeDto>> getMyEmployee() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal)) {
+            throw new ResourceNotFoundException("User", "session", "not found");
+        }
+        UserPrincipal principal = (UserPrincipal) auth.getPrincipal();
+        Integer employeeId = principal.getEmployeeId();
+        if (employeeId == null) {
+            throw new ResourceNotFoundException("Employee", "user", "no employee linked");
+        }
+        EmployeeDto employee = employeeService.getEmployeeById(employeeId);
+        return ResponseEntity.ok(ApiResponse.success(employee));
+    }
+
+    @PutMapping("/me")
+    @Operation(summary = "Update my profile (name only)", description = "Allows the authenticated user to update only their name")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<EmployeeDto>> updateMyProfile(@Valid @RequestBody UpdateMyProfileRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal)) {
+            throw new ResourceNotFoundException("User", "session", "not found");
+        }
+        UserPrincipal principal = (UserPrincipal) auth.getPrincipal();
+        Integer employeeId = principal.getEmployeeId();
+        if (employeeId == null) {
+            throw new ResourceNotFoundException("Employee", "user", "no employee linked");
+        }
+        EmployeeDto employee = employeeService.updateMyProfile(employeeId, request);
+        return ResponseEntity.ok(ApiResponse.success(employee));
+    }
 
     @GetMapping
     @Operation(summary = "Get all employees", description = "Returns a paginated list of employees")

@@ -94,7 +94,9 @@ const QuotationTableRow: React.FC<{
     onView: (id: number) => void;
     onDelete: (quotation: SupplierQuotation) => void;
     navigate: ReturnType<typeof useNavigate>;
-}> = ({ quotation, index, onView, onDelete, navigate }) => (
+    isSelected: boolean;
+    onToggleSelect: (id: number) => void;
+}> = ({ quotation, index, onView, onDelete, navigate, isSelected, onToggleSelect }) => (
     <tr
         className="hover:bg-indigo-50/50 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
         onClick={() => onView(quotation.id!)}
@@ -103,6 +105,14 @@ const QuotationTableRow: React.FC<{
             animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
+        <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+            <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                checked={isSelected}
+                onChange={() => quotation.id && onToggleSelect(quotation.id)}
+            />
+        </td>
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-50 
@@ -206,6 +216,7 @@ const SupplierQuotationsPage: React.FC = () => {
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [quotationToDelete, setQuotationToDelete] = useState<SupplierQuotation | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
@@ -229,17 +240,47 @@ const SupplierQuotationsPage: React.FC = () => {
         setIsDeleteModalOpen(true);
     };
 
+    const handleToggleSelect = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAllPage = () => {
+        const pageIds = paginatedQuotations.map(q => q.id!).filter(Boolean);
+        const allSelected = pageIds.every(id => selectedIds.includes(id));
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+        }
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (selectedIds.length === 0) {
+            toast.error('يرجى اختيار عروض أسعار أولاً');
+            return;
+        }
+        setQuotationToDelete(null);
+        setIsDeleteModalOpen(true);
+    };
+
     const handleDeleteConfirm = async () => {
-        if (!quotationToDelete?.id) return;
+        const idsToDelete = quotationToDelete?.id ? [quotationToDelete.id] : selectedIds;
+        if (!idsToDelete.length) return;
         setIsDeleting(true);
         try {
-            await purchaseService.deleteQuotation(quotationToDelete.id);
-            toast.success('تم حذف عرض السعر بنجاح');
+            for (const id of idsToDelete) {
+                await purchaseService.deleteQuotation(id);
+            }
+            toast.success(idsToDelete.length === 1 ? 'تم حذف عرض السعر بنجاح' : 'تم حذف عروض الأسعار بنجاح');
             fetchQuotations();
             setIsDeleteModalOpen(false);
             setQuotationToDelete(null);
-        } catch (error) {
-            toast.error('فشل حذف عرض السعر');
+            setSelectedIds([]);
+        } catch (error: any) {
+            const apiMessage = error?.response?.data?.message as string | undefined;
+            toast.error(apiMessage || 'فشل حذف عرض السعر');
         } finally {
             setIsDeleting(false);
         }
@@ -421,6 +462,17 @@ const SupplierQuotationsPage: React.FC = () => {
                     <table className="w-full text-right">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
+                                <th className="px-4 py-4 text-center text-sm font-bold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        checked={
+                                            paginatedQuotations.length > 0 &&
+                                            paginatedQuotations.every(q => q.id && selectedIds.includes(q.id))
+                                        }
+                                        onChange={handleToggleSelectAllPage}
+                                    />
+                                </th>
                                 <th className="px-6 py-4 text-sm font-bold text-slate-700">رقم عرض السعر</th>
                                 <th className="px-6 py-4 text-sm font-bold text-slate-700">التاريخ</th>
                                 <th className="px-6 py-4 text-sm font-bold text-slate-700">المورد</th>
@@ -433,7 +485,7 @@ const SupplierQuotationsPage: React.FC = () => {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-20">
+                                    <td colSpan={8} className="text-center py-20">
                                         <div className="flex flex-col items-center gap-4">
                                             <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
                                             <span className="text-slate-500 font-medium">جاري التحميل...</span>
@@ -442,7 +494,7 @@ const SupplierQuotationsPage: React.FC = () => {
                                 </tr>
                             ) : filteredQuotations.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-20">
+                                    <td colSpan={8} className="text-center py-20">
                                         <div className="flex flex-col items-center gap-4">
                                             <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center">
                                                 <FileText className="w-10 h-10 text-indigo-300" />
@@ -463,6 +515,8 @@ const SupplierQuotationsPage: React.FC = () => {
                                         onView={(id) => navigate(`/dashboard/procurement/quotation/${id}`)}
                                         onDelete={handleDeleteClick}
                                         navigate={navigate}
+                                        isSelected={!!q.id && selectedIds.includes(q.id)}
+                                        onToggleSelect={handleToggleSelect}
                                     />
                                 ))
                             )}
@@ -470,20 +524,38 @@ const SupplierQuotationsPage: React.FC = () => {
                     </table>
                 </div>
                 {!loading && filteredQuotations.length > 0 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalItems={filteredQuotations.length}
-                        pageSize={pageSize}
-                        onPageChange={setCurrentPage}
-                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
-                    />
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleBulkDeleteClick}
+                                disabled={selectedIds.length === 0 || isDeleting}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold
+                                    border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100
+                                    disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                حذف المحدد ({selectedIds.length})
+                            </button>
+                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filteredQuotations.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                        />
+                    </div>
                 )}
             </div>
 
             <ConfirmModal
                 isOpen={isDeleteModalOpen}
                 title="حذف عرض السعر"
-                message={`هل أنت متأكد من حذف عرض السعر رقم ${quotationToDelete?.quotationNumber}؟ سيتم حذف جميع البيانات المرتبطة به ولا يمكن التراجع عن هذه الخطوة.`}
+                message={
+                    quotationToDelete
+                        ? `هل أنت متأكد من حذف عرض السعر رقم ${quotationToDelete.quotationNumber}؟ سيتم حذف جميع البيانات المرتبطة به ولا يمكن التراجع عن هذه الخطوة.`
+                        : `هل أنت متأكد من حذف عدد ${selectedIds.length} من عروض الأسعار؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`
+                }
                 confirmText="حذف"
                 cancelText="إلغاء"
                 onConfirm={handleDeleteConfirm}

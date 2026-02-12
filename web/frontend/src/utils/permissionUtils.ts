@@ -15,7 +15,7 @@ export const SECTION_ROLES = {
 } as const;
 
 /** مسارات متاحة لجميع من سجّل دخوله */
-const PUBLIC_PATHS = ['/dashboard', '/dashboard/approvals'];
+const PUBLIC_PATHS = ['/dashboard', '/dashboard/approvals', '/dashboard/profile'];
 
 /** ربط المسار بصلاحية القسم (تُعيّن من لوحة التحكم → الأدوار والصلاحيات) */
 function getRequiredPermissionForPath(path: string): string | null {
@@ -50,22 +50,14 @@ export function getRequiredRolesForPath(path: string): string[] | null {
 
 /**
  * يتحقق إن كان المستخدم يملك صلاحية الدخول للمسار.
- * إذا وُجدت صلاحيات المستخدم (من تسجيل الدخول) يُستخدم التحقق بالصلاحيات (ديناميكي).
- * وإلا يُستخدم التحقق بالأدوار (احتياطي).
+ * يعتمد على الصلاحيات فقط (ديناميكياً من لوحة التحكم → الأدوار والصلاحيات).
  */
 export function canAccessPath(
   path: string,
-  userRole: string,
+  _userRole: string,
   userPermissions?: string[] | null
 ): boolean {
-  const usePermissions = userPermissions && userPermissions.length > 0;
-  if (usePermissions) {
-    const required = getRequiredPermissionForPath(path);
-    if (!required) return true;
-    return userPermissions.includes(required);
-  }
-  const roles = getRequiredRolesForPath(path);
-  if (!roles || roles.length === 0) return true;
-  const roleUpper = (userRole || '').toUpperCase();
-  return roles.includes(roleUpper);
+  const required = getRequiredPermissionForPath(path);
+  if (!required) return true;
+  return !!(userPermissions && userPermissions.length > 0 && userPermissions.includes(required));
 }

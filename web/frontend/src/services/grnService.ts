@@ -66,4 +66,7 @@ export const grnService = {
         const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>(url);
         return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
     },
+    deleteGRN: async (id: number) => {
+        await apiClient.post(`/inventory/grn/${id}/delete`);
+    },
 };
