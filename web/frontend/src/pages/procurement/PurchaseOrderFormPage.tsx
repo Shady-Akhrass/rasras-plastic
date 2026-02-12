@@ -517,13 +517,14 @@ const PurchaseOrderFormPage: React.FC = () => {
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-brand-primary" /> تاريخ التسليم المتوقع
+                                    تاريخ التسليم المتوقع
                                     {isReadOnly && <Lock className="w-3 h-3 text-slate-400" />}
                                 </label>
                                 <input
                                     type={isReadOnly ? 'text' : 'date'}
                                     readOnly={isReadOnly}
                                     tabIndex={isReadOnly ? -1 : undefined}
+                                    min={isReadOnly ? undefined : new Date().toISOString().split('T')[0]}
                                     value={optimisticPO.expectedDeliveryDate || (isReadOnly ? 'غير محدد' : '')}
                                     onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'expectedDeliveryDate', value: e.target.value })}
                                     className={inputClass()}

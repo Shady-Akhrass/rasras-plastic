@@ -28,6 +28,7 @@ public class PurchaseOrderService {
         private final WarehouseRepository warehouseRepo;
         private final GRNService grnService;
         private final com.rasras.erp.approval.ApprovalService approvalService;
+        private final com.rasras.erp.supplier.SupplierInvoiceRepository invoiceRepo;
 
         @Transactional(readOnly = true)
         public List<PurchaseOrderDto> getAllPOs() {
@@ -39,11 +40,22 @@ public class PurchaseOrderService {
         @Transactional(readOnly = true)
         public List<PurchaseOrderDto> getWaitingForArrivalPOs() {
                 return poRepo.findAll().stream()
-                                .filter(po -> "Approved".equals(po.getApprovalStatus()) 
-                                        && ("Confirmed".equals(po.getStatus()) || "Approved".equals(po.getStatus()))
-                                        && !"PartiallyReceived".equals(po.getStatus())
-                                        && !"Received".equals(po.getStatus())
-                                        && !"Closed".equals(po.getStatus()))
+                                .filter(po -> "Approved".equals(po.getApprovalStatus())
+                                                && ("Confirmed".equals(po.getStatus())
+                                                                || "Approved".equals(po.getStatus()))
+                                                && !"PartiallyReceived".equals(po.getStatus())
+                                                && !"Received".equals(po.getStatus())
+                                                && !"Closed".equals(po.getStatus()))
+                                .map(this::mapToDto)
+                                .collect(Collectors.toList());
+        }
+
+        @Transactional(readOnly = true)
+        public List<PurchaseOrderDto> getUninvoicedPOs() {
+                List<Integer> invoicedPoIds = invoiceRepo.findAllInvoicedPoIds();
+                return poRepo.findAll().stream()
+                                .filter(po -> !invoicedPoIds.contains(po.getId()))
+                                .filter(po -> "Approved".equals(po.getApprovalStatus()))
                                 .map(this::mapToDto)
                                 .collect(Collectors.toList());
         }
@@ -122,8 +134,8 @@ public class PurchaseOrderService {
                                 .orElseThrow(() -> new RuntimeException("Purchase Order not found"));
 
                 // Verify PO is in waiting status
-                if (!"Approved".equals(po.getApprovalStatus()) || 
-                    (!"Confirmed".equals(po.getStatus()) && !"Approved".equals(po.getStatus()))) {
+                if (!"Approved".equals(po.getApprovalStatus()) ||
+                                (!"Confirmed".equals(po.getStatus()) && !"Approved".equals(po.getStatus()))) {
                         throw new RuntimeException("Purchase Order is not in approved/confirmed status");
                 }
 
@@ -143,6 +155,8 @@ public class PurchaseOrderService {
                                 .status("Pending Inspection")
                                 .approvalStatus("Pending")
                                 .qualityStatus("Pending")
+                                .shippingCost(po.getShippingCost())
+                                .otherCosts(po.getOtherCosts())
                                 .notes("تم إنشاء تلقائياً عند وصول الشحنة من أمر الشراء: " + po.getPoNumber())
                                 .items(po.getItems() != null ? po.getItems().stream()
                                                 .map(poItem -> GRNItemDto.builder()
@@ -150,8 +164,10 @@ public class PurchaseOrderService {
                                                                 .itemId(poItem.getItem().getId())
                                                                 .itemNameAr(poItem.getItem().getItemNameAr())
                                                                 .orderedQty(poItem.getOrderedQty())
-                                                                .receivedQty(poItem.getOrderedQty()) // Full quantity received
-                                                                .acceptedQty(poItem.getOrderedQty()) // Initially all accepted
+                                                                .receivedQty(poItem.getOrderedQty()) // Full quantity
+                                                                                                     // received
+                                                                .acceptedQty(poItem.getOrderedQty()) // Initially all
+                                                                                                     // accepted
                                                                 .unitId(poItem.getUnit().getId())
                                                                 .unitNameAr(poItem.getUnit().getUnitNameAr())
                                                                 .unitCost(poItem.getUnitPrice())
@@ -160,10 +176,19 @@ public class PurchaseOrderService {
                                                 .collect(Collectors.toList()) : null)
                                 .build();
 
+                // Initial totalAmount
+                BigDecimal itemsTotal = grnDto.getItems() != null ? grnDto.getItems().stream()
+                                .map(i -> i.getTotalCost() != null ? i.getTotalCost() : BigDecimal.ZERO)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
+                grnDto.setTotalAmount(itemsTotal
+                                .add(grnDto.getShippingCost() != null ? grnDto.getShippingCost() : BigDecimal.ZERO)
+                                .add(grnDto.getOtherCosts() != null ? grnDto.getOtherCosts() : BigDecimal.ZERO));
+
                 // Create GRN using GRNService
                 GoodsReceiptNoteDto createdGRN = grnService.createGRN(grnDto);
 
-                // Update PO status to PartiallyReceived (will be updated to Closed when all items received)
+                // Update PO status to PartiallyReceived (will be updated to Closed when all
+                // items received)
                 po.setStatus("PartiallyReceived");
                 poRepo.save(po);
 
@@ -179,7 +204,7 @@ public class PurchaseOrderService {
 
         private String generatePONumber() {
                 long count = poRepo.count() + 1;
-                return "#PO-" + count;
+                return String.format("PO-%d", count);
         }
 
         private PurchaseOrderItem mapToItemEntity(PurchaseOrder po, PurchaseOrderItemDto dto) {

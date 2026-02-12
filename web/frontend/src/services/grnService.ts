@@ -35,6 +35,9 @@ export interface GoodsReceiptNoteDto {
     status?: string;
     approvalStatus?: string;
     totalReceivedQty?: number;
+    shippingCost?: number;
+    otherCosts?: number;
+    totalAmount?: number;
     notes?: string;
     items: GRNItemDto[];
 }

@@ -18,12 +18,12 @@ import {
     CheckCircle2,
     RotateCcw,
     Warehouse,
+    Archive,
     Inbox,
     X,
     ChevronDown,
     Loader2,
     SlidersHorizontal,
-    Wifi,
     WifiOff,
     Volume2,
     VolumeX,
@@ -35,6 +35,7 @@ import { approvalService, type ApprovalRequestDto } from '../../services/approva
 import { formatNumber, formatDate } from '../../utils/format';
 import { grnService } from '../../services/grnService';
 import warehouseService from '../../services/warehouseService';
+import { paymentVoucherService } from '../../services/paymentVoucherService';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 
@@ -48,6 +49,7 @@ const WORKFLOW_NAME_AR: Record<string, string> = {
     'Goods Receipt Note Approval': 'اعتماد إذن الاستلام',
     'Purchase Return Approval': 'اعتماد مرتجع المشتريات',
     'Quotation Comparison Approval': 'اعتماد مقارنة العروض',
+    'Payment Voucher Approval': 'اعتماد سند صرف',
 };
 const STEP_NAME_AR: Record<string, string> = {
     'Procurement Manager Approval': 'اعتماد مدير المشتريات',
@@ -98,6 +100,9 @@ const TYPE_ROUTES: Record<string, string> = {
     GRN: '/dashboard/procurement/grn', GoodsReceiptNote: '/dashboard/procurement/grn',
     SINV: '/dashboard/procurement/invoices', SupplierInvoice: '/dashboard/procurement/invoices',
     PurchaseReturn: '/dashboard/procurement/returns',
+    PaymentVoucher: '/dashboard/finance/payment-vouchers',
+    PV: '/dashboard/finance/payment-vouchers',
+    Supplier: '/dashboard/procurement/suppliers',
 };
 
 const isGRNType = (t: string) => t === 'GoodsReceiptNote' || t === 'GRN';
@@ -112,39 +117,12 @@ const FILTER_OPTIONS = [
     { value: 'QuotationComparison', label: 'مقارنة عروض', icon: Scale },
     { value: 'PurchaseReturn', label: 'مرتجعات', icon: RotateCcw },
     { value: 'Supplier', label: 'موردين', icon: Tag },
+    { value: 'PaymentVoucher', label: 'سندات صرف', icon: DollarSign },
 ] as const;
 
 // ════════════════════════════════════════════
 // ─── Notification Helpers ───
 // ════════════════════════════════════════════
-const playNotificationSound = () => {
-    try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        // Chime 1
-        const o1 = ctx.createOscillator();
-        const g1 = ctx.createGain();
-        o1.connect(g1); g1.connect(ctx.destination);
-        o1.frequency.setValueAtTime(880, ctx.currentTime);
-        g1.gain.setValueAtTime(0.15, ctx.currentTime);
-        g1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-        o1.start(ctx.currentTime); o1.stop(ctx.currentTime + 0.3);
-        // Chime 2
-        const o2 = ctx.createOscillator();
-        const g2 = ctx.createGain();
-        o2.connect(g2); g2.connect(ctx.destination);
-        o2.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
-        g2.gain.setValueAtTime(0.15, ctx.currentTime + 0.15);
-        g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        o2.start(ctx.currentTime + 0.15); o2.stop(ctx.currentTime + 0.5);
-    } catch { /* silent */ }
-};
-
-const sendBrowserNotification = (title: string, body: string) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body, icon: '/favicon.ico', tag: 'approval-' + Date.now() });
-    }
-};
-
 const requestNotificationPermission = async () => {
     if ('Notification' in window && Notification.permission === 'default') {
         await Notification.requestPermission();
@@ -584,6 +562,7 @@ const EmptyState: React.FC<{ searchTerm: string; hasFilters: boolean; onClearFil
 // ─── MAIN COMPONENT ───
 // ════════════════════════════════════════════════════
 const ApprovalsInbox: React.FC = () => {
+    const navigate = useNavigate();
     const location = useLocation();
     const initialType = new URLSearchParams(location.search).get('type') || 'All';
 
@@ -666,16 +645,7 @@ const ApprovalsInbox: React.FC = () => {
                     setNewRequestIds(prev => new Set([...prev, ...brandNew]));
                     setNewRequestsCount(prev => prev + brandNew.size);
 
-                    if (soundEnabled) playNotificationSound();
-
                     const count = brandNew.size;
-                    sendBrowserNotification(
-                        'طلبات اعتماد جديدة',
-                        count === 1
-                            ? 'لديك طلب اعتماد جديد ينتظر مراجعتك'
-                            : `لديك ${count} طلبات اعتماد جديدة`
-                    );
-
                     toast(`${count === 1 ? 'طلب اعتماد جديد' : `${count} طلبات اعتماد جديدة`}`, {
                         icon: '🔔',
                         duration: 5000,
@@ -734,12 +704,37 @@ const ApprovalsInbox: React.FC = () => {
             addOptimistic({ type: 'remove', id: requestId });
             try {
                 await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId);
+                const req = requests.find(r => r.id === requestId);
                 setRequests(prev => prev.filter(r => r.id !== requestId));
                 previousIdsRef.current.delete(requestId);
-                toast.success(
-                    action === 'Approved' ? 'تم الاعتماد بنجاح ✅' : 'تم رفض الطلب ❌',
-                    { duration: 3000 }
-                );
+
+                if (action === 'Approved' && (req?.documentType === 'PaymentVoucher' || req?.documentType === 'PV')) {
+                    // Trigger automatic download ONLY after General Manager Approval
+                    if (req.currentStepName === 'General Manager Approval') {
+                        paymentVoucherService.downloadVoucherPdf(req.documentId, req.documentNumber)
+                            .catch(err => console.error('Auto-download failed:', err));
+                    }
+
+                    toast.success((t) => (
+                        <div className="flex flex-col gap-2">
+                            <span className="font-bold">تم الاعتماد بنجاح ✅</span>
+                            <button
+                                onClick={() => {
+                                    toast.dismiss(t.id);
+                                    navigate(`/dashboard/finance/payment-vouchers/${req.documentId}`);
+                                }}
+                                className="text-xs text-brand-primary font-bold hover:underline text-right"
+                            >
+                                الانتقال للسند في انتظار الصرف ←
+                            </button>
+                        </div>
+                    ), { duration: 6000 });
+                } else {
+                    toast.success(
+                        action === 'Approved' ? 'تم الاعتماد بنجاح ✅' : 'تم رفض الطلب ❌',
+                        { duration: 3000 }
+                    );
+                }
             } catch {
                 toast.error('فشل تنفيذ الإجراء، جاري إعادة التحميل...');
                 await fetchRequests(false);
@@ -835,6 +830,11 @@ const ApprovalsInbox: React.FC = () => {
     return (
         <div className="space-y-5 pb-8">
             <style>{`
+                @keyframes blink-red {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.7; transform: scale(1.05); background-color: #ef4444; }
+                }
+                .animate-blink-red { animation: blink-red 1s infinite; }
                 @keyframes fadeSlideIn {
                     from { opacity: 0; transform: translateY(16px); }
                     to { opacity: 1; transform: translateY(0); }
@@ -968,8 +968,10 @@ const ApprovalsInbox: React.FC = () => {
                                 <Icon className="w-3.5 h-3.5" />
                                 <span>{opt.label}</span>
                                 {count > 0 && (
-                                    <span className={`min-w-[20px] h-5 flex items-center justify-center px-1.5 rounded-md text-[10px] font-black
-                                        ${isActive ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>
+                                    <span className={`min-w-[20px] h-5 flex items-center justify-center px-1.5 rounded-full text-[10px] font-black
+                                        transition-all duration-300 border border-white/20
+                                        ${count > 0 ? 'animate-blink-red bg-rose-500 text-white shadow-sm' :
+                                            isActive ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>
                                         {count}
                                     </span>
                                 )}
@@ -1036,91 +1038,112 @@ const ApprovalsInbox: React.FC = () => {
                 />
             )}
 
-            {/* ═══ WAREHOUSE MODAL ═══ */}
             {warehouseModal.show && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300"
                         onClick={() => setWarehouseModal(p => ({ ...p, show: false, request: null }))} />
 
-                    <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden"
-                        style={{ animation: 'fadeSlideIn 0.3s ease-out forwards' }}>
-                        {/* Header */}
-                        <div className="bg-gradient-to-l from-cyan-500 to-teal-600 p-6 text-white">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 bg-white/15 rounded-xl backdrop-blur-sm">
-                                        <Warehouse className="w-6 h-6" />
+                    <div className="relative bg-white rounded-[2rem] shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden 
+                        animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
+                        {/* Header - Premium Gradient */}
+                        <div className="bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 p-8 text-white relative">
+                            <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl" />
+                            <div className="relative flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3.5 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20 shadow-xl">
+                                        <Warehouse className="w-8 h-8 text-white" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold">اختيار المخزن</h3>
-                                        <p className="text-white/70 text-sm">حدد المخزن الذي سيتم تخزين الأصناف فيه</p>
+                                        <h3 className="text-xl font-bold tracking-tight">توجيه الشحنة للمخزن</h3>
+                                        <p className="text-white/70 text-sm mt-0.5">حدد المستودع المستهدف لإتمام عملية الإضافة</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setWarehouseModal(p => ({ ...p, show: false, request: null }))}
-                                    className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-                                    <X className="w-5 h-5" />
+                                <button
+                                    onClick={() => setWarehouseModal(p => ({ ...p, show: false, request: null }))}
+                                    className="p-2.5 hover:bg-white/10 rounded-xl transition-all hover:rotate-90 duration-300"
+                                >
+                                    <X className="w-6 h-6" />
                                 </button>
                             </div>
                         </div>
 
                         {/* Body */}
-                        <div className="p-6">
+                        <div className="p-8">
                             {warehouseModal.loading ? (
-                                <div className="py-12 text-center">
-                                    <Loader2 className="w-8 h-8 text-cyan-500 animate-spin mx-auto mb-3" />
-                                    <p className="text-slate-500 text-sm">جاري تحميل المخازن...</p>
+                                <div className="py-20 text-center">
+                                    <Loader2 className="w-10 h-10 text-brand-primary animate-spin mx-auto mb-4" />
+                                    <p className="text-slate-500 font-medium">جاري جلب قائمة المستودعات المتاحة...</p>
                                 </div>
                             ) : (
                                 <>
                                     {warehouseModal.request && (
-                                        <div className="bg-slate-50 rounded-xl p-4 mb-5 border border-slate-100">
-                                            <div className="flex items-center gap-3">
-                                                <Package className="w-5 h-5 text-cyan-500" />
+                                        <div className="bg-gradient-to-l from-slate-50 to-slate-100/50 rounded-2xl p-5 mb-8 border border-slate-200/60 shadow-inner">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center">
+                                                    <Package className="w-6 h-6 text-brand-primary" />
+                                                </div>
                                                 <div>
-                                                    <div className="text-sm font-bold text-slate-700">
-                                                        إذن إضافة #{warehouseModal.request.documentNumber}
+                                                    <div className="text-xs font-bold text-brand-primary uppercase tracking-wider mb-0.5">مستند إذن إضافة</div>
+                                                    <div className="text-lg font-black text-slate-800">
+                                                        #{warehouseModal.request.documentNumber}
                                                     </div>
-                                                    <div className="text-xs text-slate-400">
-                                                        {formatNumber(warehouseModal.request.totalAmount ?? 0)} ج.م
+                                                    <div className="text-sm font-bold text-slate-500 mt-0.5">
+                                                        القيمة الإجمالية: <span className="text-slate-700">{formatNumber(warehouseModal.request.totalAmount ?? 0)} ج.م</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
 
-                                    <div className="mb-6">
-                                        <label className="block text-sm font-bold text-slate-700 mb-2.5">المخزن المستهدف</label>
-                                        <div className="relative">
-                                            <Warehouse className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    <div className="space-y-3 mb-8">
+                                        <label className="flex items-center gap-2 text-sm font-black text-slate-700 px-1">
+                                            <Archive className="w-4 h-4 text-brand-primary" />
+                                            اختر المستودع المستلم *
+                                        </label>
+                                        <div className="relative group">
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-slate-100 rounded-lg 
+                                                flex items-center justify-center transition-colors group-focus-within:bg-brand-primary/10">
+                                                <Warehouse className="w-5 h-5 text-slate-500 group-focus-within:text-brand-primary transition-colors" />
+                                            </div>
                                             <select
                                                 value={warehouseModal.selectedWarehouseId}
                                                 onChange={e => setWarehouseModal(p => ({ ...p, selectedWarehouseId: parseInt(e.target.value, 10) }))}
-                                                className="w-full pr-12 pl-10 py-3.5 rounded-xl border-2 border-slate-200 focus:border-cyan-500 outline-none transition-colors text-sm bg-white appearance-none cursor-pointer"
+                                                className="w-full pr-16 pl-12 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 
+                                                    focus:border-brand-primary focus:bg-white outline-none transition-all duration-300 
+                                                    text-base font-bold text-slate-700 appearance-none cursor-pointer shadow-sm"
                                             >
-                                                <option value={0}>-- اختر المخزن --</option>
+                                                <option value={0}>-- اختر المخزن من القائمة --</option>
                                                 {warehouseModal.warehouses.map(w => (
                                                     <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
                                                 ))}
                                             </select>
-                                            <ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 p-1 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                                <ChevronDown className="w-4 h-4 text-slate-400" />
+                                            </div>
                                         </div>
+                                        <p className="text-[10px] text-slate-400 pr-1">* سيتم ربط الأصناف الواردة بهذا المستودع فور الاعتماد</p>
                                     </div>
 
-                                    <div className="flex gap-3">
+                                    <div className="flex gap-4">
                                         <button
                                             onClick={() => setWarehouseModal(p => ({ ...p, show: false, request: null }))}
-                                            className="flex-1 px-5 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors active:scale-95"
+                                            className="flex-1 px-6 py-4 rounded-2xl border-2 border-slate-100 text-slate-500 
+                                                font-black text-sm hover:bg-slate-50 hover:border-slate-200 transition-all 
+                                                active:scale-[0.98]"
                                         >
-                                            إلغاء
+                                            إلغاء العملية
                                         </button>
                                         <button
                                             onClick={handleWarehouseModalConfirm}
                                             disabled={!warehouseModal.selectedWarehouseId}
-                                            className="flex-1 px-5 py-3 rounded-xl bg-gradient-to-l from-emerald-500 to-emerald-600 text-white font-bold text-sm hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all active:scale-95"
+                                            className="flex-[1.5] px-6 py-4 rounded-2xl bg-gradient-to-l from-emerald-500 to-emerald-600 
+                                                text-white font-black text-sm hover:from-emerald-600 hover:to-emerald-700 
+                                                shadow-xl shadow-emerald-500/20 disabled:opacity-40 disabled:grayscale 
+                                                disabled:cursor-not-allowed disabled:shadow-none transition-all active:scale-[0.98]"
                                         >
-                                            <span className="flex items-center justify-center gap-2">
-                                                <CheckCircle2 className="w-4 h-4" />
-                                                اعتماد وتحديد المخزن
+                                            <span className="flex items-center justify-center gap-3">
+                                                <CheckCircle2 className="w-5 h-5" />
+                                                اعتماد وتوجيه للمخزن
                                             </span>
                                         </button>
                                     </div>

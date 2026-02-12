@@ -228,6 +228,37 @@ public class SupplierInvoiceService {
         }
 
         @Transactional
+        public void recordPayment(Integer invoiceId, BigDecimal paymentAmount, String paidBy) {
+                SupplierInvoice invoice = invoiceRepo.findById(invoiceId)
+                                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+                // 1. Update invoice paid amount
+                BigDecimal currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : BigDecimal.ZERO;
+                invoice.setPaidAmount(currentPaid.add(paymentAmount));
+
+                // 2. Update invoice status
+                if (invoice.getPaidAmount().compareTo(invoice.getTotalAmount()) >= 0) {
+                        invoice.setStatus("Paid");
+                } else {
+                        invoice.setStatus("Partial");
+                }
+                invoiceRepo.save(invoice);
+
+                // 3. Update supplier balance
+                Supplier supplier = invoice.getSupplier();
+                if (supplier != null) {
+                        BigDecimal currentTotalPaid = supplier.getTotalPaid() != null ? supplier.getTotalPaid()
+                                        : BigDecimal.ZERO;
+                        BigDecimal currentBalance = supplier.getCurrentBalance() != null ? supplier.getCurrentBalance()
+                                        : BigDecimal.ZERO;
+
+                        supplier.setTotalPaid(currentTotalPaid.add(paymentAmount));
+                        supplier.setCurrentBalance(currentBalance.subtract(paymentAmount));
+                        supplierRepo.save(supplier);
+                }
+        }
+
+        @Transactional
         public void createInvoiceFromGRN(Integer grnId) {
                 GoodsReceiptNote grn = grnRepo.findById(grnId)
                                 .orElseThrow(() -> new RuntimeException("GRN not found"));
@@ -374,5 +405,87 @@ public class SupplierInvoiceService {
         private String generateInvoiceNumber() {
                 long count = invoiceRepo.count() + 1;
                 return "#INV-" + count;
+        }
+
+        @Transactional(readOnly = true)
+        public InvoiceMatchingResult validateInvoiceMatching(Integer poId, Integer grnId, Integer invoiceId) {
+                InvoiceMatchingResult result = new InvoiceMatchingResult();
+
+                // Get PO
+                PurchaseOrder po = poRepo.findById(poId)
+                                .orElseThrow(() -> new RuntimeException("Purchase Order not found"));
+
+                // Get GRN
+                GoodsReceiptNote grn = grnRepo.findById(grnId)
+                                .orElseThrow(() -> new RuntimeException("Goods Receipt Note not found"));
+
+                // Validate GRN belongs to PO
+                if (!po.getId().equals(grn.getPurchaseOrder().getId())) {
+                        result.setValid(false);
+                        result.setMessage("GRN does not belong to the specified PO");
+                        return result;
+                }
+
+                // Validate quantities match
+                for (com.rasras.erp.inventory.GRNItem grnItem : grn.getItems()) {
+                        PurchaseOrderItem poItem = po.getItems().stream()
+                                        .filter(pi -> pi.getId().equals(grnItem.getPoItemId()))
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (poItem == null) {
+                                result.setValid(false);
+                                result.setMessage("GRN item not found in PO");
+                                return result;
+                        }
+
+                        BigDecimal receivedQty = grnItem.getAcceptedQty() != null ? grnItem.getAcceptedQty()
+                                        : grnItem.getReceivedQty();
+                        if (receivedQty.compareTo(poItem.getOrderedQty()) > 0) {
+                                result.setValid(false);
+                                result.setMessage("Received quantity exceeds PO quantity for item: "
+                                                + grnItem.getItem().getItemNameAr());
+                                return result;
+                        }
+                }
+
+                // Validate amounts
+                BigDecimal poTotal = po.getTotalAmount();
+                BigDecimal grnTotal = grn.getItems().stream()
+                                .map(gi -> {
+                                        BigDecimal qty = gi.getAcceptedQty() != null ? gi.getAcceptedQty()
+                                                        : gi.getReceivedQty();
+                                        BigDecimal unitPrice = gi.getUnitCost() != null ? gi.getUnitCost()
+                                                        : BigDecimal.ZERO;
+                                        return qty.multiply(unitPrice);
+                                })
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                if (grnTotal.compareTo(poTotal.multiply(new BigDecimal("1.1"))) > 0) {
+                        result.setValid(false);
+                        result.setMessage("GRN total exceeds PO total by more than 10%");
+                        return result;
+                }
+
+                result.setValid(true);
+                result.setMessage("Invoice matching validated successfully");
+                result.setPoNumber(po.getPoNumber());
+                result.setGrnNumber(grn.getGrnNumber());
+                result.setPoTotal(poTotal);
+                result.setGrnTotal(grnTotal);
+
+                return result;
+        }
+
+        @lombok.Data
+        @lombok.AllArgsConstructor
+        @lombok.NoArgsConstructor
+        public static class InvoiceMatchingResult {
+                private boolean valid;
+                private String message;
+                private String poNumber;
+                private String grnNumber;
+                private java.math.BigDecimal poTotal;
+                private java.math.BigDecimal grnTotal;
         }
 }

@@ -19,6 +19,7 @@ import com.rasras.erp.procurement.SupplierQuotationItem;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.WarehouseRepository;
+import com.rasras.erp.finance.PaymentVoucherRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +53,7 @@ public class ApprovalService {
     private final ItemRepository itemRepo;
     private final UnitRepository unitRepo;
     private final WarehouseRepository warehouseRepo;
+    private final PaymentVoucherRepository voucherRepo;
 
     @Transactional
     public ApprovalRequest initiateApproval(String workflowCode, String docType, Integer docId,
@@ -206,6 +208,7 @@ public class ApprovalService {
 
         // 2. Update request state
         if ("Approved".equalsIgnoreCase(actionType)) {
+            handleIntermediateDocumentStatus(request, actionByUserId);
             moveToNextStep(request, actionByUserId);
         } else if ("Rejected".equalsIgnoreCase(actionType)) {
             request.setStatus("Rejected");
@@ -214,6 +217,62 @@ public class ApprovalService {
         }
 
         requestRepo.save(request);
+    }
+
+    @Transactional
+    public void syncAction(String docType, Integer docId, String actionType, Integer userId) {
+        requestRepo.findByDocumentTypeAndDocumentIdAndStatus(docType, docId, "InProgress")
+                .ifPresent(request -> {
+                    // Similar logic to processAction but for sync
+                    if ("Approved".equalsIgnoreCase(actionType)) {
+                        handleIntermediateDocumentStatus(request, userId);
+                        moveToNextStep(request, userId);
+                    } else if ("Rejected".equalsIgnoreCase(actionType)) {
+                        request.setStatus("Rejected");
+                        request.setCompletedDate(LocalDateTime.now());
+                        updateLinkedDocumentStatus(request, "Rejected", userId);
+                    }
+                    requestRepo.save(request);
+                });
+
+        // Also check "Pending" status
+        requestRepo.findByDocumentTypeAndDocumentIdAndStatus(docType, docId, "Pending")
+                .ifPresent(request -> {
+                    if ("Approved".equalsIgnoreCase(actionType)) {
+                        handleIntermediateDocumentStatus(request, userId);
+                        moveToNextStep(request, userId);
+                    } else if ("Rejected".equalsIgnoreCase(actionType)) {
+                        request.setStatus("Rejected");
+                        request.setCompletedDate(LocalDateTime.now());
+                        updateLinkedDocumentStatus(request, "Rejected", userId);
+                    }
+                    requestRepo.save(request);
+                });
+    }
+
+    private void handleIntermediateDocumentStatus(ApprovalRequest request, Integer userId) {
+        String type = request.getDocumentType();
+        Integer id = request.getDocumentId();
+        User actor = userRepo.findById(userId).orElse(null);
+        String actorName = actor != null ? actor.getUsername() : "System";
+
+        if ("PaymentVoucher".equalsIgnoreCase(type) || "PV".equalsIgnoreCase(type)) {
+            voucherRepo.findById(id).ifPresent(pv -> {
+                ApprovalWorkflowStep currentStep = request.getCurrentStep();
+                if (currentStep != null) {
+                    if (currentStep.getStepNumber() == 1) {
+                        pv.setApprovalStatus("FinanceApproved");
+                        pv.setApprovedByFinanceManager(actorName);
+                        pv.setFinanceManagerApprovalDate(LocalDate.now());
+                    } else if (currentStep.getStepNumber() == 2) {
+                        pv.setApprovalStatus("GMApproved");
+                        pv.setApprovedByGeneralManager(actorName);
+                        pv.setGeneralManagerApprovalDate(LocalDate.now());
+                    }
+                }
+                voucherRepo.save(pv);
+            });
+        }
     }
 
     private void moveToNextStep(ApprovalRequest request, Integer userId) {
@@ -405,6 +464,29 @@ public class ApprovalService {
                 }
                 returnRepo.save(ret);
             });
+        } else if ("PaymentVoucher".equalsIgnoreCase(type) || "PV".equalsIgnoreCase(type)) {
+            voucherRepo.findById(id).ifPresent(pv -> {
+                pv.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    // Final Step (Disbursement) is approved.
+                    // This is equivalent to confirming payment.
+                    User actor = userRepo.findById(userId).orElse(null);
+                    String actorName = actor != null ? actor.getUsername() : "System";
+
+                    // Trigger disbursement effects
+                    supplierInvoiceService.recordPayment(
+                            pv.getSupplierInvoice().getId(),
+                            pv.getPaymentAmount(),
+                            actorName);
+
+                    pv.setStatus("Paid");
+                    pv.setPaidBy(actorName);
+                    pv.setPaidDate(LocalDate.now());
+                } else if ("Rejected".equals(status)) {
+                    pv.setStatus("Rejected");
+                }
+                voucherRepo.save(pv);
+            });
         }
     }
 
@@ -531,7 +613,6 @@ public class ApprovalService {
 
     private String generatePONumber() {
         long count = poRepo.count() + 1;
-        LocalDateTime now = LocalDateTime.now();
-        return String.format("PO-%d%02d-%03d", now.getYear(), now.getMonthValue(), count);
+        return String.format("PO-%d", count);
     }
 }

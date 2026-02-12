@@ -134,7 +134,10 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    /** إنشاء صلاحيات الأقسام وتعيينها لـ ADMIN حتى تعمل القائمة والمسارات ديناميكياً من لوحة التحكم */
+    /**
+     * إنشاء صلاحيات الأقسام وتعيينها لـ ADMIN حتى تعمل القائمة والمسارات ديناميكياً
+     * من لوحة التحكم
+     */
     private void seedSectionPermissions() {
         log.info("Seeding section permissions...");
         String[][] sectionPerms = {
@@ -390,6 +393,56 @@ public class DataSeeder implements CommandLineRunner {
                         .approverRole(pmRole)
                         .build();
                 stepRepo.save(step1);
+            }
+        }
+        // 7. Payment Voucher Approval Workflow
+        if (!workflowRepo.findByWorkflowCode("PV_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow pvWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("PV_APPROVAL")
+                    .workflowName("Payment Voucher Approval")
+                    .documentType("PaymentVoucher")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(pvWorkflow);
+
+            Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+            Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+
+            if (fmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(pvWorkflow)
+                        .stepNumber(1)
+                        .stepName("Finance Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(fmRole)
+                        .build();
+                stepRepo.save(step1);
+            }
+
+            if (gmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step2 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(pvWorkflow)
+                        .stepNumber(2)
+                        .stepName("General Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(gmRole)
+                        .build();
+                stepRepo.save(step2);
+            }
+
+            Role accRole = roleRepository.findByRoleCode("ACC").orElse(null);
+            if (accRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step3 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(pvWorkflow)
+                        .stepNumber(3)
+                        .stepName("Payment Disbursement")
+                        .approverType("ROLE")
+                        .approverRole(accRole)
+                        .build();
+                stepRepo.save(step3);
             }
         }
     }

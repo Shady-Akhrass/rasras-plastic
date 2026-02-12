@@ -16,6 +16,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
@@ -60,6 +62,7 @@ public class SupplierInvoicePdfService {
     private Font totalLabelFont, totalValueFont;
     private Font grandTotalLabelFont, grandTotalValueFont;
     private Font footerFont, footerSubFont, invoiceNoFont;
+    private Font timestampFont, timestampLabelFont;
 
     // ─────────────────────────────────────────────────────────────────
     // PUBLIC API
@@ -90,74 +93,56 @@ public class SupplierInvoicePdfService {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // FONT INITIALIZATION — ROBUST MULTI-FALLBACK
+    // FONT INITIALIZATION
     // ─────────────────────────────────────────────────────────────────
 
     private void initFonts() {
-        // ── Step 1: Try to load Arabic-capable fonts ──
         bfRegular = null;
         bfBold = null;
 
-        // Priority 1: Arial fonts
         bfRegular = tryLoadFont("fonts/arial.ttf");
         bfBold = tryLoadFont("fonts/arialbd.ttf");
 
-        // Priority 2: Cairo fonts fallback
-        if (bfRegular == null) {
+        if (bfRegular == null)
             bfRegular = tryLoadFont("fonts/Cairo-Regular.ttf");
-        }
-        if (bfBold == null) {
+        if (bfBold == null)
             bfBold = tryLoadFont("fonts/Cairo-Bold.ttf");
-        }
 
-        // Priority 3: System fonts (Windows)
-        if (bfRegular == null) {
+        if (bfRegular == null)
             bfRegular = tryLoadSystemFont(
                     "C:/Windows/Fonts/arial.ttf",
                     "C:/Windows/Fonts/Arial.ttf",
                     "C:\\Windows\\Fonts\\arial.ttf");
-        }
-        if (bfBold == null) {
+        if (bfBold == null)
             bfBold = tryLoadSystemFont(
                     "C:/Windows/Fonts/arialbd.ttf",
                     "C:/Windows/Fonts/Arialbd.ttf",
                     "C:\\Windows\\Fonts\\arialbd.ttf");
-        }
 
-        // Priority 4: System fonts (Linux)
-        if (bfRegular == null) {
+        if (bfRegular == null)
             bfRegular = tryLoadSystemFont(
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                     "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
                     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
                     "/usr/share/fonts/TTF/DejaVuSans.ttf");
-        }
-        if (bfBold == null) {
+        if (bfBold == null)
             bfBold = tryLoadSystemFont(
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
                     "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
                     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
                     "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf");
-        }
 
-        // Priority 5: System fonts (macOS)
-        if (bfRegular == null) {
+        if (bfRegular == null)
             bfRegular = tryLoadSystemFont(
                     "/System/Library/Fonts/Supplemental/Arial.ttf",
                     "/Library/Fonts/Arial.ttf",
                     "/System/Library/Fonts/Helvetica.ttc");
-        }
 
-        // Priority 6: OpenPDF registered fonts — scan system
-        if (bfRegular == null) {
+        if (bfRegular == null)
             bfRegular = tryRegisteredFonts();
-        }
 
-        // ── Step 2: Final fallback to Helvetica (Arabic WILL break) ──
         if (bfRegular == null) {
-            log.warn("⚠️ No Arabic-capable font found! Falling back to Helvetica. "
-                    + "Arabic text will NOT render correctly. "
-                    + "Please place arial.ttf or Cairo-Regular.ttf in src/main/resources/fonts/");
+            log.warn("⚠️ No Arabic-capable font found! Falling back to Helvetica.");
             try {
                 bfRegular = BaseFont.createFont(
                         BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
@@ -166,7 +151,6 @@ public class SupplierInvoicePdfService {
             }
         }
 
-        // Bold fallback to regular if not found
         if (bfBold == null) {
             if (bfRegular.getPostscriptFontName().contains("Helvetica")) {
                 try {
@@ -184,20 +168,14 @@ public class SupplierInvoicePdfService {
                 bfRegular.getPostscriptFontName(),
                 bfBold.getPostscriptFontName());
 
-        // ── Step 3: Create all styled fonts ──
         buildFontSet();
     }
 
-    /**
-     * Try loading a font from the classpath (resources folder).
-     * Returns null on failure instead of throwing.
-     */
     private BaseFont tryLoadFont(String classpathLocation) {
         try {
             ClassPathResource res = new ClassPathResource(classpathLocation);
-            if (!res.exists()) {
+            if (!res.exists())
                 return null;
-            }
 
             File tmp = File.createTempFile("pdf_font_", ".ttf");
             tmp.deleteOnExit();
@@ -213,15 +191,12 @@ public class SupplierInvoicePdfService {
             return font;
 
         } catch (Exception e) {
-            log.debug("Font not available at classpath:{} — {}", classpathLocation, e.getMessage());
+            log.debug("Font not available at classpath:{} — {}",
+                    classpathLocation, e.getMessage());
             return null;
         }
     }
 
-    /**
-     * Try loading a font from absolute system file paths.
-     * Tries each path in order, returns first success or null.
-     */
     private BaseFont tryLoadSystemFont(String... paths) {
         for (String path : paths) {
             try {
@@ -239,24 +214,17 @@ public class SupplierInvoicePdfService {
         return null;
     }
 
-    /**
-     * Last resort: register system font directories with OpenPDF and
-     * try to find an Arabic-capable font.
-     */
     private BaseFont tryRegisteredFonts() {
         try {
-            // Register common font directories
             FontFactory.registerDirectories();
-
-            // Try to find any Arabic-supporting font
             String[] candidates = {
                     "arial", "arial unicode ms", "tahoma",
                     "dejavu sans", "liberation sans", "freesans",
                     "noto sans arabic", "droid sans"
             };
-
             for (String name : candidates) {
-                Font f = FontFactory.getFont(name, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, 10);
+                Font f = FontFactory.getFont(
+                        name, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, 10);
                 if (f != null && f.getBaseFont() != null) {
                     log.info("✅ Found registered font: {}", name);
                     return f.getBaseFont();
@@ -268,9 +236,6 @@ public class SupplierInvoicePdfService {
         return null;
     }
 
-    /**
-     * Build all application fonts from the loaded base fonts.
-     */
     private void buildFontSet() {
         titleFont = new Font(bfBold, 24, Font.NORMAL, BRAND_SECONDARY);
         subtitleFont = new Font(bfRegular, 11, Font.NORMAL, SLATE_500);
@@ -289,10 +254,12 @@ public class SupplierInvoicePdfService {
         footerFont = new Font(bfRegular, 8, Font.NORMAL, SLATE_500);
         footerSubFont = new Font(bfRegular, 7, Font.NORMAL, SLATE_400);
         invoiceNoFont = new Font(bfBold, 10, Font.NORMAL, BRAND_PRIMARY);
+        timestampFont = new Font(bfRegular, 8, Font.NORMAL, SLATE_400);
+        timestampLabelFont = new Font(bfBold, 8, Font.NORMAL, SLATE_500);
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // HEADER
+    // HEADER — FIX: Arabic text flush to right edge
     // ─────────────────────────────────────────────────────────────────
 
     private void addHeader(Document document, SupplierInvoiceDto invoice)
@@ -305,51 +272,21 @@ public class SupplierInvoicePdfService {
         PdfPCell wrapperCell = createCell(Rectangle.NO_BORDER, BRAND_VERY_LIGHT);
         wrapperCell.setPadding(18);
 
-        // 3-Column Layout: Arabic Right (Cell 1), Logo Center (Cell 2), English Left (Cell 3)
-        // Since it's an RTL table, the first cell added is physically on the right.
-        PdfPTable header = rtlTable(3, 100, new float[] { 1, 0.8f, 1 });
+        // LTR table: [English LEFT] [Logo CENTER] [Arabic RIGHT]
+        PdfPTable header = new PdfPTable(3);
+        header.setWidthPercentage(100);
+        header.setWidths(new float[] { 1f, 0.8f, 1f });
 
         CompanyInfo companyInfo = companyInfoRepository.findAll()
                 .stream().findFirst().orElse(null);
-        String companyEn = companyInfo != null ? safe(companyInfo.getCompanyNameEn()) : "RasRas Plastics";
-        String companyAr = companyInfo != null ? safe(companyInfo.getCompanyNameAr()) : "شركة راس راس للبلاستيك";
+        String companyEn = companyInfo != null
+                ? safe(companyInfo.getCompanyNameEn())
+                : "RasRas Plastics";
+        String companyAr = companyInfo != null
+                ? safe(companyInfo.getCompanyNameAr())
+                : "رصرص لخامات البلاستيك";
 
-        // ── RIGHT column: Arabic Title & Brand ──
-        PdfPCell rightCol = createCell(Rectangle.NO_BORDER, null);
-        rightCol.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
-        rightCol.setVerticalAlignment(Element.ALIGN_MIDDLE);
-
-        addRtlParagraph(rightCol, "فاتورة مورد", titleFont, Element.ALIGN_RIGHT);
-
-        Paragraph invNo = new Paragraph();
-        invNo.setAlignment(Element.ALIGN_RIGHT);
-        invNo.setSpacingBefore(4);
-        invNo.add(new Chunk(safe(invoice.getInvoiceNumber()), invoiceNoFont));
-        rightCol.addElement(invNo);
-
-        addRtlParagraph(rightCol, companyAr, brandSubFont, Element.ALIGN_RIGHT, 4, 0);
-
-        header.addCell(rightCol);
-
-        // ── CENTER column: Logo ──
-        PdfPCell centerCol = createCell(Rectangle.NO_BORDER, null);
-        centerCol.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        centerCol.setHorizontalAlignment(Element.ALIGN_CENTER);
-
-        if (companyInfo != null && companyInfo.getLogoPath() != null && !companyInfo.getLogoPath().isEmpty()) {
-            try {
-                Image logo = loadLogo(companyInfo.getLogoPath().trim());
-                if (logo != null) {
-                    logo.scaleToFit(85, 85);
-                    logo.setAlignment(Element.ALIGN_CENTER);
-                    centerCol.addElement(logo);
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        header.addCell(centerCol);
-
-        // ── LEFT column: English Title & Brand ──
+        // ── COLUMN 1 (physical LEFT): English ──
         PdfPCell leftCol = createCell(Rectangle.NO_BORDER, null);
         leftCol.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
         leftCol.setVerticalAlignment(Element.ALIGN_MIDDLE);
@@ -366,39 +303,147 @@ public class SupplierInvoicePdfService {
 
         header.addCell(leftCol);
 
+        // ── COLUMN 2 (physical CENTER): Logo ──
+        PdfPCell centerCol = createCell(Rectangle.NO_BORDER, null);
+        centerCol.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        centerCol.setHorizontalAlignment(Element.ALIGN_CENTER);
+
+        if (companyInfo != null && companyInfo.getLogoPath() != null
+                && !companyInfo.getLogoPath().isEmpty()) {
+            try {
+                Image logo = loadLogo(companyInfo.getLogoPath().trim());
+                if (logo != null) {
+                    logo.scaleToFit(85, 85);
+                    logo.setAlignment(Element.ALIGN_CENTER);
+                    centerCol.addElement(logo);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        header.addCell(centerCol);
+
+        // ── COLUMN 3 (physical RIGHT): Arabic — FLUSH RIGHT EDGE ──
+        PdfPCell rightCol = createCell(Rectangle.NO_BORDER, null);
+        rightCol.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        rightCol.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        rightCol.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        rightCol.setPadding(0);
+        rightCol.setPaddingRight(0);
+        rightCol.setPaddingLeft(0);
+
+        // Use a nested RTL table to force everything to the right edge
+        PdfPTable rightContent = new PdfPTable(1);
+        rightContent.setWidthPercentage(100);
+        rightContent.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        rightContent.setHorizontalAlignment(Element.ALIGN_RIGHT);
+
+        // ── "فاتورة مورد" — large title ──
+        PdfPCell titleCell = new PdfPCell();
+        titleCell.setBorder(Rectangle.NO_BORDER);
+        titleCell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        titleCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        titleCell.setPadding(0);
+        titleCell.setPaddingBottom(2);
+        titleCell.setPhrase(new Phrase("فاتورة مورد", titleFont));
+        rightContent.addCell(titleCell);
+
+        // ── Invoice number ──
+        PdfPCell invCell = new PdfPCell();
+        invCell.setBorder(Rectangle.NO_BORDER);
+        invCell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        invCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        invCell.setPadding(0);
+        invCell.setPaddingBottom(2);
+        String rawInvNo = safe(invoice.getInvoiceNumber());
+        invCell.setPhrase(new Phrase("\u200E" + rawInvNo, invoiceNoFont));
+        rightContent.addCell(invCell);
+
+        // ── Company name Arabic ──
+        PdfPCell compCell = new PdfPCell();
+        compCell.setBorder(Rectangle.NO_BORDER);
+        compCell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        compCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        compCell.setPadding(0);
+        compCell.setPhrase(new Phrase(companyAr, brandSubFont));
+        rightContent.addCell(compCell);
+
+        rightCol.addElement(rightContent);
+        header.addCell(rightCol);
+
         wrapperCell.addElement(header);
         wrapper.addCell(wrapperCell);
         document.add(wrapper);
 
-        // Accent bar
+        // ── Accent bar ──
         PdfPTable bar = new PdfPTable(1);
         bar.setWidthPercentage(100);
-        bar.setSpacingAfter(15);
+        bar.setSpacingAfter(2);
         PdfPCell barCell = createCell(Rectangle.NO_BORDER, BRAND_PRIMARY);
         barCell.setFixedHeight(3);
         bar.addCell(barCell);
         document.add(bar);
+
+        // ── Extraction timestamp ──
+        addTimestamp(document);
+    }
+    // ─────────────────────────────────────────────────────────────────
+    // TIMESTAMP — FIX: right-aligned, proper RTL rendering
+    // ─────────────────────────────────────────────────────────────────
+
+    private void addTimestamp(Document document) throws DocumentException {
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
+                "yyyy/MM/dd  hh:mm:ss a");
+        String timestamp = now.format(formatter);
+
+        PdfPTable tsTable = new PdfPTable(1);
+        tsTable.setWidthPercentage(100);
+        tsTable.setSpacingAfter(10);
+
+        // Use a cell with RTL direction and RIGHT alignment
+        PdfPCell tsCell = new PdfPCell();
+        tsCell.setBorder(Rectangle.NO_BORDER);
+        tsCell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        tsCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        tsCell.setPadding(4);
+        tsCell.setPaddingRight(8);
+
+        // Build: "تاريخ الاستخراج: 2026/02/11 09:09:20 PM"
+        // Put the timestamp value as LTR chunk so numbers don't reverse
+        Phrase phrase = new Phrase();
+        phrase.add(new Chunk("تاريخ الاستخراج:  ", timestampLabelFont));
+
+        // Force the date/time part to render LTR within the RTL context
+        // by wrapping with Unicode LTR mark
+        String ltrTimestamp = "\u200E" + timestamp + "\u200E";
+        phrase.add(new Chunk(ltrTimestamp, timestampFont));
+
+        PdfPCell innerCell = new PdfPCell(phrase);
+        innerCell.setBorder(Rectangle.NO_BORDER);
+        innerCell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        innerCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        innerCell.setPadding(4);
+        innerCell.setPaddingRight(8);
+
+        tsTable.addCell(innerCell);
+        document.add(tsTable);
     }
 
-    /**
-     * Try multiple strategies to load a company logo image.
-     */
+    // ─────────────────────────────────────────────────────────────────
+    // LOGO LOADING
+    // ─────────────────────────────────────────────────────────────────
+
     private Image loadLogo(String logoPath) {
-        // Strategy 0: User specified specific logo
         try {
-            // Try classpath first
             ClassPathResource res = new ClassPathResource("images/logo.jpeg");
             if (res.exists())
                 return Image.getInstance(res.getURL());
-
-            // Try filesystem dev path
             File f = new File("src/main/resources/images/logo.jpeg");
             if (f.exists())
                 return Image.getInstance(f.getAbsolutePath());
         } catch (Exception ignored) {
         }
 
-        // Strategy 1: Absolute file
         try {
             File f = new File(logoPath);
             if (f.exists())
@@ -406,7 +451,6 @@ public class SupplierInvoicePdfService {
         } catch (Exception ignored) {
         }
 
-        // Strategy 2: uploads/ directory
         try {
             File f = new File("uploads/" + logoPath);
             if (f.exists())
@@ -414,7 +458,6 @@ public class SupplierInvoicePdfService {
         } catch (Exception ignored) {
         }
 
-        // Strategy 3: Classpath
         try {
             ClassPathResource res = new ClassPathResource(logoPath);
             if (res.exists())
@@ -422,7 +465,6 @@ public class SupplierInvoicePdfService {
         } catch (Exception ignored) {
         }
 
-        // Strategy 4: Classpath with static/ prefix
         try {
             ClassPathResource res = new ClassPathResource("static/" + logoPath);
             if (res.exists())
@@ -430,7 +472,6 @@ public class SupplierInvoicePdfService {
         } catch (Exception ignored) {
         }
 
-        // Strategy 5: Dev resources
         try {
             File f = new File("src/main/resources/" + logoPath);
             if (f.exists())
@@ -442,7 +483,7 @@ public class SupplierInvoicePdfService {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // INFO CARDS
+    // INFO CARDS — FIX: values right-aligned in RTL cells
     // ─────────────────────────────────────────────────────────────────
 
     private void addInfoCards(Document document, SupplierInvoiceDto invoice)
@@ -458,9 +499,13 @@ public class SupplierInvoicePdfService {
         addStatusCard(grid, safe(invoice.getStatus()));
 
         addCard(grid, "تاريخ الفاتورة",
-                invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toString() : "—");
+                invoice.getInvoiceDate() != null
+                        ? invoice.getInvoiceDate().toString()
+                        : "—");
         addCard(grid, "تاريخ الاستحقاق",
-                invoice.getDueDate() != null ? invoice.getDueDate().toString() : "—");
+                invoice.getDueDate() != null
+                        ? invoice.getDueDate().toString()
+                        : "—");
         addCard(grid, "رقم الفاتورة", safe(invoice.getInvoiceNumber()));
 
         document.add(grid);
@@ -471,9 +516,18 @@ public class SupplierInvoicePdfService {
         card.setBorderColor(SLATE_200);
         card.setBorderWidth(0.5f);
         card.setPadding(10);
+        card.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
+        // Label
         addRtlParagraph(card, label, labelFont, Element.ALIGN_RIGHT, 0, 2);
-        addRtlParagraph(card, value, valueBoldFont, Element.ALIGN_RIGHT);
+
+        // Value — wrap with LTR marks if it contains Latin/numbers
+        // so things like "AUTO-#GRN-26" and dates don't get mangled
+        Paragraph vp = new Paragraph();
+        vp.setAlignment(Element.ALIGN_RIGHT);
+        String displayValue = "\u200E" + value + "\u200E";
+        vp.add(new Chunk(displayValue, valueBoldFont));
+        card.addElement(vp);
 
         table.addCell(card);
     }
@@ -483,6 +537,7 @@ public class SupplierInvoicePdfService {
         card.setBorderColor(SLATE_200);
         card.setBorderWidth(0.5f);
         card.setPadding(10);
+        card.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
         addRtlParagraph(card, "الحالة", labelFont, Element.ALIGN_RIGHT, 0, 4);
 
@@ -492,11 +547,13 @@ public class SupplierInvoicePdfService {
 
         if (s.contains("unpaid") || s.contains("غير مدفوع")) {
             mappedStatus = "غير مدفوع";
-            bg = WARNING; // Yellow-ish
-        } else if (s.contains("paid") || s.contains("مدفوع") || s.contains("مكتمل") || s.contains("complete")) {
+            bg = WARNING;
+        } else if (s.contains("paid") || s.contains("مدفوع")
+                || s.contains("مكتمل") || s.contains("complete")) {
             mappedStatus = "مدفوع";
-            bg = SUCCESS; // Green
-        } else if (s.contains("معلق") || s.contains("pending") || s.contains("جزئي") || s.contains("partial")) {
+            bg = SUCCESS;
+        } else if (s.contains("معلق") || s.contains("pending")
+                || s.contains("جزئي") || s.contains("partial")) {
             mappedStatus = "معلق";
             bg = WARNING;
         } else if (s.contains("ملغ") || s.contains("cancel")) {
@@ -544,7 +601,8 @@ public class SupplierInvoicePdfService {
         table.setHeaderRows(1);
         table.setSpacingAfter(8);
 
-        String[] headers = { "#", "الصنف", "الكمية", "الوحدة", "السعر", "الخصم", "الإجمالي" };
+        String[] headers = { "#", "الصنف", "الكمية", "الوحدة",
+                "السعر", "الخصم", "الإجمالي" };
         for (String h : headers) {
             PdfPCell cell = new PdfPCell(new Phrase(h, tableHeaderFont));
             cell.setBackgroundColor(TABLE_HEADER_BG);
@@ -564,7 +622,7 @@ public class SupplierInvoicePdfService {
                 Color bg = (idx % 2 == 0) ? ROW_EVEN : ROW_ODD;
 
                 addDataCell(table, String.valueOf(idx + 1), bg, Element.ALIGN_CENTER);
-                addDataCell(table, safe(item.getItemNameAr()), bg, Element.ALIGN_LEFT);
+                addDataCell(table, safe(item.getItemNameAr()), bg, Element.ALIGN_RIGHT);
                 addDataCell(table, fmt(item.getQuantity()), bg, Element.ALIGN_CENTER);
                 addDataCell(table, safe(item.getUnitNameAr()), bg, Element.ALIGN_CENTER);
                 addDataCell(table, formatMoney(item.getUnitPrice()), bg, Element.ALIGN_CENTER);
@@ -587,8 +645,10 @@ public class SupplierInvoicePdfService {
         document.add(table);
     }
 
-    private void addDataCell(PdfPTable table, String value, Color bg, int align) {
-        PdfPCell cell = new PdfPCell(new Phrase(value != null ? value : "", tableCellFont));
+    private void addDataCell(PdfPTable table, String value,
+            Color bg, int align) {
+        PdfPCell cell = new PdfPCell(
+                new Phrase(value != null ? value : "", tableCellFont));
         cell.setBackgroundColor(bg);
         cell.setPadding(6);
         cell.setPaddingLeft(4);
@@ -603,20 +663,21 @@ public class SupplierInvoicePdfService {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // SUMMARY
+    // SUMMARY — FIX: summary box on the RIGHT side (RTL layout)
     // ─────────────────────────────────────────────────────────────────
 
     private void addSummarySection(Document document, SupplierInvoiceDto invoice)
             throws DocumentException {
 
+        // Use RTL outer table so first cell = RIGHT side
         PdfPTable outer = new PdfPTable(2);
         outer.setWidthPercentage(100);
-        outer.setWidths(new float[] { 1f, 1.4f });
+        outer.setWidths(new float[] { 1.4f, 1f });
         outer.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
         outer.setSpacingBefore(5);
         outer.setSpacingAfter(10);
 
-        // ── Summary box (RIGHT in RTL = first cell) ──
+        // ── First cell in RTL = RIGHT side = Summary box ──
         PdfPCell boxOuter = new PdfPCell();
         boxOuter.setBorder(Rectangle.BOX);
         boxOuter.setBorderColor(SLATE_200);
@@ -626,7 +687,7 @@ public class SupplierInvoicePdfService {
 
         PdfPTable summary = new PdfPTable(2);
         summary.setWidthPercentage(100);
-        summary.setWidths(new float[] { 1.2f, 1f });
+        summary.setWidths(new float[] { 1f, 1.2f });
         summary.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
 
         addSummaryRow(summary, "المجموع الفرعي", invoice.getSubTotal(), false);
@@ -645,7 +706,7 @@ public class SupplierInvoicePdfService {
         boxOuter.addElement(summary);
         outer.addCell(boxOuter);
 
-        // ── Spacer (LEFT in RTL = second cell) ──
+        // ── Second cell in RTL = LEFT side = empty spacer ──
         PdfPCell spacer = new PdfPCell();
         spacer.setBorder(Rectangle.NO_BORDER);
         outer.addCell(spacer);
@@ -653,8 +714,8 @@ public class SupplierInvoicePdfService {
         document.add(outer);
     }
 
-    private void addSummaryRow(PdfPTable table, String label, BigDecimal value,
-            boolean isGrand) {
+    private void addSummaryRow(PdfPTable table, String label,
+            BigDecimal value, boolean isGrand) {
 
         Font lf = isGrand ? grandTotalLabelFont : totalLabelFont;
         Font vf = isGrand ? grandTotalValueFont : totalValueFont;
@@ -664,6 +725,7 @@ public class SupplierInvoicePdfService {
         Color borderColor = isGrand ? BRAND_ACCENT : SLATE_100;
         float borderW = isGrand ? 1f : 0.5f;
 
+        // ── Label cell (RIGHT in RTL = first) ──
         PdfPCell lCell = new PdfPCell(new Phrase(label, lf));
         lCell.setBorder(border);
         lCell.setBorderColor(borderColor);
@@ -676,6 +738,7 @@ public class SupplierInvoicePdfService {
         lCell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
         table.addCell(lCell);
 
+        // ── Value cell (LEFT in RTL = second) ──
         String display = formatMoney(value);
         if (isGrand)
             display += "  ج.م";
@@ -710,15 +773,14 @@ public class SupplierInvoicePdfService {
         cell.setPadding(12);
         cell.setHorizontalAlignment(Element.ALIGN_CENTER);
 
-        // Title centered
         Paragraph title = new Paragraph("ملاحظات", sectionFont);
         title.setAlignment(Element.ALIGN_CENTER);
         title.setSpacingAfter(4);
         cell.addElement(title);
 
-        // Content centered
         Font nf = new Font(bfRegular, 10, Font.NORMAL, SLATE_700);
-        Paragraph p = new Paragraph("هذه الفاتورة صادرة وفقاً للشروط والأحكام المتفق عليها مع المورد.", nf);
+        Paragraph p = new Paragraph(
+                "هذه الفاتورة صادرة وفقاً للشروط والأحكام المتفق عليها مع المورد.", nf);
         p.setAlignment(Element.ALIGN_CENTER);
         cell.addElement(p);
 
@@ -747,12 +809,14 @@ public class SupplierInvoicePdfService {
         PdfPCell fc = rtlCell(Rectangle.NO_BORDER, null);
 
         Paragraph p1 = new Paragraph(
-                "تم إنشاء هذه الفاتورة آلياً من نظام رصرص لإدارة الموارد", footerFont);
+                "تم إنشاء هذه الفاتورة آلياً من نظام رصرص لإدارة الموارد",
+                footerFont);
         p1.setAlignment(Element.ALIGN_CENTER);
         fc.addElement(p1);
 
         Paragraph p2 = new Paragraph(
-                "Generated by RasRas ERP System  •  www.rasrasplastic.com", footerSubFont);
+                "Generated by RasRas ERP System  •  www.rasrasplastic.com",
+                footerSubFont);
         p2.setAlignment(Element.ALIGN_CENTER);
         fc.addElement(p2);
 
@@ -831,12 +895,14 @@ public class SupplierInvoicePdfService {
         return c;
     }
 
-    private void addRtlParagraph(PdfPCell cell, String text, Font f, int align) {
+    private void addRtlParagraph(PdfPCell cell, String text,
+            Font f, int align) {
         addRtlParagraph(cell, text, f, align, 0, 0);
     }
 
     private void addRtlParagraph(PdfPCell cell, String text, Font f,
-            int align, float spacingBefore, float spacingAfter) {
+            int align, float spacingBefore,
+            float spacingAfter) {
         Paragraph p = new Paragraph(text, f);
         p.setAlignment(align);
         if (spacingBefore > 0)

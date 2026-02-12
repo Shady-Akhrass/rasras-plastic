@@ -11,4 +11,7 @@ public interface SupplierInvoiceRepository extends JpaRepository<SupplierInvoice
     List<SupplierInvoice> findByStatus(String status);
 
     boolean existsByGrnId(Integer grnId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT i.poId FROM SupplierInvoice i WHERE i.poId IS NOT NULL")
+    List<Integer> findAllInvoicedPoIds();
 }
