@@ -1,5 +1,7 @@
 package com.rasras.erp.supplier;
 
+import com.rasras.erp.approval.ApprovalLimit;
+import com.rasras.erp.approval.ApprovalLimitRepository;
 import com.rasras.erp.inventory.GRNItem;
 import com.rasras.erp.inventory.GoodsReceiptNote;
 import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
@@ -11,6 +13,9 @@ import com.rasras.erp.procurement.PurchaseOrderRepository;
 import com.rasras.erp.supplier.dto.SupplierInvoiceDto;
 import com.rasras.erp.supplier.dto.SupplierInvoiceItemDto;
 import com.rasras.erp.supplier.service.SupplierInvoicePdfService;
+import com.rasras.erp.user.User;
+import com.rasras.erp.user.UserRepository;
+import com.rasras.erp.shared.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +38,8 @@ public class SupplierInvoiceService {
         private final GoodsReceiptNoteRepository grnRepo;
         private final PurchaseOrderRepository poRepo;
         private final SupplierInvoicePdfService pdfService;
+        private final ApprovalLimitRepository approvalLimitRepository;
+        private final UserRepository userRepository;
 
         @Transactional(readOnly = true)
         public List<SupplierInvoiceDto> getAllInvoices() {
@@ -166,8 +173,43 @@ public class SupplierInvoiceService {
                 SupplierInvoice invoice = invoiceRepo.findById(invoiceId)
                                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
+                if (!approved) {
+                        // رفض الاعتماد لا يحتاج تحقق حدود — يتم فقط تحديث الحالة
+                        invoice.setApprovalStatus("Rejected");
+                        return mapToDto(invoiceRepo.save(invoice));
+                }
+
+                // تحقق من صلاحية المستخدم وفق حدود الاعتماد (PAYMENT_APPROVAL)
+                User user = userRepository.findById(userId)
+                                .orElseThrow(() -> new RuntimeException("User not found"));
+
+                java.math.BigDecimal amount = invoice.getTotalAmount();
+                if (amount == null) {
+                        throw new BadRequestException("Invoice total amount is not set");
+                }
+
+                java.util.List<ApprovalLimit> limits = approvalLimitRepository
+                                .findByActivityTypeAndIsActiveTrue("PAYMENT_APPROVAL");
+                boolean allowed = limits.stream().anyMatch(limit -> {
+                        if (limit.getRole() == null
+                                        || !limit.getRole().getRoleId().equals(user.getRole().getRoleId())) {
+                                return false;
+                        }
+                        java.math.BigDecimal min = limit.getMinAmount() != null ? limit.getMinAmount()
+                                        : java.math.BigDecimal.ZERO;
+                        java.math.BigDecimal max = limit.getMaxAmount();
+                        boolean gteMin = amount.compareTo(min) >= 0;
+                        boolean lteMax = (max == null) || amount.compareTo(max) <= 0;
+                        return gteMin && lteMax;
+                });
+
+                if (!allowed) {
+                        throw new BadRequestException(
+                                        "لا تملك صلاحية اعتماد صرف هذه الفاتورة. يرجى تحويلها إلى مستوى أعلى للاعتماد.");
+                }
+
                 String oldStatus = invoice.getApprovalStatus();
-                invoice.setApprovalStatus(approved ? "Approved" : "Rejected");
+                invoice.setApprovalStatus("Approved");
 
                 // If newly approved, update supplier balance
                 if (approved && !"Approved".equals(oldStatus)) {
@@ -320,6 +362,13 @@ public class SupplierInvoiceService {
         public byte[] generateInvoicePdf(Integer id) {
                 SupplierInvoiceDto invoice = getInvoiceById(id);
                 return pdfService.generateInvoicePdf(invoice);
+        }
+
+        @Transactional
+        public void deleteInvoice(Integer id) {
+                SupplierInvoice invoice = invoiceRepo.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                invoiceRepo.delete(invoice);
         }
 
         private String generateInvoiceNumber() {

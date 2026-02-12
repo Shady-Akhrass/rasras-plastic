@@ -527,8 +527,12 @@ const ItemFormPage: React.FC = () => {
         const min = Number(formData.minStockLevel) || 0;
         const reorder = Number(formData.reorderLevel) || 0;
         const max = Number(formData.maxStockLevel) || 0;
-        if (min < 0 || reorder < 0 || max < 0) {
-            return { valid: false, error: 'مستويات المخزون لا يمكن أن تكون سالبة' };
+
+        if (min <= 0 || reorder <= 0 || max <= 0) {
+            return {
+                valid: false,
+                error: 'مستويات المخزون (الحد الأدنى، حد إعادة الطلب، الحد الأقصى) مطلوبة ويجب أن تكون أكبر من صفر'
+            };
         }
         if (max > 0 && (min > reorder || reorder > max)) {
             return { valid: false, error: 'الحد الأدنى ≤ حد إعادة الطلب ≤ الحد الأقصى' };
@@ -540,6 +544,12 @@ const ItemFormPage: React.FC = () => {
         const replacement = Number(formData.replacementPrice) || 0;
         if (cost < 0 || purchase < 0 || sale < 0 || replacement < 0) {
             return { valid: false, error: 'الأسعار والتكاليف لا يمكن أن تكون سالبة' };
+        }
+        if (cost <= 0 || purchase <= 0 || sale <= 0 || replacement <= 0) {
+            return {
+                valid: false,
+                error: 'الأسعار والتكاليف (التكلفة المعيارية، آخر سعر شراء، آخر سعر بيع، السعر الاستبدالي) مطلوبة ويجب أن تكون أكبر من صفر'
+            };
         }
 
         const vat = Number(formData.defaultVatRate) ?? 14;
@@ -891,6 +901,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={DollarSign}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                                 <FormInput
                                     label="آخر سعر شراء"
@@ -899,6 +910,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={ShoppingCart}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                                 <FormInput
                                     label="آخر سعر بيع"
@@ -907,6 +919,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={ShoppingBag}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                                 <FormInput
                                     label="السعر الاستبدالي"
@@ -915,6 +928,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={TrendingUp}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                             </div>
 
@@ -983,6 +997,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={AlertCircle}
                                     type="number"
                                     placeholder="0"
+                                    required
                                     hint="تنبيه عند الوصول لهذا المستوى"
                                     colorClass="text-rose-600 font-bold"
                                 />
@@ -993,6 +1008,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={RefreshCw}
                                     type="number"
                                     placeholder="0"
+                                    required
                                     hint="مستوى طلب إعادة التوريد"
                                     colorClass="text-amber-600 font-bold"
                                 />
@@ -1003,6 +1019,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={TrendingUp}
                                     type="number"
                                     placeholder="0"
+                                    required
                                     hint="الحد الأقصى للمخزون"
                                     colorClass="text-emerald-600 font-bold"
                                 />

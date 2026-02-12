@@ -18,18 +18,19 @@ public class WarehouseController {
     private final WarehouseService warehouseService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE')")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouses() {
         return ResponseEntity.ok(ApiResponse.success(warehouseService.getAllWarehouses()));
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE')")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getActiveWarehouses() {
         return ResponseEntity.ok(ApiResponse.success(warehouseService.getActiveWarehouses()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE')")
     public ResponseEntity<ApiResponse<WarehouseDto>> getWarehouseById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(warehouseService.getWarehouseById(id)));
     }
@@ -61,7 +62,7 @@ public class WarehouseController {
     }
 
     @GetMapping("/{id}/locations")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE')")
     public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getLocations(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(warehouseService.getLocations(id)));
     }

@@ -103,7 +103,9 @@ const ComparisonTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onDelete: (comparison: QuotationComparison) => void;
-}> = ({ comparison, index, onView, onDelete }) => (
+    isSelected: boolean;
+    onToggleSelect: (id: number) => void;
+}> = ({ comparison, index, onView, onDelete, isSelected, onToggleSelect }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -111,6 +113,14 @@ const ComparisonTableRow: React.FC<{
             animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
+        <td className="px-4 py-4 text-center">
+            <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                checked={isSelected}
+                onChange={() => comparison.id && onToggleSelect(comparison.id)}
+            />
+        </td>
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
@@ -174,6 +184,9 @@ const TableSkeleton: React.FC = () => (
     <>
         {[1, 2, 3, 4, 5].map(i => (
             <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-4 py-4 text-center">
+                    <div className="w-4 h-4 bg-slate-100 rounded" />
+                </td>
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg" />
@@ -201,7 +214,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
     <tr>
-        <td colSpan={6} className="px-6 py-16">
+        <td colSpan={7} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm ? (
@@ -233,6 +246,7 @@ const QuotationComparisonPage: React.FC = () => {
     const [pageSize, setPageSize] = useState(15);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [comparisonToDelete, setComparisonToDelete] = useState<QuotationComparison | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
@@ -287,15 +301,44 @@ const QuotationComparisonPage: React.FC = () => {
         setIsDeleteModalOpen(true);
     };
 
+    const handleToggleSelect = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAllPage = () => {
+        const pageIds = paginatedComparisons.map(c => c.id!).filter(Boolean);
+        const allSelected = pageIds.every(id => selectedIds.includes(id));
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+        }
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (selectedIds.length === 0) {
+            toast.error('يرجى اختيار مقارنات أولاً');
+            return;
+        }
+        setComparisonToDelete(null);
+        setIsDeleteModalOpen(true);
+    };
+
     const handleDeleteConfirm = async () => {
-        if (!comparisonToDelete?.id) return;
+        const idsToDelete = comparisonToDelete?.id ? [comparisonToDelete.id] : selectedIds;
+        if (!idsToDelete.length) return;
         setIsDeleting(true);
         try {
-            await purchaseService.deleteComparison(comparisonToDelete.id);
-            toast.success('تم حذف مقارنة العروض بنجاح');
+            for (const id of idsToDelete) {
+                await purchaseService.deleteComparison(id);
+            }
+            toast.success('تم حذف مقارنات العروض بنجاح');
             fetchComparisons();
             setIsDeleteModalOpen(false);
             setComparisonToDelete(null);
+            setSelectedIds([]);
         } catch (error) {
             toast.error('فشل حذف مقارنة العروض');
         } finally {
@@ -439,6 +482,17 @@ const QuotationComparisonPage: React.FC = () => {
                     <table className="w-full">
                         <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                             <tr>
+                                <th className="px-4 py-4 text-center text-sm font-bold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                                        checked={
+                                            paginatedComparisons.length > 0 &&
+                                            paginatedComparisons.every(c => c.id && selectedIds.includes(c.id))
+                                        }
+                                        onChange={handleToggleSelectAllPage}
+                                    />
+                                </th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم المقارنة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الصنف</th>
                                 <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">عدد العروض</th>
@@ -460,6 +514,8 @@ const QuotationComparisonPage: React.FC = () => {
                                         index={index}
                                         onView={handleView}
                                         onDelete={handleDeleteClick}
+                                        isSelected={!!comparison.id && selectedIds.includes(comparison.id)}
+                                        onToggleSelect={handleToggleSelect}
                                     />
                                 ))
                             )}
@@ -467,20 +523,38 @@ const QuotationComparisonPage: React.FC = () => {
                     </table>
                 </div>
                 {!loading && filteredComparisons.length > 0 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalItems={filteredComparisons.length}
-                        pageSize={pageSize}
-                        onPageChange={setCurrentPage}
-                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
-                    />
+                    <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleBulkDeleteClick}
+                                disabled={selectedIds.length === 0 || isDeleting}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold
+                                    border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100
+                                    disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                حذف المحدد ({selectedIds.length})
+                            </button>
+                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filteredComparisons.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                        />
+                    </div>
                 )}
             </div>
 
             <ConfirmModal
                 isOpen={isDeleteModalOpen}
                 title="حذف مقارنة العروض"
-                message={`هل أنت متأكد من حذف مقارنة العروض رقم ${comparisonToDelete?.comparisonNumber}؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`}
+                message={
+                    comparisonToDelete
+                        ? `هل أنت متأكد من حذف مقارنة العروض رقم ${comparisonToDelete.comparisonNumber}؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`
+                        : `هل أنت متأكد من حذف عدد ${selectedIds.length} من مقارنات العروض؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`
+                }
                 confirmText="حذف"
                 cancelText="إلغاء"
                 onConfirm={handleDeleteConfirm}

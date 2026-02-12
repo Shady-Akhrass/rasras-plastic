@@ -7,6 +7,7 @@ import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
 import com.rasras.erp.inventory.GoodsReceiptNote;
 import com.rasras.erp.procurement.dto.PurchaseReturnDto;
 import com.rasras.erp.procurement.dto.PurchaseReturnItemDto;
+import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.supplier.SupplierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -89,6 +90,16 @@ public class PurchaseReturnService {
         }
 
         return mapToDto(saved);
+    }
+
+    @Transactional
+    public void deleteReturn(Integer id) {
+        PurchaseReturn entity = returnRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Return not found"));
+        if ("Approved".equals(entity.getStatus())) {
+            throw new BadRequestException("لا يمكن حذف مرتجع شراء معتمد؛ تمت تسوية المخزين والأرصدة. يمكن إصدار مرتجع عكسي إذا لزم.");
+        }
+        returnRepo.delete(entity);
     }
 
     @Transactional

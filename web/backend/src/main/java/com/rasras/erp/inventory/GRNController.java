@@ -47,4 +47,16 @@ public class GRNController {
             @RequestParam Integer userId) {
         return ResponseEntity.ok(Map.of("data", grnService.submitGRN(id, userId)));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Void>> deleteGRN(@PathVariable Integer id) {
+        grnService.deleteGRN(id);
+        return ResponseEntity.ok(Map.of("data", null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<Map<String, Void>> deleteGRNPost(@PathVariable Integer id) {
+        grnService.deleteGRN(id);
+        return ResponseEntity.ok(Map.of("data", null));
+    }
 }

@@ -1,5 +1,6 @@
 package com.rasras.erp.inventory;
 
+import com.rasras.erp.inventory.dto.ItemBelowMinDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class StockBalanceService {
     private final StockMovementRepository movementRepo;
     private final ItemRepository itemRepo;
     private final WarehouseRepository warehouseRepo;
+    private final UnitRepository unitRepo;
 
     @Transactional(readOnly = true)
     public List<StockBalanceDto> getAllBalances() {
@@ -142,6 +144,56 @@ public class StockBalanceService {
                     .minStockLevel(item.getMinStockLevel())
                     .build());
         }
+        return result;
+    }
+
+    /**
+     * تقرير الأصناف تحت الحد الأدنى: أصناف لها حد أدنى مُعرّف والرصيد المجمع أقل منه
+     */
+    @Transactional(readOnly = true)
+    public List<ItemBelowMinDto> getItemsBelowMin(Integer warehouseId) {
+        List<StockBalance> balances = warehouseId != null
+                ? balanceRepo.findByWarehouseId(warehouseId)
+                : balanceRepo.findAll();
+
+        Map<Integer, BigDecimal> totalByItem = new HashMap<>();
+        for (StockBalance b : balances) {
+            int itemId = b.getItem().getId();
+            BigDecimal qty = b.getQuantityOnHand() != null ? b.getQuantityOnHand() : BigDecimal.ZERO;
+            totalByItem.merge(itemId, qty, BigDecimal::add);
+        }
+
+        List<Item> itemsWithMin = itemRepo.findAll().stream()
+                .filter(i -> i.getMinStockLevel() != null && i.getMinStockLevel().compareTo(BigDecimal.ZERO) > 0)
+                .collect(Collectors.toList());
+
+        Map<Integer, String> unitNames = new HashMap<>();
+        unitRepo.findAll().forEach(u -> unitNames.put(u.getId(), u.getUnitNameAr()));
+
+        List<ItemBelowMinDto> result = new ArrayList<>();
+        for (Item item : itemsWithMin) {
+            BigDecimal total = totalByItem.getOrDefault(item.getId(), BigDecimal.ZERO);
+            if (total.compareTo(item.getMinStockLevel()) >= 0) continue;
+
+            BigDecimal min = item.getMinStockLevel();
+            BigDecimal diff = min.subtract(total);
+            String unitName = unitNames.getOrDefault(item.getUnitId(), "");
+
+            result.add(ItemBelowMinDto.builder()
+                    .itemId(item.getId())
+                    .itemCode(item.getItemCode())
+                    .itemNameAr(item.getItemNameAr())
+                    .grade(item.getGrade())
+                    .unitId(item.getUnitId())
+                    .unitName(unitName)
+                    .totalQuantityOnHand(total)
+                    .minStockLevel(min)
+                    .reorderLevel(item.getReorderLevel())
+                    .maxStockLevel(item.getMaxStockLevel())
+                    .diff(diff)
+                    .build());
+        }
+        result.sort(Comparator.comparing(ItemBelowMinDto::getDiff).reversed());
         return result;
     }
 

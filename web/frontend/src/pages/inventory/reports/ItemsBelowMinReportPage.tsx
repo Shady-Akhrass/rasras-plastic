@@ -1,37 +1,45 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ChevronRight, Download, RefreshCw, Scale } from 'lucide-react';
-import { itemService, type ItemDto } from '../../../services/itemService';
+import stockBalanceService, { type ItemBelowMinDto } from '../../../services/stockBalanceService';
+import warehouseService from '../../../services/warehouseService';
+import type { WarehouseDto } from '../../../services/warehouseService';
 import { toast } from 'react-hot-toast';
 
 const ItemsBelowMinReportPage: React.FC = () => {
     const navigate = useNavigate();
-    const [items, setItems] = useState<ItemDto[]>([]);
+    const [belowMin, setBelowMin] = useState<ItemBelowMinDto[]>([]);
+    const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
+    const [warehouseId, setWarehouseId] = useState<number | undefined>(undefined);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchItems();
+        (async () => {
+            try {
+                const whRes = await warehouseService.getAll();
+                setWarehouses((whRes as any)?.data ?? []);
+            } catch {
+                setWarehouses([]);
+            }
+        })();
     }, []);
 
-    const fetchItems = async () => {
+    const fetchReport = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await itemService.getAllItems();
-            setItems(res.data || []);
+            const data = await stockBalanceService.getItemsBelowMin(warehouseId);
+            setBelowMin(Array.isArray(data) ? data : []);
         } catch (e) {
-            toast.error('فشل تحميل الأصناف');
+            toast.error('فشل تحميل التقرير');
+            setBelowMin([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [warehouseId]);
 
-    const belowMin = useMemo(() => {
-        return items.filter(i => {
-            const stock = (i as any).currentStock ?? 0;
-            const min = Number(i.minStockLevel) || 0;
-            return min > 0 && stock < min;
-        });
-    }, [items]);
+    useEffect(() => {
+        fetchReport();
+    }, [fetchReport]);
 
     return (
         <div className="space-y-6">
@@ -51,7 +59,17 @@ const ItemsBelowMinReportPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button onClick={fetchItems} disabled={loading} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl">
+                        <select
+                            value={warehouseId ?? ''}
+                            onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : undefined)}
+                            className="px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30"
+                        >
+                            <option value="">كل المخازن</option>
+                            {warehouses.map((w) => (
+                                <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>
+                            ))}
+                        </select>
+                        <button onClick={fetchReport} disabled={loading} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl">
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                         <button className="p-3 bg-white/10 hover:bg-white/20 rounded-xl">
@@ -105,12 +123,12 @@ const ItemsBelowMinReportPage: React.FC = () => {
                                 </tr>
                             ) : (
                                 belowMin.map((i) => {
-                                    const stock = (i as any).currentStock ?? 0;
+                                    const stock = Number(i.totalQuantityOnHand) || 0;
                                     const min = Number(i.minStockLevel) || 0;
                                     const reorder = Number(i.reorderLevel) || 0;
-                                    const diff = min - stock;
+                                    const diff = Number(i.diff) || 0;
                                     return (
-                                        <tr key={i.id} className="border-b border-slate-100 hover:bg-rose-50/50">
+                                        <tr key={i.itemId} className="border-b border-slate-100 hover:bg-rose-50/50">
                                             <td className="px-6 py-4 font-mono font-semibold text-brand-primary">{i.grade || i.itemCode}</td>
                                             <td className="px-6 py-4 font-medium text-slate-800">{i.itemNameAr}</td>
                                             <td className="px-6 py-4 text-slate-600">{i.unitName || '-'}</td>
@@ -124,7 +142,7 @@ const ItemsBelowMinReportPage: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <button
-                                                    onClick={() => navigate(`/dashboard/inventory/items/${i.id}`)}
+                                                    onClick={() => navigate(`/dashboard/inventory/items/${i.itemId}`)}
                                                     className="px-3 py-1.5 bg-brand-primary/10 text-brand-primary rounded-lg text-sm font-medium hover:bg-brand-primary hover:text-white"
                                                 >
                                                     فتح

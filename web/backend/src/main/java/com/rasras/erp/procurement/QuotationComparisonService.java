@@ -119,6 +119,13 @@ public class QuotationComparisonService {
                 return mapToDto(comparisonRepository.save(comparison));
         }
 
+        @Transactional
+        public void deleteComparison(Integer id) {
+                QuotationComparison comparison = comparisonRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Comparison not found"));
+                comparisonRepository.delete(comparison);
+        }
+
         private String generateComparisonNumber() {
                 long count = comparisonRepository.count() + 1;
                 return "#COMP-" + count;

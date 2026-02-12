@@ -111,6 +111,15 @@ public class EmployeeService {
     }
 
     @Transactional
+    public EmployeeDto updateMyProfile(Integer employeeId, UpdateMyProfileRequest request) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee", "id", employeeId));
+        if (request.getFirstNameAr() != null) employee.setFirstNameAr(request.getFirstNameAr());
+        if (request.getLastNameAr() != null) employee.setLastNameAr(request.getLastNameAr());
+        return mapToDto(employeeRepository.save(employee));
+    }
+
+    @Transactional
     public void deleteEmployee(Integer id) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", "id", id));

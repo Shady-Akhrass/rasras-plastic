@@ -47,4 +47,16 @@ public class SupplierInvoiceController {
                 .header("Content-Disposition", "attachment; filename=\"invoice-" + id + ".pdf\"")
                 .body(pdf);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteInvoice(@PathVariable Integer id) {
+        invoiceService.deleteInvoice(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<ApiResponse<Void>> deleteInvoicePost(@PathVariable Integer id) {
+        invoiceService.deleteInvoice(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }

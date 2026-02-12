@@ -14,10 +14,12 @@ import {
     RefreshCw,
     X,
     Eye,
-    Archive
+    Archive,
+    Trash2
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
 
 // Stat Card Component
@@ -105,7 +107,10 @@ const GRNTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onFinalize: (id: number, type?: number) => void;
-}> = ({ receipt, index, onView, onFinalize }) => (
+    onDelete: (receipt: GoodsReceiptNoteDto) => void;
+    isSelected: boolean;
+    onToggleSelect: (id: number) => void;
+}> = ({ receipt, index, onView, onFinalize, onDelete, isSelected, onToggleSelect }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -113,6 +118,14 @@ const GRNTableRow: React.FC<{
             animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
+        <td className="px-4 py-4 text-center">
+            <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                checked={isSelected}
+                onChange={() => receipt.id && onToggleSelect(receipt.id)}
+            />
+        </td>
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
@@ -166,6 +179,13 @@ const GRNTableRow: React.FC<{
                 >
                     <Eye className="w-4 h-4" />
                 </button>
+                <button
+                    onClick={() => onDelete(receipt)}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                    title="حذف"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
                 {/* زر إضافة للمخزن: للإذونات التي تم اعتماد فحص الجودة لها فقط (تم الفحص أو إذن معتمد) */}
                 {(() => {
                     const s = (receipt.status || '').toLowerCase();
@@ -195,6 +215,9 @@ const TableSkeleton: React.FC = () => (
     <>
         {[1, 2, 3, 4, 5].map(i => (
             <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-4 py-4 text-center">
+                    <div className="w-4 h-4 bg-slate-100 rounded" />
+                </td>
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg" />
@@ -218,7 +241,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
     <tr>
-        <td colSpan={6} className="px-6 py-16">
+        <td colSpan={7} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm ? (
@@ -251,6 +274,10 @@ const GRNsPage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<'all' | 'ready'>('all'); // افتراضي: الكل حتى تظهر الأذونات الجديدة (بانتظار الفحص وغيرها)
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [receiptToDelete, setReceiptToDelete] = useState<GoodsReceiptNoteDto | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchReceipts();
@@ -330,6 +357,57 @@ const GRNsPage: React.FC = () => {
 
     const handleViewGRN = (id: number) => {
         navigate(`/dashboard/procurement/grn/${id}`);
+    };
+
+    const handleDeleteClick = (receipt: GoodsReceiptNoteDto) => {
+        setReceiptToDelete(receipt);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleToggleSelect = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAllPage = () => {
+        const pageIds = paginatedReceipts.map(r => r.id!).filter(Boolean);
+        const allSelected = pageIds.every(id => selectedIds.includes(id));
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+        }
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (selectedIds.length === 0) {
+            toast.error('يرجى اختيار إذن إضافة واحد على الأقل');
+            return;
+        }
+        setReceiptToDelete(null);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        const idsToDelete = receiptToDelete?.id ? [receiptToDelete.id] : selectedIds;
+        if (!idsToDelete.length) return;
+        setIsDeleting(true);
+        try {
+            for (const id of idsToDelete) {
+                await grnService.deleteGRN(id);
+            }
+            toast.success(idsToDelete.length === 1 ? 'تم حذف إذن الإضافة بنجاح' : 'تم حذف أذونات الإضافة بنجاح');
+            fetchReceipts();
+            setIsDeleteModalOpen(false);
+            setReceiptToDelete(null);
+            setSelectedIds([]);
+        } catch (error: any) {
+            const apiMessage = error?.response?.data?.message as string | undefined;
+            toast.error(apiMessage || 'فشل حذف إذن الإضافة');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
@@ -496,6 +574,17 @@ const GRNsPage: React.FC = () => {
                     <table className="w-full">
                         <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                             <tr>
+                                <th className="px-4 py-4 text-center text-sm font-bold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                                        checked={
+                                            paginatedReceipts.length > 0 &&
+                                            paginatedReceipts.every(r => r.id && selectedIds.includes(r.id))
+                                        }
+                                        onChange={handleToggleSelectAllPage}
+                                    />
+                                </th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم إذن الإضافة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">أمر الشراء</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
@@ -517,6 +606,9 @@ const GRNsPage: React.FC = () => {
                                         index={index}
                                         onView={handleViewGRN}
                                         onFinalize={handleFinalizeStoreIn}
+                                        onDelete={handleDeleteClick}
+                                        isSelected={!!receipt.id && selectedIds.includes(receipt.id)}
+                                        onToggleSelect={handleToggleSelect}
                                     />
                                 ))
                             )}
@@ -524,15 +616,45 @@ const GRNsPage: React.FC = () => {
                     </table>
                 </div>
                 {!loading && filteredReceipts.length > 0 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalItems={filteredReceipts.length}
-                        pageSize={pageSize}
-                        onPageChange={setCurrentPage}
-                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
-                    />
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleBulkDeleteClick}
+                                disabled={selectedIds.length === 0 || isDeleting}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold
+                                    border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100
+                                    disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                حذف المحدد ({selectedIds.length})
+                            </button>
+                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filteredReceipts.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                        />
+                    </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف إذن الإضافة (GRN)"
+                message={
+                    receiptToDelete
+                        ? `هل أنت متأكد من حذف إذن الإضافة رقم ${receiptToDelete.grnNumber}؟ سيتم حذف البيانات المرتبطة به واسترجاع الكميات في أمر الشراء. لا يمكن حذف إذن تمت إضافته للمخزن.`
+                        : `هل أنت متأكد من حذف عدد ${selectedIds.length} من أذونات الإضافة؟ سيتم حذف البيانات المرتبطة بها واسترجاع الكميات في أوامر الشراء.`
+                }
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setReceiptToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

@@ -35,4 +35,16 @@ public class SupplierQuotationController {
             @RequestBody SupplierQuotationDto dto) {
         return ResponseEntity.ok(ApiResponse.success(quotationService.updateQuotation(id, dto)));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteQuotation(@PathVariable Integer id) {
+        quotationService.deleteQuotation(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<ApiResponse<Void>> deleteQuotationPost(@PathVariable Integer id) {
+        quotationService.deleteQuotation(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }

@@ -170,6 +170,13 @@ public class PurchaseOrderService {
                 return createdGRN;
         }
 
+        @Transactional
+        public void deletePO(Integer id) {
+                PurchaseOrder po = poRepo.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Purchase Order not found"));
+                poRepo.delete(po);
+        }
+
         private String generatePONumber() {
                 long count = poRepo.count() + 1;
                 return "#PO-" + count;

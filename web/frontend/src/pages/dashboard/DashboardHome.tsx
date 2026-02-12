@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, type Variants } from 'framer-motion';
+import WarehouseDashboard from './WarehouseDashboard';
+import ManagementDashboard from './ManagementDashboard';
+import ProcurementDashboard from './ProcurementDashboard';
 import {
     Users, Package, TrendingUp, ArrowUpRight, ArrowDownRight, User,
     Loader2, FileText, DollarSign, Calendar, Clock,
@@ -14,6 +17,13 @@ import apiClient from '../../services/apiClient';
 import { formatDate as formatDateEn } from '../../utils/format';
 import ExchangeRateWidget from '../../components/ExchangeRate/ExchangeRateWidget';
 import ExchangeRateCompact from '../../components/ExchangeRate/ExchangeRateCompact';
+
+interface DashboardStats {
+    totalEmployees?: number;
+    activeEmployees?: number;
+    totalDepartments?: number;
+    employeeGrowthRate?: number;
+}
 
 // Animation variants
 const containerVariants: Variants = {
@@ -334,13 +344,13 @@ const CircularProgress = ({
 const DashboardHome: React.FC = () => {
     usePageTitle('لوحة التحكم');
     const navigate = useNavigate();
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<DashboardStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
-    const employeeDisplayName = user?.fullNameAr || user?.username || 'المستخدم';
+    const userRole = (user?.roleCode || '').toUpperCase();
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -360,6 +370,13 @@ const DashboardHome: React.FC = () => {
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);
     }, []);
+
+    // تخصيص لوحة التحكم حسب الدور
+    if (userRole === 'WHM') return <WarehouseDashboard />;
+    if (userRole === 'PM' || userRole === 'BUYER') return <ProcurementDashboard />;
+    if (userRole === 'GM' || userRole === 'ADMIN') return <ManagementDashboard />;
+
+    const employeeDisplayName = user?.fullNameAr || user?.username || 'المستخدم';
 
     const getGreeting = () => {
         const hour = currentTime.getHours();

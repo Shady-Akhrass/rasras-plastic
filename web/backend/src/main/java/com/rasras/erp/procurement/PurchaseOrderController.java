@@ -47,4 +47,16 @@ public class PurchaseOrderController {
             @RequestParam(required = false) Integer userId) {
         return ResponseEntity.ok(Map.of("data", poService.markAsArrived(id, userId)));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Void>> deletePO(@PathVariable Integer id) {
+        poService.deletePO(id);
+        return ResponseEntity.ok(Map.of("data", null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<Map<String, Void>> deletePOPost(@PathVariable Integer id) {
+        poService.deletePO(id);
+        return ResponseEntity.ok(Map.of("data", null));
+    }
 }

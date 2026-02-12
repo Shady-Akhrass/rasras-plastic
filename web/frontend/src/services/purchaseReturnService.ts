@@ -56,6 +56,10 @@ export const purchaseReturnService = {
     createReturn: async (dto: PurchaseReturnDto) => {
         const response = await apiClient.post<ApiResponse<PurchaseReturnDto>>('/procurement/returns', dto);
         return response.data;
+    },
+
+    deleteReturn: async (id: number) => {
+        await apiClient.post(`/procurement/returns/${id}/delete`);
     }
 };
 

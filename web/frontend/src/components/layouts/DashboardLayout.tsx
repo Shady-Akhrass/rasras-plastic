@@ -411,14 +411,10 @@ const DashboardLayout: React.FC = () => {
         document.title = match ? `${match.label} | نظام RasRas` : 'نظام RasRas';
     }, [location.pathname]);
 
-    // عرض العناصر: إن وُجدت صلاحيات المستخدم نعتمد عليها (ديناميكي)، وإلا نعتمد على الأدوار (احتياطي)
+    // عرض العناصر: حسب الصلاحيات فقط (ديناميكياً من لوحة التحكم → الأدوار والصلاحيات)
     const filteredNavItems = navItems.filter(item => {
-        const usePerms = userPermissions.length > 0;
-        if (usePerms) {
-            if (!item.requiredPermission) return true;
-            return userPermissions.includes(item.requiredPermission);
-        }
-        return !item.roles || item.roles.length === 0 || item.roles.includes(userRole.toUpperCase());
+        if (!item.requiredPermission) return true;
+        return userPermissions.length > 0 && userPermissions.includes(item.requiredPermission);
     });
 
     // أدوار المدير: عندهم قائمة منسدلة (ينقرون لفتح كل قسم). غير المدير: القوائم الفرعية تظهر مباشرة
@@ -985,7 +981,7 @@ const DashboardLayout: React.FC = () => {
                                         animate-in fade-in slide-in-from-top-2 duration-200">
                                         <div className="p-2">
                                             <Link
-                                                to={user?.employeeId ? `/dashboard/employees/${user.employeeId}` : '/dashboard/employees'}
+                                                to="/dashboard/profile"
                                                 onClick={() => setUserMenuOpen(false)}
                                                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-700 
                                                     hover:bg-slate-50 transition-colors"

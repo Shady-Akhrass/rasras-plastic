@@ -37,6 +37,18 @@ public class QuotationComparisonController {
         return ResponseEntity.ok(ApiResponse.success(comparisonService.updateComparison(id, dto)));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteComparison(@PathVariable Integer id) {
+        comparisonService.deleteComparison(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<ApiResponse<Void>> deleteComparisonPost(@PathVariable Integer id) {
+        comparisonService.deleteComparison(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @PostMapping("/{id}/submit")
     public ResponseEntity<ApiResponse<QuotationComparisonDto>> submitForApproval(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(comparisonService.submitForApproval(id)));

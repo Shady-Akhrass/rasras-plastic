@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 @Service
@@ -32,13 +33,23 @@ public class InventoryService {
                         .quantityReserved(BigDecimal.ZERO)
                         .build());
 
-        BigDecimal balanceBefore = balance.getQuantityOnHand();
+        BigDecimal balanceBefore = balance.getQuantityOnHand() != null ? balance.getQuantityOnHand() : BigDecimal.ZERO;
         BigDecimal newQuantity;
 
         if ("IN".equalsIgnoreCase(direction)) {
             newQuantity = balanceBefore.add(quantity);
+            // تحديث التكلفة المتوسطة المرجحة عند حركة الإدخال
+            BigDecimal currentAvgCost = balance.getAverageCost() != null ? balance.getAverageCost() : BigDecimal.ZERO;
+            BigDecimal incomingCost = unitCost != null ? unitCost : BigDecimal.ZERO;
+            if (newQuantity.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal valueBefore = balanceBefore.multiply(currentAvgCost);
+                BigDecimal valueIncoming = quantity.multiply(incomingCost);
+                BigDecimal newAverageCost = valueBefore.add(valueIncoming).divide(newQuantity, 4, RoundingMode.HALF_UP);
+                balance.setAverageCost(newAverageCost);
+            }
         } else {
             newQuantity = balanceBefore.subtract(quantity);
+            // عند OUT: التكلفة المتوسطة للرصيد المتبقي لا تتغير
         }
 
         balance.setQuantityOnHand(newQuantity);

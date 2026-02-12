@@ -3,6 +3,8 @@ package com.rasras.erp.inventory;
 import com.rasras.erp.procurement.PurchaseOrder;
 import com.rasras.erp.procurement.PurchaseOrderItem;
 import com.rasras.erp.procurement.PurchaseOrderRepository;
+import com.rasras.erp.shared.exception.BadRequestException;
+import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import com.rasras.erp.supplier.Supplier;
 import com.rasras.erp.supplier.SupplierRepository;
 import lombok.RequiredArgsConstructor;
@@ -181,6 +183,33 @@ public class GRNService {
                 saved.getGrnNumber(), userId, saved.getTotalReceivedQty());
 
         return mapToDto(saved);
+    }
+
+    @Transactional
+    public void deleteGRN(Integer id) {
+        GoodsReceiptNote grn = grnRepo.findByIdWithItems(id)
+                .orElseThrow(() -> new ResourceNotFoundException("إذن الإضافة غير موجود"));
+        if ("Completed".equals(grn.getStatus())) {
+            throw new BadRequestException("لا يمكن حذف إذن إضافة تمت إضافته للمخزن. يمكن إصدار مرتجع شراء إذا لزم.");
+        }
+        PurchaseOrder po = grn.getPurchaseOrder();
+        if (grn.getItems() != null && !grn.getItems().isEmpty()) {
+            for (GRNItem grnItem : grn.getItems()) {
+                PurchaseOrderItem poItem = po.getItems().stream()
+                        .filter(pi -> pi.getId().equals(grnItem.getPoItemId()))
+                        .findFirst()
+                        .orElse(null);
+                if (poItem != null) {
+                    BigDecimal reverted = poItem.getReceivedQty().subtract(grnItem.getReceivedQty());
+                    poItem.setReceivedQty(reverted.max(BigDecimal.ZERO));
+                    poItem.setStatus(reverted.compareTo(BigDecimal.ZERO) <= 0 ? "Open" : "PartiallyReceived");
+                }
+            }
+            boolean allOpen = po.getItems().stream().allMatch(pi -> "Open".equals(pi.getStatus()));
+            po.setStatus(allOpen ? "Approved" : "PartiallyReceived");
+            poRepo.save(po);
+        }
+        grnRepo.delete(grn);
     }
 
     private void updatePOQuantities(PurchaseOrder po, List<GRNItem> grnItems) {

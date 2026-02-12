@@ -68,6 +68,9 @@ export const purchaseOrderService = {
         const response = await apiClient.post<{ data: PurchaseOrderDto }>('/procurement/po', po);
         return response.data.data;
     },
+    deletePO: async (id: number) => {
+        await apiClient.post(`/procurement/po/${id}/delete`);
+    },
     markAsArrived: async (poId: number, userId?: number) => {
         const url = userId != null 
             ? `/procurement/po/${poId}/mark-arrived?userId=${userId}`
