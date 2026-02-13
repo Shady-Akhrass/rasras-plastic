@@ -38,8 +38,15 @@ public class RoleService {
 
     @Transactional
     public RoleDto createRole(RoleDto dto) {
+        String roleCode = (dto.getRoleCode() != null) ? dto.getRoleCode().trim() : "";
+        if (roleCode.isEmpty()) {
+            throw new BadRequestException("كود الدور مطلوب");
+        }
+        if (roleRepository.existsByRoleCode(roleCode)) {
+            throw new BadRequestException("كود الدور مكرر - يرجى استخدام كود آخر");
+        }
         Role role = Role.builder()
-                .roleCode(dto.getRoleCode())
+                .roleCode(roleCode)
                 .roleNameAr(dto.getRoleNameAr())
                 .roleNameEn(dto.getRoleNameEn())
                 .description(dto.getDescription())
@@ -53,7 +60,17 @@ public class RoleService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Role not found"));
 
-        role.setRoleCode(dto.getRoleCode());
+        String roleCode = (dto.getRoleCode() != null) ? dto.getRoleCode().trim() : "";
+        if (roleCode.isEmpty()) {
+            throw new BadRequestException("كود الدور مطلوب");
+        }
+        // التحقق من عدم تكرار الكود في أدوار أخرى (استثناء الدور الحالي)
+        roleRepository.findByRoleCode(roleCode).ifPresent(existing -> {
+            if (!existing.getRoleId().equals(id)) {
+                throw new BadRequestException("كود الدور مكرر - يرجى استخدام كود آخر");
+            }
+        });
+        role.setRoleCode(roleCode);
         role.setRoleNameAr(dto.getRoleNameAr());
         role.setRoleNameEn(dto.getRoleNameEn());
         role.setDescription(dto.getDescription());
@@ -89,8 +106,13 @@ public class RoleService {
         List<RolePermission> existing = rolePermissionRepository.findByRoleRoleId(roleId);
         rolePermissionRepository.deleteAll(existing);
 
+        // إزالة التكرار لتجنب خرق قيد UNIQUE (RoleID, PermissionID)
+        List<Integer> distinctIds = permissionIds != null
+                ? permissionIds.stream().distinct().filter(pid -> pid != null).collect(Collectors.toList())
+                : List.of();
+
         // Add new permissions
-        List<RolePermission> newPermissions = permissionIds.stream()
+        List<RolePermission> newPermissions = distinctIds.stream()
                 .map(permId -> {
                     Permission permission = permissionRepository.findById(permId)
                             .orElseThrow(() -> new RuntimeException("Permission not found: " + permId));
