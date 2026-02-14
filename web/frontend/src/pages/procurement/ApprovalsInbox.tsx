@@ -55,6 +55,7 @@ const STEP_NAME_AR: Record<string, string> = {
     'Procurement Manager Approval': 'اعتماد مدير المشتريات',
     'Finance Manager Approval': 'اعتماد المدير المالي',
     'General Manager Approval': 'اعتماد المدير العام',
+    'Quality Controller Approval': 'اعتماد مراقب الجودة',
 };
 const tr = (en: string | undefined, map: Record<string, string>) =>
     en && map[en] ? map[en] : en || '';
@@ -440,14 +441,16 @@ const RequestCard: React.FC<{
                     </div>
 
                     {/* Amount */}
-                    <div className="flex flex-row lg:flex-col justify-center items-center lg:items-end 
-                        px-5 lg:border-x border-slate-100/80 min-w-[140px] gap-2 lg:gap-0">
-                        <div className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">إجمالي</div>
-                        <div className="text-xl lg:text-2xl font-black text-slate-800 tabular-nums">
-                            {formatNumber(request.totalAmount ?? 0)}
+                    {(request.totalAmount ?? 0) > 0 && (
+                        <div className="flex flex-row lg:flex-col justify-center items-center lg:items-end 
+                            px-5 lg:border-x border-slate-100/80 min-w-[140px] gap-2 lg:gap-0">
+                            <div className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">إجمالي</div>
+                            <div className="text-xl lg:text-2xl font-black text-slate-800 tabular-nums">
+                                {formatNumber(request.totalAmount ?? 0)}
+                            </div>
+                            <div className="text-xs text-slate-400 font-medium">ج.م</div>
                         </div>
-                        <div className="text-xs text-slate-400 font-medium">ج.م</div>
-                    </div>
+                    )}
 
                     {/* Actions */}
                     <div className="flex flex-row lg:flex-col justify-center gap-2 min-w-[140px]">
@@ -606,7 +609,10 @@ const ApprovalsInbox: React.FC = () => {
         selectedWarehouseId: number; loading: boolean;
     }>({ show: false, request: null, warehouses: [], selectedWarehouseId: 0, loading: false });
 
-    const currentUserId = 1;
+    // ─── Get Current User ───
+    const userString = localStorage.getItem('user');
+    const user = userString ? JSON.parse(userString) : null;
+    const currentUserId = user?.userId ?? user?.id ?? 1;
 
     // ─── Sound toggle persist ───
     useEffect(() => {
@@ -753,6 +759,23 @@ const ApprovalsInbox: React.FC = () => {
                     warehouseService.getActive().catch(() => warehouseService.getAll()),
                     grnService.getGRNById(request.documentId),
                 ]);
+
+                // ⚠️ CRITICAL: Check if GRN has been inspected by Quality
+                if (grn?.status === 'Pending Inspection') {
+                    toast.error(
+                        `❌ لا يمكن اعتماد إذن الإضافة (${grn.grnNumber})\n\n` +
+                        `الحالة الحالية: بانتظار الفحص\n\n` +
+                        `⚠️ يجب إتمام الخطوات التالية أولاً:\n` +
+                        `1. الذهاب لصفحة فحص الجودة\n` +
+                        `2. فحص الشحنة وإدخال الكميات المقبولة/المرفوضة\n` +
+                        `3. الضغط على "إرسال للاعتماد" (الزر الأخضر)\n` +
+                        `4. بعدها سيظهر هنا في قائمة الاعتمادات`,
+                        { duration: 8000, style: { whiteSpace: 'pre-line' } }
+                    );
+                    setWarehouseModal(p => ({ ...p, show: false, loading: false }));
+                    return;
+                }
+
                 const whList = (whRes as any)?.data ?? whRes ?? [];
                 const arr = Array.isArray(whList) ? whList : [];
                 const currentWhId = grn?.warehouseId ?? (arr[0]?.id ?? 0);

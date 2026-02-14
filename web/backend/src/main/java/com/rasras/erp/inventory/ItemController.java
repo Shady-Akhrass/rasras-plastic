@@ -20,20 +20,20 @@ public class ItemController {
 
     @GetMapping
     @Operation(summary = "Get all items", description = "Returns all items in inventory")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<List<ItemDto>>> getAllItems() {
         return ResponseEntity.ok(ApiResponse.success(itemService.getAllItems()));
     }
 
     @GetMapping("/active")
     @Operation(summary = "Get active items", description = "Returns all active items")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<List<ItemDto>>> getActiveItems() {
         return ResponseEntity.ok(ApiResponse.success(itemService.getActiveItems()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<ItemDto>> getItemById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(itemService.getItemById(id)));
     }

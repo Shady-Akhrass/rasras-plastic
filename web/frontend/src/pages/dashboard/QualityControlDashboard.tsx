@@ -26,9 +26,9 @@ const StatCard = ({
 }) => {
     const colors = {
         primary: 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary',
-        success: 'bg-emerald-100 border-emerald-200 text-emerald-600',
-        warning: 'bg-amber-100 border-amber-200 text-amber-600',
-        rose: 'bg-rose-100 border-rose-200 text-rose-600'
+        success: 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary',
+        warning: 'bg-brand-primary/15 border-brand-primary/25 text-brand-primary',
+        rose: 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary'
     };
     const cls = colors[color];
     return (
@@ -132,7 +132,7 @@ const QualityControlDashboard: React.FC = () => {
             {/* Header */}
             <motion.div
                 variants={itemVariants}
-                className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-600 rounded-3xl p-8 text-white"
+                className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white"
             >
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
@@ -204,8 +204,8 @@ const QualityControlDashboard: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <motion.div variants={itemVariants} className="lg:col-span-1">
                             <div className="flex items-center gap-2 mb-6">
-                                <div className="p-2 bg-emerald-100 rounded-lg">
-                                    <Microscope className="w-5 h-5 text-emerald-600" />
+                                <div className="p-2 bg-brand-primary/10 rounded-lg">
+                                    <Microscope className="w-5 h-5 text-brand-primary" />
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-900">إجراءات سريعة</h3>
                             </div>
@@ -221,8 +221,8 @@ const QualityControlDashboard: React.FC = () => {
                         <motion.div variants={itemVariants} className="lg:col-span-2">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-2">
-                                    <div className="p-2 bg-amber-100 rounded-lg">
-                                        <ArrowDownToLine className="w-5 h-5 text-amber-600" />
+                                    <div className="p-2 bg-brand-primary/10 rounded-lg">
+                                        <ArrowDownToLine className="w-5 h-5 text-brand-primary" />
                                     </div>
                                     <h3 className="text-lg font-bold text-slate-900">إذونات بانتظار الفحص</h3>
                                 </div>
@@ -236,7 +236,7 @@ const QualityControlDashboard: React.FC = () => {
                             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                                 {recentPending.length === 0 ? (
                                     <div className="p-12 text-center text-slate-500">
-                                        <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-emerald-300" />
+                                        <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-brand-primary/40" />
                                         <p>لا توجد إذونات بانتظار الفحص حالياً</p>
                                         <button
                                             onClick={() => navigate('/dashboard/inventory/quality-inspection')}
@@ -257,7 +257,7 @@ const QualityControlDashboard: React.FC = () => {
                                                     <p className="font-semibold text-slate-900">#{grn.grnNumber}</p>
                                                     <p className="text-sm text-slate-500">{grn.supplierNameAr || '-'} · {grn.grnDate ? formatDate(grn.grnDate) : '-'}</p>
                                                 </div>
-                                                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-brand-primary/10 text-brand-primary">
                                                     بانتظار الفحص
                                                 </span>
                                             </div>

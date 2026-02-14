@@ -131,27 +131,29 @@ const PaymentVoucherDetailPage: React.FC = () => {
 
         try {
             setActionLoading(true);
-            const currentUser = 'User'; // In real app, get from auth context
+            const userString = localStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            const approvedBy = user?.username ?? user?.fullNameAr ?? 'User';
 
             switch (action) {
                 case 'approveFinance':
-                    await paymentVoucherService.approveFinanceManager(voucher.paymentVoucherId, currentUser);
+                    await paymentVoucherService.approveFinanceManager(voucher.paymentVoucherId, approvedBy);
                     toast.success('تم اعتماد المدير المالي بنجاح');
                     break;
                 case 'approveGeneral':
-                    await paymentVoucherService.approveGeneralManager(voucher.paymentVoucherId, currentUser);
+                    await paymentVoucherService.approveGeneralManager(voucher.paymentVoucherId, approvedBy);
                     toast.success('تم اعتماد المدير العام بنجاح');
                     break;
                 case 'pay':
-                    await paymentVoucherService.processPayment(voucher.paymentVoucherId, currentUser);
+                    await paymentVoucherService.processPayment(voucher.paymentVoucherId, approvedBy);
                     toast.success('تم صرف الدفعة بنجاح');
                     break;
                 case 'reject':
-                    await paymentVoucherService.rejectVoucher(voucher.paymentVoucherId, currentUser, reason!);
+                    await paymentVoucherService.rejectVoucher(voucher.paymentVoucherId, approvedBy, reason!);
                     toast.success('تم رفض السند');
                     break;
                 case 'cancel':
-                    await paymentVoucherService.cancelVoucher(voucher.paymentVoucherId, currentUser, reason!);
+                    await paymentVoucherService.cancelVoucher(voucher.paymentVoucherId, approvedBy, reason!);
                     toast.success('تم إلغاء السند');
                     break;
             }

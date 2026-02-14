@@ -111,6 +111,10 @@ export interface SupplierQuotation {
     totalAmount: number;
     status?: string;
     notes?: string;
+    receivedByUserId?: number;
+    receivedDate?: string;
+    createdAt?: string;
+    createdBy?: number;
     items: SupplierQuotationItem[];
 }
 

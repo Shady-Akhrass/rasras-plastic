@@ -68,21 +68,9 @@ const GRNCard: React.FC<{
                 group-hover:scale-110 transition-transform duration-300">
                 <Package className="w-6 h-6" />
             </div>
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border
-                ${grn.status === 'Inspected'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                {grn.status === 'Inspected' ? (
-                    <>
-                        <CheckCircle2 className="w-3 h-3" />
-                        تم الفحص
-                    </>
-                ) : (
-                    <>
-                        <Clock className="w-3 h-3" />
-                        بانتظار الفحص
-                    </>
-                )}
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
+                <Clock className="w-3 h-3" />
+                بانتظار الفحص
             </span>
         </div>
         <h3 className="font-bold text-lg text-slate-800 mb-1 group-hover:text-brand-primary transition-colors">
@@ -164,7 +152,8 @@ const QualityInspectionPage: React.FC = () => {
             setLoading(true);
             const allGrns = await grnService.getAllGRNs();
             const list = Array.isArray(allGrns) ? allGrns : [];
-            setGrns(list.filter(g => g.status === 'Pending Inspection' || g.status === 'Inspected'));
+            // Only show GRNs that need inspection - exclude those already sent for approval
+            setGrns(list.filter(g => g.status === 'Pending Inspection'));
         } catch (error) {
             console.error('Error fetching GRNs:', error);
             toast.error('فشل تحميل الشحنات');
@@ -245,7 +234,6 @@ const QualityInspectionPage: React.FC = () => {
     const stats = useMemo(() => ({
         total: grns.length,
         pending: grns.filter(g => g.status === 'Pending Inspection').length,
-        inspected: grns.filter(g => g.status === 'Inspected').length,
     }), [grns]);
 
     return (
@@ -287,7 +275,7 @@ const QualityInspectionPage: React.FC = () => {
             {!selectedGrn ? (
                 <>
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <StatCard
                             icon={Package}
                             value={stats.total}
@@ -299,12 +287,6 @@ const QualityInspectionPage: React.FC = () => {
                             value={stats.pending}
                             label="بانتظار الفحص"
                             color="warning"
-                        />
-                        <StatCard
-                            icon={CheckCircle2}
-                            value={stats.inspected}
-                            label="تم الفحص"
-                            color="success"
                         />
                     </div>
 

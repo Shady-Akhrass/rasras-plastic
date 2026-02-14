@@ -74,6 +74,17 @@ public class QuotationComparison {
     @Column(name = "Notes", length = 1000)
     private String notes;
 
+    // ═══ Rejection Tracking Fields ═══
+    @Column(name = "RejectionCount")
+    @Builder.Default
+    private Integer rejectionCount = 0;
+
+    @Column(name = "LastRejectionDate")
+    private LocalDateTime lastRejectionDate;
+
+    @Column(name = "RejectionReason", length = 1000)
+    private String rejectionReason;
+
     @CreationTimestamp
     @Column(name = "CreatedAt", updatable = false)
     private LocalDateTime createdAt;

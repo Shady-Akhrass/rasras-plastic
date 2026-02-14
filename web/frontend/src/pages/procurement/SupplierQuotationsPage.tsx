@@ -301,10 +301,10 @@ const SupplierQuotationsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || q.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        // الأحدث في الأعلى
+        // الأحدث في الأعلى (بناءً على لحظة الإنشاء)
         return [...filtered].sort((a, b) => {
-            const dateA = a.quotationDate ? new Date(a.quotationDate).getTime() : 0;
-            const dateB = b.quotationDate ? new Date(b.quotationDate).getTime() : 0;
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
             if (dateB !== dateA) return dateB - dateA;
             return (b.id ?? 0) - (a.id ?? 0);
         });

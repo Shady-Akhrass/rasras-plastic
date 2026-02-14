@@ -11,4 +11,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, In
     Optional<PurchaseOrder> findByPoNumber(String poNumber);
 
     List<PurchaseOrder> findByPrId(Integer prId);
+
+    // ✅ للحماية من إنشاء PO مزدوج من نفس العرض
+    Optional<PurchaseOrder> findByQuotationId(Integer quotationId);
 }
