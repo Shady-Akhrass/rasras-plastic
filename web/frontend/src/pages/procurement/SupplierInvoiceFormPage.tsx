@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useOptimistic, startTransition } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
@@ -25,9 +25,42 @@ import { unitService, type UnitDto } from '../../services/unitService';
 import purchaseService from '../../services/purchaseService';
 import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
+// --- Helper Component for View/Edit Modes ---
+interface FormFieldProps {
+    label: string;
+    icon?: any;
+    isReadOnly: boolean;  // Changed from isView to isReadOnly
+    value?: any;
+    children: React.ReactNode;
+    className?: string;
+    required?: boolean;
+}
+
+const FormField: React.FC<FormFieldProps> = ({ label, icon: Icon, isReadOnly, value, children, className = "", required = false }) => {
+    return (
+        <div className={`space-y-2 ${className}`}>
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                {Icon && <Icon className={`w-4 h-4 ${isReadOnly ? 'text-slate-400' : 'text-brand-primary'}`} />}
+                {label}
+                {!isReadOnly && required && <span className="text-rose-500">*</span>}
+            </label>
+            {isReadOnly ? (
+                <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold min-h-[50px] flex items-center">
+                    {value || '-'}
+                </div>
+            ) : (
+                children
+            )}
+        </div>
+    );
+};
 
 const SupplierInvoiceFormPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const { id } = useParams<{ id: string }>();
+
     const navigate = useNavigate();
     const location = useLocation();
     const isEdit = !!id;
@@ -52,8 +85,9 @@ const SupplierInvoiceFormPage: React.FC = () => {
         invoiceDate: new Date().toISOString().split('T')[0],
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         supplierId: 0,
-        currency: 'EGP',
+        currency: defaultCurrency,
         exchangeRate: 1,
+
         subTotal: 0,
         discountAmount: 0,
         taxAmount: 0,
@@ -65,7 +99,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
     });
 
     // --- Logic: Centralized Calculation Helper ---
-    const calculateInvoiceTotals = (invoice: SupplierInvoiceDto): SupplierInvoiceDto => {
+    const calculateInvoiceTotals = useCallback((invoice: SupplierInvoiceDto): SupplierInvoiceDto => {
         let subTotalSum = 0;
         let totalDiscountSum = 0;
         let totalTaxSum = 0;
@@ -94,7 +128,6 @@ const SupplierInvoiceFormPage: React.FC = () => {
             };
         });
 
-        // Logic: Delivery = Total - NetItems - Other (matching PO logic)
         const currentTotal = Number(invoice.totalAmount) || 0;
         const otherCosts = Number(invoice.otherCosts) || 0;
         const netItems = (subTotalSum - totalDiscountSum) + totalTaxSum;
@@ -108,18 +141,18 @@ const SupplierInvoiceFormPage: React.FC = () => {
             taxAmount: totalTaxSum,
             deliveryCost: derivedDelivery,
             otherCosts,
-            totalAmount: currentTotal // Source of truth
+            totalAmount: currentTotal
         };
-    };
+    }, []);
 
-    // --- Optimistic Logic ---
+    // --- Reducer-style update logic ---
     type InvoiceAction =
-        | { type: 'SET_DATA', payload: SupplierInvoiceDto }
-        | { type: 'UPDATE_FIELD', field: keyof SupplierInvoiceDto, value: any }
-        | { type: 'UPDATE_ITEM', index: number, item: Partial<SupplierInvoiceItemDto> }
-        | { type: 'REMOVE_ITEM', index: number };
+        | { type: 'SET_DATA'; payload: SupplierInvoiceDto }
+        | { type: 'UPDATE_FIELD'; field: keyof SupplierInvoiceDto; value: any }
+        | { type: 'UPDATE_ITEM'; index: number; item: Partial<SupplierInvoiceItemDto> }
+        | { type: 'REMOVE_ITEM'; index: number };
 
-    const invoiceReducer = (state: SupplierInvoiceDto, action: InvoiceAction): SupplierInvoiceDto => {
+    const invoiceReducer = useCallback((state: SupplierInvoiceDto, action: InvoiceAction): SupplierInvoiceDto => {
         let newState = { ...state };
         switch (action.type) {
             case 'SET_DATA':
@@ -132,26 +165,24 @@ const SupplierInvoiceFormPage: React.FC = () => {
                     newState = { ...newState, [action.field]: action.value };
                 }
                 break;
-            case 'UPDATE_ITEM':
+            case 'UPDATE_ITEM': {
                 const newItems = [...(newState.items || [])];
                 newItems[action.index] = { ...newItems[action.index], ...action.item };
                 newState.items = newItems;
                 break;
+            }
             case 'REMOVE_ITEM':
                 newState.items = (newState.items || []).filter((_, i) => i !== action.index);
                 break;
         }
         return calculateInvoiceTotals(newState);
-    };
+    }, [calculateInvoiceTotals]);
 
-    const [optimisticData, updateOptimistic] = useOptimistic(formData, invoiceReducer);
+    const handleUpdate = useCallback((action: InvoiceAction) => {
+        setFormData(prev => invoiceReducer(prev, action));
+    }, [invoiceReducer]);
 
-    const handleUpdate = (action: InvoiceAction) => {
-        startTransition(() => {
-            updateOptimistic(action);
-            setFormData(prev => invoiceReducer(prev, action));
-        });
-    };
+    const optimisticData = formData;
 
     const handleDownloadPdf = async () => {
         if (!id) return;
@@ -186,6 +217,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
         } else if (poId) {
             loadPOData(parseInt(poId));
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, quotationId, grnId, poId]);
 
     const loadPOData = async (pId: number) => {
@@ -199,7 +231,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                     poNumber: po.poNumber,
                     invoiceDate: new Date().toISOString().split('T')[0],
                     supplierId: po.supplierId,
-                    currency: po.currency || 'EGP',
+                    currency: po.currency || defaultCurrency,
                     exchangeRate: po.exchangeRate || 1,
                     totalAmount: po.totalAmount || 0,
                     deliveryCost: po.shippingCost || 0,
@@ -217,9 +249,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
                         totalPrice: i.totalPrice || 0
                     }))
                 };
-
                 handleUpdate({ type: 'SET_DATA', payload: calculateInvoiceTotals(mappedData) });
-                toast.success(`تم تحميل ${(mappedData.items || []).length} صنف من أمر الشراء`);
+                toast.success(`تم تحميل ${(mappedData.items || []).length} صنف من أمر شراء`);
             }
         } catch (error) {
             console.error('Failed to load PO data:', error);
@@ -230,9 +261,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
     };
 
     const handlePOSelection = async (selectedPoId: string) => {
-        if (!selectedPoId || selectedPoId === '0') {
-            return;
-        }
+        if (!selectedPoId || selectedPoId === '0') return;
         const poNum = parseInt(selectedPoId);
         await loadPOData(poNum);
     };
@@ -261,11 +290,9 @@ const SupplierInvoiceFormPage: React.FC = () => {
                         grnItemId: gItem.id
                     }))
                 };
-
                 const calc = calculateInvoiceTotals(mappedData);
                 const initialTotal = (calc.subTotal || 0) - (calc.discountAmount || 0) + (calc.taxAmount || 0);
                 mappedData.totalAmount = initialTotal;
-
                 handleUpdate({ type: 'SET_DATA', payload: calculateInvoiceTotals(mappedData) });
                 toast.success(`تم تحميل ${grn.items.length} صنف من إذن الإضافة`);
             }
@@ -286,7 +313,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
                     ...formData,
                     supplierId: quotation.supplierId,
                     quotationId: qId,
-                    currency: quotation.currency || 'EGP',
+                    currency: quotation.currency || defaultCurrency,
                     exchangeRate: quotation.exchangeRate || 1,
                     totalAmount: quotation.totalAmount || 0,
                     notes: `تم الإنشاء من عرض سعر رقم: ${quotation.quotationNumber}.`,
@@ -357,23 +384,18 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
         if (!formData.supplierId) {
             toast.error('يرجى اختيار المورد');
             return;
         }
-
         if (!formData.supplierInvoiceNo?.trim()) {
             toast.error('يرجى إدخال رقم فاتورة المورد (الورقي)');
             return;
         }
-
         if (!formData.items || formData.items.length === 0) {
             toast.error('يرجى إضافة صنف واحد على الأقل');
             return;
         }
-
-        // Logic check isn't strictly needed for read-only items, but good to keep for validation
         const itemsToValidate = optimisticData.items || [];
         for (let i = 0; i < itemsToValidate.length; i++) {
             const item = itemsToValidate[i];
@@ -382,7 +404,6 @@ const SupplierInvoiceFormPage: React.FC = () => {
                 return;
             }
         }
-
         try {
             setSaving(true);
             await supplierInvoiceService.createInvoice(optimisticData);
@@ -412,24 +433,14 @@ const SupplierInvoiceFormPage: React.FC = () => {
         <div className="space-y-6 pb-20" dir="rtl">
             <style>{`
                 @keyframes slideInRight {
-                    from {
-                        opacity: 0;
-                        transform: translateX(-20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(0);
-                    }
+                    from { opacity: 0; transform: translateX(-20px); }
+                    to { opacity: 1; transform: translateX(0); }
                 }
-                .animate-slide-in {
-                    animation: slideInRight 0.4s ease-out;
-                }
+                .animate-slide-in { animation: slideInRight 0.4s ease-out; }
             `}</style>
 
             {/* Header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
-                rounded-3xl p-8 text-white shadow-2xl">
-                {/* ... (Decoration divs remain same) ... */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white shadow-2xl">
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
                         <button onClick={() => navigate(-1)} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all">
@@ -445,23 +456,17 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             <p className="text-white/80 text-lg">تسجيل المطالبة المالية بناءً على المستندات الورقية من المورد</p>
                         </div>
                     </div>
-                    {!isView && (
-                        <button
-                            onClick={handleSubmit}
-                            disabled={saving || totalItems === 0}
-                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                            {saving ? (
-                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                            ) : (
-                                <Save className="w-5 h-5" />
-                            )}
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ واعتماد'}</span>
-                        </button>
-                    )}
                     <div className="flex items-center gap-3">
+                        {!isView && (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={saving || totalItems === 0}
+                                className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                                {saving ? <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" /> : <Save className="w-5 h-5" />}
+                                <span>{saving ? 'جاري الحفظ...' : 'حفظ واعتماد'}</span>
+                            </button>
+                        )}
                         {isEdit && (
                             <button
                                 onClick={handleDownloadPdf}
@@ -473,13 +478,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             </button>
                         )}
                         {isView && (
-                            <>
-                                {/* ... (Approval buttons remain same) ... */}
-                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
-                                    <Eye className="w-5 h-5" />
-                                    <span className="font-bold">وضع العرض فقط</span>
-                                </div>
-                            </>
+                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
+                                <Eye className="w-5 h-5" />
+                                <span className="font-bold">وضع العرض فقط</span>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -488,6 +490,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
+
                     {/* Basic Info */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
@@ -504,26 +507,38 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             </div>
                         </div>
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                            {/* PO Selector (Manual) */}
                             {!poId && !grnId && !quotationId && (
                                 <div className="md:col-span-2 space-y-2">
                                     <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                         <Package className="w-4 h-4 text-brand-primary" />
                                         أمر الشراء (اختياري)
                                     </label>
-                                    <select
-                                        onChange={(e) => handlePOSelection(e.target.value)}
-                                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-brand-primary outline-none transition-all font-semibold bg-white"
-                                    >
-                                        <option value="0">اختر أمر شراء للتحميل التلقائي...</option>
-                                        {purchaseOrders.map(po => (
-                                            <option key={po.id} value={po.id}>
-                                                {`PO #${po.poNumber} - المورد: ${po.supplierNameAr || 'N/A'}`}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-slate-500">اختر أمر شراء لتحميل البيانات والأصناف تلقائياً</p>
+                                    {isView ? (
+                                        <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold">
+                                            {purchaseOrders.find(po => po.id === optimisticData.poId)?.poNumber
+                                                ? `PO #${purchaseOrders.find(po => po.id === optimisticData.poId)?.poNumber}`
+                                                : '-'}
+                                        </div>
+                                    ) : (
+                                        <select
+                                            onChange={(e) => handlePOSelection(e.target.value)}
+                                            className="w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold bg-slate-50 focus:bg-white"
+                                        >
+                                            <option value="0">اختر أمر شراء للتحميل التلقائي...</option>
+                                            {purchaseOrders.map(po => (
+                                                <option key={po.id} value={po.id}>
+                                                    {`PO #${po.poNumber} - المورد: ${po.supplierNameAr || 'N/A'}`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    {!isView && <p className="text-xs text-slate-500">اختر أمر شراء لتحميل البيانات والأصناف تلقائياً</p>}
                                 </div>
                             )}
+
+                            {/* Reference Doc Info */}
                             {(grnId || quotationId || poId) && (
                                 <div className="md:col-span-2 space-y-2">
                                     <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
@@ -547,34 +562,63 @@ const SupplierInvoiceFormPage: React.FC = () => {
                                 </div>
                             )}
 
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Hash className="w-4 h-4 text-slate-400" />
-                                    رقم الفاتورة (النظام)
-                                </label>
-                                <input type="text" value={optimisticData.invoiceNumber} disabled className="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-xl text-slate-500 font-semibold outline-none cursor-not-allowed" placeholder="سيتم إنشاؤه تلقائياً" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <FileText className="w-4 h-4 text-brand-primary" />
-                                    رقم فاتورة المورد (الورقية) <span className="text-rose-500">*</span>
-                                </label>
-                                <input type="text" value={optimisticData.supplierInvoiceNo} onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierInvoiceNo', value: e.target.value })} required disabled={isView} className={`w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-mono font-semibold ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`} placeholder={isView ? '' : "Supplier Inv #"} />
-                            </div>
-                            <div className="space-y-2 md:col-span-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Truck className="w-4 h-4 text-brand-primary" />
-                                    المورد <span className="text-rose-500">*</span>
-                                </label>
-                                <select value={optimisticData.supplierId} onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierId', value: parseInt(e.target.value) })} required disabled={isView} className={`w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}>
-                                    <option value="0">اختر المورد...</option>
+                            <FormField label="رقم الفاتورة (النظام)" icon={Hash} isReadOnly={true} value={optimisticData.invoiceNumber || 'سيتم إنشاؤه تلقائياً'}>
+                                {/* Children ignored because isView is true */}
+                                <input disabled />
+                            </FormField>
+
+                            <FormField label="رقم فاتورة المورد (الورقية)" icon={FileText} isReadOnly={isEdit || isView} value={optimisticData.supplierInvoiceNo} required>
+                                <input
+                                    type="text"
+                                    value={optimisticData.supplierInvoiceNo}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierInvoiceNo', value: e.target.value })}
+                                    required
+                                    className="w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-mono font-semibold bg-slate-50 focus:bg-white"
+                                    placeholder="Supplier Inv #"
+                                />
+                            </FormField>
+
+                            <FormField
+                                label="المورد"
+                                icon={Truck}
+                                isReadOnly={isEdit || isView}
+                                value={suppliers.find(s => s.id === optimisticData.supplierId)?.supplierNameAr}
+                                className="md:col-span-2"
+                                required
+                            >
+                                <select
+                                    value={optimisticData.supplierId}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierId', value: parseInt(e.target.value) })}
+                                    required
+                                    className="w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold bg-slate-50 focus:bg-white"
+                                >
                                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplierNameAr}</option>)}
                                 </select>
-                            </div>
+                            </FormField>
+
+                            <FormField
+                                label="العملة"
+                                icon={DollarSign}
+                                isReadOnly={isEdit || isView}
+                                value={getCurrencyLabel(optimisticData.currency)}
+                                className="md:col-span-2"
+                                required
+                            >
+                                <select
+                                    value={optimisticData.currency}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'currency', value: e.target.value })}
+                                    required
+                                    className="w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold bg-slate-50 focus:bg-white"
+                                >
+                                    <option value="EGP">ج.م (EGP)</option>
+                                    <option value="SAR">ر.س (SAR)</option>
+                                    <option value="USD">$ (USD)</option>
+                                </select>
+                            </FormField>
                         </div>
                     </div>
 
-                    {/* Items Table - DISABLED */}
+                    {/* Items Table */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '100ms' }}>
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center justify-between">
@@ -602,64 +646,90 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             <table className="w-full">
                                 <thead>
                                     <tr className="bg-slate-50 text-slate-600 text-sm font-bold border-b border-slate-200">
-                                        <th className="py-4 pr-6 text-right">الصنف <span className="text-rose-500">*</span></th>
-                                        <th className="py-4 px-4 text-center">الكمية <span className="text-rose-500">*</span></th>
+                                        <th className="py-4 pr-6 text-right">الصنف {!isView && <span className="text-rose-500">*</span>}</th>
+                                        <th className="py-4 px-4 text-center">الكمية {!isView && <span className="text-rose-500">*</span>}</th>
                                         <th className="py-4 px-4 text-center">الوحدة</th>
-                                        <th className="py-4 px-4 text-center">سعر الوحدة <span className="text-rose-500">*</span></th>
+                                        <th className="py-4 px-4 text-center">سعر الوحدة {!isView && <span className="text-rose-500">*</span>}</th>
                                         <th className="py-4 px-4 text-center">الإجمالي</th>
                                         <th className="py-4 pl-6"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {(optimisticData.items || []).map((item, idx) => (
-                                        <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                                        <tr key={idx} className={`group transition-colors ${isView ? 'hover:bg-transparent' : 'hover:bg-slate-50/50'}`}>
                                             <td className="py-4 pr-6">
-                                                <select
-                                                    value={item.itemId}
-                                                    disabled={true} /* Disabled as requested */
-                                                    className="w-full min-w-[200px] px-3 py-2 border-2 border-slate-200 rounded-xl text-sm font-semibold outline-none bg-slate-100 cursor-not-allowed opacity-70"
-                                                >
-                                                    <option value="0">اختر صنف...</option>
-                                                    {items.map(i => <option key={i.id} value={i.id}>{i.itemNameAr}</option>)}
-                                                </select>
+                                                {isEdit || isView ? (
+                                                    <div className="font-bold text-slate-700 min-w-[200px]">
+                                                        {items.find(i => i.id === item.itemId)?.itemNameAr || '-'}
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={item.itemId}
+                                                        onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { itemId: parseInt(e.target.value) } })}
+                                                        className="w-full min-w-[200px] px-3 py-2 border-2 border-transparent rounded-xl text-sm font-semibold outline-none bg-slate-50 focus:bg-white focus:border-brand-primary"
+                                                    >
+                                                        <option value="0">اختر صنف...</option>
+                                                        {items.map(i => <option key={i.id} value={i.id}>{i.itemNameAr}</option>)}
+                                                    </select>
+                                                )}
                                             </td>
                                             <td className="py-4 px-4">
-                                                <input
-                                                    type="number"
-                                                    value={item.quantity}
-                                                    disabled={true} /* Disabled as requested */
-                                                    className="w-24 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-bold text-brand-primary outline-none bg-slate-100 cursor-not-allowed opacity-70"
-                                                />
+                                                {isEdit || isView ? (
+                                                    <div className="text-center font-bold text-brand-primary text-lg">
+                                                        {item.quantity}
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { quantity: parseFloat(e.target.value) } })}
+                                                        className="w-24 px-3 py-2 border-2 border-transparent rounded-xl text-sm text-center font-bold text-brand-primary outline-none bg-slate-50 focus:bg-white focus:border-brand-primary"
+                                                    />
+                                                )}
                                             </td>
                                             <td className="py-4 px-4">
-                                                <select
-                                                    value={item.unitId}
-                                                    disabled={true} /* Disabled as requested */
-                                                    className="w-28 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm font-semibold outline-none bg-slate-100 cursor-not-allowed opacity-70"
-                                                >
-                                                    <option value="0">الوحدة...</option>
-                                                    {units.map(u => <option key={u.id} value={u.id}>{u.unitNameAr}</option>)}
-                                                </select>
+                                                {isEdit || isView ? (
+                                                    <div className="text-center font-medium text-slate-600">
+                                                        {units.find(u => u.id === item.unitId)?.unitNameAr || '-'}
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={item.unitId}
+                                                        onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitId: parseInt(e.target.value) } })}
+                                                        className="w-28 px-3 py-2 border-2 border-transparent rounded-xl text-sm font-semibold outline-none bg-slate-50 focus:bg-white focus:border-brand-primary"
+                                                    >
+                                                        <option value="0">الوحدة...</option>
+                                                        {units.map(u => <option key={u.id} value={u.id}>{u.unitNameAr}</option>)}
+                                                    </select>
+                                                )}
                                             </td>
                                             <td className="py-4 px-4">
-                                                <input
-                                                    type="number"
-                                                    value={item.unitPrice}
-                                                    disabled={true} /* Disabled as requested */
-                                                    className="w-28 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-bold outline-none bg-slate-100 cursor-not-allowed opacity-70 text-emerald-600/50"
-                                                />
+                                                {isEdit || isView ? (
+                                                    <div className="text-center font-bold text-emerald-600">
+                                                        {formatNumber(item.unitPrice)}
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="number"
+                                                        value={item.unitPrice}
+                                                        onChange={(e) => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitPrice: parseFloat(e.target.value) } })}
+                                                        className="w-28 px-3 py-2 border-2 border-transparent rounded-xl text-sm text-center font-bold outline-none bg-slate-50 focus:bg-white focus:border-brand-primary text-emerald-600"
+                                                    />
+                                                )}
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                {formatNumber(item.totalPrice ?? 0, { minimumFractionDigits: 2 })}
+                                                {formatNumber(item.totalPrice ?? 0)}
                                             </td>
                                             <td className="py-4 pl-6 text-left">
-                                                <button
-                                                    type="button"
-                                                    disabled={true}
-                                                    className="p-2 text-slate-300 opacity-50 cursor-not-allowed"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {!isEdit && !isView && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUpdate({ type: 'REMOVE_ITEM', index: idx })}
+                                                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -680,10 +750,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
-                    {/* Financial Summary */}
-                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
-                        rounded-3xl p-6 text-white shadow-2xl animate-slide-in"
-                        style={{ animationDelay: '200ms' }}>
+                    {/* Financial Summary (Already Read-Only by Design) */}
+                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-2xl animate-slide-in" style={{ animationDelay: '200ms' }}>
                         <div className="flex items-center gap-3 pb-6 border-b border-white/10">
                             <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
                                 <DollarSign className="w-6 h-6 text-emerald-400" />
@@ -694,45 +762,48 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
                                 <span className="text-white/60 text-sm">إجمالي الأصناف (صافي)</span>
                                 <span className="font-bold text-lg">
-                                    {formatNumber(optimisticData.totalAmount - (optimisticData.taxAmount || 0) - (optimisticData.deliveryCost || 0), { minimumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.totalAmount - (optimisticData.taxAmount || 0) - (optimisticData.deliveryCost || 0))}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-rose-500/10 rounded-xl border border-rose-500/20">
                                 <span className="text-rose-400 font-semibold text-sm">إجمالي الخصم</span>
                                 <span className="font-bold text-lg text-rose-400">
-                                    {formatNumber(optimisticData.discountAmount ?? 0, { minimumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.discountAmount ?? 0)}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                                 <span className="text-emerald-400 font-semibold text-sm">ضريبة القيمة المضافة</span>
                                 <span className="font-bold text-lg text-emerald-400">
-                                    {formatNumber(optimisticData.taxAmount ?? 0, { minimumFractionDigits: 2 })}
+                                    {formatNumber(optimisticData.taxAmount ?? 0)}
                                 </span>
                             </div>
 
-                            {/* Other Costs */}
-                            {optimisticData.otherCosts! > 0 && (
+                            {(optimisticData.otherCosts ?? 0) > 0 && (
                                 <div className="flex justify-between items-center p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
                                     <span className="text-purple-400 font-semibold text-sm">مصاريف أخرى</span>
                                     <span className="font-bold text-lg text-purple-400">
-                                        {formatNumber(optimisticData.otherCosts || 0, { minimumFractionDigits: 2 })}
+                                        {formatNumber(optimisticData.otherCosts || 0)}
                                     </span>
                                 </div>
                             )}
 
-                            {/* Delivery Cost */}
                             <div className="flex justify-between items-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                                 <span className="text-blue-400 font-semibold text-sm">مصاريف الشحن</span>
-                                <span className={`font-bold text-lg ${optimisticData.deliveryCost! < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
-                                    {formatNumber(optimisticData.deliveryCost || 0, { minimumFractionDigits: 2 })}
+                                <span className={`font-bold text-lg ${(optimisticData.deliveryCost ?? 0) < 0 ? 'text-rose-400' : 'text-blue-400'}`}>
+                                    {formatNumber(optimisticData.deliveryCost || 0)}
                                 </span>
                             </div>
 
                             <div className="pt-6 border-t border-white/10">
                                 <div className="text-xs text-white/40 mb-2">إجمالي الفاتورة النهائي</div>
                                 <div className="text-4xl font-black text-emerald-400">
-                                    {formatNumber(optimisticData.totalAmount, { minimumFractionDigits: 2 })}
-                                    <span className="text-sm font-bold mr-2">{optimisticData.currency}</span>
+                                    {formatNumber(optimisticData.totalAmount)}
+                                    <span className="text-sm font-bold mr-2">{getCurrencyLabel(optimisticData.currency || defaultCurrency)}</span>
+                                    {(optimisticData.currency && optimisticData.currency !== defaultCurrency) && (
+                                        <div className="text-sm font-bold text-white/60 mt-1">
+                                            (≈ {formatNumber(convertAmount(optimisticData.totalAmount, optimisticData.currency))} {getCurrencyLabel(defaultCurrency)})
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -749,20 +820,37 @@ const SupplierInvoiceFormPage: React.FC = () => {
                             </div>
                         </div>
                         <div className="p-6 space-y-5">
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-brand-primary" />
-                                    تاريخ الفاتورة <span className="text-rose-500">*</span>
-                                </label>
-                                <input type="date" value={optimisticData.invoiceDate} onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'invoiceDate', value: e.target.value })} required disabled={isView} className={`w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-rose-500" />
-                                    تاريخ الاستحقاق <span className="text-rose-500">*</span>
-                                </label>
-                                <input type="date" value={optimisticData.dueDate} onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'dueDate', value: e.target.value })} required disabled={isView} className={`w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70 border-rose-200' : 'bg-slate-50 focus:bg-white'}`} />
-                            </div>
+                            <FormField
+                                label="تاريخ الفاتورة"
+                                icon={Calendar}
+                                isReadOnly={isEdit || isView}
+                                value={optimisticData.invoiceDate}
+                                required
+                            >
+                                <input
+                                    type="date"
+                                    value={optimisticData.invoiceDate}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'invoiceDate', value: e.target.value })}
+                                    required
+                                    className="w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold bg-slate-50 focus:bg-white"
+                                />
+                            </FormField>
+
+                            <FormField
+                                label="تاريخ الاستحقاق"
+                                icon={Calendar}
+                                isReadOnly={isView}
+                                value={optimisticData.dueDate}
+                                required
+                            >
+                                <input
+                                    type="date"
+                                    value={optimisticData.dueDate}
+                                    onChange={(e) => handleUpdate({ type: 'UPDATE_FIELD', field: 'dueDate', value: e.target.value })}
+                                    required
+                                    className="w-full px-4 py-3 border-2 border-transparent rounded-xl focus:border-brand-primary outline-none transition-all font-semibold bg-slate-50 focus:bg-white"
+                                />
+                            </FormField>
                         </div>
                     </div>
 

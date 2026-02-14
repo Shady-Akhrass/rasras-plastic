@@ -22,6 +22,8 @@ import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/
 import Pagination from '../../components/common/Pagination';
 import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -129,7 +131,11 @@ const VoucherTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onPrint: (id: number, voucherNumber: string) => void;
-}> = ({ voucher, index, onView, onPrint }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ voucher, index, onView, onPrint, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -137,6 +143,7 @@ const VoucherTableRow: React.FC<{
             animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
+
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
@@ -158,10 +165,19 @@ const VoucherTableRow: React.FC<{
             </div>
         </td>
         <td className="px-6 py-4 text-right">
-            <span className="font-bold text-emerald-600">
-                {formatNumber(voucher.amount || 0)} {voucher.currency || 'ج.م'}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+                <span className="font-bold text-emerald-600">
+                    {formatNumber(convertAmount(voucher.amount || 0, voucher.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                </span>
+
+                {voucher.isSplitPayment && (
+                    <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded border border-slate-200 uppercase tracking-tighter">
+                        دفع مجزأ
+                    </span>
+                )}
+            </div>
         </td>
+
         <td className="px-6 py-4">
             <StatusBadge status={voucher.status || 'Pending'} />
         </td>
@@ -253,7 +269,10 @@ const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ se
 );
 
 const PaymentVouchersPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
+
     const [loading, setLoading] = useState(true);
     const [vouchers, setVouchers] = useState<PaymentVoucherDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -296,10 +315,11 @@ const PaymentVouchersPage: React.FC = () => {
             const response = await supplierInvoiceService.getAllInvoices();
             const allInvoices = response.data || [];
 
-            // Filter for approved but unpaid invoices
+            // Filter for approved but unpaid/partial invoices
             const unpaid = allInvoices.filter(
-                inv => inv.status === 'Approved' && inv.approvalStatus === 'Approved'
+                inv => (inv.status === 'Unpaid' || inv.status === 'Partial') && inv.approvalStatus === 'Approved'
             );
+
 
             setUnpaidInvoices(unpaid);
         } catch (error) {
@@ -362,8 +382,9 @@ const PaymentVouchersPage: React.FC = () => {
         total: vouchers.length,
         pending: vouchers.filter(v => v.status === 'Pending').length,
         approved: vouchers.filter(v => v.status === 'Approved' || v.status === 'Paid').length,
-        totalValue: formatNumber(vouchers.reduce((sum, v) => sum + (v.amount || 0), 0))
-    }), [vouchers]);
+        totalValue: formatNumber(vouchers.reduce((sum, v) => sum + convertAmount(v.amount || 0, v.currency || 'EGP'), 0))
+    }), [vouchers, defaultCurrency, convertAmount]);
+
 
     const handleViewVoucher = (id: number) => {
         navigate(`/dashboard/finance/payment-vouchers/${id}`);
@@ -486,10 +507,11 @@ const PaymentVouchersPage: React.FC = () => {
                 />
                 <StatCard
                     icon={DollarSign}
-                    value={`${stats.totalValue} ج.م`}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
                     label="إجمالي المدفوعات"
                     color="success"
                 />
+
             </div>
 
             {/* Filters - Only for Vouchers Tab */}
@@ -686,9 +708,11 @@ const PaymentVouchersPage: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <span className="font-bold text-emerald-600">
-                                                            {formatNumber(invoice.totalAmount || 0)} {invoice.currency}
+                                                            {formatNumber(convertAmount(invoice.totalAmount || 0, invoice.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                                                         </span>
                                                     </td>
+
+
                                                     <td className="px-6 py-4">
                                                         <span className="text-sm text-slate-600">—</span>
                                                     </td>
@@ -741,7 +765,11 @@ const PaymentVouchersPage: React.FC = () => {
                                             index={index}
                                             onView={handleViewVoucher}
                                             onPrint={handleDownloadPdf}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
                                         />
+
                                     ))
                                 )}
                             </tbody>

@@ -28,8 +28,9 @@ import {
 import { approvalService } from '../../services/approvalService';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
-import { itemService, type ItemDto } from '../../services/itemService';
 import { formatNumber } from '../../utils/format';
+import { itemService, type ItemDto } from '../../services/itemService';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import toast from 'react-hot-toast';
 
 // Multi Select Dropdown for Additional Suppliers
@@ -225,6 +226,7 @@ const SupplierQuotationFormPage: React.FC = () => {
     const approvalId = queryParams.get('approvalId');
 
     // State
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const [loading, setLoading] = useState(false);
     const [, startTransition] = useTransition();
     const [saving, setSaving] = useState(false);
@@ -1269,34 +1271,14 @@ const SupplierQuotationFormPage: React.FC = () => {
                         <div className="pt-6 border-t border-white/10">
                             <div className="text-xs text-white/40 mb-2">الإجمالي النهائي</div>
                             <div className="flex items-center justify-between">
-                                <div className="relative flex-1 max-w-[200px]">
-                                    <input
-                                        type="number"
-                                        value={optimisticData.totalAmount || 0}
-                                        onChange={(e) => {
-                                            const totalVal = parseFloat(e.target.value) || 0;
-                                            // Calculate items total + tax (without delivery/other)
-                                            const itemsGrandTotal = calculateGrandTotal(optimisticData.items, 0, 0);
-                                            const derivedDeliveryCost = totalVal - itemsGrandTotal - (optimisticData.otherCosts || 0);
-
-                                            const updates = {
-                                                totalAmount: totalVal,
-                                                deliveryCost: derivedDeliveryCost
-                                            };
-
-                                            startTransition(() => {
-                                                addOptimisticData(updates);
-                                                setFormData(prev => ({ ...prev, ...updates }));
-                                            });
-                                        }}
-                                        disabled={isView || isLocked}
-                                        className={`w-full border rounded-xl px-4 py-2 text-2xl font-black outline-none transition-all text-right
-                                            ${isView
-                                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400/70 cursor-not-allowed'
-                                                : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 focus:border-emerald-400'}`}
-                                    />
+                                <div className="text-4xl font-black text-emerald-400">
+                                    {formatNumber(optimisticData.totalAmount)} <span className="text-xl font-bold">{getCurrencyLabel(optimisticData.currency || defaultCurrency)}</span>
+                                    {(optimisticData.currency && optimisticData.currency !== defaultCurrency) && (
+                                        <div className="text-sm font-bold text-white/60 mt-1 font-sans">
+                                            (≈ {formatNumber(convertAmount(optimisticData.totalAmount, optimisticData.currency))} {getCurrencyLabel(defaultCurrency)})
+                                        </div>
+                                    )}
                                 </div>
-                                <span className="text-sm font-bold mr-2 text-emerald-400/60">{optimisticData.currency || 'EGP'}</span>
                             </div>
                         </div>
                     </div>

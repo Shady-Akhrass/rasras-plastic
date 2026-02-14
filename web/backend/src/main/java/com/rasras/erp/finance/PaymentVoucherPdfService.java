@@ -1,7 +1,20 @@
 package com.rasras.erp.finance;
 
-import com.lowagie.text.*;
-import com.lowagie.text.pdf.*;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.Font;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.Image;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.Rectangle;
+import com.lowagie.text.Chunk;
+import com.lowagie.text.pdf.BaseFont;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 import com.rasras.erp.company.CompanyInfo;
 import com.rasras.erp.company.CompanyInfoRepository;
 import com.rasras.erp.finance.dto.PaymentVoucherDto;
@@ -98,143 +111,56 @@ public class PaymentVoucherPdfService {
     // ─────────────────────────────────────────────────────────────────
 
     private void initFonts() {
-        bfRegular = null;
-        bfBold = null;
-
-        bfRegular = tryLoadFont("fonts/arial.ttf");
-        bfBold = tryLoadFont("fonts/arialbd.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadFont("fonts/Cairo-Regular.ttf");
-        if (bfBold == null)
-            bfBold = tryLoadFont("fonts/Cairo-Bold.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadSystemFont(
-                    "C:/Windows/Fonts/arial.ttf",
-                    "C:/Windows/Fonts/Arial.ttf",
-                    "C:\\Windows\\Fonts\\arial.ttf");
-        if (bfBold == null)
-            bfBold = tryLoadSystemFont(
-                    "C:/Windows/Fonts/arialbd.ttf",
-                    "C:/Windows/Fonts/Arialbd.ttf",
-                    "C:\\Windows\\Fonts\\arialbd.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadSystemFont(
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-                    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                    "/usr/share/fonts/TTF/DejaVuSans.ttf");
-        if (bfBold == null)
-            bfBold = tryLoadSystemFont(
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-                    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                    "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadSystemFont(
-                    "/System/Library/Fonts/Supplemental/Arial.ttf",
-                    "/Library/Fonts/Arial.ttf",
-                    "/System/Library/Fonts/Helvetica.ttc");
-
-        if (bfRegular == null)
-            bfRegular = tryRegisteredFonts();
+        bfRegular = loadClasspathFont("fonts/arial.ttf");
+        bfBold = loadClasspathFont("fonts/arialbd.ttf");
 
         if (bfRegular == null) {
-            log.warn("⚠️ No Arabic-capable font found! Falling back to Helvetica.");
-            try {
-                bfRegular = BaseFont.createFont(
-                        BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
-            } catch (Exception e) {
-                throw new RuntimeException("Cannot load even Helvetica font", e);
-            }
+            throw new RuntimeException(
+                    "❌ Font not found: fonts/arial.ttf — "
+                            + "place it under src/main/resources/fonts/");
         }
-
         if (bfBold == null) {
-            if (bfRegular.getPostscriptFontName().contains("Helvetica")) {
-                try {
-                    bfBold = BaseFont.createFont(
-                            BaseFont.HELVETICA_BOLD, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
-                } catch (Exception e) {
-                    bfBold = bfRegular;
-                }
-            } else {
-                bfBold = bfRegular;
-            }
+            log.warn("⚠️ arialbd.ttf not found, using Regular as fallback.");
+            bfBold = bfRegular;
         }
 
-        log.info("✅ PDF Font loaded — Regular: {}, Bold: {}",
+        log.info("✅ PDF Fonts — Regular: {}, Bold: {}",
                 bfRegular.getPostscriptFontName(),
                 bfBold.getPostscriptFontName());
 
         buildFontSet();
     }
 
-    private BaseFont tryLoadFont(String classpathLocation) {
+    private BaseFont loadClasspathFont(String classpathLocation) {
         try {
             ClassPathResource res = new ClassPathResource(classpathLocation);
-            if (!res.exists())
+            if (!res.exists()) {
+                log.error("❌ Font NOT FOUND: {}", classpathLocation);
                 return null;
-
-            File tmp = File.createTempFile("pdf_font_", ".ttf");
-            tmp.deleteOnExit();
-
-            try (InputStream is = res.getInputStream();
-                    java.io.FileOutputStream fos = new java.io.FileOutputStream(tmp)) {
-                is.transferTo(fos);
             }
 
+            byte[] fontBytes;
+            try (InputStream is = res.getInputStream()) {
+                fontBytes = is.readAllBytes();
+            }
+
+            log.info("📄 Font: {} — {} bytes", classpathLocation, fontBytes.length);
+
             BaseFont font = BaseFont.createFont(
-                    tmp.getAbsolutePath(), BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-            log.info("✅ Loaded font from classpath: {}", classpathLocation);
+                    classpathLocation,
+                    BaseFont.IDENTITY_H,
+                    BaseFont.EMBEDDED,
+                    true,
+                    fontBytes,
+                    null);
+
+            log.info("✅ Loaded: {}", font.getPostscriptFontName());
             return font;
 
         } catch (Exception e) {
-            log.debug("Font not available at classpath:{} — {}",
-                    classpathLocation, e.getMessage());
+            log.error("❌ Failed: {} — {}", classpathLocation, e.getMessage(), e);
             return null;
         }
-    }
-
-    private BaseFont tryLoadSystemFont(String... paths) {
-        for (String path : paths) {
-            try {
-                File f = new File(path);
-                if (f.exists() && f.isFile()) {
-                    BaseFont font = BaseFont.createFont(
-                            f.getAbsolutePath(), BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-                    log.info("✅ Loaded system font: {}", path);
-                    return font;
-                }
-            } catch (Exception e) {
-                log.debug("System font not usable: {} — {}", path, e.getMessage());
-            }
-        }
-        return null;
-    }
-
-    private BaseFont tryRegisteredFonts() {
-        try {
-            FontFactory.registerDirectories();
-            String[] candidates = {
-                    "arial", "arial unicode ms", "tahoma",
-                    "dejavu sans", "liberation sans", "freesans",
-                    "noto sans arabic", "droid sans"
-            };
-            for (String name : candidates) {
-                Font f = FontFactory.getFont(
-                        name, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, 10);
-                if (f != null && f.getBaseFont() != null) {
-                    log.info("✅ Found registered font: {}", name);
-                    return f.getBaseFont();
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Registered font search failed: {}", e.getMessage());
-        }
-        return null;
     }
 
     private void buildFontSet() {
@@ -250,8 +176,8 @@ public class PaymentVoucherPdfService {
         tableCellFont = new Font(bfRegular, 9, Font.NORMAL, SLATE_700);
         totalLabelFont = new Font(bfRegular, 10, Font.NORMAL, SLATE_700);
         totalValueFont = new Font(bfRegular, 10, Font.NORMAL, SLATE_900);
-        grandTotalLabelFont = new Font(bfBold, 12, Font.NORMAL, BRAND_SECONDARY);
-        grandTotalValueFont = new Font(bfBold, 13, Font.NORMAL, BRAND_SECONDARY);
+        grandTotalLabelFont = new Font(bfBold, 12, Font.NORMAL, WHITE);
+        grandTotalValueFont = new Font(bfBold, 13, Font.NORMAL, WHITE);
         footerFont = new Font(bfRegular, 8, Font.NORMAL, SLATE_500);
         footerSubFont = new Font(bfRegular, 7, Font.NORMAL, SLATE_400);
         invoiceNoFont = new Font(bfBold, 10, Font.NORMAL, BRAND_PRIMARY);
@@ -495,8 +421,26 @@ public class PaymentVoucherPdfService {
         addCard(grid, "المبلغ",
                 formatMoney(voucher.getAmount()) + " " + safe(voucher.getCurrency()));
 
-        // Row 3 — conditional based on payment method
-        if ("bank".equalsIgnoreCase(voucher.getPaymentMethod())
+        // Row 3 — conditional based on payment method OR split payment
+        if (Boolean.TRUE.equals(voucher.getIsSplitPayment())) {
+            grid.addCell(createCell(Rectangle.NO_BORDER, null)); // Spacer
+            grid.addCell(createCell(Rectangle.NO_BORDER, null));
+            grid.addCell(createCell(Rectangle.NO_BORDER, null));
+
+            if (voucher.getCashAmount() != null && voucher.getCashAmount().compareTo(BigDecimal.ZERO) > 0) {
+                addCard(grid, "نقدي", formatMoney(voucher.getCashAmount()));
+            }
+            if (voucher.getBankAmount() != null && voucher.getBankAmount().compareTo(BigDecimal.ZERO) > 0) {
+                addCard(grid, "بنك", formatMoney(voucher.getBankAmount()));
+            }
+            if (voucher.getChequeAmount() != null && voucher.getChequeAmount().compareTo(BigDecimal.ZERO) > 0) {
+                addCard(grid, "شيك", formatMoney(voucher.getChequeAmount()));
+            }
+            if (voucher.getBankTransferAmount() != null
+                    && voucher.getBankTransferAmount().compareTo(BigDecimal.ZERO) > 0) {
+                addCard(grid, "تحويل بنكي", formatMoney(voucher.getBankTransferAmount()));
+            }
+        } else if ("bank".equalsIgnoreCase(voucher.getPaymentMethod())
                 || "bank transfer".equalsIgnoreCase(voucher.getPaymentMethod())) {
             addCard(grid, "البنك", safe(voucher.getBankName()));
             addCard(grid, "رقم الحساب", safe(voucher.getAccountNumber()));
@@ -561,6 +505,9 @@ public class PaymentVoucherPdfService {
 
         if (s.contains("pending") || s.contains("معلق")) {
             mappedStatus = "قيد الانتظار";
+            bg = WARNING;
+        } else if (s.contains("partial") || s.contains("جزئي")) {
+            mappedStatus = "مدفوع جزئياً";
             bg = WARNING;
         } else if (s.contains("paid") || s.contains("مدفوع")
                 || s.contains("approved") || s.contains("معتمد")) {
@@ -709,19 +656,43 @@ public class PaymentVoucherPdfService {
         // Calculate Totals
         BigDecimal totalInvoicesAmount = BigDecimal.ZERO;
         BigDecimal totalPaidInThisVoucher = nvl(voucher.getAmount());
+        BigDecimal totalPreviouslyPaid = BigDecimal.ZERO;
 
         if (voucher.getAllocations() != null) {
             for (PaymentVoucherAllocationDto alloc : voucher.getAllocations()) {
                 totalInvoicesAmount = totalInvoicesAmount.add(nvl(alloc.getInvoiceTotal()));
+                totalPreviouslyPaid = totalPreviouslyPaid.add(nvl(alloc.getInvoicePreviouslyPaid()));
             }
         }
 
-        BigDecimal remaining = totalInvoicesAmount.subtract(totalPaidInThisVoucher);
+        BigDecimal remaining = totalInvoicesAmount
+                .subtract(totalPreviouslyPaid)
+                .subtract(totalPaidInThisVoucher);
 
-        addSummaryRow(summary, "إجمالي الفاتورة", totalInvoicesAmount, false);
-        addSummaryRow(summary, "المسدد في هذا السند", totalPaidInThisVoucher, false);
-        addSummaryRow(summary, "المتبقي", remaining, false);
-        addSummaryRow(summary, "الإجمالي النهائي", totalPaidInThisVoucher, true);
+        if (remaining.compareTo(BigDecimal.ZERO) < 0)
+            remaining = BigDecimal.ZERO;
+
+        addSummaryRow(summary, "إجمالي الفواتير", totalInvoicesAmount, false, voucher.getCurrency());
+
+        // Custom Design Logic
+        if (totalPreviouslyPaid.compareTo(BigDecimal.ZERO) > 0) {
+            // Second/Subsequent Payment: Show History Flow
+            // Total -> Outstanding Before -> Paid -> Remaining Balance
+            BigDecimal outstandingBeforeThisVoucher = totalInvoicesAmount.subtract(totalPreviouslyPaid);
+            addSummaryRow(summary, "المتبقي", outstandingBeforeThisVoucher, false, voucher.getCurrency());
+            addSummaryRow(summary, "المسدد في هذا السند", totalPaidInThisVoucher, false, voucher.getCurrency());
+            addSummaryRow(summary, "الرصيد المتبقي", remaining, false, voucher.getCurrency());
+        } else {
+            // First Payment: Show Simple Flow
+            // Total -> Paid -> Remaining Balance
+            addSummaryRow(summary, "المسدد في هذا السند", totalPaidInThisVoucher, false, voucher.getCurrency());
+            // User requested: "remaining = Total Invoice - Paid" ... "الرصيد المتبقي =
+            // remaining"
+            // So for First Payment, remaining (Total - Paid) IS the final balance
+            addSummaryRow(summary, "الرصيد المتبقي", remaining, false, voucher.getCurrency());
+        }
+
+        addSummaryRow(summary, "الإجمالي النهائي", totalPaidInThisVoucher, true, voucher.getCurrency());
 
         boxOuter.addElement(summary);
         outer.addCell(boxOuter);
@@ -735,14 +706,14 @@ public class PaymentVoucherPdfService {
     }
 
     private void addSummaryRow(PdfPTable table, String label,
-            BigDecimal value, boolean isGrand) {
+            BigDecimal value, boolean isGrand, String currency) {
 
         Font lf = isGrand ? grandTotalLabelFont : totalLabelFont;
         Font vf = isGrand ? grandTotalValueFont : totalValueFont;
-        Color bg = isGrand ? BRAND_VERY_LIGHT : WHITE;
+        Color bg = isGrand ? BRAND_PRIMARY : WHITE;
 
         int border = Rectangle.BOTTOM;
-        Color borderColor = isGrand ? BRAND_ACCENT : SLATE_100;
+        Color borderColor = isGrand ? BRAND_PRIMARY : SLATE_100;
         float borderW = isGrand ? 1f : 0.5f;
 
         // ── Label cell (RIGHT in RTL = first) ──
@@ -761,7 +732,7 @@ public class PaymentVoucherPdfService {
         // ── Value cell (LEFT in RTL = second) ──
         String display = formatMoney(value);
         if (isGrand)
-            display += "  ج.م";
+            display += "  " + (currency != null ? currency : "ج.م");
 
         PdfPCell vCell = new PdfPCell(new Phrase(display, vf));
         vCell.setBorder(border);

@@ -244,6 +244,7 @@ public class SupplierService {
                 .minOrderQty(item.getMinOrderQty())
                 .isPreferred(item.getIsPreferred())
                 .isActive(item.getIsActive())
+                .currency(item.getSupplier().getCurrency())
                 .build();
     }
 

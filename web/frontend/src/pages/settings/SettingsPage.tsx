@@ -3,9 +3,11 @@ import {
     Building2, Settings, Ruler, FileText,
     Sparkles, Shield, Bell, Database, Users, Lock,
     Palette, Globe, CreditCard, Layers, ArrowRight,
-    CheckCircle2, Clock, TrendingUp, Zap
+    CheckCircle2, Clock, TrendingUp, Zap, DollarSign
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+import ExchangeRateWidget from '../../components/ExchangeRate/ExchangeRateWidget';
 
 interface SettingsModule {
     title: string;
@@ -144,6 +146,10 @@ const QuickStat: React.FC<{
 
 const SettingsPage: React.FC = () => {
     const navigate = useNavigate();
+    const { defaultCurrency, getCurrencyLabel, rates } = useSystemSettings();
+
+    // Get live rate for the stat card
+    const usdToDefaultRate = rates[defaultCurrency] || 0;
 
     const settingsModules: SettingsModule[] = [
         {
@@ -274,9 +280,10 @@ const SettingsPage: React.FC = () => {
                     label="وحدة قياس"
                 />
                 <QuickStat
-                    icon={Shield}
-                    value="عالي"
-                    label="مستوى الأمان"
+                    icon={DollarSign}
+                    value={usdToDefaultRate ? usdToDefaultRate.toFixed(2) : '...'}
+                    label={`سعر الصرف (USD / ${getCurrencyLabel(defaultCurrency)})`}
+                    trend={usdToDefaultRate > 0 ? "" : undefined}
                 />
             </div>
 
@@ -339,32 +346,37 @@ const SettingsPage: React.FC = () => {
                     <Layers className="w-5 h-5 text-brand-primary" />
                     إعدادات متقدمة
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[
-                        { icon: Database, label: 'النسخ الاحتياطي', desc: 'إدارة النسخ الاحتياطية' },
-                        { icon: Palette, label: 'المظهر', desc: 'تخصيص الألوان والثيم' },
-                        { icon: Globe, label: 'اللغة والمنطقة', desc: 'إعدادات اللغة والتوقيت' },
-                        { icon: CreditCard, label: 'الفوترة', desc: 'خطط الاشتراك والدفع' },
-                    ].map((item) => (
-                        <button
-                            key={item.label}
-                            className="p-4 rounded-xl border border-slate-100 hover:border-brand-primary/30 
-                                hover:bg-brand-primary/5 transition-all duration-200 text-right group"
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-brand-primary/10 
-                                    transition-colors duration-200">
-                                    <item.icon className="w-4 h-4 text-slate-600 group-hover:text-brand-primary 
-                                        transition-colors duration-200" />
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-min">
+                        {[
+                            { icon: Database, label: 'النسخ الاحتياطي', desc: 'إدارة النسخ الاحتياطية' },
+                            { icon: Palette, label: 'المظهر', desc: 'تخصيص الألوان والثيم' },
+                            { icon: Globe, label: 'اللغة والمنطقة', desc: 'إعدادات اللغة والتوقيت' },
+                            { icon: CreditCard, label: 'الفوترة', desc: 'خطط الاشتراك والدفع' },
+                        ].map((item) => (
+                            <button
+                                key={item.label}
+                                className="p-4 rounded-xl border border-slate-100 hover:border-brand-primary/30 
+                                    hover:bg-brand-primary/5 transition-all duration-200 text-right group"
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-brand-primary/10 
+                                        transition-colors duration-200">
+                                        <item.icon className="w-4 h-4 text-slate-600 group-hover:text-brand-primary 
+                                            transition-colors duration-200" />
+                                    </div>
+                                    <span className="font-medium text-slate-700 group-hover:text-brand-primary 
+                                        transition-colors duration-200">
+                                        {item.label}
+                                    </span>
                                 </div>
-                                <span className="font-medium text-slate-700 group-hover:text-brand-primary 
-                                    transition-colors duration-200">
-                                    {item.label}
-                                </span>
-                            </div>
-                            <p className="text-xs text-slate-400 pr-11">{item.desc}</p>
-                        </button>
-                    ))}
+                                <p className="text-xs text-slate-400 pr-11">{item.desc}</p>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="lg:col-span-1">
+                        <ExchangeRateWidget />
+                    </div>
                 </div>
             </div>
         </div>

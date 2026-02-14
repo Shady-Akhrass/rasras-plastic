@@ -10,7 +10,9 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class PaymentVoucherDto {
+    // Payment Voucher Data Transfer Object
     private Integer paymentVoucherId;
+
     private String voucherNumber;
     private LocalDate voucherDate;
     private Integer supplierId;
@@ -22,7 +24,13 @@ public class PaymentVoucherDto {
     private String currency;
     private BigDecimal exchangeRate;
     private BigDecimal amount;
+    private BigDecimal cashAmount;
+    private BigDecimal bankAmount;
+    private BigDecimal chequeAmount;
+    private BigDecimal bankTransferAmount;
+    private Boolean isSplitPayment;
     private String description;
+
     private String notes;
     private String status;
     private String approvalStatus;

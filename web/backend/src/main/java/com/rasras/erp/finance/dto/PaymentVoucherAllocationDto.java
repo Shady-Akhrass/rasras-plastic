@@ -14,13 +14,14 @@ public class PaymentVoucherAllocationDto {
     private Integer paymentVoucherId;
     private Integer supplierInvoiceId;
     private BigDecimal allocatedAmount;
-    private LocalDate allocationDate;    // ← ADD THIS LINE
+    private LocalDate allocationDate; // ← ADD THIS LINE
     private String notes;
 
     // Matching Data for Detailed View
     private String invoiceNumber;
     private LocalDate invoiceDate;
     private BigDecimal invoiceTotal;
+    private BigDecimal invoicePreviouslyPaid;
     private BigDecimal invoiceSubTotal;
     private BigDecimal invoiceTaxAmount;
     private BigDecimal invoiceDiscountAmount;

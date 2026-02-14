@@ -58,6 +58,21 @@ public class PaymentVoucher extends AuditableEntity {
     @Column(name = "PaymentAmount", precision = 18, scale = 2, nullable = false)
     private BigDecimal paymentAmount;
 
+    @Column(name = "CashAmount", precision = 18, scale = 2)
+    private BigDecimal cashAmount;
+
+    @Column(name = "BankAmount", precision = 18, scale = 2)
+    private BigDecimal bankAmount;
+
+    @Column(name = "ChequeAmount", precision = 18, scale = 2)
+    private BigDecimal chequeAmount;
+
+    @Column(name = "BankTransferAmount", precision = 18, scale = 2)
+    private BigDecimal bankTransferAmount;
+
+    @Column(name = "IsSplitPayment")
+    private Boolean isSplitPayment;
+
     @Column(name = "Currency", length = 3)
     @Builder.Default
     private String currency = "EGP";

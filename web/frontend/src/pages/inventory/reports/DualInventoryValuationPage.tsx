@@ -9,6 +9,8 @@ import type { StockBalanceDto } from '../../../services/stockBalanceService';
 import { itemService } from '../../../services/itemService';
 import type { ItemDto } from '../../../services/itemService';
 import { toast } from 'react-hot-toast';
+import { useSystemSettings } from '../../../hooks/useSystemSettings';
+
 
 /** عتبة نسبة الفرق لتفعيل التنبيه (15%) */
 const DIFF_ALERT_THRESHOLD_PCT = 0.15;
@@ -34,7 +36,9 @@ export interface DualValuationRow {
 }
 
 const DualInventoryValuationPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const navigate = useNavigate();
+
     const [balances, setBalances] = useState<StockBalanceDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [loading, setLoading] = useState(true);
@@ -190,18 +194,20 @@ const DualInventoryValuationPage: React.FC = () => {
                         <span className="text-sm text-slate-500">القيمة بالتكلفة التاريخية (محاسبة)</span>
                     </div>
                     <p className="text-2xl font-bold text-slate-800">
-                        {totals.valueHistorical.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}
+                        {convertAmount(totals.valueHistorical, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-bold">{getCurrencyLabel(defaultCurrency)}</span>
                     </p>
                 </div>
+
                 <div className="bg-white p-5 rounded-2xl border border-slate-100">
                     <div className="flex items-center gap-3 mb-2">
                         <TrendingUp className="w-5 h-5 text-indigo-600" />
                         <span className="text-sm text-slate-500">القيمة بسعر الإحلال (قرارات)</span>
                     </div>
                     <p className="text-2xl font-bold text-indigo-700">
-                        {totals.valueReplacement.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}
+                        {convertAmount(totals.valueReplacement, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-bold">{getCurrencyLabel(defaultCurrency)}</span>
                     </p>
                 </div>
+
                 <div className="bg-white p-5 rounded-2xl border border-slate-100">
                     <div className="flex items-center gap-3 mb-2">
                         <Scale className="w-5 h-5 text-slate-600" />
@@ -266,10 +272,11 @@ const DualInventoryValuationPage: React.FC = () => {
                                         <td className="px-6 py-3 font-mono text-slate-700">{r.itemCode}</td>
                                         <td className="px-6 py-3">{r.itemNameAr}</td>
                                         <td className="px-6 py-3 font-medium">{(r.qty || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-3">{(r.historicalCostPerUnit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                                        <td className="px-6 py-3">{(r.replacementPricePerUnit || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</td>
-                                        <td className="px-6 py-3">{(r.valueHistorical || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</td>
-                                        <td className="px-6 py-3">{(r.valueReplacement || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</td>
+                                        <td className="px-6 py-3">{convertAmount(r.historicalCostPerUnit || 0, 'EGP').toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        <td className="px-6 py-3">{convertAmount(r.replacementPricePerUnit || 0, 'EGP').toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        <td className="px-6 py-3">{convertAmount(r.valueHistorical || 0, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                        <td className="px-6 py-3">{convertAmount(r.valueReplacement || 0, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+
                                         <td className="px-6 py-3">
                                             <span className={r.hasAlert ? 'font-bold text-amber-700' : 'text-slate-600'}>
                                                 {(r.diffPct * 100).toFixed(1)}%

@@ -8,6 +8,7 @@ import {
 import { supplierService, type SupplierItemDto, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { formatNumber } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import toast from 'react-hot-toast';
 
 // Form Input Component
@@ -191,6 +192,7 @@ const SectionCard: React.FC<{
 const SupplierItemFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const isEdit = !!id;
 
     // State
@@ -418,7 +420,7 @@ const SupplierItemFormPage: React.FC = () => {
                             onChange={(v) => setFormData({ ...formData, lastPrice: parseFloat(v) || 0 })}
                             icon={DollarSign}
                             placeholder="0.0000"
-                            hint="السعر بالجنيه المصري للوحدة الواحدة"
+                            hint={`السعر بـ (${getCurrencyLabel(selectedSupplier?.currency || defaultCurrency)}) للوحدة الواحدة`}
                         />
 
                         <FormInput
@@ -504,7 +506,12 @@ const SupplierItemFormPage: React.FC = () => {
                                 <div>
                                     <div className="text-xs text-slate-500 font-medium">آخر سعر</div>
                                     <div className="text-lg font-bold text-slate-800">
-                                        {formatNumber(formData.lastPrice ?? 0)} ج.م
+                                        {formatNumber(formData.lastPrice ?? 0)} {getCurrencyLabel(selectedSupplier?.currency || defaultCurrency)}
+                                        {selectedSupplier?.currency && selectedSupplier.currency !== defaultCurrency && (
+                                            <span className="text-xs text-slate-400 mr-2">
+                                                (≈ {formatNumber(convertAmount(formData.lastPrice || 0, selectedSupplier.currency))} {getCurrencyLabel(defaultCurrency)})
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -556,7 +563,7 @@ const SupplierItemFormPage: React.FC = () => {
                                     <div>
                                         <div className="text-xs text-slate-500 font-medium">قيمة أقل طلب</div>
                                         <div className="text-lg font-bold text-brand-primary">
-                                            {formatNumber((formData.lastPrice ?? 0) * (formData.minOrderQty ?? 0))} ج.م
+                                            {formatNumber((formData.lastPrice ?? 0) * (formData.minOrderQty ?? 0))} {getCurrencyLabel(selectedSupplier?.currency || defaultCurrency)}
                                         </div>
                                     </div>
                                 </div>

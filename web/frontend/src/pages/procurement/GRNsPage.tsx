@@ -21,6 +21,8 @@ import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService'
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -105,7 +107,11 @@ const GRNTableRow: React.FC<{
     onDelete: (receipt: GoodsReceiptNoteDto) => void;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
-}> = ({ receipt, index, onView, onFinalize, onDelete, isSelected, onToggleSelect }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ receipt, index, onView, onFinalize, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -140,10 +146,11 @@ const GRNTableRow: React.FC<{
         </td>
         <td className="px-6 py-4">
             <div className="flex flex-col">
-                <span className="text-slate-900 font-bold">{formatNumber(receipt.totalAmount || 0)} ج.م</span>
+                <span className="text-slate-900 font-bold">{formatNumber(convertAmount(receipt.totalAmount || 0, receipt.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}</span>
                 <span className="text-xs text-slate-400 font-medium">إجمالي القيمة</span>
             </div>
         </td>
+
         <td className="px-6 py-4 text-sm font-medium text-slate-700">
             {formatDate(receipt.grnDate)}
         </td>
@@ -264,7 +271,9 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
 const READY_FOR_STORE_STATUSES = ['Inspected', 'Pending Approval', 'Approved'];
 
 const GRNsPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const navigate = useNavigate();
+
     const [loading, setLoading] = useState(true);
     const [receipts, setReceipts] = useState<GoodsReceiptNoteDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -328,9 +337,10 @@ const GRNsPage: React.FC = () => {
             readyForStore: readyForStore.length,
             today: activeReceipts.filter(r => new Date(r.grnDate!).toDateString() === new Date().toDateString()).length,
             totalQty: formatNumber(activeReceipts.reduce((sum, r) => sum + (r.totalReceivedQty || 0), 0)),
-            totalValue: formatNumber(activeReceipts.reduce((sum, r) => sum + (r.totalAmount || 0), 0))
+            totalValue: formatNumber(activeReceipts.reduce((sum, r) => sum + convertAmount(r.totalAmount || 0, r.currency || 'EGP'), 0))
         };
-    }, [receipts]);
+    }, [receipts, defaultCurrency, convertAmount]);
+
 
     const handleFinalizeStoreIn = async (id: number, type: number = 1) => {
         const confirmMsg = type === 2 ? 'هل أنت متأكد من إرسال إذن الإضافة للاعتماد؟' : 'هل أنت متأكد من إصدار إذن الإضافة؟';
@@ -489,11 +499,12 @@ const GRNsPage: React.FC = () => {
                 />
                 <StatCard
                     icon={Package}
-                    value={stats.totalValue as any}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
                     label="إجمالي قيمة التوريدات"
                     color="purple"
                 />
             </div>
+
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
@@ -609,7 +620,11 @@ const GRNsPage: React.FC = () => {
                                         onDelete={handleDeleteClick}
                                         isSelected={!!receipt.id && selectedIds.includes(receipt.id)}
                                         onToggleSelect={handleToggleSelect}
+                                        getCurrencyLabel={getCurrencyLabel}
+                                        defaultCurrency={defaultCurrency}
+                                        convertAmount={convertAmount}
                                     />
+
                                 ))
                             )}
                         </tbody>

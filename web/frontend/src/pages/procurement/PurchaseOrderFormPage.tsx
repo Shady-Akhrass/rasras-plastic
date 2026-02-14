@@ -29,6 +29,8 @@ import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // ─── Centralized Calculation Helper ───
 const calculateOrderTotals = (po: PurchaseOrderDto): PurchaseOrderDto => {
@@ -70,7 +72,9 @@ const calculateOrderTotals = (po: PurchaseOrderDto): PurchaseOrderDto => {
 };
 
 const PurchaseOrderFormPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const { id } = useParams<{ id: string }>();
+
     const navigate = useNavigate();
     const location = useLocation();
     const isEdit = !!id;
@@ -95,8 +99,9 @@ const PurchaseOrderFormPage: React.FC = () => {
     // Initial Form State
     const [formData, setFormData] = useState<PurchaseOrderDto>({
         supplierId: 0,
-        currency: 'EGP',
+        currency: defaultCurrency,
         exchangeRate: 1,
+
         subTotal: 0,
         discountAmount: 0,
         taxAmount: 0,
@@ -247,12 +252,13 @@ const PurchaseOrderFormPage: React.FC = () => {
                     supplierId: quotation.supplierId,
                     quotationId: quotation.id,
                     comparisonId: comparisonId ? parseInt(comparisonId) : undefined,
-                    currency: quotation.currency || 'EGP',
+                    currency: quotation.currency || defaultCurrency,
+
                     shippingCost: finalShippingCost,
                     otherCosts: finalOtherCosts,
                     deliveryDays: comparisonDetail?.deliveryDays || quotation.deliveryDays || 0,
                     paymentTerms: quotation.paymentTerms || '',
-                    notes: `تم الإنشاء بناءً على عرض السعر: ${quotation.quotationNumber}\n${quotation.notes || ''}`,
+                    notes: `تم الإنشاء بناءً على عرض السعر: ${quotation.quotationNumber} \n${quotation.notes || ''} `,
                     items: (quotation.items || []).map((qi: any) => ({
                         itemId: qi.itemId,
                         unitId: qi.unitId,
@@ -293,11 +299,11 @@ const PurchaseOrderFormPage: React.FC = () => {
             const compId = savedPO?.comparisonId || optimisticPO.comparisonId;
 
             if (createInvoice && poId) {
-                navigate(`/dashboard/procurement/invoice/create?poId=${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''}`);
+                navigate(`/ dashboard / procurement / invoice / create ? poId = ${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''} `);
                 return;
             }
             if (createOutstanding && poId) {
-                navigate(`/dashboard/procurement/outstanding/create?poId=${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''}`);
+                navigate(`/ dashboard / procurement / outstanding / create ? poId = ${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''} `);
                 return;
             }
             navigate('/dashboard/procurement/po');
@@ -325,16 +331,13 @@ const PurchaseOrderFormPage: React.FC = () => {
 
     // ─── Shared input class generator ───
     const inputClass = (extra = '') =>
-        `w-full px-4 py-3 border-2 rounded-xl outline-none transition-all font-semibold ${isReadOnly
-            ? 'bg-slate-50 border-slate-200 text-slate-700 cursor-default pointer-events-none select-text'
-            : 'bg-slate-50 border-transparent focus:border-brand-primary focus:bg-white'
-        } ${extra}`;
+        `w-full px-4 py-3 border-2 border-transparent rounded-xl 
+        focus:border-brand-primary outline-none transition-all font-semibold
+        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'} ${extra}`;
 
     const smallInputClass = (extra = '') =>
-        `px-3 py-2 border-2 rounded-xl text-sm outline-none transition-all ${isReadOnly
-            ? 'bg-slate-50 border-slate-200 cursor-default pointer-events-none select-text'
-            : 'bg-white border-slate-200 focus:border-brand-primary'
-        } ${extra}`;
+        `px-3 py-2 border-2 border-transparent rounded-xl text-sm outline-none transition-all font-semibold
+        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white focus:border-brand-primary'} ${extra}`;
 
     if (loading)
         return (
@@ -346,12 +349,12 @@ const PurchaseOrderFormPage: React.FC = () => {
     return (
         <div className="space-y-6 pb-20" dir="rtl">
             <style>{`
-                @keyframes slideInRight {
+@keyframes slideInRight {
                     from { opacity: 0; transform: translateX(-20px); }
                     to { opacity: 1; transform: translateX(0); }
-                }
-                .animate-slide-in { animation: slideInRight 0.4s ease-out; }
-            `}</style>
+}
+                .animate - slide -in { animation: slideInRight 0.4s ease- out; }
+`}</style>
 
             {/* ═══ HEADER ═══ */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white shadow-2xl">
@@ -374,7 +377,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-3xl font-bold">
-                                    {isEdit ? `أمر شراء رقم: ${optimisticPO.poNumber || ''}` : 'إنشاء أمر شراء جديد'}
+                                    {isEdit ? `أمر شراء رقم: ${optimisticPO.poNumber || ''} ` : 'إنشاء أمر شراء جديد'}
                                 </h1>
                                 {isReadOnly && (
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20">
@@ -492,8 +495,9 @@ const PurchaseOrderFormPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-2">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div className="space-y-2 md:col-span-2">
+
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <Truck className="w-4 h-4 text-brand-primary" /> المورد
                                     {isReadOnly && <Lock className="w-3 h-3 text-slate-400" />}
@@ -544,8 +548,30 @@ const PurchaseOrderFormPage: React.FC = () => {
                                     className={inputClass()}
                                 />
                             </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <DollarSign className="w-4 h-4 text-brand-primary" /> العملة
+                                    {isReadOnly && <Lock className="w-3 h-3 text-slate-400" />}
+                                </label>
+                                {isReadOnly ? (
+                                    <div className={inputClass()}>
+                                        {getCurrencyLabel(optimisticPO.currency || defaultCurrency)}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={optimisticPO.currency}
+                                        onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'currency', value: e.target.value })}
+                                        className={inputClass()}
+                                    >
+                                        <option value="EGP">ج.م (EGP)</option>
+                                        <option value="SAR">ر.س (SAR)</option>
+                                        <option value="USD">$ (USD)</option>
+                                    </select>
+                                )}
+                            </div>
                         </div>
                     </div>
+
 
                     {/* ═══ ITEMS TABLE ═══ */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '100ms' }}>
@@ -598,7 +624,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                                             <td className="py-4 pr-6">
                                                 {isReadOnly ? (
                                                     <div className={smallInputClass('min-w-[200px] font-semibold text-slate-800')}>
-                                                        {items.find(i => i.id === item.itemId)?.itemNameAr || `صنف #${item.itemId}`}
+                                                        {items.find(i => i.id === item.itemId)?.itemNameAr || `صنف #${item.itemId} `}
                                                     </div>
                                                 ) : (
                                                     <select
@@ -669,7 +695,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                     tabIndex={isReadOnly ? -1 : undefined}
                                                     value={item.discountPercentage}
                                                     onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { discountPercentage: parseFloat(e.target.value) || 0 } })}
-                                                    className={smallInputClass(`w-16 text-center font-bold text-rose-600 ${isReadOnly ? '' : 'bg-rose-50 border-rose-100 focus:border-rose-400'}`)}
+                                                    className={smallInputClass(`w - 16 text - center font - bold text - rose - 600 ${isReadOnly ? '' : 'bg-rose-50 border-rose-100 focus:border-rose-400'} `)}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -679,7 +705,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                                                     tabIndex={isReadOnly ? -1 : undefined}
                                                     value={item.taxPercentage}
                                                     onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { taxPercentage: parseFloat(e.target.value) || 0 } })}
-                                                    className={smallInputClass(`w-16 text-center font-bold text-amber-600 ${isReadOnly ? '' : 'bg-amber-50 border-amber-100 focus:border-amber-400'}`)}
+                                                    className={smallInputClass(`w - 16 text - center font - bold text - amber - 600 ${isReadOnly ? '' : 'bg-amber-50 border-amber-100 focus:border-amber-400'} `)}
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800 tabular-nums">
@@ -747,9 +773,10 @@ const PurchaseOrderFormPage: React.FC = () => {
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
                                 <span className="text-white/60">إجمالي الأصناف (صافي)</span>
                                 <span className="font-bold text-lg text-white/90 tabular-nums">
-                                    {formatNumber(optimisticPO.totalAmount - (optimisticPO.shippingCost || 0))} {optimisticPO.currency}
+                                    {formatNumber(optimisticPO.totalAmount - (optimisticPO.shippingCost || 0))} {getCurrencyLabel(optimisticPO.currency || defaultCurrency)}
                                 </span>
                             </div>
+
 
                             <div className="flex justify-between items-center p-4 bg-brand-primary/10 rounded-xl border border-brand-primary/20">
                                 <span className="text-brand-primary-light font-semibold">مصاريف الشحن</span>
@@ -787,10 +814,16 @@ const PurchaseOrderFormPage: React.FC = () => {
                                 <div className="flex justify-between items-center p-5 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20">
                                     <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
                                     {isReadOnly ? (
-                                        <span className="font-black text-xl text-white tabular-nums">
-                                            {formatNumber(optimisticPO.totalAmount)} {optimisticPO.currency}
-                                        </span>
+                                        <div className="text-4xl font-black text-white">
+                                            {formatNumber(optimisticPO.totalAmount)} <span className="text-xl font-bold">{getCurrencyLabel(optimisticPO.currency || defaultCurrency)}</span>
+                                            {(optimisticPO.currency && optimisticPO.currency !== defaultCurrency) && (
+                                                <div className="text-sm font-bold text-white/60 mt-1">
+                                                    (≈ {formatNumber(convertAmount(optimisticPO.totalAmount, optimisticPO.currency))} {getCurrencyLabel(defaultCurrency)})
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : (
+
                                         <>
                                             <input
                                                 type="number"
@@ -840,10 +873,10 @@ const PurchaseOrderFormPage: React.FC = () => {
                             readOnly={isReadOnly}
                             tabIndex={isReadOnly ? -1 : undefined}
                             onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'notes', value: e.target.value })}
-                            className={`w-full p-4 border-2 rounded-xl outline-none transition-all text-sm leading-relaxed h-40 resize-none ${isReadOnly
-                                    ? 'bg-slate-50 border-slate-200 text-slate-700 cursor-default pointer-events-none'
-                                    : 'bg-slate-50 border-transparent focus:border-brand-primary focus:bg-white'
-                                }`}
+                            className={`w - full p - 4 border - 2 rounded - xl outline - none transition - all text - sm leading - relaxed h - 40 resize - none ${isReadOnly
+                                ? 'bg-slate-50 border-slate-200 text-slate-700 cursor-default pointer-events-none'
+                                : 'bg-slate-50 border-transparent focus:border-brand-primary focus:bg-white'
+                                } `}
                             placeholder={isReadOnly ? '' : 'اكتب أي ملاحظات أو تعليمات خاصة للمورد...'}
                         />
                     </div>

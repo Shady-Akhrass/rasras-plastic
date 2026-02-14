@@ -26,4 +26,5 @@ public class SupplierItemDto {
     private BigDecimal minOrderQty;
     private Boolean isPreferred;
     private Boolean isActive;
+    private String currency;
 }

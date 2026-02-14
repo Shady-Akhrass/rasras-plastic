@@ -46,15 +46,26 @@ const EmployeeShiftsPage: React.FC = () => {
     const q = search.trim().toLowerCase();
     const data = q
       ? items.filter(
-          (x) =>
-            (x.employeeNameAr || '').toLowerCase().includes(q) ||
-            (x.shiftCode || '').toLowerCase().includes(q) ||
-            (x.shiftNameAr || '').toLowerCase().includes(q) ||
-            (x.effectiveFrom || '').toLowerCase().includes(q)
-        )
+        (x) =>
+          (x.employeeNameAr || '').toLowerCase().includes(q) ||
+          (x.shiftCode || '').toLowerCase().includes(q) ||
+          (x.shiftNameAr || '').toLowerCase().includes(q) ||
+          (x.effectiveFrom || '').toLowerCase().includes(q)
+      )
       : items;
     return [...data].sort((a, b) => (b.employeeShiftId ?? 0) - (a.employeeShiftId ?? 0));
   }, [items, search]);
+
+  const selectableEmployees = useMemo(() => {
+    const assignedIds = items.filter(x => x.isActive).map(x => x.employeeId);
+    return employees.filter(e => {
+      // Show if not assigned to any active shift
+      // OR if we are editing this specific employee
+      if (!assignedIds.includes(e.employeeId)) return true;
+      if (form.employeeId === e.employeeId) return true;
+      return false;
+    });
+  }, [employees, items, form.employeeId]);
 
   const onNew = () =>
     setForm({
@@ -240,7 +251,7 @@ const EmployeeShiftsPage: React.FC = () => {
                 className="mt-2 w-full input-field"
               >
                 <option value="">اختر الموظف</option>
-                {employees.map((e) => (
+                {selectableEmployees.map((e) => (
                   <option key={e.employeeId} value={e.employeeId}>
                     {e.fullNameAr} ({e.employeeCode})
                   </option>

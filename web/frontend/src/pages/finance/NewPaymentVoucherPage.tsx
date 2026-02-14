@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { formatNumber, formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 import {
     paymentVoucherService,
     type SupplierWithInvoices,
@@ -27,7 +29,10 @@ interface SelectedInvoice extends InvoiceComparisonData {
 }
 
 const NewPaymentVoucherPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
+
     const location = useLocation();
     const [loading, setLoading] = useState(false);
     const [suppliersLoading, setSuppliersLoading] = useState(true);
@@ -44,11 +49,19 @@ const NewPaymentVoucherPage: React.FC = () => {
     const [formData, setFormData] = useState({
         voucherNumber: '',
         voucherDate: new Date().toISOString().split('T')[0],
-        paymentMethod: 'cash' as 'cash' | 'bank' | 'cheque',
+        paymentMethod: 'cash' as 'cash' | 'bank' | 'cheque' | 'bank_transfer',
         bankAccount: '',
         notes: '',
         referenceNumber: '',
+        isSplitPayment: false,
+        cashAmount: 0,
+        bankAmount: 0,
+        chequeAmount: 0,
+        bankTransferAmount: 0,
+        currency: defaultCurrency,
     });
+
+
 
     const totalAmount = selectedInvoices.reduce(
         (sum, inv) => sum + inv.allocatedAmount,
@@ -174,9 +187,10 @@ const NewPaymentVoucherPage: React.FC = () => {
                 ...prev,
                 {
                     ...invoice,
-                    allocatedAmount: invoice.invoiceTotal,
+                    allocatedAmount: invoice.remainingAmount ?? invoice.invoiceTotal,
                 },
             ];
+
         });
         setIsDirty(true);
     }, []);
@@ -230,23 +244,23 @@ const NewPaymentVoucherPage: React.FC = () => {
     };
 
     const validateStep2 = (): string | null => {
-        if (totalAmount <= 0) return 'يرجى إدخال مبلغ صرف صحيح';
-
-        for (const inv of selectedInvoices) {
-            if (inv.allocatedAmount <= 0) {
-                return `مبلغ الدفع للفاتورة ${inv.invoiceNumber} يجب أن يكون أكبر من صفر`;
+        if (formData.isSplitPayment) {
+            const totalSplit = (formData.cashAmount || 0) + (formData.bankAmount || 0) + (formData.chequeAmount || 0) + (formData.bankTransferAmount || 0);
+            if (totalSplit !== totalAmount) {
+                if (totalSplit > totalAmount + 0.01) { // Allow for minor floating point inaccuracies
+                    return `مجموع التوزيع (${formatNumber(totalSplit)}) يتجاوز إجمالي الفواتير المختارة (${formatNumber(totalAmount)})`;
+                }
+                // If lower, it's a partial payment, which is allowed
             }
-            if (inv.allocatedAmount > inv.invoiceTotal) {
-                return `مبلغ الدفع للفاتورة ${inv.invoiceNumber} يتجاوز إجمالي الفاتورة`;
+        } else {
+            if (formData.paymentMethod === 'bank' && !formData.bankAccount.trim()) {
+                return 'يرجى إدخال رقم الحساب البنكي';
             }
-        }
-
-        if (formData.paymentMethod === 'bank' && !formData.bankAccount.trim()) {
-            return 'يرجى إدخال رقم الحساب البنكي';
         }
 
         return null;
     };
+
 
     const handleNextStep = () => {
         if (currentStep === 1) {
@@ -274,18 +288,37 @@ const NewPaymentVoucherPage: React.FC = () => {
         try {
             setLoading(true);
 
+            const totalSplit = (formData.cashAmount || 0) + (formData.bankAmount || 0) + (formData.chequeAmount || 0) + (formData.bankTransferAmount || 0);
+
+            // Core Logic:
+            // 1. If isSplitPayment is true, the voucher amount is the sum of split portions.
+            // 2. If isSplitPayment is false, the voucher amount is the sum of invoice selections (totalAmount).
+            const voucherAmount = formData.isSplitPayment ? totalSplit : totalAmount;
+
             const voucher: PaymentVoucherDto = {
                 voucherNumber: formData.voucherNumber,
                 voucherDate: formData.voucherDate,
                 supplierId: selectedSupplier!.supplierId,
                 paymentMethod: formData.paymentMethod,
-                amount: totalAmount,
-                description: `دفعة عن ${selectedInvoices.length} فاتورة`,
+                amount: voucherAmount,
+                cashAmount: formData.isSplitPayment ? formData.cashAmount : (formData.paymentMethod === 'cash' ? totalAmount : 0),
+                bankAmount: formData.isSplitPayment ? formData.bankAmount : (formData.paymentMethod === 'bank' ? totalAmount : 0),
+                chequeAmount: formData.isSplitPayment ? formData.chequeAmount : (formData.paymentMethod === 'cheque' ? totalAmount : 0),
+                bankTransferAmount: formData.isSplitPayment ? formData.bankTransferAmount : (formData.paymentMethod === 'bank_transfer' ? totalAmount : 0),
+                isSplitPayment: formData.isSplitPayment,
+                currency: formData.currency || defaultCurrency,
+                exchangeRate: 1.0,
+
+                description: selectedInvoices.length > 1
+                    ? `دفعة مجمعة لعدد ${selectedInvoices.length} فواتير`
+                    : `دفعة للفاتورة رقم ${selectedInvoices[0].invoiceNumber}`,
                 notes: formData.notes,
-                preparedByUserId: 1, // Fallback to system user or get from auth context if available
-                allocations: selectedInvoices.map((inv) => ({
+                preparedByUserId: 1,
+                status: 'Closed',
+                approvalStatus: 'Pending',
+                allocations: selectedInvoices.map(inv => ({
                     supplierInvoiceId: inv.supplierInvoiceId,
-                    allocatedAmount: inv.allocatedAmount,
+                    allocatedAmount: inv.allocatedAmount, // This is the amount intended for this specific invoice
                     invoiceNumber: inv.invoiceNumber,
                     invoiceDate: inv.invoiceDate,
                     invoiceTotal: inv.invoiceTotal,
@@ -309,11 +342,12 @@ const NewPaymentVoucherPage: React.FC = () => {
                     grnShippingCost: inv.grnShippingCost,
                     grnOtherCosts: inv.grnOtherCosts,
                     variancePercentage: inv.variancePercentage,
-                    isValid: inv.isValid,
-                })),
+                    isValid: inv.isValid
+                }))
             };
 
             await paymentVoucherService.createVoucher(voucher);
+
             setIsDirty(false);
             toast.success('تم إنشاء سند الصرف بنجاح');
             navigate('/dashboard/finance/payment-vouchers');
@@ -324,6 +358,7 @@ const NewPaymentVoucherPage: React.FC = () => {
             setLoading(false);
         }
     };
+
 
     const handleCancel = () => {
         if (isDirty) {
@@ -421,7 +456,9 @@ const NewPaymentVoucherPage: React.FC = () => {
                                                     key={supplier.supplierId}
                                                     value={String(supplier.supplierId)}
                                                 >
-                                                    {supplier.nameAr} — {supplier.code} — ({supplier.pendingInvoices.length} فاتورة — {formatNumber(supplier.totalOutstanding)} ر.س مستحق)
+                                                    {supplier.nameAr} — {supplier.code} — ({supplier.pendingInvoices.length} فاتورة — {formatNumber(convertAmount(supplier.totalOutstanding || 0, 'EGP'))} {getCurrencyLabel(defaultCurrency)} مستحق)
+
+
                                                 </option>
                                             ))}
                                         </select>
@@ -447,7 +484,9 @@ const NewPaymentVoucherPage: React.FC = () => {
                                                         {selectedSupplier.pendingInvoices.length} فاتورة معلقة
                                                     </span>
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 rounded-lg text-xs font-bold">
-                                                        مستحق: {formatNumber(selectedSupplier.totalOutstanding)} ر.س
+                                                        مستحق: {formatNumber(convertAmount(selectedSupplier.totalOutstanding || 0, 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+
+
                                                     </span>
                                                 </div>
                                             </div>
@@ -528,11 +567,23 @@ const NewPaymentVoucherPage: React.FC = () => {
                                                         </div>
                                                     </label>
 
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex flex-col items-end">
                                                         <span className="text-xl font-bold text-slate-800">
-                                                            {formatNumber(invoice.invoiceTotal)} <span className="text-sm font-normal text-slate-500">ر.س</span>
+                                                            {formatNumber(convertAmount(invoice.remainingAmount ?? invoice.invoiceTotal, invoice.currency || 'EGP'))} <span className="text-sm font-normal text-slate-500">{getCurrencyLabel(defaultCurrency)}</span>
                                                         </span>
+                                                        {(invoice.paidAmount ?? 0) > 0 && (
+                                                            <div className="flex flex-col items-end mt-1">
+                                                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tighter">
+                                                                    مدفوع جزئياً: {formatNumber(convertAmount(invoice.paidAmount || 0, invoice.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                                                    إجمالي الفاتورة: {formatNumber(convertAmount(invoice.invoiceTotal, invoice.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
+
+
                                                 </div>
 
                                                 {/* Detailed Validation Component */}
@@ -664,10 +715,11 @@ const NewPaymentVoucherPage: React.FC = () => {
                                                             value={inv.allocatedAmount || ''}
                                                             onChange={(e) => handleInvoiceAmountChange(inv.supplierInvoiceId!, parseFloat(e.target.value))}
                                                             min={0}
-                                                            max={inv.invoiceTotal}
+                                                            max={inv.remainingAmount ?? inv.invoiceTotal}
                                                             step="0.01"
                                                         />
-                                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">ر.س</span>
+                                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">{getCurrencyLabel(formData.currency || defaultCurrency)}</span>
+
                                                     </div>
                                                 </div>
                                             </div>
@@ -676,8 +728,11 @@ const NewPaymentVoucherPage: React.FC = () => {
 
                                     <div className="flex justify-end items-center gap-4 pt-2 border-t border-slate-200 mt-2">
                                         <span className="font-bold text-slate-700">الإجمالي الكلي:</span>
-                                        <span className="text-2xl font-bold text-emerald-600">{formatNumber(totalAmount)} <span className="text-sm">ر.س</span></span>
+                                        <span className="text-2xl font-bold text-emerald-600">{formatNumber(totalAmount)} <span className="text-sm">{getCurrencyLabel(formData.currency || defaultCurrency)}</span></span>
+
                                     </div>
+
+
                                 </div>
                             </div>
 
@@ -728,23 +783,141 @@ const NewPaymentVoucherPage: React.FC = () => {
                                     <select
                                         id="paymentMethod"
                                         value={formData.paymentMethod}
+                                        onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as any })}
+                                        disabled={formData.isSplitPayment}
+                                        className={`w-full px-4 py-3 border-2 border-transparent rounded-xl outline-none transition-all font-semibold ${formData.isSplitPayment ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 focus:border-emerald-500'
+                                            }`}
+                                    >
+                                        <option value="cash">نقداً</option>
+                                        <option value="bank_transfer">تحويل بنكي</option>
+                                        <option value="cheque">شيك</option>
+                                        <option value="bank">بنك (أخر)</option>
+
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label
+                                        htmlFor="currency"
+                                        className="block text-sm font-bold text-slate-700"
+                                    >
+                                        العملة <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        id="currency"
+                                        value={formData.currency || defaultCurrency}
                                         onChange={(e) => {
                                             setFormData((prev) => ({
                                                 ...prev,
-                                                paymentMethod: e.target.value as 'cash' | 'bank' | 'cheque',
-                                                bankAccount: e.target.value !== 'bank' ? '' : prev.bankAccount,
+                                                currency: e.target.value,
                                             }));
                                             setIsDirty(true);
                                         }}
                                         className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-emerald-500 outline-none transition-all font-semibold"
+                                        required
                                     >
-                                        <option value="cash">نقداً</option>
-                                        <option value="bank">تحويل بنكي</option>
-                                        <option value="cheque">شيك</option>
+                                        <option value="EGP">ج.م (EGP)</option>
+                                        <option value="SAR">ر.س (SAR)</option>
+                                        <option value="USD">$ (USD)</option>
                                     </select>
                                 </div>
 
-                                {formData.paymentMethod === 'bank' && (
+
+                                <div className="md:col-span-2 space-y-4 bg-slate-50 p-6 rounded-2xl border-2 border-slate-100">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-emerald-100 rounded-lg">
+                                                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-slate-800">توزيع مبالغ الدفع</h3>
+                                                <p className="text-xs text-slate-500">تمكين الدفع بأكثر من طريقة في نفس السند</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, isSplitPayment: !prev.isSplitPayment }))}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.isSplitPayment ? 'bg-emerald-600' : 'bg-slate-300'
+                                                }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isSplitPayment ? '-translate-x-6' : '-translate-x-1'
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+
+                                    {formData.isSplitPayment && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 animate-fadeIn">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold text-slate-600">نقدي</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={formData.cashAmount || ''}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, cashAmount: parseFloat(e.target.value) || 0 }))}
+                                                        className="w-full pl-3 pr-8 py-2 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all font-bold text-slate-800"
+                                                        placeholder="0.00"
+                                                    />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">ج.م</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold text-slate-600">تحويل بنكي</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={formData.bankTransferAmount || ''}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, bankTransferAmount: parseFloat(e.target.value) || 0 }))}
+                                                        className="w-full pl-3 pr-8 py-2 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all font-bold text-slate-800"
+                                                        placeholder="0.00"
+                                                    />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">ج.م</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold text-slate-600">شيك</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={formData.chequeAmount || ''}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, chequeAmount: parseFloat(e.target.value) || 0 }))}
+                                                        className="w-full pl-3 pr-8 py-2 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all font-bold text-slate-800"
+                                                        placeholder="0.00"
+                                                    />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">ج.م</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold text-slate-600">بنك (أخر)</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={formData.bankAmount || ''}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, bankAmount: parseFloat(e.target.value) || 0 }))}
+                                                        className="w-full pl-3 pr-8 py-2 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none transition-all font-bold text-slate-800"
+                                                        placeholder="0.00"
+                                                    />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">ج.م</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {formData.isSplitPayment && (
+                                        <div className={`mt-2 p-2 rounded-lg text-sm flex items-center justify-between ${((formData.cashAmount || 0) + (formData.bankAmount || 0) + (formData.chequeAmount || 0) + (formData.bankTransferAmount || 0)) <= totalAmount + 0.01
+                                            ? 'bg-emerald-50 text-emerald-700'
+                                            : 'bg-red-50 text-red-700'
+                                            }`}>
+                                            <span className="font-bold">مجموع التوزيع: {formatNumber((formData.cashAmount || 0) + (formData.bankAmount || 0) + (formData.chequeAmount || 0) + (formData.bankTransferAmount || 0))} {getCurrencyLabel(formData.currency || defaultCurrency)}</span>
+                                            <span className="text-xs">المطلوب (كحد أقصى): {formatNumber(totalAmount)} {getCurrencyLabel(formData.currency || defaultCurrency)}</span>
+
+                                        </div>
+                                    )}
+                                </div>
+
+                                {formData.paymentMethod === 'bank' && !formData.isSplitPayment && (
+
                                     <div className="space-y-2">
                                         <label htmlFor="bankAccount" className="block text-sm font-bold text-slate-700">
                                             رقم الحساب البنكي <span className="text-red-500">*</span>
@@ -761,7 +934,8 @@ const NewPaymentVoucherPage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {formData.paymentMethod === 'cheque' && (
+                                {formData.paymentMethod === 'cheque' && !formData.isSplitPayment && (
+
                                     <div className="space-y-2">
                                         <label htmlFor="referenceNumber" className="block text-sm font-bold text-slate-700">
                                             رقم الشيك

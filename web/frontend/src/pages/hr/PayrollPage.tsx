@@ -89,6 +89,28 @@ const PayrollPage: React.FC = () => {
               {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
               عرض
             </button>
+            <button
+              onClick={async () => {
+                if (!window.confirm('هل أنت متأكد من إنشاء مسير الرواتب لهذا الشهر؟')) return;
+                setIsLoading(true);
+                try {
+                  const res = await hrService.generatePayroll(month, year);
+                  if (res.success) {
+                    toast.success('تم إنشاء المسير بنجاح');
+                    setItems(res.data);
+                  }
+                } catch {
+                  toast.error('فشل في إنشاء المسير');
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              disabled={isLoading || items.length > 0}
+              className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <DollarSign className="w-4 h-4" />
+              إنشاء مسير
+            </button>
           </div>
         </div>
       </div>
@@ -162,7 +184,7 @@ const PayrollPage: React.FC = () => {
           </table>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

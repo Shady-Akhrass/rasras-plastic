@@ -97,143 +97,56 @@ public class SupplierInvoicePdfService {
     // ─────────────────────────────────────────────────────────────────
 
     private void initFonts() {
-        bfRegular = null;
-        bfBold = null;
-
-        bfRegular = tryLoadFont("fonts/arial.ttf");
-        bfBold = tryLoadFont("fonts/arialbd.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadFont("fonts/Cairo-Regular.ttf");
-        if (bfBold == null)
-            bfBold = tryLoadFont("fonts/Cairo-Bold.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadSystemFont(
-                    "C:/Windows/Fonts/arial.ttf",
-                    "C:/Windows/Fonts/Arial.ttf",
-                    "C:\\Windows\\Fonts\\arial.ttf");
-        if (bfBold == null)
-            bfBold = tryLoadSystemFont(
-                    "C:/Windows/Fonts/arialbd.ttf",
-                    "C:/Windows/Fonts/Arialbd.ttf",
-                    "C:\\Windows\\Fonts\\arialbd.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadSystemFont(
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-                    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                    "/usr/share/fonts/TTF/DejaVuSans.ttf");
-        if (bfBold == null)
-            bfBold = tryLoadSystemFont(
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-                    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                    "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf");
-
-        if (bfRegular == null)
-            bfRegular = tryLoadSystemFont(
-                    "/System/Library/Fonts/Supplemental/Arial.ttf",
-                    "/Library/Fonts/Arial.ttf",
-                    "/System/Library/Fonts/Helvetica.ttc");
-
-        if (bfRegular == null)
-            bfRegular = tryRegisteredFonts();
+        bfRegular = loadClasspathFont("fonts/arial.ttf");
+        bfBold = loadClasspathFont("fonts/arialbd.ttf");
 
         if (bfRegular == null) {
-            log.warn("⚠️ No Arabic-capable font found! Falling back to Helvetica.");
-            try {
-                bfRegular = BaseFont.createFont(
-                        BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
-            } catch (Exception e) {
-                throw new RuntimeException("Cannot load even Helvetica font", e);
-            }
+            throw new RuntimeException(
+                    "❌ Font not found: fonts/arial.ttf — "
+                            + "place it under src/main/resources/fonts/");
         }
-
         if (bfBold == null) {
-            if (bfRegular.getPostscriptFontName().contains("Helvetica")) {
-                try {
-                    bfBold = BaseFont.createFont(
-                            BaseFont.HELVETICA_BOLD, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
-                } catch (Exception e) {
-                    bfBold = bfRegular;
-                }
-            } else {
-                bfBold = bfRegular;
-            }
+            log.warn("⚠️ arialbd.ttf not found, using Regular as fallback.");
+            bfBold = bfRegular;
         }
 
-        log.info("✅ PDF Font loaded — Regular: {}, Bold: {}",
+        log.info("✅ PDF Fonts — Regular: {}, Bold: {}",
                 bfRegular.getPostscriptFontName(),
                 bfBold.getPostscriptFontName());
 
         buildFontSet();
     }
 
-    private BaseFont tryLoadFont(String classpathLocation) {
+    private BaseFont loadClasspathFont(String classpathLocation) {
         try {
             ClassPathResource res = new ClassPathResource(classpathLocation);
-            if (!res.exists())
+            if (!res.exists()) {
+                log.error("❌ Font NOT FOUND: {}", classpathLocation);
                 return null;
-
-            File tmp = File.createTempFile("pdf_font_", ".ttf");
-            tmp.deleteOnExit();
-
-            try (InputStream is = res.getInputStream();
-                    java.io.FileOutputStream fos = new java.io.FileOutputStream(tmp)) {
-                is.transferTo(fos);
             }
 
+            byte[] fontBytes;
+            try (InputStream is = res.getInputStream()) {
+                fontBytes = is.readAllBytes();
+            }
+
+            log.info("📄 Font: {} — {} bytes", classpathLocation, fontBytes.length);
+
             BaseFont font = BaseFont.createFont(
-                    tmp.getAbsolutePath(), BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-            log.info("✅ Loaded font from classpath: {}", classpathLocation);
+                    classpathLocation,
+                    BaseFont.IDENTITY_H,
+                    BaseFont.EMBEDDED,
+                    true,
+                    fontBytes,
+                    null);
+
+            log.info("✅ Loaded: {}", font.getPostscriptFontName());
             return font;
 
         } catch (Exception e) {
-            log.debug("Font not available at classpath:{} — {}",
-                    classpathLocation, e.getMessage());
+            log.error("❌ Failed: {} — {}", classpathLocation, e.getMessage(), e);
             return null;
         }
-    }
-
-    private BaseFont tryLoadSystemFont(String... paths) {
-        for (String path : paths) {
-            try {
-                File f = new File(path);
-                if (f.exists() && f.isFile()) {
-                    BaseFont font = BaseFont.createFont(
-                            f.getAbsolutePath(), BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-                    log.info("✅ Loaded system font: {}", path);
-                    return font;
-                }
-            } catch (Exception e) {
-                log.debug("System font not usable: {} — {}", path, e.getMessage());
-            }
-        }
-        return null;
-    }
-
-    private BaseFont tryRegisteredFonts() {
-        try {
-            FontFactory.registerDirectories();
-            String[] candidates = {
-                    "arial", "arial unicode ms", "tahoma",
-                    "dejavu sans", "liberation sans", "freesans",
-                    "noto sans arabic", "droid sans"
-            };
-            for (String name : candidates) {
-                Font f = FontFactory.getFont(
-                        name, BaseFont.IDENTITY_H, BaseFont.EMBEDDED, 10);
-                if (f != null && f.getBaseFont() != null) {
-                    log.info("✅ Found registered font: {}", name);
-                    return f.getBaseFont();
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Registered font search failed: {}", e.getMessage());
-        }
-        return null;
     }
 
     private void buildFontSet() {
@@ -690,9 +603,9 @@ public class SupplierInvoicePdfService {
         summary.setWidths(new float[] { 1f, 1.2f });
         summary.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
 
-        addSummaryRow(summary, "المجموع الفرعي", invoice.getSubTotal(), false);
-        addSummaryRow(summary, "الخصم", invoice.getDiscountAmount(), false);
-        addSummaryRow(summary, "الضريبة (VAT)", invoice.getTaxAmount(), false);
+        addSummaryRow(summary, "المجموع الفرعي", invoice.getSubTotal(), false, invoice.getCurrency());
+        addSummaryRow(summary, "الخصم", invoice.getDiscountAmount(), false, invoice.getCurrency());
+        addSummaryRow(summary, "الضريبة (VAT)", invoice.getTaxAmount(), false, invoice.getCurrency());
 
         BigDecimal sub = nvl(invoice.getSubTotal());
         BigDecimal disc = nvl(invoice.getDiscountAmount());
@@ -700,8 +613,8 @@ public class SupplierInvoicePdfService {
         BigDecimal total = nvl(invoice.getTotalAmount());
         BigDecimal delivery = total.subtract(sub.subtract(disc).add(tax));
 
-        addSummaryRow(summary, "مصاريف الشحن", delivery, false);
-        addSummaryRow(summary, "الإجمالي النهائي", invoice.getTotalAmount(), true);
+        addSummaryRow(summary, "مصاريف الشحن", delivery, false, invoice.getCurrency());
+        addSummaryRow(summary, "الإجمالي النهائي", invoice.getTotalAmount(), true, invoice.getCurrency());
 
         boxOuter.addElement(summary);
         outer.addCell(boxOuter);
@@ -715,7 +628,7 @@ public class SupplierInvoicePdfService {
     }
 
     private void addSummaryRow(PdfPTable table, String label,
-            BigDecimal value, boolean isGrand) {
+            BigDecimal value, boolean isGrand, String currency) {
 
         Font lf = isGrand ? grandTotalLabelFont : totalLabelFont;
         Font vf = isGrand ? grandTotalValueFont : totalValueFont;
@@ -741,7 +654,7 @@ public class SupplierInvoicePdfService {
         // ── Value cell (LEFT in RTL = second) ──
         String display = formatMoney(value);
         if (isGrand)
-            display += "  ج.م";
+            display += "  " + (currency != null ? currency : "ج.م");
 
         PdfPCell vCell = new PdfPCell(new Phrase(display, vf));
         vCell.setBorder(border);
