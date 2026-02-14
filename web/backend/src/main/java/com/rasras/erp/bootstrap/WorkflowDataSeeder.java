@@ -11,7 +11,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-@Component
+// ⚠️ DISABLED: This seeder was creating incorrect "Management Approval" step
+// PO_APPROVAL workflow is now properly configured in DataSeeder.java
+// @Component
 @RequiredArgsConstructor
 public class WorkflowDataSeeder implements CommandLineRunner {
 
@@ -22,7 +24,8 @@ public class WorkflowDataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        seedPOApprovalWorkflow();
+        // DISABLED - seedPOApprovalWorkflow();
+        System.out.println("WorkflowDataSeeder is disabled. PO_APPROVAL workflow configured in DataSeeder.java");
     }
 
     private void seedPOApprovalWorkflow() {
