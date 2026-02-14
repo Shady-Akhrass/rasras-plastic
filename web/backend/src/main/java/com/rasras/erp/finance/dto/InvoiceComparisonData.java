@@ -42,5 +42,8 @@ public class InvoiceComparisonData {
 
     private BigDecimal variancePercentage;
     private Boolean isValid;
+    private BigDecimal paidAmount;
+    private BigDecimal remainingAmount;
     private List<InvoiceItemComparison> items;
+
 }

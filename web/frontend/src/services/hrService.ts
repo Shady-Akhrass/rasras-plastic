@@ -199,5 +199,10 @@ export const hrService = {
     const res = await apiClient.get<ApiResp<PayrollDto[]>>(`/hr/payroll?${qs.toString()}`);
     return res.data;
   },
+  async generatePayroll(month: number, year: number) {
+    const qs = new URLSearchParams({ month: String(month), year: String(year) });
+    const res = await apiClient.post<ApiResp<PayrollDto[]>>(`/hr/payroll/generate?${qs.toString()}`, {});
+    return res.data;
+  },
 };
 

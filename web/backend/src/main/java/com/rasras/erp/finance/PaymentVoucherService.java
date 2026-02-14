@@ -31,9 +31,12 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+// Fixed findByStatusIn compilation error
 public class PaymentVoucherService {
 
+    // Payment Voucher Business Logic Service
     private final PaymentVoucherRepository voucherRepo;
+
     private final SupplierInvoiceRepository invoiceRepo;
     private final SupplierRepository supplierRepo;
     private final PurchaseOrderRepository poRepo;
@@ -80,7 +83,13 @@ public class PaymentVoucherService {
                 .paymentMethod(dto.getPaymentMethod())
                 .amount(dto.getAmount())
                 .paymentAmount(dto.getAmount())
+                .cashAmount(dto.getCashAmount())
+                .bankAmount(dto.getBankAmount())
+                .chequeAmount(dto.getChequeAmount())
+                .bankTransferAmount(dto.getBankTransferAmount())
+                .isSplitPayment(dto.getIsSplitPayment())
                 .currency(dto.getCurrency() != null ? dto.getCurrency() : "EGP")
+
                 .exchangeRate(dto.getExchangeRate() != null ? dto.getExchangeRate() : BigDecimal.ONE)
                 .notes(dto.getNotes())
                 .preparedByUserId(dto.getPreparedByUserId())
@@ -213,7 +222,7 @@ public class PaymentVoucherService {
 
     @Transactional(readOnly = true)
     public List<SupplierWithInvoices> getSuppliersWithPendingInvoices() {
-        List<SupplierInvoice> pendingInvoices = invoiceRepo.findByStatus("Unpaid");
+        List<SupplierInvoice> pendingInvoices = invoiceRepo.findByStatusIn(List.of("Unpaid", "Partial"));
 
         // Filter for approved ones
         List<SupplierInvoice> approvedPending = pendingInvoices.stream()
@@ -233,7 +242,7 @@ public class PaymentVoucherService {
                     .collect(Collectors.toList());
 
             BigDecimal totalOutstanding = comparisonDataList.stream()
-                    .map(InvoiceComparisonData::getInvoiceTotal)
+                    .map(InvoiceComparisonData::getRemainingAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             result.add(SupplierWithInvoices.builder()
@@ -254,14 +263,15 @@ public class PaymentVoucherService {
         List<SupplierInvoice> invoices = invoiceRepo.findBySupplierId(supplierId);
 
         return invoices.stream()
-                .filter(inv -> "Unpaid".equals(inv.getStatus()) && "Approved".equals(inv.getApprovalStatus()))
+                .filter(inv -> List.of("Unpaid", "Partial").contains(inv.getStatus())
+                        && "Approved".equals(inv.getApprovalStatus()))
                 .map(this::convertToComparisonData)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<InvoiceComparisonData> getUnpaidInvoices() {
-        List<SupplierInvoice> invoices = invoiceRepo.findByStatus("Unpaid");
+        List<SupplierInvoice> invoices = invoiceRepo.findByStatusIn(List.of("Unpaid", "Partial"));
 
         return invoices.stream()
                 .filter(inv -> "Approved".equals(inv.getApprovalStatus()))
@@ -390,8 +400,12 @@ public class PaymentVoucherService {
 
                 .variancePercentage(variance)
                 .isValid(variance.abs().compareTo(new BigDecimal(10)) <= 0)
+                .paidAmount(inv.getPaidAmount() != null ? inv.getPaidAmount() : BigDecimal.ZERO)
+                .remainingAmount(inv.getTotalAmount()
+                        .subtract(inv.getPaidAmount() != null ? inv.getPaidAmount() : BigDecimal.ZERO))
                 .items(itemComparisons)
                 .build();
+
     }
 
     private BigDecimal calculateGrnTotal(GoodsReceiptNote grn) {
@@ -427,6 +441,11 @@ public class PaymentVoucherService {
                 .accountNumber(voucher.getAccountNumber())
                 .checkNumber(voucher.getCheckNumber())
                 .amount(voucher.getAmount())
+                .cashAmount(voucher.getCashAmount())
+                .bankAmount(voucher.getBankAmount())
+                .chequeAmount(voucher.getChequeAmount())
+                .bankTransferAmount(voucher.getBankTransferAmount())
+                .isSplitPayment(voucher.getIsSplitPayment())
                 .currency(voucher.getCurrency())
                 .exchangeRate(voucher.getExchangeRate())
                 .status(voucher.getStatus())
@@ -437,11 +456,30 @@ public class PaymentVoucherService {
 
         if (voucher.getSupplierInvoice() != null) {
             InvoiceComparisonData comparison = convertToComparisonData(voucher.getSupplierInvoice());
+
+            // Calculate previously paid amount
+            // If the voucher is already PAID/APPROVED, the invoice.paidAmount includes this
+            // voucher's amount
+            // So we subtract it to show what was paid BEFORE this voucher
+            BigDecimal currentPaid = voucher.getSupplierInvoice().getPaidAmount() != null
+                    ? voucher.getSupplierInvoice().getPaidAmount()
+                    : BigDecimal.ZERO;
+
+            BigDecimal previouslyPaid = currentPaid;
+            String status = voucher.getStatus() != null ? voucher.getStatus().toLowerCase() : "";
+            if (status.contains("paid") || status.contains("approved")) {
+                previouslyPaid = currentPaid.subtract(voucher.getAmount());
+            }
+            if (previouslyPaid.compareTo(BigDecimal.ZERO) < 0) {
+                previouslyPaid = BigDecimal.ZERO;
+            }
+
             PaymentVoucherAllocationDto allocation = PaymentVoucherAllocationDto.builder()
                     .supplierInvoiceId(comparison.getSupplierInvoiceId())
                     .allocatedAmount(voucher.getAmount())
                     .invoiceNumber(comparison.getInvoiceNumber())
                     .invoiceDate(comparison.getInvoiceDate())
+                    .invoicePreviouslyPaid(previouslyPaid)
                     .invoiceTotal(comparison.getInvoiceTotal())
                     .invoiceSubTotal(comparison.getInvoiceSubTotal())
                     .invoiceTaxAmount(comparison.getInvoiceTaxAmount())

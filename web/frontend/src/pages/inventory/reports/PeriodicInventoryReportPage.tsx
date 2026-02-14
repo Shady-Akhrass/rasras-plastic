@@ -5,9 +5,13 @@ import stockBalanceService, { type PeriodicReportRow } from '../../../services/s
 import warehouseService from '../../../services/warehouseService';
 import type { WarehouseDto } from '../../../services/warehouseService';
 import { toast } from 'react-hot-toast';
+import { useSystemSettings } from '../../../hooks/useSystemSettings';
+
 
 const PeriodicInventoryReportPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const navigate = useNavigate();
+
     const [reportRows, setReportRows] = useState<PeriodicReportRow[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [loading, setLoading] = useState(true);
@@ -106,20 +110,24 @@ const PeriodicInventoryReportPage: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-100">
                     <div className="flex items-center gap-3 mb-2"><Scale className="w-5 h-5 text-blue-600" /><span className="text-sm text-slate-500">رصيد أول المدة</span></div>
-                    <p className="text-2xl font-bold text-slate-800">{totals.opening.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-2xl font-bold text-slate-800">{convertAmount(totals.opening, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-bold">{getCurrencyLabel(defaultCurrency)}</span></p>
                 </div>
+
                 <div className="bg-white p-5 rounded-2xl border border-slate-100">
                     <div className="text-sm text-slate-500 mb-2">الإضافات</div>
-                    <p className="text-2xl font-bold text-emerald-600">{totals.additions.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-2xl font-bold text-emerald-600">{convertAmount(totals.additions, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-bold">{getCurrencyLabel(defaultCurrency)}</span></p>
                 </div>
+
                 <div className="bg-white p-5 rounded-2xl border border-slate-100">
                     <div className="text-sm text-slate-500 mb-2">المصروفات</div>
-                    <p className="text-2xl font-bold text-rose-600">{totals.issues.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-2xl font-bold text-rose-600">{convertAmount(totals.issues, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-bold">{getCurrencyLabel(defaultCurrency)}</span></p>
                 </div>
+
                 <div className="bg-white p-5 rounded-2xl border border-slate-100">
                     <div className="text-sm text-slate-500 mb-2">رصيد آخر المدة</div>
-                    <p className="text-2xl font-bold text-slate-800">{totals.closing.toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-2xl font-bold text-slate-800">{convertAmount(totals.closing, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-bold">{getCurrencyLabel(defaultCurrency)}</span></p>
                 </div>
+
                 <div className="bg-white p-5 rounded-2xl border border-slate-100">
                     <div className="flex items-center gap-3 mb-2"><Package className="w-5 h-5 text-amber-600" /><span className="text-sm text-slate-500">تحت الحد الأدنى</span></div>
                     <p className="text-2xl font-bold text-amber-600">{belowMin.length}</p>
@@ -159,7 +167,8 @@ const PeriodicInventoryReportPage: React.FC = () => {
                                         <td className="px-6 py-3 font-mono text-emerald-600">+{Number(r.additionsQty).toLocaleString('ar-EG')}</td>
                                         <td className="px-6 py-3 font-mono text-rose-600">-{Number(r.issuesQty).toLocaleString('ar-EG')}</td>
                                         <td className="px-6 py-3 font-mono">{Number(r.closingQty).toLocaleString('ar-EG')}</td>
-                                        <td className="px-6 py-3">{(Number(r.closingValue) || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })}</td>
+                                        <td className="px-6 py-3">{convertAmount(Number(r.closingValue) || 0, 'EGP').toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+
                                     </tr>
                                 ))
                             )}

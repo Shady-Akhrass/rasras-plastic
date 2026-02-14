@@ -203,4 +203,14 @@ public class HrController {
         List<PayrollDto> data = hrService.getPayroll(month, year);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
+
+    @PostMapping("/payroll/generate")
+    @Operation(summary = "Generate monthly payroll (if not exists)")
+    @PreAuthorize("hasAuthority('HR_CREATE') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    public ResponseEntity<ApiResponse<List<PayrollDto>>> generatePayroll(
+            @RequestParam Integer month,
+            @RequestParam Integer year) {
+        List<PayrollDto> data = hrService.generatePayroll(month, year);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Payroll generated", data));
+    }
 }

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
+import { REFRESH_DATA_EVENT } from '../../hooks/useNotificationPolling';
 import { formatNumber, formatDate } from '../../utils/format';
 import { grnService } from '../../services/grnService';
 import warehouseService from '../../services/warehouseService';
@@ -343,8 +344,11 @@ const RequestCard: React.FC<{
 
     const handleViewDocument = () => {
         const route = TYPE_ROUTES[request.documentType];
-        if (route) navigate(`${route}/${request.documentId}?mode=view&approvalId=${request.id}`);
-        else toast.error('لم يتم تحديد مسار لهذا المستند');
+        if (route) {
+            navigate(`${route}/${request.documentId}?mode=view&approvalId=${request.id}`);
+        } else {
+            toast.error('لم يتم تحديد مسار لهذا المستند');
+        }
     };
 
     const daysSinceRequest = useMemo(() => {
@@ -693,10 +697,22 @@ const ApprovalsInbox: React.FC = () => {
 
     // ─── Auto Refresh (Smart Polling) ───
     useAutoRefresh(fetchRequests, {
-        activeInterval: 15_000,   // every 15s when tab is active
-        inactiveInterval: 60_000, // every 60s when tab is hidden
+        activeInterval: 20_000,   // every 20s fallback
+        inactiveInterval: 60_000,
         enabled: isOnline,
     });
+
+    // ─── Instant Reactive Updates ───
+    useEffect(() => {
+        const handleRefresh = (e: any) => {
+            // If we're already on the page and get a notification, update immediately
+            if (e.detail?.type === 'approvals' && mountedRef.current) {
+                fetchRequests(true);
+            }
+        };
+        window.addEventListener(REFRESH_DATA_EVENT, handleRefresh);
+        return () => window.removeEventListener(REFRESH_DATA_EVENT, handleRefresh);
+    }, [fetchRequests]);
 
     // ─── Actions ───
     const handleAction = useCallback(async (requestId: number, action: 'Approved' | 'Rejected', warehouseId?: number) => {

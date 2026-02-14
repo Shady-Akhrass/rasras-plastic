@@ -20,7 +20,9 @@ import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purc
 import Pagination from '../../components/common/Pagination';
 import { formatNumber, formatDate } from '../../utils/format';
 import ConfirmModal from '../../components/common/ConfirmModal';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -113,7 +115,12 @@ const POTableRow: React.FC<{
     onDelete: (order: PurchaseOrderDto) => void;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
-}> = ({ order, index, onView, onDelete, isSelected, onToggleSelect }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ order, index, onView, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -151,12 +158,14 @@ const POTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-emerald-600">
-                {formatNumber(order.totalAmount)} {order.currency}
+                {formatNumber(convertAmount(order.totalAmount, order.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
+
         <td className="px-6 py-4 text-center font-bold text-blue-600">
-            {(order.shippingCost || 0).toLocaleString()}
+            {formatNumber(convertAmount(order.shippingCost || 0, order.currency || 'EGP'))}
         </td>
+
         <td className="px-6 py-4">
             <StatusBadge status={order.status!} />
         </td>
@@ -244,7 +253,10 @@ const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ se
 );
 
 const PurchaseOrdersPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
+
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState<PurchaseOrderDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -307,8 +319,9 @@ const PurchaseOrdersPage: React.FC = () => {
         total: orders.length,
         pending: orders.filter(o => o.status === 'Draft' || o.status === 'Pending').length,
         active: orders.filter(o => o.status === 'PartiallyReceived').length,
-        totalValue: formatNumber(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0))
-    }), [orders]);
+        totalValue: formatNumber(orders.reduce((sum, o) => sum + convertAmount(o.totalAmount || 0, o.currency || 'EGP'), 0))
+    }), [orders, defaultCurrency, convertAmount]);
+
 
     const handleViewOrder = (id: number) => {
         navigate(`/dashboard/procurement/po/${id}`);
@@ -447,10 +460,11 @@ const PurchaseOrdersPage: React.FC = () => {
                 />
                 <StatCard
                     icon={DollarSign}
-                    value={`${stats.totalValue} ج.م`}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
                     label="قيمة المشتريات"
                     color="success"
                 />
+
             </div>
 
             {/* Filters */}
@@ -569,7 +583,12 @@ const PurchaseOrdersPage: React.FC = () => {
                                         onDelete={handleDeleteClick}
                                         isSelected={!!order.id && selectedIds.includes(order.id)}
                                         onToggleSelect={handleToggleSelect}
+                                        getCurrencyLabel={getCurrencyLabel}
+                                        defaultCurrency={defaultCurrency}
+                                        convertAmount={convertAmount}
                                     />
+
+
                                 ))
                             )}
                         </tbody>

@@ -137,7 +137,9 @@ export interface QuotationComparisonDetail {
     otherCosts?: number;
     comments?: string;
     polymerGrade?: string;
+    currency?: string;
 }
+
 
 export interface QuotationComparison {
     id?: number;

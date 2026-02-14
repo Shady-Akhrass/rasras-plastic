@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 
 const ExchangeRateCompact = () => {
     const [rate, setRate] = useState<number | null>(null);
     const [previousRate, setPreviousRate] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(false);
+    const { defaultCurrency, getCurrencyLabel } = useSystemSettings();
 
     useEffect(() => {
         const fetchRate = async () => {
@@ -18,12 +20,12 @@ const ExchangeRateCompact = () => {
 
                 const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
                 if (!response.ok) throw new Error('Failed to fetch');
-                
+
                 const data = await response.json();
-                const currentRate = data.rates.EGP;
-                
+                const currentRate = data.rates[defaultCurrency] || data.rates.EGP;
+
                 setRate(currentRate);
-                
+
                 // Save for next comparison
                 localStorage.setItem('compactExchangeRate', currentRate.toString());
                 setError(false);
@@ -38,7 +40,8 @@ const ExchangeRateCompact = () => {
         fetchRate();
         const interval = setInterval(fetchRate, 5 * 60 * 1000);
         return () => clearInterval(interval);
-    }, []);
+    }, [defaultCurrency]);
+
 
     if (isLoading) {
         return (
@@ -58,12 +61,13 @@ const ExchangeRateCompact = () => {
 
     return (
         <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg
-            hover:bg-white/20 transition-colors cursor-default" title="سعر صرف الدولار مقابل الجنيه المصري">
+                hover:bg-white/20 transition-colors cursor-default" title="سعر صرف الدولار مقابل العملة المحلية">
             <DollarSign className="w-4 h-4" />
             <div className="flex items-baseline gap-1">
                 <span className="font-bold">{rate.toFixed(2)}</span>
-                <span className="text-xs opacity-70">ج.م</span>
+                <span className="text-xs opacity-70">{getCurrencyLabel(defaultCurrency)}</span>
             </div>
+
             {change !== 0 && (
                 <div className={`flex items-center text-xs ${isPositive ? 'text-emerald-300' : 'text-rose-300'}`}>
                     {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}

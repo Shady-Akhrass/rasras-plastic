@@ -7,14 +7,21 @@ export interface PaymentVoucherDto {
     voucherDate: string;
     supplierId?: number;
     payeeName?: string;
-    paymentMethod: 'cash' | 'bank' | 'cheque';
+    paymentMethod: 'cash' | 'bank' | 'cheque' | 'bank_transfer';
+
     cashRegisterId?: number;
     bankAccountId?: number;
     chequeId?: number;
     currency?: string;
     exchangeRate?: number;
     amount: number;
+    cashAmount?: number;
+    bankAmount?: number;
+    chequeAmount?: number;
+    bankTransferAmount?: number;
+    isSplitPayment?: boolean;
     amountInWords?: string;
+
     referenceType?: string;
     referenceId?: number;
     description?: string;
@@ -93,7 +100,12 @@ export interface InvoiceComparisonData {
     grnOtherCosts?: number;
     variancePercentage?: number;
     isValid?: boolean;
+    paidAmount?: number;
+    remainingAmount?: number;
+    currency?: string;
     items?: InvoiceItemComparison[];
+
+
 }
 
 export interface InvoiceItemComparison {

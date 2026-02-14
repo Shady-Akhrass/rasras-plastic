@@ -29,6 +29,7 @@ public class HrService {
     private final AttendanceRepository attendanceRepository;
     private final PayrollRepository payrollRepository;
     private final PayrollDetailRepository payrollDetailRepository;
+    private final SalaryComponentRepository salaryComponentRepository;
 
     // ---- Leave Types ----
     @Transactional(readOnly = true)
@@ -38,7 +39,8 @@ public class HrService {
 
     @Transactional(readOnly = true)
     public List<LeaveTypeDto> getActiveLeaveTypes() {
-        return leaveTypeRepository.findByIsActiveTrue().stream().map(this::mapLeaveTypeToDto).collect(Collectors.toList());
+        return leaveTypeRepository.findByIsActiveTrue().stream().map(this::mapLeaveTypeToDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -50,7 +52,8 @@ public class HrService {
         entity.setIsPaid(dto.getIsPaid() != null ? dto.getIsPaid() : true);
         entity.setMaxDaysPerYear(dto.getMaxDaysPerYear());
         entity.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : true);
-        if (entity.getCreatedAt() == null) entity.setCreatedAt(LocalDateTime.now());
+        if (entity.getCreatedAt() == null)
+            entity.setCreatedAt(LocalDateTime.now());
         return mapLeaveTypeToDto(leaveTypeRepository.save(entity));
     }
 
@@ -69,7 +72,8 @@ public class HrService {
 
     @Transactional(readOnly = true)
     public List<WorkShiftDto> getActiveWorkShifts() {
-        return workShiftRepository.findByIsActiveTrue().stream().map(this::mapWorkShiftToDto).collect(Collectors.toList());
+        return workShiftRepository.findByIsActiveTrue().stream().map(this::mapWorkShiftToDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -151,7 +155,8 @@ public class HrService {
 
     @Transactional(readOnly = true)
     public List<EmployeeShiftDto> getEmployeeShiftsByEmployee(Integer employeeId) {
-        return employeeShiftRepository.findByEmployeeEmployeeId(employeeId).stream().map(this::mapEmployeeShiftToDto).collect(Collectors.toList());
+        return employeeShiftRepository.findByEmployeeEmployeeId(employeeId).stream().map(this::mapEmployeeShiftToDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -165,7 +170,9 @@ public class HrService {
                 .employee(employee)
                 .shift(shift)
                 .effectiveFrom(LocalDate.parse(dto.getEffectiveFrom()))
-                .effectiveTo(dto.getEffectiveTo() != null && !dto.getEffectiveTo().isBlank() ? LocalDate.parse(dto.getEffectiveTo()) : null)
+                .effectiveTo(dto.getEffectiveTo() != null && !dto.getEffectiveTo().isBlank()
+                        ? LocalDate.parse(dto.getEffectiveTo())
+                        : null)
                 .isActive(dto.getIsActive() != null ? dto.getIsActive() : true)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -188,8 +195,11 @@ public class HrService {
             entity.setShift(shift);
         }
         entity.setEffectiveFrom(LocalDate.parse(dto.getEffectiveFrom()));
-        entity.setEffectiveTo(dto.getEffectiveTo() != null && !dto.getEffectiveTo().isBlank() ? LocalDate.parse(dto.getEffectiveTo()) : null);
-        if (dto.getIsActive() != null) entity.setIsActive(dto.getIsActive());
+        entity.setEffectiveTo(
+                dto.getEffectiveTo() != null && !dto.getEffectiveTo().isBlank() ? LocalDate.parse(dto.getEffectiveTo())
+                        : null);
+        if (dto.getIsActive() != null)
+            entity.setIsActive(dto.getIsActive());
         return mapEmployeeShiftToDto(employeeShiftRepository.save(entity));
     }
 
@@ -265,7 +275,8 @@ public class HrService {
 
     // ---- Attendance ----
     @Transactional(readOnly = true)
-    public java.util.List<com.rasras.erp.hr.dto.AttendanceDto> getAttendance(Integer employeeId, String fromDate, String toDate) {
+    public java.util.List<com.rasras.erp.hr.dto.AttendanceDto> getAttendance(Integer employeeId, String fromDate,
+            String toDate) {
         java.time.LocalDate from = java.time.LocalDate.parse(fromDate);
         java.time.LocalDate to = java.time.LocalDate.parse(toDate);
         java.util.List<Attendance> list = (employeeId != null)
@@ -278,7 +289,7 @@ public class HrService {
     public com.rasras.erp.hr.dto.AttendanceDto upsertAttendance(com.rasras.erp.hr.dto.AttendanceDto dto) {
         Attendance entity = dto.getAttendanceId() != null
                 ? attendanceRepository.findById(dto.getAttendanceId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Attendance", "id", dto.getAttendanceId()))
+                        .orElseThrow(() -> new ResourceNotFoundException("Attendance", "id", dto.getAttendanceId()))
                 : new Attendance();
 
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
@@ -318,7 +329,8 @@ public class HrService {
                 .build();
     }
 
-    // ---- Payroll (simple monthly generation placeholder using existing payroll tables) ----
+    // ---- Payroll (simple monthly generation placeholder using existing payroll
+    // tables) ----
     @Transactional(readOnly = true)
     public java.util.List<com.rasras.erp.hr.dto.PayrollDto> getPayroll(Integer month, Integer year) {
         java.util.List<Payroll> list = payrollRepository.findByPayrollMonthAndPayrollYear(month, year);
@@ -352,5 +364,72 @@ public class HrService {
                 .items(items)
                 .build();
     }
-}
 
+    @Transactional
+    public java.util.List<com.rasras.erp.hr.dto.PayrollDto> generatePayroll(Integer month, Integer year) {
+        // 1. Check if payroll already exists
+        java.util.List<Payroll> existing = payrollRepository.findByPayrollMonthAndPayrollYear(month, year);
+        if (!existing.isEmpty()) {
+            throw new RuntimeException("Payroll already generated for this month!");
+        }
+
+        // 2. Get active employees
+        java.util.List<Employee> employees = employeeRepository.findByIsActiveTrue();
+        java.util.List<Payroll> savedPayrolls = new java.util.ArrayList<>();
+
+        for (Employee emp : employees) {
+            java.math.BigDecimal basic = emp.getBasicSalary() != null ? emp.getBasicSalary()
+                    : java.math.BigDecimal.ZERO;
+
+            // Mock Calculation for now (TODO: Real calculation based on attendance)
+            java.math.BigDecimal allowances = basic.multiply(new java.math.BigDecimal("0.10")); // 10% allowance
+            java.math.BigDecimal deductions = basic.multiply(new java.math.BigDecimal("0.05")); // 5% deduction
+            java.math.BigDecimal net = basic.add(allowances).subtract(deductions);
+
+            Payroll p = new Payroll();
+            p.setEmployee(emp);
+            p.setPayrollMonth(month);
+            p.setPayrollYear(year);
+            p.setBasicSalary(basic);
+            p.setTotalEarnings(allowances);
+            p.setTotalDeductions(deductions);
+            p.setNetSalary(net);
+            p.setStatus("DRAFT");
+            p.setCreatedAt(LocalDateTime.now());
+
+            p = payrollRepository.save(p);
+            savedPayrolls.add(p);
+
+            // Add details
+            createPayrollDetail(p, "Basic Salary", "EARNING", basic);
+            createPayrollDetail(p, "Housing Allowance", "EARNING", allowances);
+            createPayrollDetail(p, "Social Security", "DEDUCTION", deductions);
+        }
+
+        return savedPayrolls.stream().map(this::mapPayrollToDto).collect(java.util.stream.Collectors.toList());
+    }
+
+    private void createPayrollDetail(Payroll payroll, String nameEn, String type, java.math.BigDecimal amount) {
+        if (amount.compareTo(java.math.BigDecimal.ZERO) == 0)
+            return;
+
+        // Find or create SalaryComponent
+        SalaryComponent component = salaryComponentRepository.findByComponentNameEn(nameEn)
+                .orElseGet(() -> {
+                    SalaryComponent newComp = new SalaryComponent();
+                    newComp.setComponentCode(nameEn.replaceAll("\\s+", "_").toUpperCase()); // Generate code
+                    newComp.setComponentName(nameEn); // Map to ComponentName
+                    newComp.setComponentNameEn(nameEn);
+                    newComp.setComponentNameAr(nameEn); // Fallback
+                    newComp.setComponentType(type);
+                    newComp.setIsActive(true);
+                    return salaryComponentRepository.save(newComp);
+                });
+
+        PayrollDetail d = new PayrollDetail();
+        d.setPayroll(payroll);
+        d.setComponentId(component.getComponentId());
+        d.setAmount(amount);
+        payrollDetailRepository.save(d);
+    }
+}

@@ -221,10 +221,25 @@ const DashboardLayout: React.FC = () => {
     // Close mobile menu on navigate
     useEffect(() => { setMobileMenuOpen(false); }, [location.pathname]);
 
-    // Auto-logout on JWT expiry
+    // Auto-logout on JWT expiry + Initialize SW with credentials
     useEffect(() => {
         const token = localStorage.getItem('accessToken');
         if (!token) return;
+
+        // Sync with Service Worker
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            const userString = localStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            navigator.serviceWorker.controller.postMessage({
+                type: 'INIT_AUTH',
+                payload: {
+                    accessToken: token,
+                    userId: user?.userId,
+                    apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+                }
+            });
+        }
+
         const remaining = getSessionRemainingMs(token);
         if (remaining <= 0) { clearSession(); return; }
         const id = setTimeout(() => clearSession(), remaining);
@@ -655,25 +670,10 @@ const DashboardLayout: React.FC = () => {
         });
     };
 
-    const notifications = [
-        {
-            title: 'طلب اعتماد جديد', message: 'هناك طلب شراء بانتظار اعتمادك',
-            time: 'منذ 5 دقائق', read: false, type: 'warning' as const, route: '/dashboard/approvals'
-        },
-        {
-            title: 'موظف جديد', message: 'تمت إضافة أحمد محمد للنظام',
-            time: 'منذ 10 دقائق', read: false, type: 'success' as const, route: '/dashboard/employees'
-        },
-        {
-            title: 'تنبيه النظام', message: 'تم تحديث إعدادات الأمان',
-            time: 'منذ ساعة', read: false, type: 'warning' as const, route: '/dashboard/settings/security'
-        },
-        {
-            title: 'تقرير جاهز', message: 'تقرير المبيعات الشهري جاهز للتحميل',
-            time: 'منذ 3 ساعات', read: true, type: 'info' as const, route: '/dashboard/sales/reports'
-        },
+    const notifications: any[] = [
+        /* Mock notifications removed for production optimization */
     ];
-    const unreadCount = notifications.filter(n => !n.read).length;
+    const unreadCount = pendingApprovals;
 
     return (
         <div className="min-h-screen bg-slate-50/50 flex" dir="rtl">

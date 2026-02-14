@@ -12,6 +12,8 @@ import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // --- Calculation Helpers ---
 
@@ -79,7 +81,10 @@ const StatCard: React.FC<{
     suffix?: string;
     onClick?: () => void;
     active?: boolean;
-}> = ({ icon: Icon, value, label, color, suffix, onClick, active }) => {
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+}> = ({ icon: Icon, value, label, color, suffix, onClick, active, getCurrencyLabel, defaultCurrency }) => {
+
     const colorClasses = {
         primary: 'bg-brand-primary/10 text-brand-primary',
         success: 'bg-emerald-100 text-emerald-600',
@@ -110,9 +115,10 @@ const StatCard: React.FC<{
                         {typeof value === 'number' ? formatNumber(value) : value}
                         {suffix && (
                             <span className="text-sm font-medium mr-1 opacity-70">
-                                {suffix}
+                                {suffix === 'ج.م' ? getCurrencyLabel(defaultCurrency) : suffix}
                             </span>
                         )}
+
                     </div>
                     <div className={`text-sm ${active ? 'text-white/80' : 'text-slate-500'}`}>
                         {label}
@@ -223,8 +229,8 @@ const TabButton: React.FC<{
     <button
         onClick={onClick}
         className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300 ${active
-                ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30'
-                : 'bg-white text-slate-600 border border-slate-200 hover:border-brand-primary/30 hover:bg-brand-primary/5'
+            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30'
+            : 'bg-white text-slate-600 border border-slate-200 hover:border-brand-primary/30 hover:bg-brand-primary/5'
             }`}
     >
         <Icon className="w-5 h-5" />
@@ -240,8 +246,6 @@ const TabButton: React.FC<{
     </button>
 );
 
-// --- Invoice Row Component ---
-
 const InvoiceRow: React.FC<{
     invoice: SupplierInvoiceDto;
     index: number;
@@ -252,7 +256,13 @@ const InvoiceRow: React.FC<{
     onDelete: (invoice: SupplierInvoiceDto) => void;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
-}> = ({ invoice, index, isExpanded, onToggle, onView, onApprove, onDelete, isSelected, onToggleSelect }) => {
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ invoice, index, isExpanded, onToggle, onView, onApprove, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => {
+
+
+
     const handleDownloadPdf = async (invoice: SupplierInvoiceDto) => {
         try {
             const toastId = toast.loading('جاري تحميل الفاتورة...');
@@ -333,22 +343,24 @@ const InvoiceRow: React.FC<{
                 </td>
                 <td className="px-6 py-4 text-center">
                     <div className="font-bold text-slate-700">
-                        {formatNumber(invoice.deliveryCost || 0)}
+                        {formatNumber(convertAmount(invoice.deliveryCost || 0, invoice.currency || 'EGP'))}
                         <span className="text-[10px] font-medium text-slate-400 mr-1">
-                            {invoice.currency}
+                            {getCurrencyLabel(defaultCurrency)}
                         </span>
+
                     </div>
                 </td>
                 <td className="px-6 py-4 text-center font-bold">
                     <div className="text-lg text-brand-primary">
-                        {formatNumber(invoice.totalAmount)}
+                        {formatNumber(convertAmount(invoice.totalAmount || 0, invoice.currency || 'EGP'))}
                         <span className="text-xs font-medium text-slate-400 mr-1">
-                            {invoice.currency}
+                            {getCurrencyLabel(defaultCurrency)}
                         </span>
                     </div>
+
                     {invoice.paidAmount! > 0 && (
                         <div className="text-xs text-emerald-600 font-bold mt-0.5">
-                            مسدد: {formatNumber(invoice.paidAmount)}
+                            مسدد: {formatNumber(convertAmount(invoice.paidAmount || 0, invoice.currency || 'EGP'))}
                         </div>
                     )}
                 </td>
@@ -626,7 +638,10 @@ const EmptyState: React.FC<{
 // --- Main Page Component ---
 
 const SupplierInvoicesPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
+
 
     const [loading, setLoading] = useState(true);
     const [invoices, setInvoices] = useState<SupplierInvoiceDto[]>([]);
@@ -798,33 +813,42 @@ const SupplierInvoicesPage: React.FC = () => {
             approved: processedInvoices.filter(i => i.status === 'Approved').length,
             paid: processedInvoices.filter(i => i.status === 'Paid').length,
             subTotal: processedInvoices.reduce(
-                (sum, i) => sum + (i.subTotal || 0),
+                (sum, i) => sum + convertAmount(i.subTotal || 0, i.currency || 'EGP'),
                 0
             ),
             taxAmount: processedInvoices.reduce(
-                (sum, i) => sum + (i.taxAmount || 0),
+                (sum, i) => sum + convertAmount(i.taxAmount || 0, i.currency || 'EGP'),
                 0
             ),
             discountAmount: processedInvoices.reduce(
-                (sum, i) => sum + (i.discountAmount || 0),
+                (sum, i) => sum + convertAmount(i.discountAmount || 0, i.currency || 'EGP'),
                 0
             ),
             deliveryCost: processedInvoices.reduce(
-                (sum, i) => sum + (i.deliveryCost || 0),
+                (sum, i) => sum + convertAmount(i.deliveryCost || 0, i.currency || 'EGP'),
                 0
             ),
             otherCosts: processedInvoices.reduce(
-                (sum, i) => sum + (i.otherCosts || 0),
+                (sum, i) => sum + convertAmount(i.otherCosts || 0, i.currency || 'EGP'),
                 0
             ),
             totalAmount: processedInvoices.reduce(
-                (sum, i) => sum + (i.totalAmount || 0),
+                (sum, i) => sum + convertAmount(i.totalAmount || 0, i.currency || 'EGP'),
+                0
+            ),
+            totalPaidAmount: processedInvoices.reduce(
+                (sum, i) => sum + convertAmount(i.paidAmount || 0, i.currency || 'EGP'),
+                0
+            ),
+            totalUnpaidAmount: processedInvoices.reduce(
+                (sum, i) => sum + (convertAmount(i.totalAmount || 0, i.currency || 'EGP') - convertAmount(i.paidAmount || 0, i.currency || 'EGP')),
                 0
             ),
             pendingGRNs: pendingGRNs.length,
         }),
-        [processedInvoices, pendingGRNs]
+        [processedInvoices, pendingGRNs, defaultCurrency, convertAmount]
     );
+
 
     const statusOptions = [
         { value: 'All', label: 'جميع الحالات' },
@@ -900,44 +924,54 @@ const SupplierInvoicesPage: React.FC = () => {
                     value={stats.subTotal}
                     label="الإجمالي (قبل الخصم والضريبة)"
                     color="primary"
-                    suffix="ج.م"
+                    suffix={getCurrencyLabel(defaultCurrency)}
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
+
                 <StatCard
-                    icon={Ban}
-                    value={stats.discountAmount}
-                    label="إجمالي الخصومات"
-                    color="rose"
-                    suffix="ج.م"
-                />
-                <StatCard
-                    icon={Clock}
-                    value={stats.taxAmount}
-                    label="إجمالي الضريبة"
-                    color="warning"
-                    suffix="ج.م"
-                />
-                <StatCard
-                    icon={Truck}
-                    value={stats.deliveryCost}
-                    label="إجمالي مصاريف الشحن"
-                    color="blue"
-                    suffix="ج.م"
+                    icon={FileText}
+                    value={stats.total}
+                    label="إجمالي الفواتير"
+                    color="primary"
+                    active={activeTab === 'invoices' && statusFilter === 'All'}
+                    onClick={() => { setActiveTab('invoices'); setStatusFilter('All'); }}
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={DollarSign}
-                    value={stats.totalAmount}
-                    label="الإجمالي النهائي"
-                    color="success"
-                    suffix="ج.م"
+                    value={stats.totalUnpaidAmount}
+                    label="مستحقات غير مدفوعة"
+                    suffix={getCurrencyLabel(defaultCurrency)}
+                    color="rose"
+                    active={activeTab === 'invoices' && statusFilter === 'Unpaid'}
+                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Unpaid'); }}
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
-                    icon={Package}
-                    value={stats.pendingGRNs}
-                    label="بانتظار الفوترة"
-                    color="purple"
-                    onClick={() => setActiveTab('pending')}
-                    active={activeTab === 'pending'}
+                    icon={CheckCircle2}
+                    value={stats.totalPaidAmount}
+                    label="إجمالي المدفوعات"
+                    suffix={getCurrencyLabel(defaultCurrency)}
+                    color="success"
+                    active={activeTab === 'invoices' && statusFilter === 'Paid'}
+                    onClick={() => { setActiveTab('invoices'); setStatusFilter('Paid'); }}
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
+                <StatCard
+                    icon={RefreshCw}
+                    value={pendingGRNs.length}
+                    label="توريدات في انتظار الفوترة"
+                    color="blue"
+                    active={activeTab === 'pending'}
+                    onClick={() => setActiveTab('pending')}
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
+                />
+
             </div>
 
             {/* Tabs */}
@@ -963,8 +997,8 @@ const SupplierInvoicesPage: React.FC = () => {
                     <div className="relative flex-1">
                         <Search
                             className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-200 ${isSearchFocused
-                                    ? 'text-brand-primary'
-                                    : 'text-slate-400'
+                                ? 'text-brand-primary'
+                                : 'text-slate-400'
                                 }`}
                         />
                         <input
@@ -979,8 +1013,8 @@ const SupplierInvoicesPage: React.FC = () => {
                             onFocus={() => setIsSearchFocused(true)}
                             onBlur={() => setIsSearchFocused(false)}
                             className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none bg-slate-50 ${isSearchFocused
-                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
-                                    : 'border-transparent hover:border-slate-200'
+                                ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                : 'border-transparent hover:border-slate-200'
                                 }`}
                         />
                         {searchTerm && (
@@ -1095,7 +1129,11 @@ const SupplierInvoicesPage: React.FC = () => {
                                             onDelete={handleDeleteClick}
                                             isSelected={inv.id != null && selectedIds.includes(inv.id)}
                                             onToggleSelect={handleToggleSelect}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
                                         />
+
                                     ))
                                 )
                             ) : filteredPending.length === 0 ? (

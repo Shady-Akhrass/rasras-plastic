@@ -22,6 +22,8 @@ import { purchaseReturnService, type PurchaseReturnDto } from '../../services/pu
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import toast from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -104,7 +106,11 @@ const ReturnTableRow: React.FC<{
     onDelete: (returnItem: PurchaseReturnDto) => void;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
-}> = ({ returnItem, index, onView, onDelete, isSelected, onToggleSelect }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ returnItem, index, onView, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -150,9 +156,10 @@ const ReturnTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-rose-600">
-                {formatNumber(returnItem.totalAmount)} ج.م
+                {formatNumber(convertAmount(returnItem.totalAmount || 0, returnItem.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
+
         <td className="px-6 py-4 text-center">
             <StatusBadge status={returnItem.status!} />
         </td>
@@ -230,7 +237,9 @@ const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ se
 );
 
 const PurchaseReturnsPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const navigate = useNavigate();
+
     const [loading, setLoading] = useState(true);
     const [returns, setReturns] = useState<PurchaseReturnDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -291,8 +300,9 @@ const PurchaseReturnsPage: React.FC = () => {
         total: returns.length,
         pending: returns.filter(r => r.status === 'Draft' || r.status === 'Pending').length,
         approved: returns.filter(r => r.status === 'Approved').length,
-        totalValue: formatNumber(returns.reduce((sum, r) => sum + (r.totalAmount || 0), 0))
-    }), [returns]);
+        totalValue: formatNumber(returns.reduce((sum, r) => sum + convertAmount(r.totalAmount || 0, r.currency || 'EGP'), 0))
+    }), [returns, defaultCurrency, convertAmount]);
+
 
     const handleViewReturn = (id: number) => {
         navigate(`/dashboard/procurement/returns/${id}`);
@@ -419,11 +429,12 @@ const PurchaseReturnsPage: React.FC = () => {
                 />
                 <StatCard
                     icon={DollarSign}
-                    value={`${stats.totalValue} ج.م`}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
                     label="إجمالي القيمة"
                     color="rose"
                 />
             </div>
+
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
@@ -539,7 +550,11 @@ const PurchaseReturnsPage: React.FC = () => {
                                             onDelete={handleDeleteClick}
                                             isSelected={!!returnItem.id && selectedIds.includes(returnItem.id)}
                                             onToggleSelect={handleToggleSelect}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
                                         />
+
                                     ))
                                 )}
                             </tbody>

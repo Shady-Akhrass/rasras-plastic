@@ -44,12 +44,15 @@ const sendBrowserNotification = (title: string, body: string, route: string = '/
     }
 };
 
+// ─── Global Event Bus for Internal Refreshes ───
+export const REFRESH_DATA_EVENT = 'app:refresh_notification_data';
+
 // ─── Interval Config ───
 const INTERVALS = {
     /** When user is on a relevant page (approvals, inspections, etc.) */
-    ACTIVE_PAGE: 30_000,      // 30 seconds
+    ACTIVE_PAGE: 8_000,       // 8 seconds for "sudden" feel
     /** Normal background polling */
-    BACKGROUND: 120_000,      // 2 minutes
+    BACKGROUND: 60_000,      // 1 minute
     /** When tab is hidden — very infrequent */
     HIDDEN_TAB: 300_000,      // 5 minutes
 } as const;
@@ -133,6 +136,11 @@ export function useNotificationPolling(pathname: string) {
                 if (newRequests.length > 0) {
                     if (soundEnabled) playNotificationSound();
 
+                    // Dispatch event for other components (like ApprovalsInbox) to react immediately
+                    window.dispatchEvent(new CustomEvent(REFRESH_DATA_EVENT, {
+                        detail: { type: 'approvals', count: newRequests.length }
+                    }));
+
                     const count = newRequests.length;
                     if (!currentPath.startsWith('/dashboard/approvals')) {
                         sendBrowserNotification(
@@ -200,10 +208,17 @@ export function useNotificationPolling(pathname: string) {
     // ─── Adaptive scheduling loop ───
     const scheduleNext = useCallback(() => {
         if (timerRef.current) clearTimeout(timerRef.current);
+
+        // If Service Worker is active and polling, we can significantly slow down main-thread polling
+        // or stop it entirely for pendingApprovals.
         const interval = getInterval();
         timerRef.current = setTimeout(async () => {
-            await fetchAll();
-            scheduleNext(); // chain next tick
+            // Check if SW is active - if so, only fetch things SW doesn't handle (yet)
+            const hasSW = !!navigator.serviceWorker?.controller;
+            if (!hasSW) {
+                await fetchAll();
+            }
+            scheduleNext();
         }, interval);
     }, [fetchAll, getInterval]);
 
@@ -227,6 +242,29 @@ export function useNotificationPolling(pathname: string) {
         return () =>
             document.removeEventListener('visibilitychange', handleVisibility);
     }, [fetchAll, scheduleNext]);
+
+    // ─── Service Worker Listener ───
+    useEffect(() => {
+        if (!('serviceWorker' in navigator)) return;
+
+        const handleMessage = (event: MessageEvent) => {
+            const { channel, payload } = event.data;
+            if (channel === 'notification_counts') {
+                const { pendingApprovals } = payload;
+                setCounts(prev => ({
+                    ...prev,
+                    pendingApprovals
+                }));
+                // Also trigger internal event bus for synchronized refreshes
+                window.dispatchEvent(new CustomEvent(REFRESH_DATA_EVENT, {
+                    detail: { type: 'approvals', count: pendingApprovals, source: 'sw' }
+                }));
+            }
+        };
+
+        navigator.serviceWorker.addEventListener('message', handleMessage);
+        return () => navigator.serviceWorker.removeEventListener('message', handleMessage);
+    }, []);
 
     // ─── Re-schedule when path changes (interval may differ) ───
     useEffect(() => {

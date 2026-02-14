@@ -38,6 +38,7 @@ export interface GoodsReceiptNoteDto {
     shippingCost?: number;
     otherCosts?: number;
     totalAmount?: number;
+    currency?: string;
     notes?: string;
     items: GRNItemDto[];
 }
