@@ -77,6 +77,23 @@ const SystemSettingsPage: React.FC = () => {
             );
         }
 
+        if (setting.settingKey === 'DefaultCurrency') {
+            return (
+                <div className="flex gap-2">
+                    <select
+                        value={setting.settingValue}
+                        onChange={(e) => handleUpdate(setting.settingKey, e.target.value)}
+                        disabled={saving === setting.settingKey}
+                        className="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 outline-none transition-all bg-white"
+                    >
+                        <option value="EGP">EGP (ج.م)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="SAR">SAR (ر.س)</option>
+                    </select>
+                </div>
+            );
+        }
+
         return (
             <div className="flex gap-2">
                 <input
@@ -92,6 +109,7 @@ const SystemSettingsPage: React.FC = () => {
                 />
             </div>
         );
+
     };
 
     return (

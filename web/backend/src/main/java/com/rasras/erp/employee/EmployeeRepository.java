@@ -24,4 +24,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     List<Employee> findByRoleCode(String roleCode);
 
     boolean existsByEmployeeCode(String employeeCode);
+
+    List<Employee> findByIsActiveTrue();
 }

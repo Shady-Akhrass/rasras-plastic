@@ -1,10 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Receipt, RefreshCw, Eye, FileText } from 'lucide-react';
+import { Plus, Search, Receipt, RefreshCw, Eye, Pencil, Trash2, Clock, CheckCircle2, FileText } from 'lucide-react';
 import { salesInvoiceService, type SalesInvoiceDto } from '../../services/salesInvoiceService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
+
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
+        'Draft': { icon: Receipt, className: 'bg-slate-50 text-slate-700 border-slate-200', label: 'مسودة' },
+        'Pending': { icon: Clock, className: 'bg-amber-50 text-amber-700 border-amber-200', label: 'قيد الاعتماد' },
+        'Approved': { icon: CheckCircle2, className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'معتمد' },
+        'Paid': { icon: CheckCircle2, className: 'bg-purple-50 text-purple-700 border-purple-200', label: 'مدفوع' },
+        'Partial': { icon: Clock, className: 'bg-blue-50 text-blue-700 border-blue-200', label: 'مدفوع جزئياً' }
+    };
+    const { icon: Icon, className, label } = config[status] || config['Draft'];
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+        </span>
+    );
+};
 
 const SalesInvoiceListPage: React.FC = () => {
     const navigate = useNavigate();
@@ -13,6 +32,9 @@ const SalesInvoiceListPage: React.FC = () => {
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoiceDto | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => { fetchList(); }, []);
     useEffect(() => { setCurrentPage(1); }, [search]);
@@ -26,6 +48,27 @@ const SalesInvoiceListPage: React.FC = () => {
             toast.error('فشل تحميل فواتير المبيعات');
             setList([]);
         } finally { setLoading(false); }
+    };
+
+    const handleDeleteClick = (invoice: SalesInvoiceDto) => {
+        setInvoiceToDelete(invoice);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!invoiceToDelete?.id) return;
+        setIsDeleting(true);
+        try {
+            await salesInvoiceService.delete(invoiceToDelete.id);
+            toast.success('تم حذف الفاتورة');
+            await fetchList();
+            setIsDeleteModalOpen(false);
+            setInvoiceToDelete(null);
+        } catch (error: any) {
+            toast.error(error?.response?.data?.message || 'فشل الحذف');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const filtered = useMemo(() => {
@@ -116,14 +159,25 @@ const SalesInvoiceListPage: React.FC = () => {
                             ) : (
                                 paginated.map((inv) => (
                                     <tr key={inv.id} className="border-b border-slate-100 hover:bg-purple-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-purple-700">{inv.invoiceNumber || '—'}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-mono font-bold text-purple-700">{inv.invoiceNumber || '—'}</div>
+                                            <div className="mt-1"><StatusBadge status={inv.status || 'Draft'} /></div>
+                                        </td>
                                         <td className="px-6 py-4 text-slate-600">{inv.invoiceDate ? formatDate(inv.invoiceDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{inv.customerNameAr || '—'}</td>
-                                        <td className="px-6 py-4">{formatNumber(inv.totalAmount ?? 0)} {inv.currency || ''}</td>
+                                        <td className="px-6 py-4 font-bold">{formatNumber(inv.totalAmount ?? 0)} {inv.currency || ''}</td>
                                         <td className="px-6 py-4 text-emerald-600">{formatNumber(inv.paidAmount ?? 0)}</td>
-                                        <td className="px-6 py-4">{formatNumber(inv.remainingAmount ?? 0)}</td>
+                                        <td className="px-6 py-4 font-bold text-amber-600">{formatNumber(inv.remainingAmount ?? 0)}</td>
                                         <td className="px-6 py-4">
-                                            <button onClick={() => navigate(`/dashboard/sales/invoices/${inv.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => navigate(`/dashboard/sales/invoices/${inv.id}?mode=view`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg" title="عرض التفاصيل"><Eye className="w-5 h-5" /></button>
+                                                {(!inv.status || inv.status === 'Draft') && (
+                                                    <>
+                                                        <button onClick={() => navigate(`/dashboard/sales/invoices/${inv.id}`)} className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg" title="تعديل"><Pencil className="w-4 h-4" /></button>
+                                                        <button onClick={() => handleDeleteClick(inv)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -135,6 +189,18 @@ const SalesInvoiceListPage: React.FC = () => {
                     <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف فاتورة المبيعات"
+                message={`هل أنت متأكد من حذف الفاتورة ${invoiceToDelete?.invoiceNumber || ''}؟`}
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setInvoiceToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

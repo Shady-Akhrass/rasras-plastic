@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { formatNumber } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -58,99 +59,109 @@ const ItemTableRow: React.FC<{
     onUnlink: (id: number) => void;
     isSelected: boolean;
     onToggleSelect: () => void;
-}> = ({ item, index, onViewSupplier, onUnlink, isSelected, onToggleSelect }) => (
-    <tr
-        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
-        style={{
-            animationDelay: `${index * 30}ms`,
-            animation: 'fadeInUp 0.3s ease-out forwards'
-        }}
-    >
-        <td className="px-4 py-4 text-center">
-            <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={onToggleSelect}
-                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary/40"
-            />
-        </td>
-        <td className="px-6 py-4">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+}> = ({ item, index, onViewSupplier, onUnlink, isSelected, onToggleSelect }) => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+    return (
+        <tr
+            className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
+            style={{
+                animationDelay: `${index * 30}ms`,
+                animation: 'fadeInUp 0.3s ease-out forwards'
+            }}
+        >
+            <td className="px-4 py-4 text-center">
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={onToggleSelect}
+                    className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary/40"
+                />
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                     rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Package className="w-5 h-5 text-brand-primary" />
-                </div>
-                <div>
-                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                        {item.itemNameAr}
+                        <Package className="w-5 h-5 text-brand-primary" />
                     </div>
-                    <div className="text-xs text-slate-400 font-mono">#{item.itemCode}</div>
+                    <div>
+                        <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                            {item.itemNameAr}
+                        </div>
+                        <div className="text-xs text-slate-400 font-mono">#{item.itemCode}</div>
+                    </div>
                 </div>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-sm text-slate-600">
-            <div className="flex items-center gap-2">
-                <Truck className="w-4 h-4 text-slate-400" />
-                <span>{item.supplierId} - (مورد)</span>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="inline-flex items-center px-3 py-1 bg-slate-100 rounded-lg text-xs font-mono text-slate-600">
-                {item.supplierItemCode || '-'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="font-bold text-emerald-600">
-                {item.lastPrice ? `${formatNumber(item.lastPrice)} EGP` : '-'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center text-sm text-slate-500">
-            {item.lastPriceDate || '-'}
-        </td>
-        <td className="px-6 py-4 text-center text-sm text-slate-600">
-            {item.minOrderQty != null ? formatNumber(item.minOrderQty) : '-'}
-        </td>
-        <td className="px-6 py-4 text-center text-sm text-slate-600">
-            {item.leadTimeDays ? `${item.leadTimeDays} يوم` : '-'}
-        </td>
-        <td className="px-6 py-4 text-center">
-            {item.isPreferred ? (
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                    <CheckCircle2 className="w-3 h-3" />
-                    مفضل
+            </td>
+            <td className="px-6 py-4 text-sm text-slate-600">
+                <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-slate-400" />
+                    <span>{item.supplierId} - (مورد)</span>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className="inline-flex items-center px-3 py-1 bg-slate-100 rounded-lg text-xs font-mono text-slate-600">
+                    {item.supplierItemCode || '-'}
                 </span>
-            ) : (
-                <span className="text-slate-300 text-xs">—</span>
-            )}
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold 
-                ${item.isActive 
-                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-                    : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
-                {item.isActive ? 'نشط' : 'معطل'}
-            </span>
-        </td>
-        <td className="px-6 py-4">
-            <div className="flex items-center justify-end gap-2">
-                <button
-                    onClick={() => onViewSupplier(item.supplierId)}
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                    title="عرض المورد"
-                >
-                    <ExternalLink className="w-4 h-4" />
-                </button>
-                <button
-                    onClick={() => onUnlink(item.id!)}
-                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                    title="فك الارتباط"
-                >
-                    <Link2Off className="w-4 h-4" />
-                </button>
-            </div>
-        </td>
-    </tr>
-);
+            </td>
+            <td className="px-6 py-4 text-center">
+                <div className="flex flex-col items-center">
+                    <span className="font-bold text-emerald-600">
+                        {item.lastPrice ? `${formatNumber(item.lastPrice)} ${getCurrencyLabel(item.currency || defaultCurrency)}` : '-'}
+                    </span>
+                    {item.lastPrice && item.currency !== defaultCurrency && (
+                        <span className="text-[10px] text-slate-400 font-bold">
+                            (≈ {formatNumber(convertAmount(item.lastPrice, item.currency || defaultCurrency))} {getCurrencyLabel(defaultCurrency)})
+                        </span>
+                    )}
+                </div>
+            </td>
+            <td className="px-6 py-4 text-center text-sm text-slate-500">
+                {item.lastPriceDate || '-'}
+            </td>
+            <td className="px-6 py-4 text-center text-sm text-slate-600">
+                {item.minOrderQty != null ? formatNumber(item.minOrderQty) : '-'}
+            </td>
+            <td className="px-6 py-4 text-center text-sm text-slate-600">
+                {item.leadTimeDays ? `${item.leadTimeDays} يوم` : '-'}
+            </td>
+            <td className="px-6 py-4 text-center">
+                {item.isPreferred ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3" />
+                        مفضل
+                    </span>
+                ) : (
+                    <span className="text-slate-300 text-xs">—</span>
+                )}
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold 
+                ${item.isActive
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                    {item.isActive ? 'نشط' : 'معطل'}
+                </span>
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center justify-end gap-2">
+                    <button
+                        onClick={() => onViewSupplier(item.supplierId)}
+                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                        title="عرض المورد"
+                    >
+                        <ExternalLink className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => onUnlink(item.id!)}
+                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                        title="فك الارتباط"
+                    >
+                        <Link2Off className="w-4 h-4" />
+                    </button>
+                </div>
+            </td>
+        </tr>
+    );
+};
 
 // Loading Skeleton
 const TableSkeleton: React.FC = () => (
@@ -488,7 +499,7 @@ const SupplierItemsPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>
                         </thead>
-                                <tbody>
+                        <tbody>
                             {loading ? (
                                 <TableSkeleton />
                             ) : filteredItems.length === 0 ? (

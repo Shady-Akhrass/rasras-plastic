@@ -26,6 +26,8 @@ import { supplierService, type SupplierOutstandingDto } from '../../services/sup
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
 import { formatNumber, formatDate } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // --- Calculation Helpers (matching PurchaseOrderFormPage) ---
 const calculateInvoiceTotals = (invoice: SupplierInvoiceDto): SupplierInvoiceDto => {
@@ -81,7 +83,11 @@ const StatCard: React.FC<{
     value: string | number;
     label: string;
     color: 'primary' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
-}> = ({ icon: Icon, value, label, color }) => {
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    suffix?: string;
+}> = ({ icon: Icon, value, label, color, getCurrencyLabel, defaultCurrency, suffix }) => {
+
     const colorClasses = {
         primary: 'bg-brand-primary/10 text-brand-primary',
         success: 'bg-emerald-100 text-emerald-600',
@@ -100,9 +106,12 @@ const StatCard: React.FC<{
                     <Icon className="w-5 h-5" />
                 </div>
                 <div>
-                    <div className="text-2xl font-bold text-slate-800">{value}</div>
+                    <div className="text-2xl font-bold text-slate-800">
+                        {value} {suffix || getCurrencyLabel(defaultCurrency)}
+                    </div>
                     <div className="text-sm text-slate-500">{label}</div>
                 </div>
+
             </div>
         </div>
     );
@@ -117,15 +126,20 @@ const BalanceTableRow: React.FC<{
     isExpanded: boolean;
     onToggleExpand: (id: number) => void;
     invoices: SupplierInvoiceDto[];
-}> = ({ summary, index, onView, isExpanded, onToggleExpand, invoices }) => {
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ summary, index, onView, isExpanded, onToggleExpand, invoices, getCurrencyLabel, defaultCurrency, convertAmount }) => {
+
+
+
     const [expandedInvoiceId, setExpandedInvoiceId] = React.useState<number | null>(null);
 
     return (
         <>
             <tr
-                className={`hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer ${
-                    isExpanded ? 'bg-brand-primary/5' : ''
-                }`}
+                className={`hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer ${isExpanded ? 'bg-brand-primary/5' : ''
+                    }`}
                 onClick={() => onToggleExpand(summary.id)}
                 style={{
                     animationDelay: `${index * 30}ms`,
@@ -149,34 +163,45 @@ const BalanceTableRow: React.FC<{
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span className="font-medium text-slate-600">
-                        {formatNumber(summary.totalInvoiced ?? 0)} {summary.currency || 'EGP'}
+                        {formatNumber(convertAmount(summary.totalInvoiced ?? 0, summary.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                     </span>
+
+
+
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span className="font-medium text-amber-600">
-                        {formatNumber(summary.totalReturned ?? 0)} {summary.currency || 'EGP'}
+                        {formatNumber(convertAmount(summary.totalReturned ?? 0, summary.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                     </span>
+
+
+
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span className="font-medium text-emerald-600">
-                        {formatNumber(summary.totalPaid ?? 0)} {summary.currency || 'EGP'}
+                        {formatNumber(convertAmount(summary.totalPaid ?? 0, summary.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                     </span>
+
+
+
                 </td>
                 <td className="px-6 py-4 text-center">
                     <span
-                        className={`font-bold ${
-                            (summary.currentBalance || 0) > 0
-                                ? 'text-rose-600'
-                                : 'text-emerald-600'
-                        }`}
+                        className={`font-bold ${(summary.currentBalance || 0) > 0
+                            ? 'text-rose-600'
+                            : 'text-emerald-600'
+                            }`}
                     >
-                        {formatNumber(Math.abs(summary.currentBalance ?? 0))}{' '}
-                        {summary.currency || 'EGP'}
+                        {formatNumber(Math.abs(convertAmount(summary.currentBalance ?? 0, summary.currency || 'EGP')))}{' '}
+                        {getCurrencyLabel(defaultCurrency)}
+
+
+
                         {(summary.currentBalance || 0) > 0
                             ? ' (لم يسدد)'
                             : (summary.currentBalance || 0) < 0
-                              ? ' (له رصيد)'
-                              : ''}
+                                ? ' (له رصيد)'
+                                : ''}
                     </span>
                 </td>
                 <td className="px-6 py-4 text-center">
@@ -198,11 +223,10 @@ const BalanceTableRow: React.FC<{
                             <Eye className="w-4 h-4" />
                         </button>
                         <button
-                            className={`p-2 rounded-lg transition-all ${
-                                isExpanded
-                                    ? 'bg-slate-200 text-slate-600'
-                                    : 'hover:bg-slate-100 text-slate-400'
-                            }`}
+                            className={`p-2 rounded-lg transition-all ${isExpanded
+                                ? 'bg-slate-200 text-slate-600'
+                                : 'hover:bg-slate-100 text-slate-400'
+                                }`}
                         >
                             {isExpanded ? (
                                 <TrendingUp className="w-4 h-4" />
@@ -276,29 +300,34 @@ const BalanceTableRow: React.FC<{
                                                         {formatDate(inv.invoiceDate)}
                                                     </td>
                                                     <td className="px-4 py-3 font-medium">
-                                                        {formatNumber(inv.totalAmount)}
+                                                        {formatNumber(convertAmount(inv.totalAmount || 0, inv.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                                                     </td>
+
+
                                                     <td className="px-4 py-3 text-emerald-600">
-                                                        {formatNumber(inv.paidAmount ?? 0)}
+                                                        {formatNumber(convertAmount(inv.paidAmount ?? 0, inv.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                                                     </td>
+
+
                                                     <td className="px-4 py-3 text-rose-600">
-                                                        {formatNumber(inv.remainingAmount ?? 0)}
+                                                        {formatNumber(convertAmount(inv.remainingAmount ?? 0, inv.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                                                     </td>
+
+
                                                     <td className="px-4 py-3 text-center">
                                                         <span
-                                                            className={`px-2 py-0.5 rounded text-xs font-bold ${
-                                                                inv.status === 'Paid'
-                                                                    ? 'bg-emerald-100 text-emerald-700'
-                                                                    : inv.status === 'Partial'
-                                                                      ? 'bg-amber-100 text-amber-700'
-                                                                      : 'bg-rose-100 text-rose-700'
-                                                            }`}
+                                                            className={`px-2 py-0.5 rounded text-xs font-bold ${inv.status === 'Paid'
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : inv.status === 'Partial'
+                                                                    ? 'bg-amber-100 text-amber-700'
+                                                                    : 'bg-rose-100 text-rose-700'
+                                                                }`}
                                                         >
                                                             {inv.status === 'Paid'
                                                                 ? 'مدفوعة'
                                                                 : inv.status === 'Partial'
-                                                                  ? 'جزئي'
-                                                                  : 'غير مدفوعة'}
+                                                                    ? 'جزئي'
+                                                                    : 'غير مدفوعة'}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -400,14 +429,18 @@ const BalanceTableRow: React.FC<{
         </>
     );
 };
-
 // --- Order Table Row ---
 
 const OrderTableRow: React.FC<{
     order: PurchaseOrderDto;
     index: number;
     onView: (id: number) => void;
-}> = ({ order, index, onView }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ order, index, onView, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -433,9 +466,10 @@ const OrderTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-emerald-600">
-                {formatNumber(order.totalAmount)} {order.currency}
+                {formatNumber(convertAmount(order.totalAmount || 0, order.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
+
         <td className="px-6 py-4 text-center">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -493,6 +527,8 @@ const EmptyState: React.FC<{
 type FilterType = 'All' | 'Debit' | 'Credit';
 
 const SupplierOutstandingPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'balances' | 'orders'>('balances');
@@ -563,38 +599,40 @@ const SupplierOutstandingPage: React.FC = () => {
 
     const stats = useMemo(() => {
         const totalOutstanding = summaries.reduce(
-            (acc, curr) => acc + (curr.currentBalance || 0),
+            (acc, curr) => acc + convertAmount(curr.currentBalance || 0, curr.currency || 'EGP'),
             0
         );
         const totalPaid = summaries.reduce(
-            (acc, curr) => acc + (curr.totalPaid || 0),
+            (acc, curr) => acc + convertAmount(curr.totalPaid || 0, curr.currency || 'EGP'),
             0
         );
         const totalInvoiced = summaries.reduce(
-            (acc, curr) => acc + (curr.totalInvoiced || 0),
+            (acc, curr) => acc + convertAmount(curr.totalInvoiced || 0, curr.currency || 'EGP'),
             0
         );
         const totalReturned = summaries.reduce(
-            (acc, curr) => acc + (curr.totalReturned || 0),
+            (acc, curr) => acc + convertAmount(curr.totalReturned || 0, curr.currency || 'EGP'),
             0
         );
+
         const providersWithBalance = summaries.filter(
             s => (s.currentBalance || 0) > 0
         ).length;
 
         const calculatedInvoices = allInvoices.map(inv => calculateInvoiceTotals(inv));
         const totalTax = calculatedInvoices.reduce(
-            (sum, inv) => sum + (inv.taxAmount || 0),
+            (sum, inv) => sum + convertAmount(inv.taxAmount || 0, inv.currency || 'EGP'),
             0
         );
         const totalDiscount = calculatedInvoices.reduce(
-            (sum, inv) => sum + (inv.discountAmount || 0),
+            (sum, inv) => sum + convertAmount(inv.discountAmount || 0, inv.currency || 'EGP'),
             0
         );
         const totalDelivery = calculatedInvoices.reduce(
-            (sum, inv) => sum + (inv.deliveryCost || 0),
+            (sum, inv) => sum + convertAmount(inv.deliveryCost || 0, inv.currency || 'EGP'),
             0
         );
+
 
         return {
             totalOutstanding: formatNumber(totalOutstanding),
@@ -682,43 +720,61 @@ const SupplierOutstandingPage: React.FC = () => {
                     value={stats.totalOutstanding}
                     label="إجمالي المستحقات"
                     color="rose"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
+
+
                 <StatCard
                     icon={TrendingUp}
                     value={stats.totalInvoiced}
                     label="إجمالي الفواتير"
                     color="blue"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={Ban}
                     value={stats.totalDiscount}
                     label="إجمالي الخصومات"
                     color="rose"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={Clock}
                     value={stats.totalTax}
                     label="إجمالي الضريبة"
                     color="warning"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={Truck}
                     value={stats.totalDelivery}
                     label="إجمالي مصاريف الشحن"
                     color="blue"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={TrendingDown}
                     value={stats.totalPaid}
                     label="إجمالي المدفوعات"
                     color="success"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={AlertCircle}
                     value={stats.providersWithBalance}
                     label="موردين بمديونية"
                     color="warning"
+                    suffix="مورد"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
+
             </div>
 
             {/* Info Banner */}
@@ -734,22 +790,20 @@ const SupplierOutstandingPage: React.FC = () => {
             <div className="flex gap-2 p-1 bg-white w-fit rounded-2xl border border-slate-100 shadow-sm">
                 <button
                     onClick={() => setActiveTab('balances')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${
-                        activeTab === 'balances'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'balances'
+                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                        : 'text-slate-500 hover:text-slate-700'
+                        }`}
                 >
                     <Wallet className="w-4 h-4" />
                     <span>أرصدة الموردين</span>
                 </button>
                 <button
                     onClick={() => setActiveTab('orders')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${
-                        activeTab === 'orders'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'orders'
+                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                        : 'text-slate-500 hover:text-slate-700'
+                        }`}
                 >
                     <ShoppingCart className="w-4 h-4" />
                     <span>أوامر مغلقة</span>
@@ -766,11 +820,10 @@ const SupplierOutstandingPage: React.FC = () => {
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="relative flex-1">
                         <Search
-                            className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-200 ${
-                                isSearchFocused
-                                    ? 'text-brand-primary'
-                                    : 'text-slate-400'
-                            }`}
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-200 ${isSearchFocused
+                                ? 'text-brand-primary'
+                                : 'text-slate-400'
+                                }`}
                         />
                         <input
                             type="text"
@@ -783,11 +836,10 @@ const SupplierOutstandingPage: React.FC = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
                             onBlur={() => setIsSearchFocused(false)}
-                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none bg-slate-50 ${
-                                isSearchFocused
-                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
-                                    : 'border-transparent hover:border-slate-200'
-                            }`}
+                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none bg-slate-50 ${isSearchFocused
+                                ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                : 'border-transparent hover:border-slate-200'
+                                }`}
                         />
                         {searchTerm && (
                             <button
@@ -893,6 +945,9 @@ const SupplierOutstandingPage: React.FC = () => {
                                             invoices={allInvoices.filter(
                                                 inv => inv.supplierId === summary.id
                                             )}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
                                         />
                                     ))
                                 )}
@@ -938,6 +993,9 @@ const SupplierOutstandingPage: React.FC = () => {
                                             order={order}
                                             index={index}
                                             onView={handleViewOrder}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
                                         />
                                     ))
                                 )}

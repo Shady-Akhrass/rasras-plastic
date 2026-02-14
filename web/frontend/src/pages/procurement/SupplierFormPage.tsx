@@ -10,6 +10,7 @@ import {
 import { supplierService, type SupplierDto, type SupplierItemDto, type SupplierBankDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { formatNumber } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import { toast } from 'react-hot-toast';
 
 type Tab = 'basic' | 'financial' | 'contact' | 'items';
@@ -463,6 +464,7 @@ const SupplierFormPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
+    const { defaultCurrency } = useSystemSettings();
     const isEdit = !!id;
     const queryParams = new URLSearchParams(location.search);
     const isView = queryParams.get('mode') === 'view';
@@ -493,7 +495,7 @@ const SupplierFormPage: React.FC = () => {
         bankAccountNo: '',
         iban: '',
         swift: '',
-        currency: 'EGP',
+        currency: defaultCurrency,
         isDefault: false
     });
 
@@ -677,7 +679,7 @@ const SupplierFormPage: React.FC = () => {
                 bankAccountNo: '',
                 iban: '',
                 swift: '',
-                currency: 'EGP',
+                currency: defaultCurrency,
                 isDefault: false
             });
             loadSupplierBanks(parseInt(id!));
@@ -706,9 +708,9 @@ const SupplierFormPage: React.FC = () => {
     ];
 
     const currencyOptions = [
-        { value: 'EGP', label: 'EGP - جنيه مصري' },
-        { value: 'USD', label: 'USD - دولار أمريكي' },
-        { value: 'EUR', label: 'EUR - ريال سعودي ' },
+        { value: 'EGP', label: 'EGP (ج.م)' },
+        { value: 'USD', label: 'USD ($)' },
+        { value: 'SAR', label: 'SAR (ر.س)' },
     ];
 
     const ratingOptions = [

@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import { formatNumber, formatDate } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 import purchaseService, {
     type SupplierQuotation,
     type PurchaseRequisition,
@@ -34,7 +36,9 @@ import purchaseService, {
 import toast from 'react-hot-toast';
 
 const QuotationComparisonFormPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const { id } = useParams<{ id: string }>();
+
     const navigate = useNavigate();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
@@ -104,14 +108,15 @@ const QuotationComparisonFormPage: React.FC = () => {
     const calculateRatings = (details: QuotationComparisonDetail[]) => {
         if (!details || details.length === 0) return details;
 
-        const validPrices = details.map(d => d.totalPrice || 0).filter(p => p > 0);
+        const normalizedPrices = details.map(d => convertAmount(d.totalPrice || 0, d.currency || defaultCurrency)).filter(p => p > 0);
         const validDelivery = details.map(d => d.deliveryDays || 0).filter(d => d > 0);
 
-        const minTotalPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+        const minNormalizedPrice = normalizedPrices.length > 0 ? Math.min(...normalizedPrices) : 0;
         const minDeliveryDays = validDelivery.length > 0 ? Math.min(...validDelivery) : 0;
 
         return details.map(d => {
-            const priceRate = d.totalPrice && d.totalPrice > 0 && minTotalPrice > 0 ? (minTotalPrice / d.totalPrice) * 10 : 0;
+            const normalizedPrice = convertAmount(d.totalPrice || 0, d.currency || defaultCurrency);
+            const priceRate = normalizedPrice > 0 && minNormalizedPrice > 0 ? (minNormalizedPrice / normalizedPrice) * 10 : 0;
             const deliveryRate = d.deliveryDays && d.deliveryDays > 0 && minDeliveryDays > 0 ? (minDeliveryDays / d.deliveryDays) * 10 : 0;
             const overallScore = (priceRate + deliveryRate) / 2;
 
@@ -208,8 +213,10 @@ const QuotationComparisonFormPage: React.FC = () => {
                         priceRating: 0,
                         overallScore: 0,
                         comments: '',
-                        polymerGrade: firstItem?.polymerGrade || ''
+                        polymerGrade: firstItem?.polymerGrade || '',
+                        currency: q.currency
                     };
+
                 });
                 const detailsWithRating = calculateRatings(initialDetails);
                 setFormData(prev => ({
@@ -263,13 +270,15 @@ const QuotationComparisonFormPage: React.FC = () => {
 
     const selectLowestPrice = () => {
         if (!formData.details || formData.details.length === 0) return;
-        const sorted = [...formData.details].sort((a, b) => (a.totalPrice || 0) - (b.totalPrice || 0));
+        const sorted = [...formData.details].sort((a, b) =>
+            convertAmount(a.totalPrice || 0, a.currency || defaultCurrency) - convertAmount(b.totalPrice || 0, b.currency || defaultCurrency)
+        );
         setFormData(prev => ({
             ...prev,
             selectedQuotationId: sorted[0].quotationId,
             selectionReason: 'أقل سعر متاح'
         }));
-        toast.success('تم تحديد العرض صاحب أقل سعر');
+        toast.success('تم تحديد العرض صاحب أقل سعر (بعد تحويل العملة)');
     };
 
     const selectFastestDelivery = () => {
@@ -689,8 +698,10 @@ const QuotationComparisonFormPage: React.FC = () => {
                                 <option value="">حدد العرض الأفضل...</option>
                                 {formData.details?.map(d => (
                                     <option key={d.quotationId} value={d.quotationId}>
-                                        {d.supplierNameAr} - {formatNumber(d.totalPrice)} ج.م
+                                        {d.supplierNameAr} - {formatNumber(d.totalPrice || 0)} {getCurrencyLabel(d.currency || 'EGP')}
+                                        {d.currency && d.currency !== defaultCurrency && ` (${formatNumber(convertAmount(d.totalPrice || 0, d.currency))} ${getCurrencyLabel(defaultCurrency)})`}
                                     </option>
+
                                 ))}
                             </select>
                         </div>

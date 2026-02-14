@@ -17,7 +17,9 @@ import { stockBalanceService, type StockBalanceDto } from '../../services/stockB
 import { itemService, type ItemDto } from '../../services/itemService';
 import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
 import { formatNumber, formatDate } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import toast from 'react-hot-toast';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -58,7 +60,11 @@ const StockTableRow: React.FC<{
     index: number;
     onEdit: (stock: StockBalanceDto) => void;
     onDelete: (id: number) => void;
-}> = ({ stock, index, onEdit, onDelete }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ stock, index, onEdit, onDelete, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -97,13 +103,15 @@ const StockTableRow: React.FC<{
             </span>
         </td>
         <td className="px-6 py-4 text-center text-slate-600 font-medium">
-            {formatNumber(stock.averageCost ?? 0)} ج.م
+            {formatNumber(convertAmount(stock.averageCost || 0, 'EGP'))} {getCurrencyLabel(defaultCurrency)}
         </td>
+
         <td className="px-6 py-4 text-center">
             <span className="font-bold text-brand-primary">
-                {formatNumber((stock.quantityOnHand ?? 0) * (stock.averageCost ?? 0))} ج.م
+                {formatNumber(convertAmount((stock.quantityOnHand || 0) * (stock.averageCost || 0), 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
+
         <td className="px-6 py-4 text-center text-xs text-slate-400">
             {stock.lastMovementDate ? formatDate(stock.lastMovementDate) : '-'}
         </td>
@@ -186,7 +194,9 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
 );
 
 const StockLevelsPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const [loading, setLoading] = useState(true);
+
     const [stocks, setStocks] = useState<StockBalanceDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
@@ -287,11 +297,12 @@ const StockLevelsPage: React.FC = () => {
 
         return {
             totalItems,
-            totalValue: formatNumber(totalValue),
+            totalValue: formatNumber(convertAmount(totalValue, 'EGP')),
             lowStock,
             totalQuantity: formatNumber(totalQuantity)
         };
-    }, [stocks]);
+    }, [stocks, defaultCurrency, convertAmount]);
+
 
     return (
         <div className="space-y-6">
@@ -359,7 +370,7 @@ const StockLevelsPage: React.FC = () => {
                 />
                 <StatCard
                     icon={DollarSign}
-                    value={`${stats.totalValue} ج.م`}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
                     label="قيمة المخزون"
                     color="success"
                 />
@@ -468,7 +479,11 @@ const StockLevelsPage: React.FC = () => {
                                         index={index}
                                         onEdit={openEdit}
                                         onDelete={handleDelete}
+                                        getCurrencyLabel={getCurrencyLabel}
+                                        defaultCurrency={defaultCurrency}
+                                        convertAmount={convertAmount}
                                     />
+
                                 ))
                             )}
                         </tbody>

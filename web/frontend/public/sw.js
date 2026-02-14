@@ -1,4 +1,85 @@
-// Service Worker for handling notifications
+// Service Worker for handling notifications and background polling
+let config = {
+    accessToken: null,
+    userId: null,
+    apiUrl: 'http://localhost:8080/api'
+};
+let pollInterval = null;
+
+// Helper to broadcast to all clients
+const broadcast = async (channel, payload) => {
+    const clientsList = await self.clients.matchAll();
+    clientsList.forEach(client => {
+        client.postMessage({ channel, payload });
+    });
+};
+
+// Fetch logic moved to SW
+const fetchCounts = async () => {
+    if (!config.accessToken || !config.userId) return;
+
+    try {
+        const response = await fetch(`${config.apiUrl}/approvals/pending?userId=${config.userId}`, {
+            headers: {
+                'Authorization': `Bearer ${config.accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.status === 401) {
+            broadcast('auth_status', { authenticated: false });
+            stopPolling();
+            return;
+        }
+
+        const data = await response.json();
+        const count = data.data?.length || 0;
+
+        broadcast('notification_counts', {
+            pendingApprovals: count,
+            timestamp: Date.now()
+        });
+    } catch (error) {
+        console.error('SW fetch failed:', error);
+    }
+};
+
+const startPolling = (intervalMs = 30000) => {
+    stopPolling();
+    fetchCounts();
+    pollInterval = setInterval(fetchCounts, intervalMs);
+};
+
+const stopPolling = () => {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
+};
+
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('message', (event) => {
+    const { type, payload } = event.data;
+
+    switch (type) {
+        case 'INIT_AUTH':
+        case 'UPDATE_AUTH':
+            config = { ...config, ...payload };
+            if (config.accessToken && config.userId) {
+                startPolling(30000);
+            } else {
+                stopPolling();
+            }
+            break;
+        case 'REQUEST_IMMEDIATE_FETCH':
+            fetchCounts();
+            break;
+    }
+});
+
 self.addEventListener('push', (event) => {
     const data = event.data?.json() || {};
     const options = {
@@ -23,7 +104,6 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then((clientList) => {
-                // Try to find an existing window
                 for (const client of clientList) {
                     if (client.url === '/' || client.url.includes('/dashboard')) {
                         return client.focus().then(() => {
@@ -31,7 +111,6 @@ self.addEventListener('notificationclick', (event) => {
                         });
                     }
                 }
-                // If no window found, open a new one
                 if (clients.openWindow) {
                     return clients.openWindow(route);
                 }

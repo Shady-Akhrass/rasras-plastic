@@ -8,6 +8,7 @@ import {
 import { approvalService } from '../../services/approvalService';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../services/grnService';
 import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto } from '../../services/purchaseOrderService';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import purchaseService from '../../services/purchaseService';
 import warehouseService from '../../services/warehouseService';
 import type { WarehouseDto, WarehouseLocationDto } from '../../services/warehouseService';
@@ -29,6 +30,7 @@ const GRNFormPage: React.FC = () => {
 
 
     // Data State
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const [saving, setSaving] = useState(false);
     const [pos, setPos] = useState<PurchaseOrderDto[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
@@ -46,7 +48,8 @@ const GRNFormPage: React.FC = () => {
         shippingCost: 0,
         otherCosts: 0,
         notes: '',
-        items: []
+        items: [],
+        currency: 'EGP' // Default currency for new GRN
     });
 
     // Allow warehouse edit if in approval mode and not completed
@@ -110,7 +113,8 @@ const GRNFormPage: React.FC = () => {
                             ...g,
                             items: g.items || [],
                             shippingCost: g.shippingCost || 0,
-                            otherCosts: g.otherCosts || 0
+                            otherCosts: g.otherCosts || 0,
+                            currency: g.currency || 'EGP' // Ensure currency is set
                         });
                         setSelectedPo({
                             supplierId: g.supplierId!,
@@ -121,7 +125,8 @@ const GRNFormPage: React.FC = () => {
                                 totalPrice: item.totalCost || 0
                             })),
                             subTotal: 0,
-                            totalAmount: 0
+                            totalAmount: 0,
+                            currency: g.currency || 'EGP' // Ensure currency is set for selectedPo
                         } as unknown as PurchaseOrderDto);
                     }
                 } catch {
@@ -174,7 +179,7 @@ const GRNFormPage: React.FC = () => {
     const handleSelectPo = async (poId: number) => {
         if (!poId) {
             setSelectedPo(null);
-            setForm((f) => ({ ...f, poId: 0, supplierId: 0, supplierNameAr: undefined, items: [] }));
+            setForm((f) => ({ ...f, poId: 0, supplierId: 0, supplierNameAr: undefined, items: [], currency: 'EGP' }));
             setRows({});
             return;
         }
@@ -187,6 +192,7 @@ const GRNFormPage: React.FC = () => {
                 poNumber: po.poNumber,
                 supplierId: po.supplierId,
                 supplierNameAr: po.supplierNameAr,
+                currency: po.currency || 'EGP', // Set currency from PO
                 items: (po.items || []).map((i: PurchaseOrderItemDto) => {
                     const rem = (Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0);
                     if (rem <= 0) return null;
@@ -330,9 +336,10 @@ const GRNFormPage: React.FC = () => {
             itemCount: items.length,
             totalQty: totalQty,
             totalCost: subTotal,
-            grandTotal: grandTotal
+            grandTotal: grandTotal,
+            currency: form.currency || 'EGP' // Include currency in totals
         };
-    }, [rows, selectedPo, form.items, isNew, form.shippingCost, form.otherCosts]);
+    }, [rows, selectedPo, form.items, isNew, form.shippingCost, form.otherCosts, form.currency]);
 
     // Max remaining quantity
     const maxRem = (i: PurchaseOrderItemDto) => (Number(i.orderedQty) || 0) - (Number(i.receivedQty) || 0);
@@ -371,7 +378,8 @@ const GRNFormPage: React.FC = () => {
                     otherCosts: form.otherCosts || 0,
                     receivedByUserId,
                     notes: form.notes || undefined,
-                    items
+                    items,
+                    currency: form.currency || 'EGP' // Include currency in payload
                 };
                 await grnService.createGRN(payload);
                 toast.success('تم إنشاء إذن الإضافة بنجاح وتحديث أرصدة المخزون');
@@ -693,7 +701,7 @@ const GRNFormPage: React.FC = () => {
                                             className={inputClass('pl-12')}
                                             readOnly={isReadOnly}
                                         />
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">EGP</div>
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">{getCurrencyLabel(form.currency || defaultCurrency)}</div>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -706,7 +714,7 @@ const GRNFormPage: React.FC = () => {
                                             className={inputClass('pl-12')}
                                             readOnly={isReadOnly}
                                         />
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">EGP</div>
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">{getCurrencyLabel(form.currency || defaultCurrency)}</div>
                                     </div>
                                 </div>
                             </div>
@@ -753,7 +761,7 @@ const GRNFormPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-xs text-brand-primary mb-1">إجمالي التكلفة</p>
-                                    <p className="font-semibold text-slate-800">{formatNumber(totals.grandTotal, { minimumFractionDigits: 2 })} ج.م</p>
+                                    <p className="font-semibold text-slate-800">{formatNumber(totals.grandTotal, { minimumFractionDigits: 2 })} {getCurrencyLabel(form.currency || defaultCurrency)}</p>
                                 </div>
                             </div>
                         </div>
@@ -970,10 +978,14 @@ const GRNFormPage: React.FC = () => {
                                 </div>
                             )}
                             <div className="pt-6 border-t border-white/10">
-                                <div className="text-xs text-white/40 mb-2">إجمالي التكلفة</div>
-                                <div className="text-3xl font-black text-brand-primary">
-                                    {formatNumber(totals.grandTotal, { minimumFractionDigits: 2 })}
-                                    <span className="text-sm font-bold opacity-70"> ج.م</span>
+                                <div className="text-xs text-white/40 mb-2">إجمالي الوارد النهائي</div>
+                                <div className="text-4xl font-black text-emerald-400">
+                                    {formatNumber(totals.grandTotal)} <span className="text-xl font-bold">{getCurrencyLabel(totals.currency || defaultCurrency)}</span>
+                                    {(totals.currency && totals.currency !== defaultCurrency) && (
+                                        <div className="text-sm font-bold text-white/60 mt-1 font-sans">
+                                            (≈ {formatNumber(convertAmount(totals.grandTotal, totals.currency))} {getCurrencyLabel(defaultCurrency)})
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

@@ -23,6 +23,8 @@ import purchaseService, { type SupplierQuotation } from '../../services/purchase
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import toast from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -96,7 +98,11 @@ const QuotationTableRow: React.FC<{
     navigate: ReturnType<typeof useNavigate>;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
-}> = ({ quotation, index, onView, onDelete, navigate, isSelected, onToggleSelect }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ quotation, index, onView, onDelete, navigate, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
     <tr
         className="hover:bg-indigo-50/50 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
         onClick={() => onView(quotation.id!)}
@@ -144,9 +150,10 @@ const QuotationTableRow: React.FC<{
         <td className="px-6 py-4 text-sm text-slate-800 font-bold text-left">
             <div className="flex items-center justify-end gap-2">
                 <DollarSign className="w-4 h-4 text-emerald-500" />
-                <span>{formatNumber(quotation.totalAmount, { minimumFractionDigits: 2 })} {quotation.currency}</span>
+                <span>{formatNumber(convertAmount(quotation.totalAmount || 0, quotation.currency || 'EGP'), { minimumFractionDigits: 2 })} {getCurrencyLabel(defaultCurrency)}</span>
             </div>
         </td>
+
         <td className="px-6 py-4 text-sm text-slate-600">
             {quotation.deliveryDays ? `${quotation.deliveryDays} يوم` : '-'}
         </td>
@@ -207,7 +214,9 @@ const QuotationTableRow: React.FC<{
 );
 
 const SupplierQuotationsPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const navigate = useNavigate();
+
     const [loading, setLoading] = useState(true);
     const [quotations, setQuotations] = useState<SupplierQuotation[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -324,7 +333,7 @@ const SupplierQuotationsPage: React.FC = () => {
     const stats = useMemo(() => {
         const total = quotations.length;
         const avgAmount = total > 0
-            ? quotations.reduce((sum, q) => sum + (q.totalAmount || 0), 0) / total
+            ? quotations.reduce((sum, q) => sum + convertAmount(q.totalAmount || 0, q.currency || 'EGP'), 0) / total
             : 0;
         return {
             total,
@@ -332,7 +341,8 @@ const SupplierQuotationsPage: React.FC = () => {
             selected: quotations.filter(q => q.status === 'Selected').length,
             avgAmount: formatNumber(avgAmount, { maximumFractionDigits: 0 })
         };
-    }, [quotations]);
+    }, [quotations, defaultCurrency, convertAmount]);
+
 
     return (
         <div className="space-y-6">
@@ -379,8 +389,9 @@ const SupplierQuotationsPage: React.FC = () => {
                 <StatCard icon={FileText} value={stats.total} label="إجمالي العروض" color="indigo" />
                 <StatCard icon={Clock} value={stats.received} label="مستلم" color="blue" />
                 <StatCard icon={CheckCircle2} value={stats.selected} label="مقبول" color="success" />
-                <StatCard icon={DollarSign} value={`${stats.avgAmount} ج.م`} label="متوسط القيمة" color="purple" />
+                <StatCard icon={DollarSign} value={`${stats.avgAmount} ${getCurrencyLabel(defaultCurrency)}`} label="متوسط القيمة" color="purple" />
             </div>
+
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
@@ -517,7 +528,11 @@ const SupplierQuotationsPage: React.FC = () => {
                                         navigate={navigate}
                                         isSelected={!!q.id && selectedIds.includes(q.id)}
                                         onToggleSelect={handleToggleSelect}
+                                        getCurrencyLabel={getCurrencyLabel}
+                                        defaultCurrency={defaultCurrency}
+                                        convertAmount={convertAmount}
                                     />
+
                                 ))
                             )}
                         </tbody>

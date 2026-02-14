@@ -38,6 +38,7 @@ export interface PurchaseReturnDto {
     subTotal: number;
     taxAmount: number;
     totalAmount: number;
+    currency?: string;
     status?: string;
     items: PurchaseReturnItemDto[];
 }

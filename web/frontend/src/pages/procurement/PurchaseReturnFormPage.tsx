@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import { purchaseReturnService, type PurchaseReturnDto, type PurchaseReturnItemDto } from '../../services/purchaseReturnService';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import { grnService } from '../../services/grnService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
@@ -29,6 +30,7 @@ import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 const PurchaseReturnFormPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
@@ -517,10 +519,14 @@ const PurchaseReturnFormPage: React.FC = () => {
                                 </span>
                             </div>
                             <div className="pt-6 border-t border-white/10">
-                                <div className="text-xs text-white/40 mb-2">إجمالي قيمة المرتجع</div>
+                                <div className="text-xs text-white/40 mb-2">إجمالي المرتجع النهائي</div>
                                 <div className="text-4xl font-black text-emerald-400">
-                                    {formatNumber(formData.totalAmount)}
-                                    <span className="text-sm font-bold mr-2">ج.م</span>
+                                    {formatNumber(formData.totalAmount)} <span className="text-xl font-bold">{getCurrencyLabel(formData.currency || defaultCurrency)}</span>
+                                    {(formData.currency && formData.currency !== defaultCurrency) && (
+                                        <div className="text-sm font-bold text-white/60 mt-1 font-sans">
+                                            (≈ {formatNumber(convertAmount(formData.totalAmount, formData.currency))} {getCurrencyLabel(defaultCurrency)})
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

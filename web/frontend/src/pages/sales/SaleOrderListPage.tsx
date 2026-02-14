@@ -1,10 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, FileText, RefreshCw, Eye } from 'lucide-react';
+import { Plus, Search, FileText, RefreshCw, Eye, Pencil, Trash2, Clock, CheckCircle2, Truck, Lock } from 'lucide-react';
 import { saleOrderService, type SaleOrderDto } from '../../services/saleOrderService';
 import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
+
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
+        'Draft': { icon: FileText, className: 'bg-slate-50 text-slate-700 border-slate-200', label: 'مسودة' },
+        'Pending': { icon: Clock, className: 'bg-amber-50 text-amber-700 border-amber-200', label: 'قيد الاعتماد' },
+        'Confirmed': { icon: CheckCircle2, className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'مؤكد' },
+        'Shipped': { icon: Truck, className: 'bg-blue-50 text-blue-700 border-blue-200', label: 'تم الشحن' },
+        'Closed': { icon: Lock, className: 'bg-slate-100 text-slate-700 border-slate-300', label: 'مغلق' }
+    };
+    const { icon: Icon, className, label } = config[status] || config['Draft'];
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+        </span>
+    );
+};
 
 const SaleOrderListPage: React.FC = () => {
     const navigate = useNavigate();
@@ -13,6 +32,9 @@ const SaleOrderListPage: React.FC = () => {
     const [search, setSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState<SaleOrderDto | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => { fetchList(); }, []);
     useEffect(() => { setCurrentPage(1); }, [search]);
@@ -26,6 +48,27 @@ const SaleOrderListPage: React.FC = () => {
             toast.error('فشل تحميل أوامر البيع');
             setList([]);
         } finally { setLoading(false); }
+    };
+
+    const handleDeleteClick = (order: SaleOrderDto) => {
+        setOrderToDelete(order);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!orderToDelete?.id) return;
+        setIsDeleting(true);
+        try {
+            await saleOrderService.delete(orderToDelete.id);
+            toast.success('تم حذف أمر البيع');
+            await fetchList();
+            setIsDeleteModalOpen(false);
+            setOrderToDelete(null);
+        } catch (error: any) {
+            toast.error(error?.response?.data?.message || 'فشل الحذف');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const filtered = useMemo(() => {
@@ -114,13 +157,24 @@ const SaleOrderListPage: React.FC = () => {
                             ) : (
                                 paginated.map((o) => (
                                     <tr key={o.id} className="border-b border-slate-100 hover:bg-emerald-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-emerald-700">{o.soNumber || '—'}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-mono font-bold text-emerald-700">{o.soNumber || '—'}</div>
+                                            <div className="mt-1"><StatusBadge status={o.status || 'Draft'} /></div>
+                                        </td>
                                         <td className="px-6 py-4 text-slate-600">{o.soDate ? formatDate(o.soDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{o.customerNameAr || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{o.expectedDeliveryDate ? formatDate(o.expectedDeliveryDate) : '—'}</td>
-                                        <td className="px-6 py-4">{formatNumber(o.totalAmount ?? 0)} {o.currency || ''}</td>
+                                        <td className="px-6 py-4 font-bold">{formatNumber(o.totalAmount ?? 0)} {o.currency || ''}</td>
                                         <td className="px-6 py-4">
-                                            <button onClick={() => navigate(`/dashboard/sales/orders/${o.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => navigate(`/dashboard/sales/orders/${o.id}?mode=view`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg" title="عرض التفاصيل"><Eye className="w-5 h-5" /></button>
+                                                {(!o.status || o.status === 'Draft') && (
+                                                    <>
+                                                        <button onClick={() => navigate(`/dashboard/sales/orders/${o.id}`)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg" title="تعديل"><Pencil className="w-4 h-4" /></button>
+                                                        <button onClick={() => handleDeleteClick(o)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -132,6 +186,18 @@ const SaleOrderListPage: React.FC = () => {
                     <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف أمر البيع"
+                message={`هل أنت متأكد من حذف أمر البيع ${orderToDelete?.soNumber || ''}؟`}
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setOrderToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };
