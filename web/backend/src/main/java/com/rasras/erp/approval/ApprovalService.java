@@ -204,8 +204,7 @@ public class ApprovalService {
 
     private ApprovalRequestDto mapToDto(ApprovalRequest req) {
         BigDecimal amountToUse = req.getTotalAmount();
-        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix
-        // display)
+        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix display)
         if ("QuotationComparison".equals(req.getDocumentType())
                 && (amountToUse == null || amountToUse.compareTo(BigDecimal.ZERO) == 0)) {
             amountToUse = comparisonRepo.findById(req.getDocumentId())
@@ -316,7 +315,7 @@ public class ApprovalService {
                         // ✅ Strategy B: إغلاق الطلب نهائياً
                         request.setStatus("Rejected");
                         request.setCompletedDate(LocalDateTime.now());
-                        request.setCurrentStep(null); // ✅ تصفير CurrentStep
+                        request.setCurrentStep(null);  // ✅ تصفير CurrentStep
                         updateLinkedDocumentStatus(request, "Rejected", userId);
                     }
                     requestRepo.save(request);
@@ -484,33 +483,31 @@ public class ApprovalService {
                 qc.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     qc.setStatus("Approved");
-
+                    
                     // ✅ Idempotent PO Creation: إنشاء PO مرة واحدة فقط
                     if (qc.getSelectedQuotation() != null) {
                         boolean poExists = poRepo.findByQuotationId(qc.getSelectedQuotation().getId()).isPresent();
-
+                        
                         if (!poExists) {
                             // NEW: Automatically create PO and initiate its approval
                             createPOFromComparison(qc, userId);
                         } else {
-                            System.out.println("PO already exists for quotation " +
-                                    qc.getSelectedQuotation().getId() + " - skipping creation");
+                            System.out.println("PO already exists for quotation " + 
+                                qc.getSelectedQuotation().getId() + " - skipping creation");
                         }
                     }
                 } else if ("Rejected".equals(status)) {
                     // ✅ إعادة المقارنة إلى Draft للسماح بالتعديل وإعادة الإرسال
                     qc.setStatus("Draft");
                     qc.setApprovalStatus("Rejected"); // تتبع آخر محاولة رفض
-
+                    
                     // ✅ تتبع عدد مرات الرفض
                     Integer rejectionCount = qc.getRejectionCount() != null ? qc.getRejectionCount() : 0;
                     qc.setRejectionCount(rejectionCount + 1);
                     qc.setLastRejectionDate(LocalDateTime.now());
-
-                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل
-                    // تاريخي
-                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات
-                    // المُغلقة
+                    
+                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل تاريخي
+                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات المُغلقة
                 }
                 comparisonRepo.save(qc);
             });
