@@ -1133,7 +1133,7 @@ const RFQFormPage: React.FC = () => {
                             <option value="">اختر طلب شراء معتمد...</option>
                             {availablePRs.map(pr => (
                                 <option key={pr.id} value={pr.id}>
-                                    #{pr.prNumber} — {formatNumber(pr.items.length)} صنف
+                                    رقم الطلب {pr.prNumber} — عدد الأصناف {formatNumber(pr.items.length)}
                                 </option>
                             ))}
                         </select>

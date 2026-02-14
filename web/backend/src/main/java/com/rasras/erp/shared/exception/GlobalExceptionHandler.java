@@ -70,12 +70,20 @@ public class GlobalExceptionHandler {
 
         // تكرار/مفتاح فريد
         if (causeMsg.contains("Duplicate") || causeMsg.contains("UNIQUE")) {
+            // صلاحيات الدور: تكرار (RoleID, PermissionID)
+            if (lower.contains("rolepermission") || lower.contains("uq_rolepermission")) {
+                return "صلاحية مكررة لهذا الدور - يرجى المحاولة مجدداً";
+            }
             return "كود مكرر - يرجى المحاولة مجدداً";
         }
 
         // قيود المفاتيح الأجنبية
         if (lower.contains("foreign key") || lower.contains("constraintviolation")) {
-            // عملاء
+            // حذف موظف: وجود مستخدم أو عملاء أو مستندات مبيعات مرتبطة به
+            if (lower.contains("parent row") && (lower.contains("employee") || lower.contains("employees"))) {
+                return "لا يمكن حذف الموظف لوجود مستخدم أو عملاء أو مستندات مبيعات مرتبطة به. قم بإزالة الربط أو حذف المستندات المرتبطة أولاً.";
+            }
+            // عملاء (إنشاء/تحديث: مندوب مبيعات غير صحيح)
             if (causeMsg.contains("FK_Customers_SalesRep") || causeMsg.contains("SalesRepID")) {
                 return "مسؤول المبيعات غير صحيح - اختر موظفاً من القائمة أو اترك الحقل فارغاً";
             }

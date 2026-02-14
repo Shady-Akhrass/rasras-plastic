@@ -93,18 +93,22 @@ public class QualityInspectionService {
                                         .map(gi -> gi.getRejectedQty() != null ? gi.getRejectedQty() : BigDecimal.ZERO)
                                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                        grn.setTotalAcceptedQty(totalAcc);
-                        grn.setTotalRejectedQty(totalRej);
+                grn.setTotalAcceptedQty(totalAcc);
+                grn.setTotalRejectedQty(totalRej);
 
-                        grnRepo.save(grn);
+                grnRepo.save(grn);
 
-                        // NEW: Create Purchase Return for rejected quantities
-                        if (totalRej.compareTo(BigDecimal.ZERO) > 0) {
-                                createPurchaseReturnFromInspection(grn, bulkRequest.getInspectedByUserId());
-                        }
+                // Recalculate GRN amounts based on accepted quantities
+                // This ensures tax and discount are recalculated while keeping shipping/other costs unchanged
+                grnService.recalculateGRNAmountsAfterQC(grnId);
 
-                        // Auto-submit for approval
-                        grnService.submitGRN(grnId, bulkRequest.getInspectedByUserId());
+                // NEW: Create Purchase Return for rejected quantities
+                if (totalRej.compareTo(BigDecimal.ZERO) > 0) {
+                        createPurchaseReturnFromInspection(grn, bulkRequest.getInspectedByUserId());
+                }
+
+                // Auto-submit for approval
+                grnService.submitGRN(grnId, bulkRequest.getInspectedByUserId());
                 } else {
                         if (allInspected) {
                                 grn.setStatus("Inspected");

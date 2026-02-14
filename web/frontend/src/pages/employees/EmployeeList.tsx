@@ -315,8 +315,9 @@ const EmployeeList: React.FC = () => {
             handleSuccess('تم حذف الموظف بنجاح');
             setIsDeleteDialogOpen(false);
             setEmployeeToDelete(null);
-        } catch (err) {
-            alert('حدث خطأ أثناء الحذف');
+        } catch (err: any) {
+            const msg = err?.response?.data?.message;
+            alert(msg && typeof msg === 'string' ? msg : 'حدث خطأ أثناء الحذف');
         } finally {
             setIsDeleting(false);
         }

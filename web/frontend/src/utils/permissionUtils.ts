@@ -28,7 +28,7 @@ function getRequiredPermissionForPath(path: string): string | null {
   if (path.startsWith('/dashboard/sales')) return 'SECTION_SALES';
   if (path.startsWith('/dashboard/crm')) return 'SECTION_CRM';
   if (path.startsWith('/dashboard/inventory')) {
-    if (path.includes('quality-parameters') || path.includes('price-lists') || path.includes('units')) return 'SECTION_OPERATIONS';
+    if (path.includes('quality-inspection') || path.includes('quality-parameters') || path.includes('price-lists') || path.includes('units') || path.includes('categories') || path.includes('items')) return 'SECTION_OPERATIONS';
     return 'SECTION_WAREHOUSE';
   }
   return null;
@@ -44,7 +44,7 @@ export function getRequiredRolesForPath(path: string): string[] | null {
   if (path.startsWith('/dashboard/employees') || path === '/dashboard/employees') return [...SECTION_ROLES.employees];
   if (path.startsWith('/dashboard/hr')) return [...SECTION_ROLES.employees];
   if (path.startsWith('/dashboard/inventory')) {
-    if (path.includes('quality-parameters') || path.includes('price-lists') || path.includes('units')) return [...SECTION_ROLES.operations];
+    if (path.includes('quality-inspection') || path.includes('quality-parameters') || path.includes('price-lists') || path.includes('units') || path.includes('categories') || path.includes('items')) return [...SECTION_ROLES.operations];
     return [...SECTION_ROLES.warehouse];
   }
   return null;

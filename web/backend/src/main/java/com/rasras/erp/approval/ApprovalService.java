@@ -160,19 +160,32 @@ public class ApprovalService {
     }
 
     private ApprovalRequestDto mapToDto(ApprovalRequest req) {
+        BigDecimal amountToUse = req.getTotalAmount();
+        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix display)
+        if ("QuotationComparison".equals(req.getDocumentType())
+                && (amountToUse == null || amountToUse.compareTo(BigDecimal.ZERO) == 0)) {
+            amountToUse = comparisonRepo.findById(req.getDocumentId())
+                    .map(qc -> qc.getSelectedQuotation() != null ? qc.getSelectedQuotation().getTotalAmount() : null)
+                    .filter(java.util.Objects::nonNull)
+                    .orElse(amountToUse);
+        }
+        if (amountToUse == null) {
+            amountToUse = BigDecimal.ZERO;
+        }
+        final BigDecimal finalAmount = amountToUse;
         return ApprovalRequestDto.builder()
                 .id(req.getId())
                 .workflowName(req.getWorkflow().getWorkflowName())
                 .documentType(req.getDocumentType())
                 .documentId(req.getDocumentId())
                 .documentNumber(req.getDocumentNumber())
-                .requestedByName(req.getRequestedByUser().getUsername()) // or e.g. getEmployee().getFullName()
-                .totalAmount(req.getTotalAmount())
+                .requestedByName(req.getRequestedByUser().getUsername())
+                .totalAmount(finalAmount)
                 .status(req.getStatus())
                 .currentStepName(req.getCurrentStep() != null ? req.getCurrentStep().getStepName() : "")
                 .requestedDate(req.getRequestedDate())
                 .completedDate(req.getCompletedDate())
-                .priority("Normal") // Default, logic can be added later
+                .priority("Normal")
                 .build();
     }
 
@@ -189,6 +202,11 @@ public class ApprovalService {
         if ("GoodsReceiptNote".equalsIgnoreCase(request.getDocumentType()) && "Approved".equalsIgnoreCase(actionType)
                 && warehouseId != null) {
             grnRepo.findById(request.getDocumentId()).ifPresent(grn -> {
+                // ⚠️ CRITICAL: GRN must be inspected by Quality before approval
+                if (!"Inspected".equals(grn.getStatus()) && !"Approved".equals(grn.getStatus())) {
+                    throw new RuntimeException(
+                            "لا يمكن اعتماد إذن الإضافة قبل فحص الجودة. الرجاء إرسال الفحص للاعتماد من صفحة فحص الجودة أولاً.");
+                }
                 grn.setWarehouseId(warehouseId);
                 grnRepo.save(grn);
             });
@@ -209,9 +227,17 @@ public class ApprovalService {
             handleIntermediateDocumentStatus(request, actionByUserId);
             moveToNextStep(request, actionByUserId);
         } else if ("Rejected".equalsIgnoreCase(actionType)) {
-            request.setStatus("Rejected");
+            // ✅ Strategy B: إغلاق الطلب نهائياً (لا إعادة استخدام)
+            request.setStatus("Rejected");  // يمكن استخدام "Cancelled" إذا كان متوفراً في enum
             request.setCompletedDate(LocalDateTime.now());
+            request.setCurrentStep(null);  // ✅ تصفير CurrentStep (يُكتب NULL في CurrentStepID)
+            
+            // تحديث الوثيقة المرتبطة (سيعيدها إلى Draft)
             updateLinkedDocumentStatus(request, "Rejected", actionByUserId);
+            
+            // ✅ ملاحظة: CurrentStep يصبح null وهذا طبيعي لأن الطلب مُغلق
+            // Audit Trail محفوظ في approvalactions - CurrentStep مجرد مؤشر تشغيلي
+            // عند إعادة الإرسال، submitForApproval() سينشئ approvalrequest جديد تماماً
         }
 
         requestRepo.save(request);
@@ -226,8 +252,10 @@ public class ApprovalService {
                         handleIntermediateDocumentStatus(request, userId);
                         moveToNextStep(request, userId);
                     } else if ("Rejected".equalsIgnoreCase(actionType)) {
+                        // ✅ Strategy B: إغلاق الطلب نهائياً
                         request.setStatus("Rejected");
                         request.setCompletedDate(LocalDateTime.now());
+                        request.setCurrentStep(null);  // ✅ تصفير CurrentStep
                         updateLinkedDocumentStatus(request, "Rejected", userId);
                     }
                     requestRepo.save(request);
@@ -240,8 +268,10 @@ public class ApprovalService {
                         handleIntermediateDocumentStatus(request, userId);
                         moveToNextStep(request, userId);
                     } else if ("Rejected".equalsIgnoreCase(actionType)) {
+                        // ✅ Strategy B: إغلاق الطلب نهائياً
                         request.setStatus("Rejected");
                         request.setCompletedDate(LocalDateTime.now());
+                        request.setCurrentStep(null);  // ✅ تصفير CurrentStep
                         updateLinkedDocumentStatus(request, "Rejected", userId);
                     }
                     requestRepo.save(request);
@@ -274,14 +304,20 @@ public class ApprovalService {
     }
 
     private void moveToNextStep(ApprovalRequest request, Integer userId) {
+        if (request.getWorkflow() == null) {
+            return;
+        }
         List<ApprovalWorkflowStep> steps = stepRepo
                 .findByWorkflowWorkflowIdOrderByStepNumberAsc(request.getWorkflow().getWorkflowId());
 
         int currentIdx = -1;
-        for (int i = 0; i < steps.size(); i++) {
-            if (steps.get(i).getStepId().equals(request.getCurrentStep().getStepId())) {
-                currentIdx = i;
-                break;
+        ApprovalWorkflowStep currentStep = request.getCurrentStep();
+        if (currentStep != null) {
+            for (int i = 0; i < steps.size(); i++) {
+                if (steps.get(i).getStepId().equals(currentStep.getStepId())) {
+                    currentIdx = i;
+                    break;
+                }
             }
         }
 
@@ -403,10 +439,31 @@ public class ApprovalService {
                 qc.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     qc.setStatus("Approved");
-                    // NEW: Automatically create PO and initiate its approval
-                    createPOFromComparison(qc, userId);
+                    
+                    // ✅ Idempotent PO Creation: إنشاء PO مرة واحدة فقط
+                    if (qc.getSelectedQuotation() != null) {
+                        boolean poExists = poRepo.findByQuotationId(qc.getSelectedQuotation().getId()).isPresent();
+                        
+                        if (!poExists) {
+                            // NEW: Automatically create PO and initiate its approval
+                            createPOFromComparison(qc, userId);
+                        } else {
+                            System.out.println("PO already exists for quotation " + 
+                                qc.getSelectedQuotation().getId() + " - skipping creation");
+                        }
+                    }
                 } else if ("Rejected".equals(status)) {
-                    qc.setStatus("Rejected");
+                    // ✅ إعادة المقارنة إلى Draft للسماح بالتعديل وإعادة الإرسال
+                    qc.setStatus("Draft");
+                    qc.setApprovalStatus("Rejected"); // تتبع آخر محاولة رفض
+                    
+                    // ✅ تتبع عدد مرات الرفض
+                    Integer rejectionCount = qc.getRejectionCount() != null ? qc.getRejectionCount() : 0;
+                    qc.setRejectionCount(rejectionCount + 1);
+                    qc.setLastRejectionDate(LocalDateTime.now());
+                    
+                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل تاريخي
+                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات المُغلقة
                 }
                 comparisonRepo.save(qc);
             });

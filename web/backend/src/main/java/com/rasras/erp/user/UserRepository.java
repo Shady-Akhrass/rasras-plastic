@@ -13,6 +13,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     boolean existsByUsername(String username);
 
+    boolean existsByEmployeeId(Integer employeeId);
+
     @Query("SELECT u FROM User u JOIN FETCH u.role r LEFT JOIN FETCH r.rolePermissions rp LEFT JOIN FETCH rp.permission WHERE u.username = :username")
     Optional<User> findByUsernameWithPermissions(String username);
 

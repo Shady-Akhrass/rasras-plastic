@@ -6,6 +6,7 @@ import com.rasras.erp.approval.ApprovalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import java.util.ArrayList;
@@ -179,22 +180,48 @@ public class QuotationComparisonService {
                 QuotationComparison comparison = comparisonRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Comparison not found"));
 
+                // ✅ Validation 1: يجب اختيار عرض فائز
                 if (comparison.getSelectedQuotation() == null) {
                         throw new RuntimeException("Cannot submit for approval without selecting a winning quotation");
                 }
 
-                comparison.setStatus("Pending Approval");
+                // ✅ Validation 2: يجب أن تكون المقارنة في حالة Draft
+                // هذا يمنع إعادة الإرسال المزدوج أو إرسال مقارنة معتمدة بالفعل
+                if (!"Draft".equalsIgnoreCase(comparison.getStatus())) {
+                        throw new RuntimeException(
+                                "Cannot submit comparison in status '" + comparison.getStatus() + "'. " +
+                                "Only Draft comparisons can be submitted. " +
+                                "(Current status indicates it's already submitted, approved, or rejected)"
+                        );
+                }
+
+                // ✅ Strategy B: إنشاء approvalrequest جديد في كل مرة
+                // حتى لو كان هناك طلب قديم مرفوض/مُلغى، نتجاهله ونبدأ من جديد
+                
+                comparison.setStatus("PendingApproval"); // ✅ توحيد: لا مسافات
                 comparison.setApprovalStatus("Pending");
 
-                // Initiate formal approval workflow
+                // Total = selected quotation total, or sum of selected quote's detail lines
+                BigDecimal totalAmount = comparison.getSelectedQuotation() != null
+                                && comparison.getSelectedQuotation().getTotalAmount() != null
+                                ? comparison.getSelectedQuotation().getTotalAmount()
+                                : (comparison.getDetails() != null && comparison.getSelectedQuotation() != null
+                                                ? comparison.getDetails().stream()
+                                                                .filter(d -> comparison.getSelectedQuotation().getId()
+                                                                                .equals(d.getQuotation().getId()))
+                                                                .map(d -> d.getTotalPrice() != null ? d.getTotalPrice() : BigDecimal.ZERO)
+                                                                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                                                : BigDecimal.ZERO);
+
+                // ✅ إنشاء approvalrequest جديد دائماً (لا نعيد استخدام القديم)
+                // سيفشل هذا إذا كان هناك طلب Pending موجود بالفعل - وهذا مقصود للحماية
                 approvalService.initiateApproval(
                                 "QC_APPROVAL",
                                 "QuotationComparison",
                                 comparison.getId(),
                                 comparison.getComparisonNumber(),
                                 comparison.getCreatedBy(),
-                                java.math.BigDecimal.ZERO // Amount not strictly applicable here but can be added if
-                                                          // needed
+                                totalAmount
                 );
 
                 return mapToDto(comparisonRepository.save(comparison));

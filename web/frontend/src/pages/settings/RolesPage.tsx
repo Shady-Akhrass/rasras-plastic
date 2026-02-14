@@ -637,11 +637,19 @@ const RolesPage: React.FC = () => {
         e.preventDefault();
         try {
             setIsSaving(true);
+            const payload = {
+                ...formData,
+                roleCode: (formData.roleCode || '').trim(),
+            };
+            if (!payload.roleCode) {
+                toast.error('كود الدور مطلوب');
+                return;
+            }
             if (editingRole?.roleId) {
-                await roleService.updateRole(editingRole.roleId, formData);
+                await roleService.updateRole(editingRole.roleId, payload);
                 toast.success('تم تحديث الدور بنجاح', { icon: '🎉' });
             } else {
-                await roleService.createRole(formData);
+                await roleService.createRole(payload);
                 toast.success('تم إضافة الدور بنجاح', { icon: '🎉' });
             }
             setShowModal(false);
@@ -665,7 +673,9 @@ const RolesPage: React.FC = () => {
         if (!currentRoleForPerms?.roleId) return;
         try {
             setIsSavingPerms(true);
-            await roleService.assignPermissions(currentRoleForPerms.roleId, selectedPermissions);
+            // إزالة التكرار لتجنب خطأ "صلاحية مكررة"
+            const uniquePerms = [...new Set(selectedPermissions)];
+            await roleService.assignPermissions(currentRoleForPerms.roleId, uniquePerms);
             toast.success('تم تحديث الصلاحيات بنجاح', { icon: '🔐' });
             setShowPermModal(false);
             fetchData();

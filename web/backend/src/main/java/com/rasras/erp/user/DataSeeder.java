@@ -116,7 +116,8 @@ public class DataSeeder implements CommandLineRunner {
                 { "PM", "مدير المشتريات", "Procurement Manager", "إدارة عمليات الشراء" },
                 { "BUYER", "مشتري", "Buyer", "تنفيذ عمليات الشراء" },
                 { "SM", "مدير المبيعات", "Sales Manager", "إدارة عمليات البيع" },
-                { "WHM", "أمين المخزن", "Warehouse Keeper", "إدارة المخازن والجرد" }
+                { "WHM", "أمين المخزن", "Warehouse Keeper", "إدارة المخازن والجرد" },
+                { "QC", "مراقب الجودة", "Quality Controller", "فحص واعتماد الجودة" }
         };
 
         for (String[] roleData : roles) {
@@ -198,6 +199,7 @@ public class DataSeeder implements CommandLineRunner {
         roleSectionMap.put("BUYER", java.util.Arrays.asList("SECTION_MAIN", "SECTION_PROCUREMENT"));
         roleSectionMap.put("SM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_SALES", "SECTION_CRM"));
         roleSectionMap.put("WHM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_WAREHOUSE"));
+        roleSectionMap.put("QC", java.util.Arrays.asList("SECTION_MAIN", "SECTION_OPERATIONS"));
         roleSectionMap.put("GM", allSectionCodes);
         roleSectionMap.put("FM", java.util.Arrays.asList("SECTION_MAIN"));
         roleSectionMap.put("ACC", java.util.Arrays.asList("SECTION_MAIN"));
@@ -324,7 +326,7 @@ public class DataSeeder implements CommandLineRunner {
             }
         }
 
-        // 4. GRN Approval Workflow
+        // 4. GRN Approval Workflow (Quality Check -> Procurement)
         if (!workflowRepo.findByWorkflowCode("GRN_APPROVAL").isPresent()) {
             com.rasras.erp.approval.ApprovalWorkflow grnWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
                     .workflowCode("GRN_APPROVAL")
@@ -334,21 +336,36 @@ public class DataSeeder implements CommandLineRunner {
                     .build();
             workflowRepo.save(grnWorkflow);
 
-            Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
-            if (pmRole != null) {
+            // Step 1: Quality Controller Approval
+            Role qcRole = roleRepository.findByRoleCode("QC").orElse(null);
+            if (qcRole != null) {
                 com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
                         .builder()
                         .workflow(grnWorkflow)
                         .stepNumber(1)
+                        .stepName("Quality Controller Approval")
+                        .approverType("ROLE")
+                        .approverRole(qcRole)
+                        .build();
+                stepRepo.save(step1);
+            }
+
+            // Step 2: Procurement Manager Approval
+            Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
+            if (pmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step2 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(grnWorkflow)
+                        .stepNumber(2)
                         .stepName("Procurement Manager Approval")
                         .approverType("ROLE")
                         .approverRole(pmRole)
                         .build();
-                stepRepo.save(step1);
+                stepRepo.save(step2);
             }
         }
 
-        // 5. Purchase Return Approval Workflow
+        // 5. Purchase Return Approval Workflow (Quality Controller)
         if (!workflowRepo.findByWorkflowCode("RET_APPROVAL").isPresent()) {
             com.rasras.erp.approval.ApprovalWorkflow retWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
                     .workflowCode("RET_APPROVAL")
@@ -358,15 +375,16 @@ public class DataSeeder implements CommandLineRunner {
                     .build();
             workflowRepo.save(retWorkflow);
 
-            Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
-            if (pmRole != null) {
+            // Quality Controller approves purchase returns (usually quality-related)
+            Role qcRole = roleRepository.findByRoleCode("QC").orElse(null);
+            if (qcRole != null) {
                 com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
                         .builder()
                         .workflow(retWorkflow)
                         .stepNumber(1)
-                        .stepName("Procurement Manager Approval")
+                        .stepName("Quality Controller Approval")
                         .approverType("ROLE")
-                        .approverRole(pmRole)
+                        .approverRole(qcRole)
                         .build();
                 stepRepo.save(step1);
             }
@@ -383,6 +401,10 @@ public class DataSeeder implements CommandLineRunner {
             workflowRepo.save(qcWorkflow);
 
             Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
+            Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+            Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+
+            // ✅ Step 1: Procurement Manager Approval
             if (pmRole != null) {
                 com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
                         .builder()
@@ -393,6 +415,32 @@ public class DataSeeder implements CommandLineRunner {
                         .approverRole(pmRole)
                         .build();
                 stepRepo.save(step1);
+            }
+
+            // ✅ Step 2: Finance Manager Approval (NEW)
+            if (fmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step2 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(qcWorkflow)
+                        .stepNumber(2)
+                        .stepName("Finance Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(fmRole)
+                        .build();
+                stepRepo.save(step2);
+            }
+
+            // ✅ Step 3: General Manager Approval (NEW)
+            if (gmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step3 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(qcWorkflow)
+                        .stepNumber(3)
+                        .stepName("General Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(gmRole)
+                        .build();
+                stepRepo.save(step3);
             }
         }
         // 7. Payment Voucher Approval Workflow

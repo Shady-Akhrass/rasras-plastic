@@ -229,6 +229,81 @@ public class GRNService {
         grnRepo.delete(grn);
     }
 
+    /**
+     * Recalculate GRN amounts after quality control inspection
+     * Uses acceptedQty instead of receivedQty and recalculates tax/discount
+     * while keeping shipping and other costs unchanged
+     */
+    @Transactional
+    public void recalculateGRNAmountsAfterQC(Integer grnId) {
+        GoodsReceiptNote grn = grnRepo.findByIdWithItems(grnId)
+                .orElseThrow(() -> new RuntimeException("GRN not found: " + grnId));
+
+        // Get Purchase Order to access discount and tax percentages
+        PurchaseOrder po = grn.getPurchaseOrder();
+        if (po == null) {
+            throw new RuntimeException("GRN has no associated Purchase Order");
+        }
+
+        // Create a map of PO items by ID for quick lookup
+        java.util.Map<Integer, PurchaseOrderItem> poItemsMap = po.getItems().stream()
+                .collect(java.util.stream.Collectors.toMap(PurchaseOrderItem::getId, item -> item));
+
+        BigDecimal subTotal = BigDecimal.ZERO;
+
+        // Recalculate each GRN item using acceptedQty
+        for (GRNItem grnItem : grn.getItems()) {
+            PurchaseOrderItem poItem = poItemsMap.get(grnItem.getPoItemId());
+            if (poItem == null) {
+                throw new RuntimeException("PO Item not found for GRN Item: " + grnItem.getId());
+            }
+
+            // Use acceptedQty if set, otherwise fallback to receivedQty
+            BigDecimal qty = grnItem.getAcceptedQty() != null ? grnItem.getAcceptedQty() : grnItem.getReceivedQty();
+            if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
+                // If no quantity, set totalCost to zero
+                grnItem.setTotalCost(BigDecimal.ZERO);
+                continue;
+            }
+
+            // Get pricing info from PO item
+            BigDecimal unitPrice = poItem.getUnitPrice() != null ? poItem.getUnitPrice()
+                    : (grnItem.getUnitCost() != null ? grnItem.getUnitCost() : BigDecimal.ZERO);
+            BigDecimal discountPercentage = poItem.getDiscountPercentage() != null
+                    ? poItem.getDiscountPercentage()
+                    : BigDecimal.ZERO;
+            BigDecimal taxPercentage = poItem.getTaxPercentage() != null
+                    ? poItem.getTaxPercentage()
+                    : BigDecimal.ZERO;
+
+            // Calculate: Gross -> Discount -> Tax on Taxable Amount
+            BigDecimal grossAmount = qty.multiply(unitPrice);
+            BigDecimal discountAmount = grossAmount.multiply(discountPercentage)
+                    .divide(new BigDecimal("100"), 4, java.math.RoundingMode.HALF_UP);
+            BigDecimal taxableAmount = grossAmount.subtract(discountAmount);
+            BigDecimal taxAmount = taxableAmount.multiply(taxPercentage)
+                    .divide(new BigDecimal("100"), 4, java.math.RoundingMode.HALF_UP);
+            BigDecimal totalCost = taxableAmount.add(taxAmount);
+
+            // Update GRN Item total cost
+            grnItem.setTotalCost(totalCost.setScale(2, java.math.RoundingMode.HALF_UP));
+
+            // Accumulate subtotal
+            subTotal = subTotal.add(totalCost);
+        }
+
+        // Recalculate GRN total: subtotal + shipping + other costs
+        // Note: shipping and other costs remain unchanged
+        BigDecimal shippingCost = grn.getShippingCost() != null ? grn.getShippingCost() : BigDecimal.ZERO;
+        BigDecimal otherCosts = grn.getOtherCosts() != null ? grn.getOtherCosts() : BigDecimal.ZERO;
+        BigDecimal totalAmount = subTotal.add(shippingCost).add(otherCosts);
+
+        grn.setTotalAmount(totalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
+
+        // Save updated GRN
+        grnRepo.save(grn);
+    }
+
     private void updatePOQuantities(PurchaseOrder po, List<GRNItem> grnItems) {
         for (GRNItem grnItem : grnItems) {
             PurchaseOrderItem poItem = po.getItems().stream()
