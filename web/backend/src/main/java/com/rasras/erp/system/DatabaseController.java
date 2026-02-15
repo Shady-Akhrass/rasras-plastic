@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/settings/database")
@@ -69,6 +70,19 @@ public class DatabaseController {
     @Operation(summary = "Get Database Overview", description = "Returns statistics about database tables (rows, size, etc.)")
     public ResponseEntity<ApiResponse<List<DatabaseService.TableStatus>>> getDatabaseOverview() {
         return ResponseEntity.ok(ApiResponse.success(databaseService.getDatabaseOverview()));
+    }
+
+    @GetMapping("/table/{tableName}/data")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @Operation(summary = "Get Table Data", description = "Returns the first N rows of a specific table")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getTableData(
+            @PathVariable String tableName,
+            @RequestParam(defaultValue = "50") int limit) {
+        try {
+            return ResponseEntity.ok(ApiResponse.success(databaseService.getTableData(tableName, limit)));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Failed to fetch table data: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/logs")

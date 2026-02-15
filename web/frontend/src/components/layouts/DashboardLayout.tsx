@@ -235,7 +235,7 @@ const DashboardLayout: React.FC = () => {
                 payload: {
                     accessToken: token,
                     userId: user?.userId,
-                    apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+                    apiUrl: `${import.meta.env.VITE_API_URL}/api`
                 }
             });
         }

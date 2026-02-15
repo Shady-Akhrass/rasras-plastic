@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface TableStatus {
     name: string;
     rows: number;
@@ -61,6 +63,12 @@ const DatabaseSettingsPage: React.FC = () => {
     const [dbUser, setDbUser] = useState('');
     const [dbPassword, setDbPassword] = useState('');
 
+    // Table Data Viewer State
+    const [selectedTable, setSelectedTable] = useState<string | null>(null);
+    const [tableData, setTableData] = useState<any[]>([]);
+    const [loadingTableData, setLoadingTableData] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     const [overview, setOverview] = useState<TableStatus[]>([]);
     const [loadingStats, setLoadingStats] = useState(false);
 
@@ -110,7 +118,7 @@ const DatabaseSettingsPage: React.FC = () => {
 
         try {
             const token = localStorage.getItem('accessToken');
-            const response = await fetch('/api/settings/database/restore', {
+            const response = await fetch(`${API_BASE_URL}/api/settings/database/restore`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -143,7 +151,7 @@ const DatabaseSettingsPage: React.FC = () => {
         try {
             const token = localStorage.getItem('accessToken');
             const response = await fetch(
-                `/api/settings/database/backup?dbUser=${encodeURIComponent(dbUser)}&dbPassword=${encodeURIComponent(dbPassword)}`,
+                `${API_BASE_URL}/api/settings/database/backup?dbUser=${encodeURIComponent(dbUser)}&dbPassword=${encodeURIComponent(dbPassword)}`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
             if (response.ok) {
@@ -166,11 +174,35 @@ const DatabaseSettingsPage: React.FC = () => {
         }
     };
 
+    const fetchTableData = async (tableName: string) => {
+        setLoadingTableData(true);
+        setSelectedTable(tableName);
+        setIsModalOpen(true);
+        try {
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch(`${API_BASE_URL}/api/settings/database/table/${tableName}/data?limit=50`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setTableData(data.data);
+            } else {
+                showNotification('error', 'فشل في جلب بيانات الجدول');
+            }
+        } catch (error: any) {
+            showNotification('error', error.message);
+        } finally {
+            setLoadingTableData(false);
+        }
+    };
+
     const fetchOverview = async () => {
         setLoadingStats(true);
         try {
             const token = localStorage.getItem('accessToken');
-            const response = await fetch('/api/settings/database/overview', {
+            const response = await fetch(`${API_BASE_URL}/api/settings/database/overview`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
@@ -186,7 +218,7 @@ const DatabaseSettingsPage: React.FC = () => {
         setLoadingLogs(true);
         try {
             const token = localStorage.getItem('accessToken');
-            const response = await fetch('/api/settings/database/logs?lines=200', {
+            const response = await fetch(`${API_BASE_URL}/api/settings/database/logs?lines=200`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
@@ -411,13 +443,14 @@ const DatabaseSettingsPage: React.FC = () => {
                                         <th className="px-6 py-4 bg-slate-50">السجلات</th>
                                         <th className="px-6 py-4 bg-slate-50 min-w-[180px]">الحجم</th>
                                         <th className="px-6 py-4 bg-slate-50">الملاحظات</th>
+                                        <th className="px-6 py-4 bg-slate-50 text-left">الإجراءات</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {filteredTables.map((table) => {
                                         const sizePercent = ((table.dataSize + table.indexSize) / maxTableSize) * 100;
                                         return (
-                                            <tr key={table.name} className="hover:bg-slate-50/50 transition-colors">
+                                            <tr key={table.name} className="hover:bg-slate-50/50 transition-colors group">
                                                 <td className="px-6 py-4 font-bold text-slate-700">{table.name}</td>
                                                 <td className="px-6 py-4 text-slate-600 tabular-nums">{table.rows.toLocaleString()}</td>
                                                 <td className="px-6 py-4">
@@ -434,12 +467,21 @@ const DatabaseSettingsPage: React.FC = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-400 text-sm">{table.comment || '-'}</td>
+                                                <td className="px-6 py-4 text-left">
+                                                    <button
+                                                        onClick={() => fetchTableData(table.name)}
+                                                        className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-brand-primary transition-all"
+                                                        title="عرض البيانات"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                </td>
                                             </tr>
                                         );
                                     })}
                                     {filteredTables.length === 0 && !loadingStats && (
                                         <tr>
-                                            <td colSpan={4} className="px-6 py-14 text-center">
+                                            <td colSpan={5} className="px-6 py-14 text-center">
                                                 <Database className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                                                 <p className="text-slate-400 italic text-sm">
                                                     {tableSearch ? 'لا توجد جداول مطابقة' : 'جاري تحميل سكيما قاعدة البيانات...'}
@@ -685,6 +727,99 @@ const DatabaseSettingsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+            {/* ═══ Table Data Modal ═══ */}
+            {isModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden animate-zoomIn flex flex-col" style={{ maxHeight: '85vh' }}>
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 flex items-center justify-center">
+                                    <Layers className="w-6 h-6 text-brand-primary" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                                        بيانات الجدول: <span className="text-brand-primary font-mono">{selectedTable}</span>
+                                    </h2>
+                                    <p className="text-xs text-slate-500">عرض أول 50 سجلاً من الجدول المحدد</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                className="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-auto p-0 custom-scrollbar bg-slate-50">
+                            {loadingTableData ? (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4">
+                                    <RefreshCw className="w-10 h-10 text-brand-primary animate-spin" />
+                                    <span className="text-sm font-bold text-slate-500">جاري تحميل البيانات...</span>
+                                </div>
+                            ) : tableData.length > 0 ? (
+                                <div className="p-6">
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '500px' }}>
+                                            <table className="w-full text-left font-mono text-xs leading-relaxed border-collapse">
+                                                <thead className="bg-slate-950 text-slate-200 sticky top-0 z-10">
+                                                    <tr>
+                                                        <th className="px-4 py-3 border-b border-slate-800">#</th>
+                                                        {Object.keys(tableData[0]).map(key => (
+                                                            <th key={key} className="px-4 py-3 border-b border-slate-800 font-bold whitespace-nowrap">
+                                                                {key}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 bg-white">
+                                                    {tableData.map((row, idx) => (
+                                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="px-4 py-3 text-slate-400 border-r border-slate-100 bg-slate-50/50 sticky left-0 font-bold">
+                                                                {idx + 1}
+                                                            </td>
+                                                            {Object.values(row).map((val, i) => (
+                                                                <td key={i} className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                                                                    {val === null ? (
+                                                                        <span className="text-[10px] text-slate-300 italic">NULL</span>
+                                                                    ) : typeof val === 'object' ? (
+                                                                        JSON.stringify(val)
+                                                                    ) : (
+                                                                        String(val)
+                                                                    )}
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4">
+                                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
+                                        <Search className="w-8 h-8 text-slate-400" />
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-500">لا توجد بيانات متاحة في هذا الجدول</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-6 py-2 bg-brand-primary text-white rounded-xl font-bold hover:shadow-lg transition-all"
+                            >
+                                إغلاق
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

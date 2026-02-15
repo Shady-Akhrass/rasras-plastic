@@ -16,6 +16,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -69,7 +70,10 @@ public class DatabaseService {
         }
         log.info("Target Database: {}", dbName);
 
-        // 4. Clean Database (Drop and Recreate)
+        // 4. Clean SQL File (Remove DEFINER for VPS compatibility)
+        cleanSqlFile(targetPath);
+
+        // 5. Clean Database (Drop and Recreate)
         cleanDatabase(providedUser, providedPassword, dbName);
 
         log.info("Executing restore command: {} -u{} -p**** {}", mysqlPath, providedUser, dbName);
@@ -104,6 +108,21 @@ public class DatabaseService {
             log.error("Database restore failed with exit code: {}", exitCode);
             throw new RuntimeException("Restore failed (Exit Code: " + exitCode + ")\n" + output.toString());
         }
+    }
+
+    private void cleanSqlFile(Path path) throws IOException {
+        log.info("Cleaning SQL file to remove DEFINER clauses: {}", path);
+        String content = Files.readString(path);
+
+        // 1. Remove /*!50013 DEFINER=`root`@`localhost` */ style comments
+        content = content.replaceAll("(?i)/\\*\\!50013 DEFINER=[^\\*]+\\*/", "");
+
+        // 2. Remove DEFINER=`root`@`localhost` style clauses (for procedures/triggers)
+        content = content.replaceAll("(?i)DEFINER\\s*=\\s*`[^`]+`@`[^`]+`", "");
+        content = content.replaceAll("(?i)DEFINER\\s*=\\s*[^\\s]+@[^\\s]+", "");
+
+        Files.writeString(path, content);
+        log.info("SQL file cleaned successfully.");
     }
 
     private void cleanDatabase(String providedUser, String providedPassword, String dbName)
@@ -190,6 +209,16 @@ public class DatabaseService {
         byte[] data = Files.readAllBytes(backupFile);
         Files.delete(backupFile); // Clean up
         return data;
+    }
+
+    public List<Map<String, Object>> getTableData(String tableName, int limit) {
+        // Sanitize table name to prevent basic SQL injection (only allow alphanumeric
+        // and underscore)
+        if (!tableName.matches("^[a-zA-Z0-9_]+$")) {
+            throw new IllegalArgumentException("Invalid table name");
+        }
+        String sql = "SELECT * FROM " + tableName + " LIMIT ?";
+        return jdbcTemplate.queryForList(sql, limit);
     }
 
     private String getDatabaseName() {

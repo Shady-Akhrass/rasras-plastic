@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronRight, Save, Plus, Trash2, Receipt, Clock, CheckCircle2, Lock, Info, Calendar, DollarSign, Package, AlertCircle, FileText } from 'lucide-react';
+import { ChevronRight, Save, Plus, Trash2, Receipt, Clock, CheckCircle2, Lock, Info, Calendar, DollarSign, Package, FileText } from 'lucide-react';
 import { salesInvoiceService, type SalesInvoiceDto, type SalesInvoiceItemDto } from '../../services/salesInvoiceService';
 import { saleOrderService } from '../../services/saleOrderService';
 import customerService from '../../services/customerService';

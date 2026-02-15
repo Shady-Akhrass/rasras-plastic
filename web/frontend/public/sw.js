@@ -2,7 +2,7 @@
 let config = {
     accessToken: null,
     userId: null,
-    apiUrl: 'http://localhost:8080/api'
+    apiUrl: null
 };
 let pollInterval = null;
 
