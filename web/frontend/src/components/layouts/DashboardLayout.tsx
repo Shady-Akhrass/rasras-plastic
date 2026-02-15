@@ -7,7 +7,7 @@ import {
     DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart,
     ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine,
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity,
-    ClipboardCheck, GitCompare, Undo2
+    ClipboardCheck, GitCompare, Undo2, Database
 } from 'lucide-react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
@@ -576,6 +576,11 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/settings/notifications', icon: Bell,
                 label: 'الإشعارات', section: 'system', roles: ROLES_SYSTEM,
+                requiredPermission: 'SECTION_SYSTEM'
+            },
+            {
+                to: '/dashboard/settings/database', icon: Database,
+                label: 'قاعدة البيانات', section: 'system', roles: ROLES_SYSTEM,
                 requiredPermission: 'SECTION_SYSTEM'
             },
         ];

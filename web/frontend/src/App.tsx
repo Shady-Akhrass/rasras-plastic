@@ -36,6 +36,7 @@ import PeriodicInventoryReportPage from './pages/inventory/reports/PeriodicInven
 import VarianceReportPage from './pages/inventory/reports/VarianceReportPage';
 import DualInventoryValuationPage from './pages/inventory/reports/DualInventoryValuationPage';
 import SystemSettingsPage from './pages/settings/SystemSettingsPage';
+import DatabaseSettingsPage from './pages/settings/DatabaseSettingsPage';
 import PublicCompanyPage from './pages/public/PublicCompanyPage';
 import RolesPage from './pages/settings/RolesPage';
 import PermissionsPage from './pages/settings/PermissionsPage';
@@ -127,6 +128,7 @@ function App() {
             <Route path="company" element={<CompanyInfoPage />} />
             <Route path="units" element={<UnitsPage />} />
             <Route path="system" element={<SystemSettingsPage />} />
+            <Route path="database" element={<DatabaseSettingsPage />} />
             <Route path="users" element={<UserList />} />
             <Route path="roles" element={<RolesPage />} />
             <Route path="permissions" element={<PermissionsPage />} />

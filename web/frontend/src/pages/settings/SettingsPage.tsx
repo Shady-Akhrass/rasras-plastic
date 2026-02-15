@@ -349,13 +349,14 @@ const SettingsPage: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-min">
                         {[
-                            { icon: Database, label: 'النسخ الاحتياطي', desc: 'إدارة النسخ الاحتياطية' },
+                            { icon: Database, label: 'النسخ الاحتياطي', desc: 'إدارة النسخ الاحتياطية', path: '/dashboard/settings/database' },
                             { icon: Palette, label: 'المظهر', desc: 'تخصيص الألوان والثيم' },
                             { icon: Globe, label: 'اللغة والمنطقة', desc: 'إعدادات اللغة والتوقيت' },
                             { icon: CreditCard, label: 'الفوترة', desc: 'خطط الاشتراك والدفع' },
                         ].map((item) => (
                             <button
                                 key={item.label}
+                                onClick={() => item.path && navigate(item.path)}
                                 className="p-4 rounded-xl border border-slate-100 hover:border-brand-primary/30 
                                     hover:bg-brand-primary/5 transition-all duration-200 text-right group"
                             >
