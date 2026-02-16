@@ -17,7 +17,7 @@ import java.util.List;
 public class PurchaseRequisitionDto {
     private Integer id;
     private String prNumber;
-    private LocalDateTime prDate;
+    private LocalDate prDate;
 
     private Integer requestedByDeptId;
     private String requestedByDeptName; // UI helper

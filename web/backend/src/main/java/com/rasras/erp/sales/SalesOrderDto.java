@@ -17,7 +17,7 @@ import java.util.List;
 public class SalesOrderDto {
     private Integer id;
     private String soNumber;
-    private LocalDateTime soDate;
+    private LocalDate soDate;
     private Integer salesQuotationId;
     private String quotationNumber;
     private Integer customerId;
@@ -40,6 +40,7 @@ public class SalesOrderDto {
     private String paymentTerms;
     private Integer paymentTermDays;
     private String status;
+    private String approvalStatus;
     private String creditCheckStatus;
     private Integer creditCheckBy;
     private LocalDateTime creditCheckDate;

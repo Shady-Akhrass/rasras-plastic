@@ -3,6 +3,7 @@ package com.rasras.erp.sales;
 import com.rasras.erp.crm.Customer;
 import com.rasras.erp.crm.CustomerRepository;
 import com.rasras.erp.inventory.*;
+import com.rasras.erp.approval.ApprovalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class StockIssueNoteService {
     private final UnitRepository unitRepository;
     private final InventoryService inventoryService;
     private final StockBalanceRepository stockBalanceRepository;
+    private final ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<StockIssueNoteDto> getAll() {
@@ -57,12 +59,14 @@ public class StockIssueNoteService {
         SalesOrder so = salesOrderRepository.findById(salesOrderId)
                 .orElseThrow(() -> new RuntimeException("Sales Order not found"));
         List<StockAvailabilityWarningDto> warnings = new ArrayList<>();
-        if (so.getItems() == null) return warnings;
+        if (so.getItems() == null)
+            return warnings;
 
         for (SalesOrderItem soItem : so.getItems()) {
             BigDecimal remaining = soItem.getOrderedQty().subtract(
                     soItem.getDeliveredQty() != null ? soItem.getDeliveredQty() : BigDecimal.ZERO);
-            if (remaining.compareTo(BigDecimal.ZERO) <= 0) continue;
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0)
+                continue;
 
             Integer itemId = soItem.getItem().getId();
             Optional<StockBalance> balanceOpt = stockBalanceRepository.findByItemIdAndWarehouseId(itemId, warehouseId);
@@ -119,8 +123,10 @@ public class StockIssueNoteService {
         List<StockIssueNoteItem> items = new ArrayList<>();
         if (so.getItems() != null) {
             for (SalesOrderItem soItem : so.getItems()) {
-                BigDecimal remaining = soItem.getOrderedQty().subtract(soItem.getDeliveredQty() != null ? soItem.getDeliveredQty() : BigDecimal.ZERO);
-                if (remaining.compareTo(BigDecimal.ZERO) <= 0) continue;
+                BigDecimal remaining = soItem.getOrderedQty()
+                        .subtract(soItem.getDeliveredQty() != null ? soItem.getDeliveredQty() : BigDecimal.ZERO);
+                if (remaining.compareTo(BigDecimal.ZERO) <= 0)
+                    continue;
 
                 StockIssueNoteItem issueItem = StockIssueNoteItem.builder()
                         .stockIssueNote(note)
@@ -169,8 +175,9 @@ public class StockIssueNoteService {
         }
 
         StockIssueNote note = StockIssueNote.builder()
-                .issueNoteNumber(dto.getIssueNoteNumber() != null ? dto.getIssueNoteNumber() : generateIssueNoteNumber())
-                .issueDate(dto.getIssueDate() != null ? dto.getIssueDate() : LocalDateTime.now())
+                .issueNoteNumber(
+                        dto.getIssueNoteNumber() != null ? dto.getIssueNoteNumber() : generateIssueNoteNumber())
+                .issueDate(dto.getIssueDate() != null ? dto.getIssueDate().atStartOfDay() : LocalDateTime.now())
                 .issueType(issueType)
                 .referenceType(dto.getReferenceType())
                 .referenceId(dto.getReferenceId())
@@ -185,7 +192,7 @@ public class StockIssueNoteService {
                 .vehicleNo(dto.getVehicleNo())
                 .driverName(dto.getDriverName())
                 .status(dto.getStatus() != null ? dto.getStatus() : "Draft")
-                .deliveryDate(dto.getDeliveryDate())
+                .deliveryDate(dto.getDeliveryDate() != null ? dto.getDeliveryDate().atStartOfDay() : null)
                 .notes(dto.getNotes())
                 .build();
 
@@ -232,8 +239,13 @@ public class StockIssueNoteService {
         StockIssueNote note = issueNoteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Stock Issue Note not found"));
 
-        if (!"Draft".equals(note.getStatus())) {
-            throw new RuntimeException("Cannot update Issue Note that is not in Draft status");
+        if (!"Draft".equals(note.getStatus()) && !"Rejected".equals(note.getStatus())) {
+            throw new RuntimeException("Cannot update Issue Note that is not in Draft or Rejected status");
+        }
+
+        // Reset approval status if rejected and being edited
+        if ("Rejected".equals(note.getStatus())) {
+            note.setApprovalStatus("Pending");
         }
 
         note.setReceivedByName(dto.getReceivedByName());
@@ -241,7 +253,7 @@ public class StockIssueNoteService {
         note.setReceivedBySignature(dto.getReceivedBySignature());
         note.setVehicleNo(dto.getVehicleNo());
         note.setDriverName(dto.getDriverName());
-        note.setDeliveryDate(dto.getDeliveryDate());
+        note.setDeliveryDate(dto.getDeliveryDate() != null ? dto.getDeliveryDate().atStartOfDay() : null);
         note.setNotes(dto.getNotes());
         note.setUpdatedBy(dto.getUpdatedBy() != null ? dto.getUpdatedBy() : 1);
 
@@ -284,12 +296,37 @@ public class StockIssueNoteService {
     }
 
     @Transactional
+    public StockIssueNoteDto submitForApproval(Integer id) {
+        StockIssueNote note = issueNoteRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Stock Issue Note not found"));
+
+        if (!"Draft".equals(note.getStatus()) && !"Rejected".equals(note.getStatus())) {
+            throw new RuntimeException("Stock Issue Note must be in Draft or Rejected status to submit");
+        }
+
+        note.setStatus("Pending");
+        StockIssueNote saved = issueNoteRepository.save(note);
+
+        // Calculate total amount from items
+        BigDecimal totalAmount = saved.getItems() != null ? saved.getItems().stream()
+                .map(item -> item.getTotalCost() != null ? item.getTotalCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
+
+        // Initiate approval workflow
+        approvalService.initiateApproval("ISSUE_NOTE_APPROVAL", "StockIssueNote", saved.getId(),
+                saved.getIssueNoteNumber(), saved.getIssuedByUserId() != null ? saved.getIssuedByUserId() : 1,
+                totalAmount);
+
+        return mapToDto(saved);
+    }
+
+    @Transactional
     public void delete(Integer id) {
         StockIssueNote note = issueNoteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Stock Issue Note not found"));
 
-        if (!"Draft".equals(note.getStatus())) {
-            throw new RuntimeException("Cannot delete Issue Note that is not in Draft status");
+        if (!"Draft".equals(note.getStatus()) && !"Pending".equals(note.getStatus()) && !"Rejected".equals(note.getStatus())) {
+            throw new RuntimeException("Cannot delete Issue Note that is not in Draft, Pending, or Rejected status");
         }
         issueNoteRepository.delete(note);
     }
@@ -317,12 +354,12 @@ public class StockIssueNoteService {
             inventoryService.updateStock(
                     itemId, warehouseId, qty, "OUT",
                     "ISSUE", "StockIssueNote", note.getId(), note.getIssueNoteNumber(),
-                    unitCost, userId
-            );
+                    unitCost, userId);
 
             SalesOrderItem soItem = item.getSalesOrderItem();
             if (soItem != null) {
-                BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty() : BigDecimal.ZERO).add(qty);
+                BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty()
+                        : BigDecimal.ZERO).add(qty);
                 soItem.setDeliveredQty(newDelivered);
             }
         }
@@ -340,7 +377,7 @@ public class StockIssueNoteService {
         StockIssueNoteDto dto = StockIssueNoteDto.builder()
                 .id(note.getId())
                 .issueNoteNumber(note.getIssueNoteNumber())
-                .issueDate(note.getIssueDate())
+                .issueDate(note.getIssueDate() != null ? note.getIssueDate().toLocalDate() : null)
                 .issueType(note.getIssueType())
                 .referenceType(note.getReferenceType())
                 .referenceId(note.getReferenceId())
@@ -359,7 +396,8 @@ public class StockIssueNoteService {
                 .vehicleNo(note.getVehicleNo())
                 .driverName(note.getDriverName())
                 .status(note.getStatus())
-                .deliveryDate(note.getDeliveryDate())
+                .approvalStatus(note.getApprovalStatus())
+                .deliveryDate(note.getDeliveryDate() != null ? note.getDeliveryDate().toLocalDate() : null)
                 .notes(note.getNotes())
                 .createdAt(note.getCreatedAt())
                 .createdBy(note.getCreatedBy())

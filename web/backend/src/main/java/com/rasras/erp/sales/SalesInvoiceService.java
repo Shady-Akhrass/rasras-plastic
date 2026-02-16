@@ -6,6 +6,7 @@ import com.rasras.erp.inventory.Item;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitOfMeasure;
 import com.rasras.erp.inventory.UnitRepository;
+import com.rasras.erp.approval.ApprovalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class SalesInvoiceService {
     private final CustomerRepository customerRepository;
     private final ItemRepository itemRepository;
     private final UnitRepository unitRepository;
+    private final ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<SalesInvoiceDto> getAllInvoices() {
@@ -45,32 +47,35 @@ public class SalesInvoiceService {
     public SalesInvoiceDto createInvoice(SalesInvoiceDto dto) {
         SalesInvoice invoice = new SalesInvoice();
         invoice.setInvoiceNumber(generateInvoiceNumber());
-        invoice.setInvoiceDate(dto.getInvoiceDate() != null ? dto.getInvoiceDate() : LocalDateTime.now());
+        invoice.setInvoiceDate(
+                dto.getInvoiceDate() != null ? dto.getInvoiceDate().atStartOfDay() : LocalDateTime.now());
         invoice.setDueDate(dto.getDueDate() != null ? dto.getDueDate() : LocalDate.now().plusDays(30));
-        
+
         if (dto.getSalesOrderId() != null) {
             SalesOrder order = orderRepository.findById(dto.getSalesOrderId())
                     .orElse(null);
             invoice.setSalesOrder(order);
         }
-        
+
         invoice.setIssueNoteId(dto.getIssueNoteId());
-        
+
         Customer customer = customerRepository.findById(dto.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
         invoice.setCustomer(customer);
-        
+
         invoice.setSalesRepId(dto.getSalesRepId());
         invoice.setCurrency(dto.getCurrency() != null ? dto.getCurrency() : "EGP");
         invoice.setExchangeRate(dto.getExchangeRate() != null ? dto.getExchangeRate() : BigDecimal.ONE);
         invoice.setSubTotal(dto.getSubTotal() != null ? dto.getSubTotal() : BigDecimal.ZERO);
-        invoice.setDiscountPercentage(dto.getDiscountPercentage() != null ? dto.getDiscountPercentage() : BigDecimal.ZERO);
+        invoice.setDiscountPercentage(
+                dto.getDiscountPercentage() != null ? dto.getDiscountPercentage() : BigDecimal.ZERO);
         invoice.setDiscountAmount(dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO);
         invoice.setTaxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO);
         invoice.setShippingCost(dto.getShippingCost() != null ? dto.getShippingCost() : BigDecimal.ZERO);
         invoice.setTotalAmount(dto.getTotalAmount() != null ? dto.getTotalAmount() : BigDecimal.ZERO);
         invoice.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
         invoice.setStatus(dto.getStatus() != null ? dto.getStatus() : "Draft");
+        invoice.setApprovalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : "Pending");
         invoice.setPaymentTerms(dto.getPaymentTerms());
         invoice.setNotes(dto.getNotes());
         invoice.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy() : 1);
@@ -93,8 +98,13 @@ public class SalesInvoiceService {
         SalesInvoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Invoice not found"));
 
-        if (!"Draft".equals(invoice.getStatus())) {
-            throw new RuntimeException("Cannot edit invoice that is not in Draft status");
+        if (!"Draft".equals(invoice.getStatus()) && !"Rejected".equals(invoice.getStatus())) {
+            throw new RuntimeException("Cannot edit invoice that is not in Draft or Rejected status");
+        }
+
+        // Reset approval status if rejected and being edited
+        if ("Rejected".equals(invoice.getStatus())) {
+            invoice.setApprovalStatus("Pending");
         }
 
         invoice.setDueDate(dto.getDueDate());
@@ -125,14 +135,34 @@ public class SalesInvoiceService {
     }
 
     @Transactional
+    public SalesInvoiceDto submitForApproval(Integer id) {
+        SalesInvoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Sales Invoice not found"));
+
+        if (!"Draft".equals(invoice.getStatus()) && !"Rejected".equals(invoice.getStatus())) {
+            throw new RuntimeException("Sales Invoice must be in Draft or Rejected status to submit");
+        }
+
+        invoice.setStatus("Pending");
+        SalesInvoice saved = invoiceRepository.save(invoice);
+
+        // Initiate approval workflow
+        approvalService.initiateApproval("INVOICE_APPROVAL", "SalesInvoice", saved.getId(),
+                saved.getInvoiceNumber(), saved.getCreatedBy() != null ? saved.getCreatedBy() : 1,
+                saved.getTotalAmount());
+
+        return mapToDto(saved);
+    }
+
+    @Transactional
     public void deleteInvoice(Integer id) {
         SalesInvoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Invoice not found"));
-        
-        if (!"Draft".equals(invoice.getStatus())) {
-            throw new RuntimeException("Cannot delete invoice that is not in Draft status");
+
+        if (!"Draft".equals(invoice.getStatus()) && !"Pending".equals(invoice.getStatus()) && !"Rejected".equals(invoice.getStatus())) {
+            throw new RuntimeException("Cannot delete invoice that is not in Draft, Pending, or Rejected status");
         }
-        
+
         invoiceRepository.delete(invoice);
     }
 
@@ -144,7 +174,7 @@ public class SalesInvoiceService {
         SalesInvoiceDto dto = SalesInvoiceDto.builder()
                 .id(invoice.getId())
                 .invoiceNumber(invoice.getInvoiceNumber())
-                .invoiceDate(invoice.getInvoiceDate())
+                .invoiceDate(invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toLocalDate() : null)
                 .dueDate(invoice.getDueDate())
                 .issueNoteId(invoice.getIssueNoteId())
                 .customerId(invoice.getCustomer().getId())
@@ -162,6 +192,7 @@ public class SalesInvoiceService {
                 .paidAmount(invoice.getPaidAmount())
                 .remainingAmount(invoice.getTotalAmount().subtract(invoice.getPaidAmount()))
                 .status(invoice.getStatus())
+                .approvalStatus(invoice.getApprovalStatus())
                 .eInvoiceStatus(invoice.getEInvoiceStatus())
                 .eInvoiceUUID(invoice.getEInvoiceUUID())
                 .paymentTerms(invoice.getPaymentTerms())
@@ -216,7 +247,7 @@ public class SalesInvoiceService {
     private SalesInvoiceItem mapItemToEntity(SalesInvoiceItemDto dto, SalesInvoice invoice) {
         Item item = itemRepository.findById(dto.getItemId())
                 .orElseThrow(() -> new RuntimeException("Item not found"));
-        
+
         UnitOfMeasure unit = unitRepository.findById(dto.getUnitId())
                 .orElseThrow(() -> new RuntimeException("Unit not found"));
 

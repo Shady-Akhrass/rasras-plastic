@@ -47,4 +47,9 @@ public class SalesQuotationController {
     public ResponseEntity<ApiResponse<SalesQuotationDto>> convertToSalesOrder(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(quotationService.convertToSalesOrder(id)));
     }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ApiResponse<SalesQuotationDto>> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(quotationService.submitForApproval(id)));
+    }
 }

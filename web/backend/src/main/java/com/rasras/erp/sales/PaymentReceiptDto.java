@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,7 +17,7 @@ import java.util.List;
 public class PaymentReceiptDto {
     private Integer id;
     private String voucherNumber;
-    private LocalDateTime voucherDate;
+    private LocalDate voucherDate;
     private Integer customerId;
     private String customerNameAr;
     private String customerCode;
@@ -33,6 +34,7 @@ public class PaymentReceiptDto {
     private Integer referenceId;
     private String description;
     private String status;
+    private String approvalStatus;
     private Integer journalEntryId;
     private Integer receivedByUserId;
     private String receivedByUserName;
