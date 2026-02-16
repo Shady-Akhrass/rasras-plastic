@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Data
 @Builder
@@ -18,6 +18,6 @@ public class PaymentReceiptAllocationDto {
     private Integer salesInvoiceId;
     private String invoiceNumber;
     private BigDecimal allocatedAmount;
-    private LocalDateTime allocationDate;
+    private LocalDate allocationDate;
     private String notes;
 }

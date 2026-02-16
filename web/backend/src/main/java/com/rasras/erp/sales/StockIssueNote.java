@@ -81,6 +81,10 @@ public class StockIssueNote extends AuditableEntity {
     @Builder.Default
     private String status = "Draft";
 
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
+
     @Column(name = "DeliveryDate")
     private LocalDateTime deliveryDate;
 

@@ -45,7 +45,7 @@ const SalesSectionsPage: React.FC = () => {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 rounded-3xl p-8 text-white">
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white">
                 <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-80 h-80 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -65,10 +65,10 @@ const SalesSectionsPage: React.FC = () => {
 
             {/* دورة المبيعات */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-l from-blue-50 to-white">
+                <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-l from-slate-50 to-white">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-blue-100">
-                            <Tag className="w-5 h-5 text-blue-600" />
+                        <div className="p-2 rounded-xl bg-brand-primary/10">
+                            <Tag className="w-5 h-5 text-brand-primary" />
                         </div>
                         <div>
                             <h2 className="font-bold text-slate-900">دورة المبيعات</h2>

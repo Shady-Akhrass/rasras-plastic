@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, FileText, RefreshCw, Eye, Pencil, Trash2, Clock, CheckCircle2, Truck, Lock } from 'lucide-react';
+import { Plus, Search, FileText, RefreshCw, Eye, Pencil, Trash2, Clock, CheckCircle2, Truck, Lock, XCircle } from 'lucide-react';
 import { saleOrderService, type SaleOrderDto } from '../../services/saleOrderService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -9,18 +9,56 @@ import { toast } from 'react-hot-toast';
 
 // Status Badge Component
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
-        'Draft': { icon: FileText, className: 'bg-slate-50 text-slate-700 border-slate-200', label: 'مسودة' },
-        'Pending': { icon: Clock, className: 'bg-amber-50 text-amber-700 border-amber-200', label: 'قيد الاعتماد' },
-        'Confirmed': { icon: CheckCircle2, className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'مؤكد' },
-        'Shipped': { icon: Truck, className: 'bg-blue-50 text-blue-700 border-blue-200', label: 'تم الشحن' },
-        'Closed': { icon: Lock, className: 'bg-slate-100 text-slate-700 border-slate-300', label: 'مغلق' }
+    const config: Record<string, {
+        label: string;
+        bg: string;
+        text: string;
+        border: string;
+        icon: React.ElementType;
+    }> = {
+        'Draft': {
+            label: 'مسودة',
+            bg: 'bg-slate-50',
+            text: 'text-slate-700',
+            border: 'border-slate-200',
+            icon: FileText
+        },
+        'Pending': {
+            label: 'قيد الاعتماد',
+            bg: 'bg-amber-50',
+            text: 'text-amber-700',
+            border: 'border-amber-200',
+            icon: Clock
+        },
+        'Confirmed': {
+            label: 'مؤكد',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-700',
+            border: 'border-emerald-200',
+            icon: CheckCircle2
+        },
+        'Shipped': {
+            label: 'تم الشحن',
+            bg: 'bg-blue-50',
+            text: 'text-blue-700',
+            border: 'border-blue-200',
+            icon: Truck
+        },
+        'Closed': {
+            label: 'مغلق',
+            bg: 'bg-slate-100',
+            text: 'text-slate-700',
+            border: 'border-slate-300',
+            icon: Lock
+        }
     };
-    const { icon: Icon, className, label } = config[status] || config['Draft'];
+
+    const c = config[status] || config['Draft'];
+
     return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
-            <Icon className="w-3.5 h-3.5" />
-            {label}
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${c.bg} ${c.text} ${c.border}`}>
+            <c.icon className="w-3.5 h-3.5" />
+            {c.label}
         </span>
     );
 };
@@ -51,6 +89,11 @@ const SaleOrderListPage: React.FC = () => {
     };
 
     const handleDeleteClick = (order: SaleOrderDto) => {
+        // Only allow deletion for Draft, Pending, or Rejected statuses
+        if (order.status !== 'Draft' && order.status !== 'Pending' && order.status !== 'Rejected') {
+            toast.error('لا يمكن حذف هذا الأمر في حالته الحالية');
+            return;
+        }
         setOrderToDelete(order);
         setIsDeleteModalOpen(true);
     };
@@ -92,29 +135,41 @@ const SaleOrderListPage: React.FC = () => {
     }, [filtered, currentPage, pageSize]);
 
     return (
-        <div className="space-y-6">
-            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-8 text-white">
-                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-6 pb-20" dir="rtl">
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex items-center justify-between">
                     <div className="flex items-center gap-5">
-                        <div className="p-4 bg-white/10 rounded-2xl"><FileText className="w-10 h-10" /></div>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                            <FileText className="w-10 h-10" />
+                        </div>
                         <div>
-                            <h1 className="text-2xl font-bold mb-1">أوامر البيع</h1>
-                            <p className="text-white/80">أمر بيع (SO) من عرض السعر، عميل، بنود، تاريخ تسليم</p>
+                            <h1 className="text-3xl font-bold mb-2">أوامر البيع</h1>
+                            <p className="text-white/80 text-lg">إدارة أوامر البيع ومتابعة حالة الطلبات</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button onClick={fetchList} disabled={loading} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl">
+                        <button onClick={fetchList} disabled={loading} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                         <button onClick={() => navigate('/dashboard/sales/orders/new')}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold">
-                            <Plus className="w-5 h-5" />أمر بيع جديد
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all">
+                            <Plus className="w-5 h-5" />
+                            <span>أمر بيع جديد</span>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            {/* Table Card */}
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden">
                 <div className="p-4 border-b border-slate-100">
                     <div className="relative max-w-md">
                         <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -126,7 +181,7 @@ const SaleOrderListPage: React.FC = () => {
                     <table className="w-full">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">رقم الأمر</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">رقم الأمر / الحالة</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">التاريخ</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">العميل</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">تاريخ التسليم</th>
@@ -159,7 +214,21 @@ const SaleOrderListPage: React.FC = () => {
                                     <tr key={o.id} className="border-b border-slate-100 hover:bg-emerald-50/50">
                                         <td className="px-6 py-4">
                                             <div className="font-mono font-bold text-emerald-700">{o.soNumber || '—'}</div>
-                                            <div className="mt-1"><StatusBadge status={o.status || 'Draft'} /></div>
+                                            <div className="mt-1 flex flex-col gap-1">
+                                                <StatusBadge status={o.status || 'Draft'} />
+                                                {o.approvalStatus && (
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${
+                                                        o.approvalStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                                        o.approvalStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                        o.approvalStatus === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                        'bg-slate-50 text-slate-500 border-slate-200'
+                                                    }`}>
+                                                        {o.approvalStatus === 'Approved' ? 'معتمد' :
+                                                            o.approvalStatus === 'Rejected' ? 'مرفوض' :
+                                                            o.approvalStatus === 'Pending' ? 'قيد الاعتماد' : o.approvalStatus}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-slate-600">{o.soDate ? formatDate(o.soDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{o.customerNameAr || '—'}</td>
@@ -168,10 +237,12 @@ const SaleOrderListPage: React.FC = () => {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <button onClick={() => navigate(`/dashboard/sales/orders/${o.id}?mode=view`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg" title="عرض التفاصيل"><Eye className="w-5 h-5" /></button>
-                                                {(!o.status || o.status === 'Draft') && (
+                                                {(o.status === 'Draft' || o.status === 'Rejected') && (
                                                     <>
                                                         <button onClick={() => navigate(`/dashboard/sales/orders/${o.id}`)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg" title="تعديل"><Pencil className="w-4 h-4" /></button>
-                                                        <button onClick={() => handleDeleteClick(o)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                                                        {(o.status === 'Draft' || o.status === 'Pending' || o.status === 'Rejected') && (
+                                                            <button onClick={() => handleDeleteClick(o)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                                                        )}
                                                     </>
                                                 )}
                                             </div>

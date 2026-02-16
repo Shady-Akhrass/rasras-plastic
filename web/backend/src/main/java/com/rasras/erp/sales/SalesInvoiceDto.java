@@ -17,7 +17,7 @@ import java.util.List;
 public class SalesInvoiceDto {
     private Integer id;
     private String invoiceNumber;
-    private LocalDateTime invoiceDate;
+    private LocalDate invoiceDate;
     private LocalDate dueDate;
     private Integer salesOrderId;
     private String soNumber;
@@ -38,6 +38,7 @@ public class SalesInvoiceDto {
     private BigDecimal paidAmount;
     private BigDecimal remainingAmount;
     private String status;
+    private String approvalStatus;
     private String eInvoiceStatus;
     private String eInvoiceUUID;
     private String paymentTerms;

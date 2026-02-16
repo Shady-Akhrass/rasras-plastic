@@ -2,6 +2,7 @@ package com.rasras.erp.sales;
 
 import com.rasras.erp.crm.Customer;
 import com.rasras.erp.crm.CustomerRepository;
+import com.rasras.erp.approval.ApprovalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ public class DeliveryOrderService {
     private final DeliveryOrderRepository deliveryOrderRepository;
     private final StockIssueNoteRepository issueNoteRepository;
     private final CustomerRepository customerRepository;
+    private final ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<DeliveryOrderDto> getAll() {
@@ -53,7 +55,8 @@ public class DeliveryOrderService {
                 .orderDate(LocalDateTime.now())
                 .stockIssueNote(issueNote)
                 .customer(issueNote.getCustomer())
-                .deliveryAddress(issueNote.getSalesOrder() != null ? issueNote.getSalesOrder().getShippingAddress() : null)
+                .deliveryAddress(
+                        issueNote.getSalesOrder() != null ? issueNote.getSalesOrder().getShippingAddress() : null)
                 .driverName(issueNote.getDriverName())
                 .vehicleId(null)
                 .status("Pending")
@@ -71,8 +74,9 @@ public class DeliveryOrderService {
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
 
         DeliveryOrder order = DeliveryOrder.builder()
-                .deliveryOrderNumber(dto.getDeliveryOrderNumber() != null ? dto.getDeliveryOrderNumber() : generateDeliveryOrderNumber())
-                .orderDate(dto.getOrderDate() != null ? dto.getOrderDate() : LocalDateTime.now())
+                .deliveryOrderNumber(dto.getDeliveryOrderNumber() != null ? dto.getDeliveryOrderNumber()
+                        : generateDeliveryOrderNumber())
+                .orderDate(dto.getOrderDate() != null ? dto.getOrderDate().atStartOfDay() : LocalDateTime.now())
                 .stockIssueNote(issueNote)
                 .customer(customer)
                 .deliveryAddress(dto.getDeliveryAddress())
@@ -84,10 +88,12 @@ public class DeliveryOrderService {
                 .driverPhone(dto.getDriverPhone())
                 .scheduledDate(dto.getScheduledDate())
                 .scheduledTime(dto.getScheduledTime())
-                .actualDeliveryDate(dto.getActualDeliveryDate())
+                .actualDeliveryDate(
+                        dto.getActualDeliveryDate() != null ? dto.getActualDeliveryDate().atStartOfDay() : null)
                 .deliveryCost(dto.getDeliveryCost())
                 .isCostOnCustomer(dto.getIsCostOnCustomer() != null ? dto.getIsCostOnCustomer() : false)
                 .status(dto.getStatus() != null ? dto.getStatus() : "Pending")
+                .approvalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : "Pending")
                 .receiverName(dto.getReceiverName())
                 .receiverPhone(dto.getReceiverPhone())
                 .receiverSignature(dto.getReceiverSignature())
@@ -104,6 +110,15 @@ public class DeliveryOrderService {
         DeliveryOrder order = deliveryOrderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Delivery Order not found"));
 
+        if (!"Draft".equals(order.getStatus()) && !"Pending".equals(order.getStatus()) && !"Rejected".equals(order.getStatus())) {
+            throw new RuntimeException("Cannot edit delivery order that is not in Draft, Pending, or Rejected status");
+        }
+
+        // Reset approval status if rejected and being edited
+        if ("Rejected".equals(order.getStatus())) {
+            order.setApprovalStatus("Pending");
+        }
+
         order.setDeliveryAddress(dto.getDeliveryAddress());
         order.setZoneId(dto.getZoneId());
         order.setDeliveryType(dto.getDeliveryType());
@@ -113,7 +128,8 @@ public class DeliveryOrderService {
         order.setDriverPhone(dto.getDriverPhone());
         order.setScheduledDate(dto.getScheduledDate());
         order.setScheduledTime(dto.getScheduledTime());
-        order.setActualDeliveryDate(dto.getActualDeliveryDate());
+        order.setActualDeliveryDate(
+                dto.getActualDeliveryDate() != null ? dto.getActualDeliveryDate().atStartOfDay() : null);
         order.setDeliveryCost(dto.getDeliveryCost());
         order.setIsCostOnCustomer(dto.getIsCostOnCustomer());
         order.setStatus(dto.getStatus());
@@ -128,11 +144,31 @@ public class DeliveryOrderService {
     }
 
     @Transactional
+    public DeliveryOrderDto submitForApproval(Integer id) {
+        DeliveryOrder order = deliveryOrderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Delivery Order not found"));
+
+        if (!"Draft".equals(order.getStatus()) && !"Rejected".equals(order.getStatus())) {
+            throw new RuntimeException("Delivery Order must be in Draft or Rejected status to submit");
+        }
+
+        order.setStatus("Pending");
+        DeliveryOrder saved = deliveryOrderRepository.save(order);
+
+        // Initiate approval workflow
+        approvalService.initiateApproval("DELIVERY_APPROVAL", "DeliveryOrder", saved.getId(),
+                saved.getDeliveryOrderNumber(), saved.getCreatedBy() != null ? saved.getCreatedBy() : 1,
+                saved.getDeliveryCost() != null ? saved.getDeliveryCost() : java.math.BigDecimal.ZERO);
+
+        return mapToDto(saved);
+    }
+
+    @Transactional
     public void delete(Integer id) {
         DeliveryOrder order = deliveryOrderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Delivery Order not found"));
-        if ("Delivered".equals(order.getStatus())) {
-            throw new RuntimeException("Cannot delete a delivered order");
+        if (!"Draft".equals(order.getStatus()) && !"Pending".equals(order.getStatus()) && !"Rejected".equals(order.getStatus())) {
+            throw new RuntimeException("Cannot delete delivery order that is not in Draft, Pending, or Rejected status");
         }
         deliveryOrderRepository.delete(order);
     }
@@ -145,7 +181,7 @@ public class DeliveryOrderService {
         return DeliveryOrderDto.builder()
                 .id(order.getId())
                 .deliveryOrderNumber(order.getDeliveryOrderNumber())
-                .orderDate(order.getOrderDate())
+                .orderDate(order.getOrderDate() != null ? order.getOrderDate().toLocalDate() : null)
                 .issueNoteId(order.getStockIssueNote().getId())
                 .issueNoteNumber(order.getStockIssueNote().getIssueNoteNumber())
                 .customerId(order.getCustomer().getId())
@@ -160,10 +196,12 @@ public class DeliveryOrderService {
                 .driverPhone(order.getDriverPhone())
                 .scheduledDate(order.getScheduledDate())
                 .scheduledTime(order.getScheduledTime())
-                .actualDeliveryDate(order.getActualDeliveryDate())
+                .actualDeliveryDate(
+                        order.getActualDeliveryDate() != null ? order.getActualDeliveryDate().toLocalDate() : null)
                 .deliveryCost(order.getDeliveryCost())
                 .isCostOnCustomer(order.getIsCostOnCustomer())
                 .status(order.getStatus())
+                .approvalStatus(order.getApprovalStatus())
                 .receiverName(order.getReceiverName())
                 .receiverPhone(order.getReceiverPhone())
                 .receiverSignature(order.getReceiverSignature())

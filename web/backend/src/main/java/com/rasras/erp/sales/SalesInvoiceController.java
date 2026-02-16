@@ -42,4 +42,9 @@ public class SalesInvoiceController {
         invoiceService.deleteInvoice(id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ApiResponse<SalesInvoiceDto>> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(invoiceService.submitForApproval(id)));
+    }
 }

@@ -74,7 +74,7 @@ public class PurchaseOrderService {
 
                 PurchaseOrder po = PurchaseOrder.builder()
                                 .poNumber(generatePONumber())
-                                .poDate(LocalDateTime.now())
+                                .poDate(dto.getPoDate() != null ? dto.getPoDate().atStartOfDay() : LocalDateTime.now())
                                 .prId(dto.getPrId())
                                 .quotationId(dto.getQuotationId())
                                 .supplier(supplier)
@@ -231,7 +231,7 @@ public class PurchaseOrderService {
                 return PurchaseOrderDto.builder()
                                 .id(entity.getId())
                                 .poNumber(entity.getPoNumber())
-                                .poDate(entity.getPoDate())
+                                .poDate(entity.getPoDate() != null ? entity.getPoDate().toLocalDate() : null)
                                 .prId(entity.getPrId())
                                 .quotationId(entity.getQuotationId())
                                 .supplierId(entity.getSupplier().getId())

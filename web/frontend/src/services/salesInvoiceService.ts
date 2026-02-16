@@ -52,6 +52,7 @@ export interface SalesInvoiceDto {
     paidAmount?: number;
     remainingAmount?: number;
     status?: string;
+    approvalStatus?: string;
     eInvoiceStatus?: string;
     eInvoiceUUID?: string;
     paymentTerms?: string;
@@ -228,6 +229,14 @@ export const salesInvoiceService = {
             return true;
         } catch {
             return false;
+        }
+    },
+    submitForApproval: async (id: number): Promise<SalesInvoiceDto | null> => {
+        try {
+            const res = await apiClient.post<{ data?: SalesInvoiceDto }>(`${_api}/${id}/submit`);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
         }
     },
     // Legacy methods that return legacy format

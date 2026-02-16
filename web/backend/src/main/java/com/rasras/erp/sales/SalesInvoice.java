@@ -86,6 +86,10 @@ public class SalesInvoice extends AuditableEntity {
     @Builder.Default
     private String status = "Draft";
 
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
+
     @Column(name = "EInvoiceStatus", length = 20)
     private String eInvoiceStatus;
 

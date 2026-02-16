@@ -42,4 +42,9 @@ public class PaymentReceiptController {
         receiptService.deleteReceipt(id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ApiResponse<PaymentReceiptDto>> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(receiptService.submitForApproval(id)));
+    }
 }

@@ -59,6 +59,8 @@ import SupplierOutstandingPage from './pages/procurement/SupplierOutstandingPage
 import SupplierItemsPage from './pages/procurement/SupplierItemsPage';
 import SupplierItemFormPage from './pages/procurement/SupplierItemFormPage';
 import SalesSectionsPage from './pages/sales/SalesSectionsPage';
+import CustomerRequestListPage from './pages/sales/CustomerRequestListPage';
+import CustomerRequestFormPage from './pages/sales/CustomerRequestFormPage';
 import QuotationListPage from './pages/sales/QuotationListPage';
 import QuotationFormPage from './pages/sales/QuotationFormPage';
 import SaleOrderListPage from './pages/sales/SaleOrderListPage';
@@ -72,6 +74,8 @@ import SalesInvoiceFormPage from './pages/sales/SalesInvoiceFormPage';
 import ReceiptListPage from './pages/sales/ReceiptListPage';
 import ReceiptFormPage from './pages/sales/ReceiptFormPage';
 import SalesReportsPage from './pages/sales/SalesReportsPage';
+import PurchaseRequisitionsListPage from './pages/sales/PurchaseRequisitionsListPage';
+import SalesPurchaseRequisitionFormPage from './pages/sales/PurchaseRequisitionFormPage';
 import { Toaster } from 'react-hot-toast';
 import StockLevelsPage from './pages/inventory/StockLevelsPage';
 import QualityInspectionPage from './pages/inventory/QualityInspectionPage';
@@ -185,10 +189,20 @@ function App() {
           <Route path="sales">
             <Route index element={<Navigate to="sections" replace />} />
             <Route path="sections" element={<SalesSectionsPage />} />
+            <Route path="purchase-requisitions">
+              <Route index element={<PurchaseRequisitionsListPage />} />
+              <Route path="new" element={<SalesPurchaseRequisitionFormPage />} />
+              <Route path=":id" element={<SalesPurchaseRequisitionFormPage />} />
+            </Route>
             <Route path="quotations">
               <Route index element={<QuotationListPage />} />
               <Route path="new" element={<QuotationFormPage />} />
               <Route path=":id" element={<QuotationFormPage />} />
+            </Route>
+            <Route path="customer-requests">
+              <Route index element={<CustomerRequestListPage />} />
+              <Route path="new" element={<CustomerRequestFormPage />} />
+              <Route path=":id" element={<CustomerRequestFormPage />} />
             </Route>
             <Route path="orders">
               <Route index element={<SaleOrderListPage />} />

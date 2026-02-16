@@ -38,6 +38,7 @@ export interface DeliveryOrderDto {
     deliveryCost?: number;
     isCostOnCustomer?: boolean;
     status?: string;
+    approvalStatus?: string;
     receiverName?: string;
     receiverPhone?: string;
     receiverSignature?: string;
@@ -120,6 +121,14 @@ export const deliveryOrderService = {
             return true;
         } catch {
             return false;
+        }
+    },
+    submitForApproval: async (id: number): Promise<DeliveryOrderDto | null> => {
+        try {
+            const res = await apiClient.post<{ data?: DeliveryOrderDto }>(`${_api}/${id}/submit`);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
         }
     },
 };
