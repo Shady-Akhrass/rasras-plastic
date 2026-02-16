@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -17,7 +16,7 @@ import java.util.List;
 public class PurchaseOrderDto {
     private Integer id;
     private String poNumber;
-    private LocalDateTime poDate;
+    private LocalDate poDate;
     private Integer prId;
     private Integer quotationId;
     private Integer supplierId;

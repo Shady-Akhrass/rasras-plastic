@@ -76,6 +76,10 @@ public class PaymentReceipt extends AuditableEntity {
     @Builder.Default
     private String status = "Draft";
 
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
+
     @Column(name = "JournalEntryID")
     private Integer journalEntryId;
 

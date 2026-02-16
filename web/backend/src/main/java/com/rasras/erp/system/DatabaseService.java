@@ -242,6 +242,82 @@ public class DatabaseService {
         });
     }
 
+    private static final String ERROR_LOG_FILE = "db_ops_errors.log";
+
+    public void logError(String context, Exception e) {
+        String timestamp = java.time.LocalDateTime.now().toString();
+        String errorMessage = String.format("[%s] ERROR in %s: %s\n", timestamp, context, e.getMessage());
+        try {
+            Files.writeString(Paths.get(ERROR_LOG_FILE), errorMessage, java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException ioException) {
+            log.error("Failed to write to error log file", ioException);
+        }
+    }
+
+    public List<String> getErrorLogs() {
+        try {
+            Path path = Paths.get(ERROR_LOG_FILE);
+            if (!Files.exists(path)) {
+                return new ArrayList<>();
+            }
+            return Files.readAllLines(path);
+        } catch (IOException e) {
+            log.error("Failed to read error log file", e);
+            return List.of("Failed to read logs: " + e.getMessage());
+        }
+    }
+
+    // Execute raw SQL script
+    public String executeSqlScript(String sql) {
+        try {
+            String trimmedSql = sql.trim();
+            if (trimmedSql.toUpperCase().startsWith("SELECT") || trimmedSql.toUpperCase().startsWith("SHOW")
+                    || trimmedSql.toUpperCase().startsWith("DESCRIBE")) {
+                List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
+                if (result.isEmpty())
+                    return "Query returned 0 rows.";
+
+                // Format as table-like string or JSON
+                StringBuilder sb = new StringBuilder();
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    mapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+                    return mapper.writeValueAsString(result);
+                } catch (Exception e) {
+                    return result.toString();
+                }
+            } else {
+                jdbcTemplate.execute(sql);
+                return "Script executed successfully.";
+            }
+        } catch (Exception e) {
+            logError("executeSqlScript", e);
+            throw e;
+        }
+    }
+
+    public void clearTables(List<String> tables, boolean disableFkChecks) {
+        try {
+            if (disableFkChecks) {
+                jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
+            }
+            for (String table : tables) {
+                if (!table.matches("^[a-zA-Z0-9_]+$")) {
+                    throw new IllegalArgumentException("Invalid table name: " + table);
+                }
+                jdbcTemplate.execute("TRUNCATE TABLE " + table);
+            }
+        } catch (Exception e) {
+            logError("clearTables", e);
+            throw e;
+        } finally {
+            if (disableFkChecks) {
+                jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+            }
+        }
+    }
+
     @lombok.Data
     public static class TableStatus {
         private String name;

@@ -55,4 +55,9 @@ public class DeliveryOrderController {
         deliveryOrderService.delete(id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ApiResponse<DeliveryOrderDto>> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(deliveryOrderService.submitForApproval(id)));
+    }
 }

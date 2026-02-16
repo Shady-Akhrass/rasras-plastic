@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronRight, Save, Plus, Trash2, FileText, Lock, Info, Calendar, DollarSign, Package, AlertCircle } from 'lucide-react';
+import {
+    Save,
+    ArrowRight,
+    Plus,
+    Trash2,
+    FileText,
+    Lock,
+    Info,
+    Calendar,
+    DollarSign,
+    Package,
+    AlertCircle,
+    Send,
+    CheckCircle2,
+    XCircle,
+    Clock,
+    RefreshCw,
+    Eye
+} from 'lucide-react';
 import { saleOrderService, type SaleOrderDto, type SaleOrderItemDto } from '../../services/saleOrderService';
 import { salesQuotationService } from '../../services/salesQuotationService';
 import customerService from '../../services/customerService';
 import { itemService } from '../../services/itemService';
+import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
 
@@ -19,9 +38,11 @@ const SaleOrderFormPage: React.FC = () => {
 
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [processing, setProcessing] = useState(false);
     const [customers, setCustomers] = useState<any[]>([]);
     const [items, setItems] = useState<any[]>([]);
     const [quotations, setQuotations] = useState<any[]>([]);
+    const approvalId = searchParams.get('approvalId');
 
     const [form, setForm] = useState<SaleOrderDto>({
         soDate: new Date().toISOString().split('T')[0],
@@ -38,7 +59,7 @@ const SaleOrderFormPage: React.FC = () => {
         items: []
     });
 
-    const isReadOnly = isView || (isEdit && form.status !== 'Draft');
+    const isReadOnly = isView || (isEdit && form.status !== 'Draft' && form.status !== 'Rejected');
 
     useEffect(() => {
         (async () => {
@@ -124,6 +145,7 @@ const SaleOrderFormPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isReadOnly) return;
+        if (form.approvalStatus === 'Approved') return;
         if (!form.customerId) { toast.error('اختر العميل'); return; }
         if (form.items.length === 0) { toast.error('أضف بنداً واحداً على الأقل'); return; }
         setSaving(true);
@@ -141,6 +163,53 @@ const SaleOrderFormPage: React.FC = () => {
             const msg = err?.response?.status === 404 ? 'واجهة أوامر البيع غير مفعّلة في الخادم بعد' : (err?.response?.data?.message || 'فشل الحفظ');
             toast.error(msg);
         } finally { setSaving(false); }
+    };
+
+    const handleSubmitForApproval = async () => {
+        if (!id || isNew) {
+            toast.error('يجب حفظ الأمر أولاً قبل الإرسال للاعتماد');
+            return;
+        }
+        if (!form.customerId) {
+            toast.error('اختر العميل');
+            return;
+        }
+        if (form.items.length === 0) {
+            toast.error('أضف بنداً واحداً على الأقل');
+            return;
+        }
+        if (form.status !== 'Draft' && form.status !== 'Rejected') {
+            toast.error('يمكن إرسال المسودات أو المرفوضة فقط للاعتماد');
+            return;
+        }
+        try {
+            setProcessing(true);
+            const updated = await saleOrderService.submitForApproval(parseInt(id));
+            if (updated) {
+                setForm(updated);
+                toast.success('تم إرسال الأمر للاعتماد بنجاح');
+                navigate('/dashboard/sales/orders');
+            }
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'فشل إرسال الأمر للاعتماد');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/sales/approvals');
+        } catch {
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
+        }
     };
 
     const inputClass = (extra = '') =>
@@ -161,14 +230,19 @@ const SaleOrderFormPage: React.FC = () => {
                 .animate-slide-in { animation: slideInRight 0.4s ease-out; }
             `}</style>
 
-            {/* ═══ HEADER ═══ */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-600/95 to-emerald-600/90 rounded-3xl p-8 text-white shadow-2xl">
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
-                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex items-center justify-between">
                     <div className="flex items-center gap-5">
                         <button onClick={() => navigate(-1)} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
-                            <ChevronRight className="w-5 h-5" />
+                            <ArrowRight className="w-5 h-5" />
                         </button>
                         <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
                             <FileText className="w-10 h-10" />
@@ -177,16 +251,61 @@ const SaleOrderFormPage: React.FC = () => {
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-3xl font-bold">{isNew ? 'أمر بيع جديد' : `أمر بيع: ${form.soNumber || ''}`}</h1>
                                 {isReadOnly && <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20"><Lock className="w-3 h-3" /> للعرض فقط</span>}
+                                {form.approvalStatus && (
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${
+                                        form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
+                                        form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
+                                        form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
+                                        'bg-slate-500/20 text-white border-slate-300/30'
+                                    }`}>
+                                        {form.approvalStatus === 'Approved' && <CheckCircle2 className="w-3 h-3" />}
+                                        {form.approvalStatus === 'Rejected' && <XCircle className="w-3 h-3" />}
+                                        {form.approvalStatus === 'Pending' && <Clock className="w-3 h-3" />}
+                                        {form.approvalStatus === 'Approved' ? 'معتمد' : form.approvalStatus === 'Rejected' ? 'مرفوض' : form.approvalStatus === 'Pending' ? 'قيد الانتظار' : form.approvalStatus}
+                                    </span>
+                                )}
                             </div>
                             <p className="text-white/80 text-lg">إدارة أوامر البيع ومتابعة حالة الطلبات</p>
                         </div>
                     </div>
                     <div className="flex gap-3 flex-wrap">
+                        {isView && approvalId && (
+                            <>
+                                <button
+                                    onClick={() => handleApprovalAction('Approved')}
+                                    disabled={processing}
+                                    className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                >
+                                    {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                    <span>اعتماد</span>
+                                </button>
+                                <button
+                                    onClick={() => handleApprovalAction('Rejected')}
+                                    disabled={processing}
+                                    className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                >
+                                    {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                    <span>رفض</span>
+                                </button>
+                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                    <Eye className="w-5 h-5" />
+                                    <span className="font-bold">عرض من صندوق الاعتماد</span>
+                                </div>
+                            </>
+                        )}
                         {!isReadOnly && (
-                            <button onClick={handleSubmit} disabled={saving} className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-700 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
-                                <Save className="w-5 h-5" />
-                                <span>{saving ? 'جاري الحفظ...' : 'حفظ'}</span>
-                            </button>
+                            <>
+                                <button onClick={handleSubmit} disabled={saving} className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
+                                    <Save className="w-5 h-5" />
+                                    <span>{saving ? 'جاري الحفظ...' : 'حفظ'}</span>
+                                </button>
+                                {isEdit && (form.status === 'Draft' || form.status === 'Rejected') && (
+                                    <button onClick={handleSubmitForApproval} disabled={processing || saving} className="flex items-center gap-3 px-8 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                        <span>إرسال للاعتماد</span>
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
@@ -194,17 +313,25 @@ const SaleOrderFormPage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    {/* ═══ BASIC INFORMATION ═══ */}
+                    {/* Basic Information Card */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center gap-3">
-                                <div className="p-3 bg-emerald-100/50 rounded-xl"><Info className="w-5 h-5 text-emerald-600" /></div>
-                                <div><h3 className="font-bold text-slate-800 text-lg">البيانات الأساسية</h3><p className="text-slate-500 text-sm">تفاصيل العميل والأمر</p></div>
+                                <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                    <Info className="w-5 h-5 text-brand-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">البيانات الأساسية</h3>
+                                    <p className="text-slate-500 text-sm">تفاصيل العميل والأمر</p>
+                                </div>
                             </div>
                         </div>
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">العميل *</label>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <FileText className="w-4 h-4 text-brand-primary" />
+                                    العميل <span className="text-rose-500">*</span>
+                                </label>
                                 <select disabled={isReadOnly} value={form.customerId || ''} onChange={(e) => setForm((f) => ({ ...f, customerId: parseInt(e.target.value) || 0 }))} className={inputClass()}>
                                     <option value="">اختر العميل...</option>
                                     {customers.map((c) => <option key={c.id} value={c.id}>{c.customerNameAr}</option>)}
@@ -218,15 +345,21 @@ const SaleOrderFormPage: React.FC = () => {
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600"><Calendar className="w-4 h-4 text-emerald-600" /> تاريخ الأمر *</label>
-                                <input disabled={isReadOnly} type="date" value={form.soDate || ''} onChange={(e) => setForm((f) => ({ ...f, soDate: e.target.value }))} className={inputClass()} required />
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Calendar className="w-4 h-4 text-brand-primary" />
+                                    تاريخ الأمر <span className="text-rose-500">*</span>
+                                </label>
+                                <input disabled={isReadOnly} type="date" value={form.soDate || ''} onChange={(e) => setForm((f) => ({ ...f, soDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={inputClass()} required />
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">تاريخ التسليم</label>
-                                <input disabled={isReadOnly} type="date" value={form.expectedDeliveryDate || ''} onChange={(e) => setForm((f) => ({ ...f, expectedDeliveryDate: e.target.value }))} className={inputClass()} />
+                                <input disabled={isReadOnly} type="date" value={form.expectedDeliveryDate || ''} onChange={(e) => setForm((f) => ({ ...f, expectedDeliveryDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={inputClass()} />
                             </div>
                             <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600"><DollarSign className="w-4 h-4 text-emerald-600" /> العملة</label>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <DollarSign className="w-4 h-4 text-brand-primary" />
+                                    العملة
+                                </label>
                                 <select disabled={isReadOnly} value={form.currency || 'EGP'} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} className={inputClass()}>
                                     <option value="EGP">ج.م (EGP)</option>
                                     <option value="USD">$ (USD)</option>
@@ -240,15 +373,20 @@ const SaleOrderFormPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* ═══ ITEMS TABLE ═══ */}
+                    {/* Items Card */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '100ms' }}>
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-emerald-100/50 rounded-xl"><Package className="w-5 h-5 text-emerald-600" /></div>
-                                    <div><h3 className="font-bold text-slate-800 text-lg">الأصناف</h3><p className="text-slate-500 text-sm">{form.items.length} صنف مضاف</p></div>
+                                    <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                        <Package className="w-5 h-5 text-brand-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف</h3>
+                                        <p className="text-slate-500 text-sm">{form.items.length} صنف مضاف</p>
+                                    </div>
                                 </div>
-                                {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg hover:scale-105 active:scale-95"><Plus className="w-4 h-4" /> إضافة صنف</button>}
+                                {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg"><Plus className="w-4 h-4" /> إضافة صنف</button>}
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -314,7 +452,7 @@ const SaleOrderFormPage: React.FC = () => {
                                 {isReadOnly ? <span className="font-bold">{formatNumber(form.taxAmount || 0)}</span> : <input type="number" value={form.taxAmount || ''} onChange={(e) => setForm({ ...form, taxAmount: parseFloat(e.target.value) || 0 })} className="w-24 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-emerald-500 outline-none" />}
                             </div>
                             <div className="pt-4 mt-2 border-t border-white/10">
-                                <div className="flex justify-between items-center p-5 bg-emerald-600 rounded-2xl shadow-lg shadow-emerald-500/20">
+                                <div className="flex justify-between items-center p-5 bg-brand-primary rounded-2xl shadow-lg shadow-brand-primary/20">
                                     <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
                                     <div className="text-3xl font-black text-white">{formatNumber(total)} <span className="text-lg font-bold">{form.currency}</span></div>
                                 </div>

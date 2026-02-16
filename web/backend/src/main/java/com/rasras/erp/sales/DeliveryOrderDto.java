@@ -17,7 +17,7 @@ import java.time.LocalTime;
 public class DeliveryOrderDto {
     private Integer id;
     private String deliveryOrderNumber;
-    private LocalDateTime orderDate;
+    private LocalDate orderDate;
     private Integer issueNoteId;
     private String issueNoteNumber;
     private Integer customerId;
@@ -32,10 +32,11 @@ public class DeliveryOrderDto {
     private String driverPhone;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
-    private LocalDateTime actualDeliveryDate;
+    private LocalDate actualDeliveryDate;
     private BigDecimal deliveryCost;
     private Boolean isCostOnCustomer;
     private String status;
+    private String approvalStatus;
     private String receiverName;
     private String receiverPhone;
     private String receiverSignature;

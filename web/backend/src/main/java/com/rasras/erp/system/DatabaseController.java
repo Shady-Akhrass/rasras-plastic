@@ -22,6 +22,7 @@ import java.util.Map;
 @RequestMapping("/settings/database")
 @RequiredArgsConstructor
 @Tag(name = "Database & Logs", description = "Database Restore and System Log APIs")
+@Tag(name = "Database & Logs", description = "Database Restore, SQL Execution, and System Log APIs")
 public class DatabaseController {
 
     private final DatabaseService databaseService;
@@ -90,5 +91,47 @@ public class DatabaseController {
     @Operation(summary = "Get System Logs", description = "Returns the last N lines of system logs")
     public ResponseEntity<ApiResponse<List<String>>> getSystemLogs(@RequestParam(defaultValue = "100") int lines) {
         return ResponseEntity.ok(ApiResponse.success(logService.getSystemLogs(lines)));
+    }
+
+    @PostMapping("/execute-sql")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @Operation(summary = "Execute SQL Script", description = "Executes a raw SQL script.")
+    public ResponseEntity<ApiResponse<String>> executeSql(@RequestBody Map<String, String> payload) {
+        try {
+            String sql = payload.get("sql");
+            if (sql == null || sql.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("SQL script cannot be empty"));
+            }
+            String result = databaseService.executeSqlScript(sql);
+            return ResponseEntity.ok(ApiResponse.success("Execution Successful", result));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Execution failed: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/clear-tables")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @Operation(summary = "Clear Tables", description = "Clears data from selected tables with optional FK check disable.")
+    public ResponseEntity<ApiResponse<String>> clearTables(@RequestBody Map<String, Object> payload) {
+        try {
+            List<String> tables = (List<String>) payload.get("tables");
+            boolean disableFk = (boolean) payload.getOrDefault("disableFk", false);
+
+            if (tables == null || tables.isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("No tables selected"));
+            }
+
+            databaseService.clearTables(tables, disableFk);
+            return ResponseEntity.ok(ApiResponse.success("Selected tables cleared successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Failed to clear tables: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/error-logs")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @Operation(summary = "Get Database Error Logs", description = "Returns the persistent database operation error logs.")
+    public ResponseEntity<ApiResponse<List<String>>> getErrorLogs() {
+        return ResponseEntity.ok(ApiResponse.success(databaseService.getErrorLogs()));
     }
 }

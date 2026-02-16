@@ -1,26 +1,83 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronRight, Save, Plus, Trash2, Receipt, Clock, CheckCircle2, Lock, Info, Calendar, DollarSign, Package, FileText } from 'lucide-react';
+import {
+    Save,
+    ArrowRight,
+    Plus,
+    Trash2,
+    Receipt,
+    Clock,
+    CheckCircle2,
+    Lock,
+    Info,
+    Calendar,
+    DollarSign,
+    Package,
+    FileText,
+    Send,
+    XCircle,
+    RefreshCw,
+    Eye
+} from 'lucide-react';
 import { salesInvoiceService, type SalesInvoiceDto, type SalesInvoiceItemDto } from '../../services/salesInvoiceService';
 import { saleOrderService } from '../../services/saleOrderService';
 import customerService from '../../services/customerService';
 import { itemService } from '../../services/itemService';
+import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
-        'Draft': { icon: Receipt, className: 'bg-slate-50 text-slate-700 border-slate-200', label: 'مسودة' },
-        'Pending': { icon: Clock, className: 'bg-amber-50 text-amber-700 border-amber-200', label: 'قيد الاعتماد' },
-        'Approved': { icon: CheckCircle2, className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'معتمد' },
-        'Paid': { icon: CheckCircle2, className: 'bg-purple-50 text-purple-700 border-purple-200', label: 'مدفوع' },
-        'Partial': { icon: Clock, className: 'bg-blue-50 text-blue-700 border-blue-200', label: 'مدفوع جزئياً' }
+    const config: Record<string, {
+        label: string;
+        bg: string;
+        text: string;
+        border: string;
+        icon: React.ElementType;
+    }> = {
+        'Draft': {
+            label: 'مسودة',
+            bg: 'bg-slate-50',
+            text: 'text-slate-700',
+            border: 'border-slate-200',
+            icon: FileText
+        },
+        'Pending': {
+            label: 'قيد الاعتماد',
+            bg: 'bg-amber-50',
+            text: 'text-amber-700',
+            border: 'border-amber-200',
+            icon: Clock
+        },
+        'Approved': {
+            label: 'معتمد',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-700',
+            border: 'border-emerald-200',
+            icon: CheckCircle2
+        },
+        'Paid': {
+            label: 'مدفوع',
+            bg: 'bg-purple-50',
+            text: 'text-purple-700',
+            border: 'border-purple-200',
+            icon: CheckCircle2
+        },
+        'Partial': {
+            label: 'مدفوع جزئياً',
+            bg: 'bg-blue-50',
+            text: 'text-blue-700',
+            border: 'border-blue-200',
+            icon: Clock
+        }
     };
-    const { icon: Icon, className, label } = config[status] || config['Draft'];
+
+    const c = config[status] || config['Draft'];
+
     return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
-            <Icon className="w-3.5 h-3.5" />
-            {label}
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${c.bg} ${c.text} ${c.border}`}>
+            <c.icon className="w-3.5 h-3.5" />
+            {c.label}
         </span>
     );
 };
@@ -36,9 +93,11 @@ const SalesInvoiceFormPage: React.FC = () => {
 
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [processing, setProcessing] = useState(false);
     const [customers, setCustomers] = useState<any[]>([]);
     const [items, setItems] = useState<any[]>([]);
     const [saleOrders, setSaleOrders] = useState<any[]>([]);
+    const approvalId = searchParams.get('approvalId');
 
     const [form, setForm] = useState<SalesInvoiceDto>({
         invoiceDate: new Date().toISOString().split('T')[0],
@@ -56,7 +115,7 @@ const SalesInvoiceFormPage: React.FC = () => {
         items: []
     });
 
-    const isReadOnly = isView || (isEdit && form.status !== 'Draft');
+    const isReadOnly = isView || (isEdit && form.status !== 'Draft' && form.status !== 'Rejected');
 
     useEffect(() => {
         (async () => {
@@ -147,18 +206,71 @@ const SalesInvoiceFormPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isReadOnly) return;
+        if (form.approvalStatus === 'Approved') return;
         if (!form.customerId) { toast.error('اختر العميل'); return; }
         if (form.items.length === 0) { toast.error('أضف بنداً واحداً على الأقل'); return; }
         setSaving(true);
         try {
             const payload: SalesInvoiceDto = { ...form, subTotal: subtotal, discountAmount: disc, taxAmount: tax, totalAmount: total, remainingAmount: balance, items: form.items };
-            await salesInvoiceService.create(payload);
-            toast.success('تم إنشاء الفاتورة');
+            if (isNew) {
+                await salesInvoiceService.create(payload);
+                toast.success('تم إنشاء الفاتورة');
+            } else {
+                await salesInvoiceService.update(parseInt(id!), payload);
+                toast.success('تم التحديث');
+            }
             navigate('/dashboard/sales/invoices');
         } catch (err: any) {
             const msg = err?.response?.status === 404 ? 'واجهة فواتير المبيعات غير مفعّلة في الخادم بعد' : (err?.response?.data?.message || 'فشل الحفظ');
             toast.error(msg);
         } finally { setSaving(false); }
+    };
+
+    const handleSubmitForApproval = async () => {
+        if (!id || isNew) {
+            toast.error('يجب حفظ الفاتورة أولاً قبل الإرسال للاعتماد');
+            return;
+        }
+        if (!form.customerId) {
+            toast.error('اختر العميل');
+            return;
+        }
+        if (form.items.length === 0) {
+            toast.error('أضف بنداً واحداً على الأقل');
+            return;
+        }
+        if (form.status !== 'Draft' && form.status !== 'Rejected') {
+            toast.error('يمكن إرسال المسودات أو المرفوضة فقط للاعتماد');
+            return;
+        }
+        try {
+            setProcessing(true);
+            const updated = await salesInvoiceService.submitForApproval(parseInt(id));
+            if (updated) {
+                setForm(updated);
+                toast.success('تم إرسال الفاتورة للاعتماد بنجاح');
+                navigate('/dashboard/sales/invoices');
+            }
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'فشل إرسال الفاتورة للاعتماد');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/sales/approvals');
+        } catch {
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
+        }
     };
 
     const inputClass = (extra = '') =>
@@ -178,41 +290,101 @@ const SalesInvoiceFormPage: React.FC = () => {
                 @keyframes slideInRight { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
                 .animate-slide-in { animation: slideInRight 0.4s ease-out; }
             `}</style>
-            {/* ═══ HEADER ═══ */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-purple-600/95 to-purple-600/90 rounded-3xl p-8 text-white shadow-2xl">
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
-                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex items-center justify-between gap-5">
                     <div className="flex items-center gap-5">
                         <button onClick={() => navigate('/dashboard/sales/invoices')} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
-                            <ChevronRight className="w-5 h-5" />
+                            <ArrowRight className="w-5 h-5" />
                         </button>
-                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20"><Receipt className="w-10 h-10" /></div>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                            <Receipt className="w-10 h-10" />
+                        </div>
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-3xl font-bold">{isNew ? 'فاتورة مبيعات جديدة' : `فاتورة ${form.invoiceNumber || ''}`}</h1>
                                 {!isNew && <StatusBadge status={form.status || 'Draft'} />}
                                 {isReadOnly && <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20"><Lock className="w-3 h-3" /> للعرض فقط</span>}
+                                {form.approvalStatus && (
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${
+                                        form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
+                                        form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
+                                        form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
+                                        'bg-slate-500/20 text-white border-slate-300/30'
+                                    }`}>
+                                        {form.approvalStatus === 'Approved' && <CheckCircle2 className="w-3 h-3" />}
+                                        {form.approvalStatus === 'Rejected' && <XCircle className="w-3 h-3" />}
+                                        {form.approvalStatus === 'Pending' && <Clock className="w-3 h-3" />}
+                                        {form.approvalStatus === 'Approved' ? 'معتمد' : form.approvalStatus === 'Rejected' ? 'مرفوض' : form.approvalStatus === 'Pending' ? 'قيد الانتظار' : form.approvalStatus}
+                                    </span>
+                                )}
                             </div>
                             <p className="text-white/80 text-lg">إصدار ومتابعة فواتير العملاء</p>
                         </div>
                     </div>
-                    {!isReadOnly && !isNew && (
-                        <button onClick={() => { if (window.confirm('حذف الفاتورة؟')) { /* Delete Logic */ } }} className="p-3 bg-white/10 backdrop-blur-sm text-white hover:bg-rose-500/80 rounded-2xl border border-white/20 transition-all">
-                            <Trash2 className="w-5 h-5" />
-                        </button>
-                    )}
+                    <div className="flex items-center gap-3 flex-wrap">
+                        {isView && approvalId && (
+                            <>
+                                <button
+                                    onClick={() => handleApprovalAction('Approved')}
+                                    disabled={processing}
+                                    className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                >
+                                    {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                    <span>اعتماد</span>
+                                </button>
+                                <button
+                                    onClick={() => handleApprovalAction('Rejected')}
+                                    disabled={processing}
+                                    className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                >
+                                    {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                    <span>رفض</span>
+                                </button>
+                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                    <Eye className="w-5 h-5" />
+                                    <span className="font-bold">عرض من صندوق الاعتماد</span>
+                                </div>
+                            </>
+                        )}
+                        {!isReadOnly && (
+                            <>
+                                <button onClick={handleSubmit} disabled={saving} className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
+                                    <Save className="w-5 h-5" />
+                                    <span>{saving ? 'جاري الحفظ...' : isNew ? 'حفظ الفاتورة' : 'تحديث'}</span>
+                                </button>
+                                {isEdit && (form.status === 'Draft' || form.status === 'Rejected') && (
+                                    <button onClick={handleSubmitForApproval} disabled={processing || saving} className="flex items-center gap-3 px-8 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                        <span>إرسال للاعتماد</span>
+                                    </button>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    {/* ═══ BASIC INFORMATION ═══ */}
+                    {/* Basic Information Card */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center gap-3">
-                                <div className="p-3 bg-purple-100/50 rounded-xl"><Info className="w-5 h-5 text-purple-600" /></div>
-                                <div><h3 className="font-bold text-slate-800 text-lg">البيانات الأساسية</h3><p className="text-slate-500 text-sm">بيانات العميل والفاتورة</p></div>
+                                <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                    <Info className="w-5 h-5 text-brand-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg">البيانات الأساسية</h3>
+                                    <p className="text-slate-500 text-sm">بيانات العميل والفاتورة</p>
+                                </div>
                             </div>
                         </div>
 
@@ -232,12 +404,15 @@ const SalesInvoiceFormPage: React.FC = () => {
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600"><Calendar className="w-4 h-4 text-purple-600" /> تاريخ الفاتورة *</label>
-                                <input disabled={isReadOnly} type="date" value={form.invoiceDate || ''} onChange={(e) => setForm((f) => ({ ...f, invoiceDate: e.target.value }))} className={inputClass()} required />
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Calendar className="w-4 h-4 text-brand-primary" />
+                                    تاريخ الفاتورة <span className="text-rose-500">*</span>
+                                </label>
+                                <input disabled={isReadOnly} type="date" value={form.invoiceDate || ''} onChange={(e) => setForm((f) => ({ ...f, invoiceDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={inputClass()} required />
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">تاريخ الاستحقاق</label>
-                                <input disabled={isReadOnly} type="date" value={form.dueDate || ''} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className={inputClass()} />
+                                <input disabled={isReadOnly} type="date" value={form.dueDate || ''} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={inputClass()} />
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">شروط الدفع</label>
@@ -254,7 +429,7 @@ const SalesInvoiceFormPage: React.FC = () => {
                                     <div className="p-3 bg-purple-100/50 rounded-xl"><Package className="w-5 h-5 text-purple-600" /></div>
                                     <div><h3 className="font-bold text-slate-800 text-lg">الأصناف</h3><p className="text-slate-500 text-sm">{form.items.length} صنف مضاف</p></div>
                                 </div>
-                                {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg hover:scale-105 active:scale-95"><Plus className="w-4 h-4" /> إضافة صنف</button>}
+                                {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg"><Plus className="w-4 h-4" /> إضافة صنف</button>}
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -320,7 +495,7 @@ const SalesInvoiceFormPage: React.FC = () => {
                                 {isReadOnly ? <span className="font-bold">{formatNumber(form.taxAmount || 0)}</span> : <input type="number" value={form.taxAmount || ''} onChange={(e) => setForm({ ...form, taxAmount: parseFloat(e.target.value) || 0 })} className="w-24 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-purple-500 outline-none" />}
                             </div>
                             <div className="pt-4 mt-2 border-t border-white/10">
-                                <div className="flex justify-between items-center p-5 bg-purple-600 rounded-2xl shadow-lg shadow-purple-500/20">
+                                <div className="flex justify-between items-center p-5 bg-brand-primary rounded-2xl shadow-lg shadow-brand-primary/20">
                                     <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
                                     <div className="text-3xl font-black text-white">{formatNumber(total)} <span className="text-lg font-bold">{form.currency}</span></div>
                                 </div>
@@ -350,13 +525,6 @@ const SalesInvoiceFormPage: React.FC = () => {
                             <textarea value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} disabled={isReadOnly} className={`w-full p-4 border-2 rounded-xl outline-none transition-all h-40 resize-none ${isReadOnly ? 'bg-slate-50 border-slate-200' : 'focus:border-purple-500'}`} placeholder="ملاحظات..." />
                         </div>
                     </div>
-
-                    {!isReadOnly && (
-                        <button type="submit" disabled={saving} className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
-                            <Save className="w-5 h-5" />
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ الفاتورة'}</span>
-                        </button>
-                    )}
                 </div>
             </form>
         </div>

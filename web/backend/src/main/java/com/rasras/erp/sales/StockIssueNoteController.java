@@ -71,4 +71,9 @@ public class StockIssueNoteController {
             @RequestParam(required = false) Integer approvedByUserId) {
         return ResponseEntity.ok(ApiResponse.success(issueNoteService.approve(id, approvedByUserId)));
     }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ApiResponse<StockIssueNoteDto>> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(issueNoteService.submitForApproval(id)));
+    }
 }

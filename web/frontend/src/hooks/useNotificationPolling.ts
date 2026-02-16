@@ -3,6 +3,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { approvalService } from '../services/approvalService';
 import { grnService } from '../services/grnService';
 import { purchaseOrderService } from '../services/purchaseOrderService';
+import { customerRequestService } from '../services/customerRequestService';
 import toast from 'react-hot-toast';
 
 // ─── Sound & Browser Notification Helpers ───
@@ -63,12 +64,14 @@ const ACTIVE_PATHS = [
     '/dashboard/inventory/quality-inspection',
     '/dashboard/procurement/waiting-imports',
     '/dashboard/procurement/grn',
+    '/dashboard/sales/customer-requests',
 ];
 
 export interface NotificationCounts {
     pendingApprovals: number;
     pendingInspections: number;
     waitingImports: number;
+    pendingCustomerRequests: number;
 }
 
 export function useNotificationPolling(pathname: string) {
@@ -76,6 +79,7 @@ export function useNotificationPolling(pathname: string) {
         pendingApprovals: 0,
         pendingInspections: 0,
         waitingImports: 0,
+        pendingCustomerRequests: 0,
     });
 
     // ─── Refs to track previous state (no re-renders) ───
@@ -114,13 +118,13 @@ export function useNotificationPolling(pathname: string) {
         const soundEnabled = localStorage.getItem('approvals_sound') !== 'off';
         const currentPath = pathnameRef.current;
 
-        // Run all 3 fetches concurrently with Promise.allSettled
-        // so one failure doesn't block the others
-        const [approvalsResult, inspectionsResult, importsResult] =
+        // Run all 4 fetches concurrently with Promise.allSettled
+        const [approvalsResult, inspectionsResult, importsResult, crResult] =
             await Promise.allSettled([
                 approvalService.getPendingRequests(user.userId),
                 grnService.getAllGRNs(),
                 purchaseOrderService.getWaitingForArrivalPOs(),
+                customerRequestService.getAllRequests(),
             ]);
 
         // ── 1) Approvals ──
@@ -199,6 +203,16 @@ export function useNotificationPolling(pathname: string) {
             setCounts(prev => {
                 if (prev.waitingImports === waitingPOs.length) return prev;
                 return { ...prev, waitingImports: waitingPOs.length };
+            });
+        }
+
+        // ── 4) Customer Requests ──
+        if (crResult.status === 'fulfilled') {
+            const requests = crResult.value.data || [];
+            const pendingCount = requests.filter((r: any) => r.status === 'Pending').length;
+            setCounts(prev => {
+                if (prev.pendingCustomerRequests === pendingCount) return prev;
+                return { ...prev, pendingCustomerRequests: pendingCount };
             });
         }
 

@@ -18,6 +18,12 @@ import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.WarehouseRepository;
 import com.rasras.erp.finance.PaymentVoucherRepository;
+import com.rasras.erp.sales.SalesOrderRepository;
+import com.rasras.erp.sales.SalesQuotationRepository;
+import com.rasras.erp.sales.SalesInvoiceRepository;
+import com.rasras.erp.sales.DeliveryOrderRepository;
+import com.rasras.erp.sales.StockIssueNoteRepository;
+import com.rasras.erp.sales.PaymentReceiptRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +60,12 @@ public class ApprovalService {
     private final UnitRepository unitRepo;
     private final WarehouseRepository warehouseRepo;
     private final PaymentVoucherRepository voucherRepo;
+    private final SalesOrderRepository salesOrderRepo;
+    private final SalesQuotationRepository salesQuotationRepo;
+    private final SalesInvoiceRepository salesInvoiceRepo;
+    private final DeliveryOrderRepository deliveryOrderRepo;
+    private final StockIssueNoteRepository stockIssueNoteRepo;
+    private final PaymentReceiptRepository paymentReceiptRepo;
 
     @Transactional
     public ApprovalRequest initiateApproval(String workflowCode, String docType, Integer docId,
@@ -576,6 +588,48 @@ public class ApprovalService {
                     pv.setStatus("Rejected");
                 }
                 voucherRepo.save(pv);
+            });
+        } else if ("SalesOrder".equalsIgnoreCase(type)) {
+            salesOrderRepo.findById(id).ifPresent(so -> {
+                so.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    so.setStatus("Approved");
+                    so.setApprovedByUserId(userId);
+                    so.setApprovedDate(LocalDateTime.now());
+                } else if ("Rejected".equals(status)) {
+                    so.setStatus("Rejected");
+                }
+                salesOrderRepo.save(so);
+            });
+        } else if ("SalesQuotation".equalsIgnoreCase(type)) {
+            salesQuotationRepo.findById(id).ifPresent(sq -> {
+                sq.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    sq.setStatus("Approved");
+                } else if ("Rejected".equals(status)) {
+                    sq.setStatus("Rejected");
+                }
+                salesQuotationRepo.save(sq);
+            });
+        } else if ("SalesInvoice".equalsIgnoreCase(type)) {
+            salesInvoiceRepo.findById(id).ifPresent(inv -> {
+                inv.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    inv.setStatus("Approved");
+                } else if ("Rejected".equals(status)) {
+                    inv.setStatus("Rejected");
+                }
+                salesInvoiceRepo.save(inv);
+            });
+        } else if ("PaymentReceipt".equalsIgnoreCase(type)) {
+            paymentReceiptRepo.findById(id).ifPresent(pr -> {
+                pr.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    pr.setStatus("Approved");
+                } else if ("Rejected".equals(status)) {
+                    pr.setStatus("Rejected");
+                }
+                paymentReceiptRepo.save(pr);
             });
         }
     }

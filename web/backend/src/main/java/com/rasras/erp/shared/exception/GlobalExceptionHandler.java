@@ -1,6 +1,7 @@
 package com.rasras.erp.shared.exception;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,10 +17,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));
@@ -27,6 +30,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
+        log.warn("Bad request: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
@@ -34,6 +38,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
+        log.warn("Bad credentials: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error("Invalid username or password"));
@@ -41,6 +46,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
+        log.warn("Access denied: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("Access denied"));
@@ -48,6 +54,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.error("Data integrity violation", ex);
         Throwable root = ex.getMostSpecificCause();
         String causeMsg = root != null ? root.getMessage() : "";
         String msg = resolveDataIntegrityMessage(causeMsg);
@@ -127,7 +134,8 @@ public class GlobalExceptionHandler {
             if (lower.contains("approvallimits") || (lower.contains("requiresreviewby") && lower.contains("role"))) {
                 return "لا يمكن حذف الدور لأنه مستخدم في حدود الموافقة. قم بتعديل حدود الموافقة أولاً.";
             }
-            if (causeMsg.contains("RoleID") || (lower.contains("role") && (lower.contains("users") || lower.contains("user")))) {
+            if (causeMsg.contains("RoleID")
+                    || (lower.contains("role") && (lower.contains("users") || lower.contains("user")))) {
                 return "لا يمكن حذف الدور لأنه مرتبط بمستخدمين. قم بتغيير دور المستخدمين أولاً.";
             }
 
@@ -144,22 +152,15 @@ public class GlobalExceptionHandler {
         return defaultMsg;
     }
 
-   /**
-     * يتحقق ما إذا كان نص الخطأ متعلقًا بحذف أمر شراء (مرجع من GRN أو فواتير المورد).
-     */
     private boolean isPurchaseOrderDeleteConstraint(String causeMsg, String lower) {
         return causeMsg.contains("FK_GRN_PO")
                 || causeMsg.contains("FK_GRNItems_POItem")
                 || causeMsg.contains("FK_SI_PO")
                 || (lower.contains("purchaseorders") && (lower.contains("goodsreceiptnotes")
-                || lower.contains("grnitems")
-                || lower.contains("supplierinvoices")));
+                        || lower.contains("grnitems")
+                        || lower.contains("supplierinvoices")));
     }
 
-    /**
-     * يتحقق ما إذا كان نص الخطأ متعلقًا بحذف إذن إضافة (GRN) ومرجع من فواتير أو مرتجعات أو حركات.
-     * أي قيد أجنبي يذكر جدول أذونات الاستلام أو بنودها يعامل كخطأ حذف GRN.
-     */
     private boolean isGRNDeleteConstraint(String causeMsg, String lower) {
         return causeMsg.contains("FK_PurchaseReturn_GRN")
                 || causeMsg.contains("FK_PurchaseReturnItem_GRNItem")
@@ -167,15 +168,12 @@ public class GlobalExceptionHandler {
                 || causeMsg.contains("FK_SIItems_GRNItem")
                 || causeMsg.contains("FK_Batch_GRNItem")
                 || (lower.contains("goodsreceiptnotes") && (lower.contains("purchasereturns")
-                || lower.contains("supplierinvoices")
-                || lower.contains("supplierinvoiceitems")))
+                        || lower.contains("supplierinvoices")
+                        || lower.contains("supplierinvoiceitems")))
                 || lower.contains("goodsreceiptnotes")
                 || lower.contains("grnitems");
     }
 
-    /**
-     * يتحقق ما إذا كان نص الخطأ متعلقًا بعرض سعر (supplier quotations أو ما يرتبط به).
-     */
     private boolean isQuotationConstraint(String causeMsg, String lower) {
         return causeMsg.contains("FK_QCDetails_Quotation")
                 || causeMsg.contains("FK_QC_SelectedQuotation")
@@ -208,6 +206,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationErrors(MethodArgumentNotValidException ex) {
+        log.warn("Validation failed: {}", ex.getMessage());
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
             String fieldName = ((FieldError) error).getField();
@@ -221,8 +220,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
-        org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)
-                .error("Unhandled exception", ex);
+        log.error("Unexpected error occurred", ex);
         String msg = ex.getMessage();
         String displayMsg = (msg != null && !msg.isEmpty())
                 ? ("An unexpected error occurred: " + msg)

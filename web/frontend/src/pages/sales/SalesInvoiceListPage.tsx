@@ -9,18 +9,56 @@ import { toast } from 'react-hot-toast';
 
 // Status Badge Component
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
-        'Draft': { icon: Receipt, className: 'bg-slate-50 text-slate-700 border-slate-200', label: 'مسودة' },
-        'Pending': { icon: Clock, className: 'bg-amber-50 text-amber-700 border-amber-200', label: 'قيد الاعتماد' },
-        'Approved': { icon: CheckCircle2, className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'معتمد' },
-        'Paid': { icon: CheckCircle2, className: 'bg-purple-50 text-purple-700 border-purple-200', label: 'مدفوع' },
-        'Partial': { icon: Clock, className: 'bg-blue-50 text-blue-700 border-blue-200', label: 'مدفوع جزئياً' }
+    const config: Record<string, {
+        label: string;
+        bg: string;
+        text: string;
+        border: string;
+        icon: React.ElementType;
+    }> = {
+        'Draft': {
+            label: 'مسودة',
+            bg: 'bg-slate-50',
+            text: 'text-slate-700',
+            border: 'border-slate-200',
+            icon: FileText
+        },
+        'Pending': {
+            label: 'قيد الاعتماد',
+            bg: 'bg-amber-50',
+            text: 'text-amber-700',
+            border: 'border-amber-200',
+            icon: Clock
+        },
+        'Approved': {
+            label: 'معتمد',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-700',
+            border: 'border-emerald-200',
+            icon: CheckCircle2
+        },
+        'Paid': {
+            label: 'مدفوع',
+            bg: 'bg-purple-50',
+            text: 'text-purple-700',
+            border: 'border-purple-200',
+            icon: CheckCircle2
+        },
+        'Partial': {
+            label: 'مدفوع جزئياً',
+            bg: 'bg-blue-50',
+            text: 'text-blue-700',
+            border: 'border-blue-200',
+            icon: Clock
+        }
     };
-    const { icon: Icon, className, label } = config[status] || config['Draft'];
+
+    const c = config[status] || config['Draft'];
+
     return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
-            <Icon className="w-3.5 h-3.5" />
-            {label}
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${c.bg} ${c.text} ${c.border}`}>
+            <c.icon className="w-3.5 h-3.5" />
+            {c.label}
         </span>
     );
 };
@@ -92,23 +130,34 @@ const SalesInvoiceListPage: React.FC = () => {
     }, [filtered, currentPage, pageSize]);
 
     return (
-        <div className="space-y-6">
-            <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 to-violet-700 rounded-3xl p-8 text-white">
-                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-6 pb-20" dir="rtl">
+            {/* Enhanced Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
+                rounded-3xl p-8 text-white shadow-2xl">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+
+                <div className="relative flex items-center justify-between">
                     <div className="flex items-center gap-5">
-                        <div className="p-4 bg-white/10 rounded-2xl"><Receipt className="w-10 h-10" /></div>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                            <Receipt className="w-10 h-10" />
+                        </div>
                         <div>
-                            <h1 className="text-2xl font-bold mb-1">فواتير المبيعات</h1>
-                            <p className="text-white/80">فاتورة من إذن صرف أو أمر بيع، ضرائب، مستحق ومدفوع</p>
+                            <h1 className="text-3xl font-bold mb-2">فواتير المبيعات</h1>
+                            <p className="text-white/80 text-lg">إصدار ومتابعة فواتير العملاء</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button onClick={fetchList} disabled={loading} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl">
+                        <button onClick={fetchList} disabled={loading} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                         <button onClick={() => navigate('/dashboard/sales/invoices/new')}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-purple-700 rounded-xl font-bold">
-                            <Plus className="w-5 h-5" />فاتورة جديدة
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all">
+                            <Plus className="w-5 h-5" />
+                            <span>فاتورة جديدة</span>
                         </button>
                     </div>
                 </div>

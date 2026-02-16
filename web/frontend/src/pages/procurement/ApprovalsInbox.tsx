@@ -29,9 +29,11 @@ import {
     VolumeX,
     BellRing,
     Radio,
+    MessageSquare,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
+import { customerRequestService } from '../../services/customerRequestService';
 import { REFRESH_DATA_EVENT } from '../../hooks/useNotificationPolling';
 import { formatNumber, formatDate } from '../../utils/format';
 import { grnService } from '../../services/grnService';
@@ -88,6 +90,8 @@ const DOC_TYPE_CONFIGS: Record<string, {
     ReceiptVoucher: { label: 'سند قبض', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign, gradient: 'from-emerald-500 to-green-600' },
     RV: { label: 'سند قبض', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: DollarSign, gradient: 'from-emerald-500 to-green-600' },
     Supplier: { label: 'مورد', bg: 'bg-slate-50', text: 'text-slate-600', icon: Package, gradient: 'from-slate-500 to-gray-600' },
+    CustomerRequest: { label: 'طلب عميل', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', icon: MessageSquare, gradient: 'from-fuchsia-500 to-pink-600' },
+    CR: { label: 'طلب عميل', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', icon: MessageSquare, gradient: 'from-fuchsia-500 to-pink-600' },
 };
 
 const getDocTypeConfig = (type: string) =>
@@ -105,6 +109,8 @@ const TYPE_ROUTES: Record<string, string> = {
     PaymentVoucher: '/dashboard/finance/payment-vouchers',
     PV: '/dashboard/finance/payment-vouchers',
     Supplier: '/dashboard/procurement/suppliers',
+    CustomerRequest: '/dashboard/sales/customer-requests',
+    CR: '/dashboard/sales/customer-requests',
 };
 
 const isGRNType = (t: string) => t === 'GoodsReceiptNote' || t === 'GRN';
@@ -120,6 +126,7 @@ const FILTER_OPTIONS = [
     { value: 'PurchaseReturn', label: 'مرتجعات', icon: RotateCcw },
     { value: 'Supplier', label: 'موردين', icon: Tag },
     { value: 'PaymentVoucher', label: 'سندات صرف', icon: DollarSign },
+    { value: 'CustomerRequest', label: 'طلبات عملاء', icon: MessageSquare },
 ] as const;
 
 // ════════════════════════════════════════════
@@ -637,8 +644,32 @@ const ApprovalsInbox: React.FC = () => {
         if (!mountedRef.current) return;
         try {
             if (!silent) setLoading(true);
-            const data = await approvalService.getPendingRequests(currentUserId);
-            const fetched: ApprovalRequestDto[] = data.data || [];
+            const [approvalsData, crsData] = await Promise.all([
+                approvalService.getPendingRequests(currentUserId),
+                customerRequestService.getAllRequests() // We will filter effectively on client side or create a specific endpoint later
+            ]);
+
+            const approvals: ApprovalRequestDto[] = approvalsData.data || [];
+
+            // Map pending CRs to ApprovalRequestDto format
+            const crs: ApprovalRequestDto[] = (crsData.data || [])
+                .filter(cr => cr.status === 'Pending')
+                .map(cr => ({
+                    id: cr.requestId || 0,
+                    documentType: 'CustomerRequest',
+                    documentId: cr.requestId || 0,
+                    documentNumber: cr.requestNumber || `CR-${cr.requestId}`,
+                    requesterId: cr.customerId,
+                    requestedByName: 'Customer', // Or fetch customer name if available
+                    requestedDate: cr.requestDate ? new Date(cr.requestDate).toISOString() : new Date().toISOString(),
+                    status: 'Pending',
+                    currentStepName: 'Sales Manager Approval', // Hardcoded for now
+                    workflowName: 'Customer Request Approval',
+                    priority: 'Normal',
+                    totalAmount: 0 // CRs don't have amount yet
+                }));
+
+            const fetched = [...approvals, ...crs];
 
             if (!mountedRef.current) return;
             setLastRefresh(Date.now());
@@ -725,7 +756,17 @@ const ApprovalsInbox: React.FC = () => {
         startTransition(async () => {
             addOptimistic({ type: 'remove', id: requestId });
             try {
-                await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId);
+                const request = requests.find(r => r.id === requestId);
+                if (request?.documentType === 'CustomerRequest' || request?.documentType === 'CR') {
+                    if (action === 'Approved') {
+                        await customerRequestService.approveRequest(requestId);
+                    } else {
+                        await customerRequestService.rejectRequest(requestId, 'Rejected via Inbox');
+                    }
+                } else {
+                    await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId);
+                }
+
                 const req = requests.find(r => r.id === requestId);
                 setRequests(prev => prev.filter(r => r.id !== requestId));
                 previousIdsRef.current.delete(requestId);
@@ -765,7 +806,7 @@ const ApprovalsInbox: React.FC = () => {
                 setRemovingIds(prev => { const n = new Set(prev); n.delete(requestId); return n; });
             }
         });
-    }, [addOptimistic, fetchRequests]);
+    }, [addOptimistic, fetchRequests, requests, currentUserId, navigate]);
 
     const handleApproveClick = useCallback(async (request: ApprovalRequestDto) => {
         if (isGRNType(request.documentType)) {

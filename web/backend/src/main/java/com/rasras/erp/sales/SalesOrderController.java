@@ -52,4 +52,9 @@ public class SalesOrderController {
     public ResponseEntity<ApiResponse<SalesOrderDto>> checkCreditLimit(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(orderService.checkCreditLimit(id)));
     }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<ApiResponse<SalesOrderDto>> submitForApproval(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(orderService.submitForApproval(id)));
+    }
 }
