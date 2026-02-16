@@ -32,6 +32,9 @@ public class GoodsReceiptNoteDto {
     private BigDecimal totalReceivedQty;
     private BigDecimal totalAcceptedQty;
     private BigDecimal totalRejectedQty;
+    private BigDecimal shippingCost;
+    private BigDecimal otherCosts;
+    private BigDecimal totalAmount;
     private String notes;
     private List<GRNItemDto> items;
 }

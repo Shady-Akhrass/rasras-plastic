@@ -1,5 +1,6 @@
 package com.rasras.erp.inventory;
 
+import com.rasras.erp.inventory.dto.ItemBelowMinDto;
 import com.rasras.erp.shared.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +17,11 @@ public class StockBalanceController {
     private final StockBalanceService stockService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<StockBalanceDto>>> getAllBalances() {
+    public ResponseEntity<ApiResponse<List<StockBalanceDto>>> getAllBalances(
+            @RequestParam(required = false) Integer warehouseId) {
+        if (warehouseId != null) {
+            return ResponseEntity.ok(ApiResponse.success(stockService.getByWarehouseId(warehouseId)));
+        }
         return ResponseEntity.ok(ApiResponse.success(stockService.getAllBalances()));
     }
 
@@ -40,5 +45,19 @@ public class StockBalanceController {
     public ResponseEntity<ApiResponse<Void>> deleteBalance(@PathVariable Integer id) {
         stockService.deleteBalance(id);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @GetMapping("/reports/periodic")
+    public ResponseEntity<ApiResponse<java.util.List<PeriodicInventoryReportDto>>> getPeriodicReport(
+            @RequestParam int month,
+            @RequestParam int year,
+            @RequestParam(required = false) Integer warehouseId) {
+        return ResponseEntity.ok(ApiResponse.success(stockService.getPeriodicReport(month, year, warehouseId)));
+    }
+
+    @GetMapping("/reports/below-min")
+    public ResponseEntity<ApiResponse<List<ItemBelowMinDto>>> getItemsBelowMin(
+            @RequestParam(required = false) Integer warehouseId) {
+        return ResponseEntity.ok(ApiResponse.success(stockService.getItemsBelowMin(warehouseId)));
     }
 }

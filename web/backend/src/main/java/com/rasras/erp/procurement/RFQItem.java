@@ -40,4 +40,7 @@ public class RFQItem {
 
     @Column(name = "Specifications", length = 500)
     private String specifications;
+
+    @Column(name = "EstimatedUnitPrice", precision = 18, scale = 4)
+    private BigDecimal estimatedUnitPrice;
 }

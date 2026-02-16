@@ -8,18 +8,15 @@ import {
     Building2,
     Users,
     Phone,
-    Mail,
     MapPin,
     CheckCircle2,
     RefreshCw,
     Edit3,
-    ExternalLink,
-    MoreVertical,
-    Eye,
     Trash2
 } from 'lucide-react';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -50,6 +47,13 @@ const StatCard: React.FC<{
             </div>
         </div>
     );
+};
+
+// Supplier Type Labels (Arabic)
+const SUPPLIER_TYPE_LABELS: Record<string, string> = {
+    Local: 'محلي',
+    International: 'دولي',
+    Service: 'خدمي'
 };
 
 // Status Badge Component
@@ -86,6 +90,9 @@ const SuppliersPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [supplierToDelete, setSupplierToDelete] = useState<SupplierDto | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchSuppliers();
@@ -114,8 +121,30 @@ const SuppliersPage: React.FC = () => {
         }
     };
 
+    const handleDeleteClick = (supplier: SupplierDto) => {
+        setSupplierToDelete(supplier);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!supplierToDelete) return;
+
+        try {
+            setIsDeleting(true);
+            await supplierService.deleteSupplier(supplierToDelete.id!);
+            toast.success('تم حذف المورد بنجاح');
+            setIsDeleteModalOpen(false);
+            setSupplierToDelete(null);
+            fetchSuppliers();
+        } catch (error) {
+            toast.error('فشل حذف المورد');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     const filteredSuppliers = useMemo(() => {
-        return suppliers.filter(s => {
+        const filtered = suppliers.filter(s => {
             const matchesSearch =
                 s.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 s.supplierCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,6 +152,8 @@ const SuppliersPage: React.FC = () => {
             const matchesType = typeFilter === 'All' || s.supplierType === typeFilter;
             return matchesSearch && matchesType;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [suppliers, searchTerm, typeFilter]);
 
     const stats = useMemo(() => ({
@@ -213,8 +244,8 @@ const SuppliersPage: React.FC = () => {
                         <option value="Service">خدمي</option>
                     </select>
                 </div>
-                <button 
-                    onClick={fetchSuppliers} 
+                <button
+                    onClick={fetchSuppliers}
                     className="p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
                 >
                     <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -311,8 +342,8 @@ const SuppliersPage: React.FC = () => {
                             ) : (
                                 // Data Rows
                                 filteredSuppliers.map((supplier, index) => (
-                                    <tr 
-                                        key={supplier.id} 
+                                    <tr
+                                        key={supplier.id}
                                         className="group hover:bg-slate-50/50 transition-colors"
                                         style={{
                                             animationDelay: `${index * 30}ms`,
@@ -342,7 +373,7 @@ const SuppliersPage: React.FC = () => {
                                         </td>
                                         <td className="py-4 px-4">
                                             <span className="text-sm text-slate-600 font-medium">
-                                                {supplier.supplierType || 'عام'}
+                                                {SUPPLIER_TYPE_LABELS[supplier.supplierType || ''] || supplier.supplierType || 'عام'}
                                             </span>
                                         </td>
                                         <td className="py-4 px-4">
@@ -374,15 +405,6 @@ const SuppliersPage: React.FC = () => {
                                                 >
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
-                                                {['PENDING', 'Pending'].includes(supplier.status || '') && (
-                                                    <button
-                                                        onClick={() => navigate('/dashboard/procurement/approvals?type=Supplier')}
-                                                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                                                        title="مراجعة"
-                                                    >
-                                                        <ExternalLink className="w-4 h-4" />
-                                                    </button>
-                                                )}
                                                 {['DRAFT', 'Draft'].includes(supplier.status || '') && (
                                                     <button
                                                         onClick={() => handleApprove(supplier.id!)}
@@ -392,6 +414,13 @@ const SuppliersPage: React.FC = () => {
                                                         <CheckCircle2 className="w-4 h-4" />
                                                     </button>
                                                 )}
+                                                <button
+                                                    onClick={() => handleDeleteClick(supplier)}
+                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                    title="حذف"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -401,6 +430,19 @@ const SuppliersPage: React.FC = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف المورد"
+                message={`هل أنت متأكد من حذف المورد "${supplierToDelete?.supplierNameAr}"؟ سيتم حذف جميع البيانات المرتبطة به ولا يمكن التراجع عن هذه الخطوة.`}
+                confirmText="حذف المورد"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setSupplierToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

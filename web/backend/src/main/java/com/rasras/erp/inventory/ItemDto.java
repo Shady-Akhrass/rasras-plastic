@@ -14,10 +14,17 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ItemDto {
     private Integer id;
+    /** كود الصنف الفريد - يُولَّد تلقائياً */
     private String itemCode;
     private String itemNameAr;
     private String itemNameEn;
-    private String gradeName;
+    /** العلامة التجارية / Grade - يمكن أن يتكرر */
+    private String grade;
+    /** MFR (Melt Flow Rate) - معدل تدفق الذوبان - g/10 min */
+    private BigDecimal gradeName;
+    private String mi2;
+    private String mi21;
+    private String density;
     private Integer categoryId;
     private String categoryName; // Useful for UI
     private Integer unitId;

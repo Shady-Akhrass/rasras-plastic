@@ -38,6 +38,7 @@ export interface PurchaseReturnDto {
     subTotal: number;
     taxAmount: number;
     totalAmount: number;
+    currency?: string;
     status?: string;
     items: PurchaseReturnItemDto[];
 }
@@ -56,6 +57,10 @@ export const purchaseReturnService = {
     createReturn: async (dto: PurchaseReturnDto) => {
         const response = await apiClient.post<ApiResponse<PurchaseReturnDto>>('/procurement/returns', dto);
         return response.data;
+    },
+
+    deleteReturn: async (id: number) => {
+        await apiClient.post(`/procurement/returns/${id}/delete`);
     }
 };
 

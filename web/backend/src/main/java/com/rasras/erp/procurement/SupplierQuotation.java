@@ -63,6 +63,13 @@ public class SupplierQuotation {
     @Column(name = "TotalAmount", precision = 18, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "DeliveryCost", precision = 18, scale = 2)
+    private BigDecimal deliveryCost;
+
+    @Column(name = "OtherCosts", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal otherCosts = BigDecimal.ZERO;
+
     @Column(name = "Status", length = 20)
     @Builder.Default
     private String status = "Received";

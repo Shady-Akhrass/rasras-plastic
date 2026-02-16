@@ -20,18 +20,19 @@ public class UnitController {
 
     @GetMapping
     @Operation(summary = "Get all units", description = "Returns all units of measure")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<List<UnitDto>>> getAllUnits() {
         return ResponseEntity.ok(ApiResponse.success(unitService.getAllUnits()));
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<List<UnitDto>>> getActiveUnits() {
         return ResponseEntity.ok(ApiResponse.success(unitService.getActiveUnits()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<UnitDto>> getUnitById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(unitService.getUnitById(id)));
     }

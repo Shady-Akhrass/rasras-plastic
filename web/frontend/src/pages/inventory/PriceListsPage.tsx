@@ -2,11 +2,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
     Plus, Search, Edit2, Trash2, X, RefreshCw, CheckCircle2, XCircle,
     DollarSign, Package, Tag, Save, ChevronRight, Calendar, Coins,
-    TrendingUp, TrendingDown, ShoppingCart, FileText, Layers
+    TrendingUp, TrendingDown, ShoppingCart, Layers
 } from 'lucide-react';
 import { priceListService, type PriceListDto, type PriceListItemDto } from '../../services/priceListService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 // Stat Card Component
@@ -109,14 +110,14 @@ const PriceListRow: React.FC<{
         {/* Valid From */}
         <td className="px-6 py-4">
             <span className="text-slate-600 text-sm">
-                {list.validFrom ? new Date(list.validFrom).toLocaleDateString('ar-EG') : <span className="text-slate-300">---</span>}
+                {list.validFrom ? formatDate(list.validFrom) : <span className="text-slate-300">---</span>}
             </span>
         </td>
 
         {/* Valid To */}
         <td className="px-6 py-4">
             <span className="text-slate-600 text-sm">
-                {list.validTo ? new Date(list.validTo).toLocaleDateString('ar-EG') : <span className="text-slate-300">غير محدد</span>}
+                {list.validTo ? formatDate(list.validTo) : <span className="text-slate-300">غير محدد</span>}
             </span>
         </td>
 
@@ -377,7 +378,7 @@ const ItemLineRow: React.FC<{
                 >
                     <option value="0">اختر الصنف...</option>
                     {items.filter(i => i.isSellable).map(i => (
-                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.itemCode})</option>
+                        <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>
                     ))}
                 </select>
             </div>
@@ -624,9 +625,11 @@ const PriceListsPage: React.FC = () => {
     };
 
     const filteredLists = useMemo(() => {
-        return priceLists.filter(list =>
+        const filtered = priceLists.filter(list =>
             list.priceListName.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [priceLists, searchTerm]);
 
     const stats = useMemo(() => ({

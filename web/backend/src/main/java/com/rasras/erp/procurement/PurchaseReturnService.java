@@ -7,6 +7,7 @@ import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
 import com.rasras.erp.inventory.GoodsReceiptNote;
 import com.rasras.erp.procurement.dto.PurchaseReturnDto;
 import com.rasras.erp.procurement.dto.PurchaseReturnItemDto;
+import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.supplier.SupplierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class PurchaseReturnService {
     private final UnitRepository unitRepo;
     private final GoodsReceiptNoteRepository grnRepo;
     private final com.rasras.erp.inventory.InventoryService inventoryService;
+    private final com.rasras.erp.approval.ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<PurchaseReturnDto> getAllReturns() {
@@ -71,9 +73,33 @@ public class PurchaseReturnService {
             saved.setApprovedDate(java.time.LocalDateTime.now());
             processApprovalEffects(saved, 1);
             saved = returnRepo.save(saved);
+        } else {
+            // Initiate approval workflow if status is Pending or Draft (and has items)
+            if (saved.getItems() != null && !saved.getItems().isEmpty()) {
+                approvalService.initiateApproval(
+                        "RET_APPROVAL",
+                        "PurchaseReturn",
+                        saved.getId(),
+                        saved.getReturnNumber(),
+                        1, // Placeholder requester ID
+                        saved.getTotalAmount());
+
+                saved.setStatus("Pending");
+                saved = returnRepo.save(saved);
+            }
         }
 
         return mapToDto(saved);
+    }
+
+    @Transactional
+    public void deleteReturn(Integer id) {
+        PurchaseReturn entity = returnRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Return not found"));
+        if ("Approved".equals(entity.getStatus())) {
+            throw new BadRequestException("لا يمكن حذف مرتجع شراء معتمد؛ تمت تسوية المخزين والأرصدة. يمكن إصدار مرتجع عكسي إذا لزم.");
+        }
+        returnRepo.delete(entity);
     }
 
     @Transactional
@@ -95,19 +121,25 @@ public class PurchaseReturnService {
     }
 
     private void processApprovalEffects(PurchaseReturn entity, Integer userId) {
-        // 1. Update Stock (Decrement)
-        for (PurchaseReturnItem item : entity.getItems()) {
-            inventoryService.updateStock(
-                    item.getItem().getId(),
-                    entity.getWarehouse().getId(),
-                    item.getReturnedQty(),
-                    "OUT",
-                    "RETURN",
-                    "PurchaseReturn",
-                    entity.getId(),
-                    entity.getReturnNumber(),
-                    item.getUnitPrice(),
-                    userId);
+        // 1. Update Stock (Decrement) - ONLY if items were originally accepted into
+        // stock
+        boolean isRejectionReturn = entity.getReturnReason() != null &&
+                entity.getReturnReason().contains("Rejected during Quality Inspection");
+
+        if (!isRejectionReturn) {
+            for (PurchaseReturnItem item : entity.getItems()) {
+                inventoryService.updateStock(
+                        item.getItem().getId(),
+                        entity.getWarehouse().getId(),
+                        item.getReturnedQty(),
+                        "OUT",
+                        "RETURN",
+                        "PurchaseReturn",
+                        entity.getId(),
+                        entity.getReturnNumber(),
+                        item.getUnitPrice(),
+                        userId);
+            }
         }
 
         // 2. Update Supplier Balance (Decrease) & Total Returned (Increase)

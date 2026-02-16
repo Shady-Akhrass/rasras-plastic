@@ -10,4 +10,6 @@ public interface SupplierQuotationRepository extends JpaRepository<SupplierQuota
     List<SupplierQuotation> findByRfqId(Integer rfqId);
 
     List<SupplierQuotation> findBySupplierId(Integer supplierId);
+
+    boolean existsByRfqId(Integer rfqId);
 }

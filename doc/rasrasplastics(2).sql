@@ -5746,6 +5746,75 @@ ALTER TABLE `warehouselocations`
 --
 ALTER TABLE `warehouses`
   ADD CONSTRAINT `FK_Warehouses_Manager` FOREIGN KEY (`ManagerID`) REFERENCES `employees` (`EmployeeID`);
+
+-- --------------------------------------------------------
+--
+-- Additional HR / Employee master tables (added)
+--
+
+--
+-- Table structure for table `leavetypes`
+--
+CREATE TABLE IF NOT EXISTS `leavetypes` (
+  `LeaveTypeCode` varchar(20) COLLATE utf8mb4_general_ci NOT NULL,
+  `LeaveTypeNameAr` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `LeaveTypeNameEn` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `IsPaid` tinyint(1) NOT NULL DEFAULT '1',
+  `MaxDaysPerYear` int DEFAULT NULL,
+  `IsActive` tinyint(1) NOT NULL DEFAULT '1',
+  `CreatedAt` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`LeaveTypeCode`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `workshifts`
+--
+CREATE TABLE IF NOT EXISTS `workshifts` (
+  `ShiftID` int NOT NULL AUTO_INCREMENT,
+  `ShiftCode` varchar(20) COLLATE utf8mb4_general_ci NOT NULL,
+  `ShiftNameAr` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `ShiftNameEn` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `StartTime` time NOT NULL,
+  `EndTime` time NOT NULL,
+  `GraceMinutes` int NOT NULL DEFAULT '0',
+  `IsNightShift` tinyint(1) NOT NULL DEFAULT '0',
+  `IsActive` tinyint(1) NOT NULL DEFAULT '1',
+  `CreatedAt` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`ShiftID`),
+  UNIQUE KEY `UK_WorkShifts_ShiftCode` (`ShiftCode`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `employeeshifts`
+--
+CREATE TABLE IF NOT EXISTS `employeeshifts` (
+  `EmployeeShiftID` int NOT NULL AUTO_INCREMENT,
+  `EmployeeID` int NOT NULL,
+  `ShiftID` int NOT NULL,
+  `EffectiveFrom` date NOT NULL,
+  `EffectiveTo` date DEFAULT NULL,
+  `IsActive` tinyint(1) NOT NULL DEFAULT '1',
+  `CreatedAt` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`EmployeeShiftID`),
+  KEY `IX_EmployeeShifts_Employee` (`EmployeeID`),
+  KEY `IX_EmployeeShifts_Shift` (`ShiftID`),
+  CONSTRAINT `FK_EmployeeShifts_Employee` FOREIGN KEY (`EmployeeID`) REFERENCES `employees` (`EmployeeID`),
+  CONSTRAINT `FK_EmployeeShifts_Shift` FOREIGN KEY (`ShiftID`) REFERENCES `workshifts` (`ShiftID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `holidays`
+--
+CREATE TABLE IF NOT EXISTS `holidays` (
+  `HolidayID` int NOT NULL AUTO_INCREMENT,
+  `HolidayDate` date NOT NULL,
+  `HolidayNameAr` varchar(200) COLLATE utf8mb4_general_ci NOT NULL,
+  `HolidayNameEn` varchar(200) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `IsActive` tinyint(1) NOT NULL DEFAULT '1',
+  `CreatedAt` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`HolidayID`),
+  UNIQUE KEY `UK_Holidays_Date` (`HolidayDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -39,6 +39,8 @@ export interface PurchaseRequisition {
     items: PurchaseRequisitionItem[];
     createdAt?: string;
     createdBy?: number;
+    hasActiveOrders?: boolean;
+    hasComparison?: boolean;
 }
 
 export interface RFQItem {
@@ -66,6 +68,8 @@ export interface RFQ {
     status?: string;
     notes?: string;
     items: RFQItem[];
+    hasActiveOrders?: boolean;
+    hasQuotation?: boolean;
 }
 
 export interface SupplierQuotationItem {
@@ -84,6 +88,7 @@ export interface SupplierQuotationItem {
     taxAmount?: number;
     totalPrice: number;
     deliveryDays?: number;
+    polymerGrade?: string;
     notes?: string;
 }
 
@@ -101,9 +106,15 @@ export interface SupplierQuotation {
     paymentTerms?: string;
     deliveryTerms?: string;
     deliveryDays?: number;
+    deliveryCost?: number;
+    otherCosts?: number;
     totalAmount: number;
     status?: string;
     notes?: string;
+    receivedByUserId?: number;
+    receivedDate?: string;
+    createdAt?: string;
+    createdBy?: number;
     items: SupplierQuotationItem[];
 }
 
@@ -122,8 +133,13 @@ export interface QuotationComparisonDetail {
     qualityRating?: number;
     priceRating?: number;
     overallScore?: number;
+    deliveryCost?: number;
+    otherCosts?: number;
     comments?: string;
+    polymerGrade?: string;
+    currency?: string;
 }
+
 
 export interface QuotationComparison {
     id?: number;
@@ -174,6 +190,9 @@ const purchaseService = {
         const response = await apiClient.post<{ data: PurchaseRequisition }>(`/procurement/pr/${id}/submit`);
         return response.data.data;
     },
+    deletePR: async (id: number) => {
+        await apiClient.delete(`/procurement/pr/${id}`);
+    },
 
     // RFQs
     getAllRFQs: async () => {
@@ -188,6 +207,13 @@ const purchaseService = {
         const response = await apiClient.post<{ data: RFQ }>('/procurement/rfq', rfq);
         return response.data.data;
     },
+    updateRFQ: async (id: number, rfq: RFQ) => {
+        const response = await apiClient.put<{ data: RFQ }>(`/procurement/rfq/${id}`, rfq);
+        return response.data.data;
+    },
+    deleteRFQ: async (id: number) => {
+        await apiClient.post(`/procurement/rfq/${id}/delete`);
+    },
 
     // Quotations
     getAllQuotations: async () => {
@@ -201,6 +227,13 @@ const purchaseService = {
     createQuotation: async (quotation: SupplierQuotation) => {
         const response = await apiClient.post<{ data: SupplierQuotation }>('/procurement/quotation', quotation);
         return response.data.data;
+    },
+    updateQuotation: async (id: number, quotation: SupplierQuotation) => {
+        const response = await apiClient.put<{ data: SupplierQuotation }>(`/procurement/quotation/${id}`, quotation);
+        return response.data.data;
+    },
+    deleteQuotation: async (id: number) => {
+        await apiClient.post(`/procurement/quotation/${id}/delete`);
     },
 
     // Comparisons
@@ -236,12 +269,30 @@ const purchaseService = {
         });
         return response.data.data;
     },
+    deleteComparison: async (id: number) => {
+        await apiClient.post(`/procurement/comparison/${id}/delete`);
+    },
 
     // Suppliers
     getAllSuppliers: async () => {
         const response = await apiClient.get<{ data: Supplier[] }>('/suppliers');
         return response.data.data;
+    },
+
+    // Lifecycle
+    getPRLifecycle: async (id: number) => {
+        const response = await apiClient.get<{ data: PRLifecycle }>('/procurement/pr/' + id + '/lifecycle');
+        return response.data.data;
     }
 };
+
+export interface PRLifecycle {
+    requisition: { status: string; date: string; prNumber: string };
+    approval: { status: string; currentStep: string; lastActionDate?: string };
+    sourcing: { status: string; rfqCount: number; quotationCount: number; comparisonStatus: string; selectedQuotationId?: number };
+    ordering: { status: string; poNumbers: string[]; poIds?: number[]; lastPoDate?: string };
+    receiving: { status: string; grnNumbers: string[]; grnIds?: number[]; lastGrnDate?: string };
+    quality: { status: string; result: string; inspectionDate?: string };
+}
 
 export default purchaseService;

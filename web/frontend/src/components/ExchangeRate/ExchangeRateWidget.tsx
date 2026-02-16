@@ -1,9 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { 
-    DollarSign, TrendingUp, TrendingDown, RefreshCw, 
-    AlertCircle, Banknote, ArrowLeftRight 
+import { formatDate as formatDateEn } from '../../utils/format';
+import {
+    DollarSign, TrendingUp, TrendingDown, RefreshCw,
+    AlertCircle, Banknote, ArrowLeftRight, Calculator
 } from 'lucide-react';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 interface ExchangeRateData {
     rate: number;
@@ -16,6 +19,8 @@ const ExchangeRateWidget = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const { defaultCurrency, getCurrencyLabel } = useSystemSettings();
+    const [convertAmount, setConvertAmount] = useState<string>('1');
 
     // Get previous rate from localStorage
     const getPreviousRate = (): number => {
@@ -35,13 +40,13 @@ const ExchangeRateWidget = () => {
 
             // Using free Exchange Rate API (no API key required)
             const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-            
+
             if (!response.ok) {
                 throw new Error('Failed to fetch exchange rate');
             }
 
             const data = await response.json();
-            const currentRate = data.rates.EGP;
+            const currentRate = data.rates[defaultCurrency] || data.rates.EGP;
             const previousRate = getPreviousRate() || currentRate;
 
             setExchangeRate({
@@ -60,7 +65,7 @@ const ExchangeRateWidget = () => {
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    }, []);
+    }, [defaultCurrency]);
 
     useEffect(() => {
         fetchExchangeRate();
@@ -69,18 +74,9 @@ const ExchangeRateWidget = () => {
         return () => clearInterval(interval);
     }, [fetchExchangeRate]);
 
-    const formatTime = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleTimeString('ar-EG', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-        });
-    };
-
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('ar-EG', { 
+        return formatDateEn(date, {
             day: 'numeric',
             month: 'long',
             year: 'numeric'
@@ -132,8 +128,8 @@ const ExchangeRateWidget = () => {
     }
 
     const change = exchangeRate.rate - exchangeRate.previousRate;
-    const changePercent = exchangeRate.previousRate > 0 
-        ? ((change / exchangeRate.previousRate) * 100) 
+    const changePercent = exchangeRate.previousRate > 0
+        ? ((change / exchangeRate.previousRate) * 100)
         : 0;
     const isPositive = change >= 0;
     const TrendIcon = isPositive ? TrendingUp : TrendingDown;
@@ -149,7 +145,7 @@ const ExchangeRateWidget = () => {
             {/* Background Decorations */}
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
             <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-            
+
             {/* Dollar Icon Decoration */}
             <div className="absolute top-4 left-4 opacity-10">
                 <DollarSign className="w-24 h-24" />
@@ -172,12 +168,12 @@ const ExchangeRateWidget = () => {
                                 <span className="text-white/50">/</span>
                                 <span className="flex items-center gap-1">
                                     <Banknote className="w-4 h-4" />
-                                    EGP
+                                    {defaultCurrency}
                                 </span>
                             </p>
                         </div>
                     </div>
-                    
+
                     <button
                         onClick={fetchExchangeRate}
                         disabled={isRefreshing}
@@ -195,7 +191,7 @@ const ExchangeRateWidget = () => {
                         <span className="text-5xl font-bold text-white">
                             {exchangeRate.rate.toFixed(2)}
                         </span>
-                        <span className="text-white/60 text-lg font-medium">ج.م</span>
+                        <span className="text-white/60 text-lg font-medium">{getCurrencyLabel(defaultCurrency)}</span>
                     </div>
                     <p className="text-white/70 text-sm mt-1">لكل دولار أمريكي واحد</p>
                 </div>
@@ -203,8 +199,8 @@ const ExchangeRateWidget = () => {
                 {/* Change Indicator */}
                 <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg
-                        ${isPositive 
-                            ? 'bg-emerald-400/30 text-white' 
+                        ${isPositive
+                            ? 'bg-emerald-400/30 text-white'
                             : 'bg-rose-500/30 text-white'
                         }`}>
                         <TrendIcon className="w-4 h-4" />
@@ -226,6 +222,34 @@ const ExchangeRateWidget = () => {
                     </div>
                 </div>
 
+                {/* Price Converter Section */}
+                <div className="mt-6 p-4 bg-black/10 backdrop-blur-sm rounded-xl border border-white/5">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Calculator className="w-4 h-4 text-white/70" />
+                        <h4 className="text-white/80 text-xs font-bold uppercase tracking-wider">محول العملات السريع</h4>
+                    </div>
+                    <div className="space-y-3">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                <span className="text-white/40 text-xs font-bold">$</span>
+                            </div>
+                            <input
+                                type="number"
+                                value={convertAmount}
+                                onChange={(e) => setConvertAmount(e.target.value)}
+                                placeholder="المبلغ بالدولار..."
+                                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pr-8 pl-3 text-white text-sm focus:bg-white/10 outline-none transition-all placeholder:text-white/20"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-white/50 text-[10px]">القيمة المقابلة:</span>
+                            <span className="text-white font-mono font-bold">
+                                {(Number(convertAmount) * exchangeRate.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {getCurrencyLabel(defaultCurrency)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Source Badge */}
                 <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
                     <p className="text-white/50 text-xs">
@@ -243,5 +267,6 @@ const ExchangeRateWidget = () => {
         </motion.div>
     );
 };
+
 
 export default ExchangeRateWidget;

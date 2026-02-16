@@ -18,18 +18,76 @@ import {
     FileText,
     X,
     AlertCircle,
-    Undo2
+    Ban,
+    Clock,
+    Truck
 } from 'lucide-react';
 import { supplierService, type SupplierOutstandingDto } from '../../services/supplierService';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
+import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
+import { formatNumber, formatDate } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 
-// Stat Card Component
+
+// --- Calculation Helpers (matching PurchaseOrderFormPage) ---
+const calculateInvoiceTotals = (invoice: SupplierInvoiceDto): SupplierInvoiceDto => {
+    let subTotal = 0;
+    let totalDiscountAmount = 0;
+    let totalTaxAmount = 0;
+
+    const updatedItems = (invoice.items || []).map(item => {
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const discountRate = (Number(item.discountPercentage) || 0) / 100;
+        const taxRate = (Number(item.taxPercentage) || 0) / 100;
+
+        const grossAmount = qty * price;
+        const discountAmount = grossAmount * discountRate;
+        const taxableAmount = grossAmount - discountAmount;
+        const taxAmount = taxableAmount * taxRate;
+        const totalPrice = taxableAmount + taxAmount;
+
+        subTotal += grossAmount;
+        totalDiscountAmount += discountAmount;
+        totalTaxAmount += taxAmount;
+
+        return {
+            ...item,
+            discountAmount,
+            taxAmount,
+            totalPrice
+        };
+    });
+
+    const deliveryCost = Number(invoice.deliveryCost) || 0;
+    const otherCosts = Number(invoice.otherCosts) || 0;
+
+    const grandTotal = (subTotal - totalDiscountAmount) + totalTaxAmount + deliveryCost + otherCosts;
+
+    return {
+        ...invoice,
+        items: updatedItems,
+        subTotal,
+        discountAmount: totalDiscountAmount,
+        taxAmount: totalTaxAmount,
+        deliveryCost,
+        otherCosts,
+        totalAmount: grandTotal
+    };
+};
+
+// --- Reusable Components ---
+
 const StatCard: React.FC<{
     icon: React.ElementType;
     value: string | number;
     label: string;
     color: 'primary' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
-}> = ({ icon: Icon, value, label, color }) => {
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    suffix?: string;
+}> = ({ icon: Icon, value, label, color, getCurrencyLabel, defaultCurrency, suffix }) => {
+
     const colorClasses = {
         primary: 'bg-brand-primary/10 text-brand-primary',
         success: 'bg-emerald-100 text-emerald-600',
@@ -40,95 +98,349 @@ const StatCard: React.FC<{
     };
 
     return (
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
-            hover:border-brand-primary/20 transition-all duration-300 group">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg hover:border-brand-primary/20 transition-all duration-300 group">
             <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${colorClasses[color]} 
-                    group-hover:scale-110 transition-transform duration-300`}>
+                <div
+                    className={`p-3 rounded-xl ${colorClasses[color]} group-hover:scale-110 transition-transform duration-300`}
+                >
                     <Icon className="w-5 h-5" />
                 </div>
                 <div>
-                    <div className="text-2xl font-bold text-slate-800">{value}</div>
+                    <div className="text-2xl font-bold text-slate-800">
+                        {value} {suffix || getCurrencyLabel(defaultCurrency)}
+                    </div>
                     <div className="text-sm text-slate-500">{label}</div>
                 </div>
+
             </div>
         </div>
     );
 };
 
-// Balance Table Row Component
+// --- Balance Table Row ---
+
 const BalanceTableRow: React.FC<{
     summary: SupplierOutstandingDto;
     index: number;
     onView: (id: number) => void;
-}> = ({ summary, index, onView }) => (
-    <tr
-        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
-        style={{
-            animationDelay: `${index * 30}ms`,
-            animation: 'fadeInUp 0.3s ease-out forwards'
-        }}
-    >
-        <td className="px-6 py-4">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
-                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Building2 className="w-5 h-5 text-brand-primary" />
-                </div>
-                <div>
-                    <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                        {summary.supplierNameAr}
-                    </div>
-                    <div className="text-xs text-slate-400 font-mono">#{summary.supplierCode}</div>
-                </div>
-            </div>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="font-medium text-slate-600">
-                {(summary.totalInvoiced || 0).toLocaleString()} {summary.currency || 'EGP'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="font-medium text-amber-600">
-                {(summary.totalReturned || 0).toLocaleString()} {summary.currency || 'EGP'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className="font-medium text-emerald-600">
-                {(summary.totalPaid || 0).toLocaleString()} {summary.currency || 'EGP'}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <span className={`font-bold ${(summary.currentBalance || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {Math.abs(summary.currentBalance || 0).toLocaleString()} {summary.currency || 'EGP'}
-                {(summary.currentBalance || 0) > 0 ? ' (لم يسدد)' : (summary.currentBalance || 0) < 0 ? ' (له رصيد)' : ''}
-            </span>
-        </td>
-        <td className="px-6 py-4 text-center">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
-                <CreditCard className="w-3 h-3" />
-                {(summary.creditLimit || 0).toLocaleString()}
-            </div>
-        </td>
-        <td className="px-6 py-4">
-            <button
-                onClick={() => onView(summary.id)}
-                className="p-2 text-brand-primary bg-brand-primary/5 rounded-lg hover:bg-brand-primary 
-                    hover:text-white transition-all"
-                title="عرض التفاصيل"
-            >
-                <Eye className="w-4 h-4" />
-            </button>
-        </td>
-    </tr>
-);
+    isExpanded: boolean;
+    onToggleExpand: (id: number) => void;
+    invoices: SupplierInvoiceDto[];
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ summary, index, onView, isExpanded, onToggleExpand, invoices, getCurrencyLabel, defaultCurrency, convertAmount }) => {
 
-// Order Table Row Component
+
+
+    const [expandedInvoiceId, setExpandedInvoiceId] = React.useState<number | null>(null);
+
+    return (
+        <>
+            <tr
+                className={`hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer ${isExpanded ? 'bg-brand-primary/5' : ''
+                    }`}
+                onClick={() => onToggleExpand(summary.id)}
+                style={{
+                    animationDelay: `${index * 30}ms`,
+                    animation: 'fadeInUp 0.3s ease-out forwards'
+                }}
+            >
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Building2 className="w-5 h-5 text-brand-primary" />
+                        </div>
+                        <div>
+                            <div className="font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                                {summary.supplierNameAr}
+                            </div>
+                            <div className="text-xs text-slate-400 font-mono">
+                                #{summary.supplierCode}
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span className="font-medium text-slate-600">
+                        {formatNumber(convertAmount(summary.totalInvoiced ?? 0, summary.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                    </span>
+
+
+
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span className="font-medium text-amber-600">
+                        {formatNumber(convertAmount(summary.totalReturned ?? 0, summary.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                    </span>
+
+
+
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span className="font-medium text-emerald-600">
+                        {formatNumber(convertAmount(summary.totalPaid ?? 0, summary.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                    </span>
+
+
+
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <span
+                        className={`font-bold ${(summary.currentBalance || 0) > 0
+                            ? 'text-rose-600'
+                            : 'text-emerald-600'
+                            }`}
+                    >
+                        {formatNumber(Math.abs(convertAmount(summary.currentBalance ?? 0, summary.currency || 'EGP')))}{' '}
+                        {getCurrencyLabel(defaultCurrency)}
+
+
+
+                        {(summary.currentBalance || 0) > 0
+                            ? ' (لم يسدد)'
+                            : (summary.currentBalance || 0) < 0
+                                ? ' (له رصيد)'
+                                : ''}
+                    </span>
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
+                        <CreditCard className="w-3 h-3" />
+                        {formatNumber(summary.creditLimit ?? 0)}
+                    </div>
+                </td>
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onView(summary.id);
+                            }}
+                            className="p-2 text-brand-primary bg-brand-primary/5 rounded-lg hover:bg-brand-primary hover:text-white transition-all"
+                            title="عرض الملف"
+                        >
+                            <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                            className={`p-2 rounded-lg transition-all ${isExpanded
+                                ? 'bg-slate-200 text-slate-600'
+                                : 'hover:bg-slate-100 text-slate-400'
+                                }`}
+                        >
+                            {isExpanded ? (
+                                <TrendingUp className="w-4 h-4" />
+                            ) : (
+                                <TrendingDown className="w-4 h-4" />
+                            )}
+                        </button>
+                    </div>
+                </td>
+            </tr>
+
+            {isExpanded && (
+                <tr className="bg-slate-50/50">
+                    <td colSpan={7} className="px-6 py-4">
+                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-slate-500" />
+                                <span className="font-bold text-slate-700 text-sm">
+                                    تفاصيل الفواتير ({invoices.length})
+                                </span>
+                            </div>
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-500">
+                                        <th className="px-4 py-2 text-right">رقم الفاتورة</th>
+                                        <th className="px-4 py-2 text-right">التاريخ</th>
+                                        <th className="px-4 py-2 text-right">المبلغ الكلي</th>
+                                        <th className="px-4 py-2 text-right">المدفوع</th>
+                                        <th className="px-4 py-2 text-right">المتبقي</th>
+                                        <th className="px-4 py-2 text-center">الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {invoices.length === 0 ? (
+                                        <tr>
+                                            <td
+                                                colSpan={6}
+                                                className="px-4 py-8 text-center text-slate-400"
+                                            >
+                                                لا توجد فواتير مسجلة
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        invoices.map(inv => (
+                                            <React.Fragment key={inv.id}>
+                                                <tr
+                                                    className="hover:bg-slate-50 cursor-pointer"
+                                                    onClick={() =>
+                                                        setExpandedInvoiceId(prev =>
+                                                            prev === inv.id
+                                                                ? null
+                                                                : inv.id || null
+                                                        )
+                                                    }
+                                                >
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <button className="text-slate-400 hover:text-brand-primary transition-colors">
+                                                                {expandedInvoiceId === inv.id ? (
+                                                                    <TrendingUp className="w-4 h-4" />
+                                                                ) : (
+                                                                    <TrendingDown className="w-4 h-4" />
+                                                                )}
+                                                            </button>
+                                                            <span className="font-mono text-brand-primary">
+                                                                {inv.invoiceNumber}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-600">
+                                                        {formatDate(inv.invoiceDate)}
+                                                    </td>
+                                                    <td className="px-4 py-3 font-medium">
+                                                        {formatNumber(convertAmount(inv.totalAmount || 0, inv.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                                                    </td>
+
+
+                                                    <td className="px-4 py-3 text-emerald-600">
+                                                        {formatNumber(convertAmount(inv.paidAmount ?? 0, inv.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                                                    </td>
+
+
+                                                    <td className="px-4 py-3 text-rose-600">
+                                                        {formatNumber(convertAmount(inv.remainingAmount ?? 0, inv.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                                                    </td>
+
+
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span
+                                                            className={`px-2 py-0.5 rounded text-xs font-bold ${inv.status === 'Paid'
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : inv.status === 'Partial'
+                                                                    ? 'bg-amber-100 text-amber-700'
+                                                                    : 'bg-rose-100 text-rose-700'
+                                                                }`}
+                                                        >
+                                                            {inv.status === 'Paid'
+                                                                ? 'مدفوعة'
+                                                                : inv.status === 'Partial'
+                                                                    ? 'جزئي'
+                                                                    : 'غير مدفوعة'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+
+                                                {expandedInvoiceId === inv.id &&
+                                                    inv.items &&
+                                                    inv.items.length > 0 && (
+                                                        <tr>
+                                                            <td
+                                                                colSpan={6}
+                                                                className="px-4 py-2 bg-slate-50/50"
+                                                            >
+                                                                <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                                                                    <div className="px-3 py-2 bg-slate-100 border-b border-slate-200">
+                                                                        <span className="text-xs font-bold text-slate-600">
+                                                                            أصناف الفاتورة
+                                                                        </span>
+                                                                    </div>
+                                                                    <table className="w-full text-xs">
+                                                                        <thead>
+                                                                            <tr className="bg-slate-50 text-slate-500">
+                                                                                <th className="px-3 py-2 text-right">
+                                                                                    الصنف
+                                                                                </th>
+                                                                                <th className="px-3 py-2 text-center">
+                                                                                    الكمية
+                                                                                </th>
+                                                                                <th className="px-3 py-2 text-center">
+                                                                                    الوحدة
+                                                                                </th>
+                                                                                <th className="px-3 py-2 text-center">
+                                                                                    السعر
+                                                                                </th>
+                                                                                <th className="px-3 py-2 text-center">
+                                                                                    خصم %
+                                                                                </th>
+                                                                                <th className="px-3 py-2 text-center">
+                                                                                    الضريبة %
+                                                                                </th>
+                                                                                <th className="px-3 py-2 text-center">
+                                                                                    الإجمالي
+                                                                                </th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-slate-100">
+                                                                            {inv.items.map(
+                                                                                (item, idx) => (
+                                                                                    <tr
+                                                                                        key={idx}
+                                                                                        className="hover:bg-slate-50"
+                                                                                    >
+                                                                                        <td className="px-3 py-2 text-slate-700">
+                                                                                            {item.itemNameAr}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-center font-medium text-brand-primary">
+                                                                                            {item.quantity}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-center text-slate-600">
+                                                                                            {item.unitNameAr}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-center font-medium text-emerald-600">
+                                                                                            {formatNumber(
+                                                                                                item.unitPrice
+                                                                                            )}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-center text-rose-600">
+                                                                                            {item.discountPercentage ||
+                                                                                                0}
+                                                                                            %
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-center text-amber-600">
+                                                                                            {item.taxPercentage ||
+                                                                                                0}
+                                                                                            %
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-center font-bold text-slate-800">
+                                                                                            {formatNumber(
+                                                                                                item.totalPrice
+                                                                                            )}
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                )
+                                                                            )}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                            </React.Fragment>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+            )}
+        </>
+    );
+};
+// --- Order Table Row ---
+
 const OrderTableRow: React.FC<{
     order: PurchaseOrderDto;
     index: number;
     onView: (id: number) => void;
-}> = ({ order, index, onView }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ order, index, onView, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -138,8 +450,7 @@ const OrderTableRow: React.FC<{
     >
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 
-                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                     <ShoppingCart className="w-5 h-5 text-emerald-600" />
                 </div>
                 <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
@@ -148,19 +459,19 @@ const OrderTableRow: React.FC<{
             </div>
         </td>
         <td className="px-6 py-4 text-sm text-slate-600">
-            {new Date(order.poDate!).toLocaleDateString('ar-EG')}
+            {formatDate(order.poDate!)}
         </td>
         <td className="px-6 py-4 text-sm font-medium text-slate-700">
             {order.supplierNameAr}
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-emerald-600">
-                {order.totalAmount.toLocaleString()} {order.currency}
+                {formatNumber(convertAmount(order.totalAmount || 0, order.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
+
         <td className="px-6 py-4 text-center">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold 
-                border bg-emerald-50 text-emerald-700 border-emerald-200">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 مغلق
             </span>
@@ -177,7 +488,8 @@ const OrderTableRow: React.FC<{
     </tr>
 );
 
-// Loading Skeleton
+// --- Loading Skeleton ---
+
 const TableSkeleton: React.FC<{ columns: number }> = ({ columns }) => (
     <>
         {[1, 2, 3, 4, 5].map(i => (
@@ -190,7 +502,8 @@ const TableSkeleton: React.FC<{ columns: number }> = ({ columns }) => (
     </>
 );
 
-// Empty State
+// --- Empty State ---
+
 const EmptyState: React.FC<{
     icon: React.ElementType;
     message: string;
@@ -209,14 +522,23 @@ const EmptyState: React.FC<{
     </tr>
 );
 
+// --- Main Page Component ---
+
+type FilterType = 'All' | 'Debit' | 'Credit';
+
 const SupplierOutstandingPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'balances' | 'orders'>('balances');
     const [summaries, setSummaries] = useState<SupplierOutstandingDto[]>([]);
     const [orders, setOrders] = useState<PurchaseOrderDto[]>([]);
+    const [allInvoices, setAllInvoices] = useState<SupplierInvoiceDto[]>([]);
+    const [expandedSupplierId, setExpandedSupplierId] = useState<number | null>(null);
+
     const [searchTerm, setSearchTerm] = useState('');
-    const [filter, setFilter] = useState<'All' | 'Debit' | 'Credit'>('All');
+    const [filter, setFilter] = useState<FilterType>('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     useEffect(() => {
@@ -226,12 +548,14 @@ const SupplierOutstandingPage: React.FC = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [suppliersRes, posRes] = await Promise.all([
+            const [suppliersRes, posRes, invoicesRes] = await Promise.all([
                 supplierService.getOutstandingSummary(),
-                purchaseOrderService.getAllPOs()
+                purchaseOrderService.getAllPOs(),
+                supplierInvoiceService.getAllInvoices()
             ]);
             setSummaries(suppliersRes.data || []);
             setOrders(posRes || []);
+            setAllInvoices(invoicesRes.data || []);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
@@ -240,7 +564,7 @@ const SupplierOutstandingPage: React.FC = () => {
     };
 
     const filteredSummaries = useMemo(() => {
-        return summaries.filter(s => {
+        const filtered = summaries.filter(s => {
             const matchesSearch =
                 s.supplierNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 s.supplierCode.toLowerCase().includes(searchTerm.toLowerCase());
@@ -252,33 +576,75 @@ const SupplierOutstandingPage: React.FC = () => {
 
             return matchesSearch && matchesFilter;
         });
+
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [summaries, searchTerm, filter]);
 
     const filteredOrders = useMemo(() => {
-        return orders.filter(o => {
+        const filtered = orders.filter(o => {
             const isClosed = o.status === 'Closed';
             const matchesSearch =
                 o.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 o.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
             return isClosed && matchesSearch;
         });
+
+        return [...filtered].sort((a, b) => {
+            const dateA = a.poDate ? new Date(a.poDate).getTime() : 0;
+            const dateB = b.poDate ? new Date(b.poDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
+        });
     }, [orders, searchTerm]);
 
     const stats = useMemo(() => {
-        const totalOutstanding = summaries.reduce((acc, curr) => acc + (curr.currentBalance || 0), 0);
-        const totalPaid = summaries.reduce((acc, curr) => acc + (curr.totalPaid || 0), 0);
-        const totalInvoiced = summaries.reduce((acc, curr) => acc + (curr.totalInvoiced || 0), 0);
-        const totalReturned = summaries.reduce((acc, curr) => acc + (curr.totalReturned || 0), 0);
-        const providersWithBalance = summaries.filter(s => (s.currentBalance || 0) > 0).length;
+        const totalOutstanding = summaries.reduce(
+            (acc, curr) => acc + convertAmount(curr.currentBalance || 0, curr.currency || 'EGP'),
+            0
+        );
+        const totalPaid = summaries.reduce(
+            (acc, curr) => acc + convertAmount(curr.totalPaid || 0, curr.currency || 'EGP'),
+            0
+        );
+        const totalInvoiced = summaries.reduce(
+            (acc, curr) => acc + convertAmount(curr.totalInvoiced || 0, curr.currency || 'EGP'),
+            0
+        );
+        const totalReturned = summaries.reduce(
+            (acc, curr) => acc + convertAmount(curr.totalReturned || 0, curr.currency || 'EGP'),
+            0
+        );
+
+        const providersWithBalance = summaries.filter(
+            s => (s.currentBalance || 0) > 0
+        ).length;
+
+        const calculatedInvoices = allInvoices.map(inv => calculateInvoiceTotals(inv));
+        const totalTax = calculatedInvoices.reduce(
+            (sum, inv) => sum + convertAmount(inv.taxAmount || 0, inv.currency || 'EGP'),
+            0
+        );
+        const totalDiscount = calculatedInvoices.reduce(
+            (sum, inv) => sum + convertAmount(inv.discountAmount || 0, inv.currency || 'EGP'),
+            0
+        );
+        const totalDelivery = calculatedInvoices.reduce(
+            (sum, inv) => sum + convertAmount(inv.deliveryCost || 0, inv.currency || 'EGP'),
+            0
+        );
+
 
         return {
-            totalOutstanding: totalOutstanding.toLocaleString(),
-            totalPaid: totalPaid.toLocaleString(),
-            totalInvoiced: totalInvoiced.toLocaleString(),
-            totalReturned: totalReturned.toLocaleString(),
+            totalOutstanding: formatNumber(totalOutstanding),
+            totalPaid: formatNumber(totalPaid),
+            totalInvoiced: formatNumber(totalInvoiced),
+            totalReturned: formatNumber(totalReturned),
+            totalTax: formatNumber(totalTax),
+            totalDiscount: formatNumber(totalDiscount),
+            totalDelivery: formatNumber(totalDelivery),
             providersWithBalance
         };
-    }, [summaries]);
+    }, [summaries, allInvoices]);
 
     const handleViewSupplier = (id: number) => {
         navigate(`/dashboard/procurement/suppliers/${id}`);
@@ -288,9 +654,12 @@ const SupplierOutstandingPage: React.FC = () => {
         navigate(`/dashboard/procurement/po/${id}`);
     };
 
+    const handleToggleExpand = (id: number) => {
+        setExpandedSupplierId(prev => (prev === id ? null : id));
+    };
+
     return (
         <div className="space-y-6">
-            {/* Custom Styles */}
             <style>{`
                 @keyframes fadeInUp {
                     from {
@@ -304,10 +673,8 @@ const SupplierOutstandingPage: React.FC = () => {
                 }
             `}</style>
 
-            {/* Header Section */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
-                rounded-3xl p-8 text-white">
-                {/* Decorative Elements */}
+            {/* Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white">
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
                 <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
@@ -319,69 +686,103 @@ const SupplierOutstandingPage: React.FC = () => {
                             <Wallet className="w-10 h-10" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold mb-2">الأرصدة المستحقة للموردين</h1>
-                            <p className="text-white/70 text-lg">متابعة المديونيات، الفواتير، والمدفوعات لكل مورد</p>
+                            <h1 className="text-3xl font-bold mb-2">
+                                الأرصدة المستحقة للموردين
+                            </h1>
+                            <p className="text-white/70 text-lg">
+                                متابعة المديونيات، الفواتير، والمدفوعات لكل مورد
+                            </p>
                         </div>
                     </div>
 
                     <div className="flex gap-3">
-                        <button
-                            className="flex items-center gap-2 px-4 py-3 bg-white/10 backdrop-blur-sm text-white 
-                                rounded-xl font-bold hover:bg-white/20 transition-all duration-200"
-                        >
+                        <button className="flex items-center gap-2 px-4 py-3 bg-white/10 backdrop-blur-sm text-white rounded-xl font-bold hover:bg-white/20 transition-all duration-200">
                             <Download className="w-4 h-4" />
                             <span className="hidden sm:inline">تصدير</span>
                         </button>
                         <button
                             onClick={fetchData}
                             disabled={loading}
-                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-xl hover:bg-white/20 
-                                transition-all duration-200 disabled:opacity-50"
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-xl hover:bg-white/20 transition-all duration-200 disabled:opacity-50"
                         >
-                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                            <RefreshCw
+                                className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
+                            />
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <StatCard
                     icon={Wallet}
                     value={stats.totalOutstanding}
                     label="إجمالي المستحقات"
                     color="rose"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
+
+
                 <StatCard
                     icon={TrendingUp}
                     value={stats.totalInvoiced}
                     label="إجمالي الفواتير"
                     color="blue"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
-                    icon={Undo2}
-                    value={stats.totalReturned}
-                    label="إجمالي المرتجعات"
-                    color="purple"
+                    icon={Ban}
+                    value={stats.totalDiscount}
+                    label="إجمالي الخصومات"
+                    color="rose"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
+                />
+                <StatCard
+                    icon={Clock}
+                    value={stats.totalTax}
+                    label="إجمالي الضريبة"
+                    color="warning"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
+                />
+                <StatCard
+                    icon={Truck}
+                    value={stats.totalDelivery}
+                    label="إجمالي مصاريف الشحن"
+                    color="blue"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={TrendingDown}
                     value={stats.totalPaid}
                     label="إجمالي المدفوعات"
                     color="success"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
                 <StatCard
                     icon={AlertCircle}
                     value={stats.providersWithBalance}
-                    label="موردين لهم مديونية"
+                    label="موردين بمديونية"
                     color="warning"
+                    suffix="مورد"
+                    getCurrencyLabel={getCurrencyLabel}
+                    defaultCurrency={defaultCurrency}
                 />
+
             </div>
 
+            {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-center gap-3 text-blue-700 text-sm">
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-5 h-5 shrink-0" />
                 <p className="font-medium">
-                    المعادلة الحسابية: الرصيد الحالي = إجمالي الفواتير - إجمالي المرتجعات - إجمالي المدفوعات
+                    المعادلة الحسابية: الرصيد الحالي = إجمالي الفواتير - إجمالي المرتجعات -
+                    إجمالي المدفوعات
                 </p>
             </div>
 
@@ -389,20 +790,20 @@ const SupplierOutstandingPage: React.FC = () => {
             <div className="flex gap-2 p-1 bg-white w-fit rounded-2xl border border-slate-100 shadow-sm">
                 <button
                     onClick={() => setActiveTab('balances')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'balances'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'balances'
+                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                        : 'text-slate-500 hover:text-slate-700'
+                        }`}
                 >
                     <Wallet className="w-4 h-4" />
                     <span>أرصدة الموردين</span>
                 </button>
                 <button
                     onClick={() => setActiveTab('orders')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all
-                        ${activeTab === 'orders'
-                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
-                            : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'orders'
+                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                        : 'text-slate-500 hover:text-slate-700'
+                        }`}
                 >
                     <ShoppingCart className="w-4 h-4" />
                     <span>أوامر مغلقة</span>
@@ -414,33 +815,36 @@ const SupplierOutstandingPage: React.FC = () => {
                 </button>
             </div>
 
-            {/* Filters */}
+            {/* Search & Filters */}
             <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="relative flex-1">
-                        <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
-                            transition-colors duration-200
-                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
+                        <Search
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-200 ${isSearchFocused
+                                ? 'text-brand-primary'
+                                : 'text-slate-400'
+                                }`}
+                        />
                         <input
                             type="text"
-                            placeholder={activeTab === 'balances'
-                                ? "بحث باسم المورد أو كود المورد..."
-                                : "بحث برقم الأمر أو المورد..."}
+                            placeholder={
+                                activeTab === 'balances'
+                                    ? 'بحث باسم المورد أو كود المورد...'
+                                    : 'بحث برقم الأمر أو المورد...'
+                            }
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
                             onBlur={() => setIsSearchFocused(false)}
-                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
-                                outline-none bg-slate-50
-                                ${isSearchFocused
-                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
-                                    : 'border-transparent hover:border-slate-200'}`}
+                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none bg-slate-50 ${isSearchFocused
+                                ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                : 'border-transparent hover:border-slate-200'
+                                }`}
                         />
                         {searchTerm && (
                             <button
                                 onClick={() => setSearchTerm('')}
-                                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 
-                                    rounded-full transition-colors"
+                                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-full transition-colors"
                             >
                                 <X className="w-4 h-4 text-slate-400" />
                             </button>
@@ -448,12 +852,13 @@ const SupplierOutstandingPage: React.FC = () => {
                     </div>
 
                     {activeTab === 'balances' && (
-                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent
-                            hover:border-slate-200 transition-all duration-200">
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-slate-200 transition-all duration-200">
                             <Filter className="text-slate-400 w-5 h-5" />
                             <select
                                 value={filter}
-                                onChange={(e) => setFilter(e.target.value as any)}
+                                onChange={(e) =>
+                                    setFilter(e.target.value as FilterType)
+                                }
                                 className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
                             >
                                 <option value="All">جميع الأرصدة</option>
@@ -470,12 +875,19 @@ const SupplierOutstandingPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <div className="w-1.5 h-6 bg-brand-primary rounded-full" />
                     <span className="text-slate-600">
-                        عرض <span className="font-bold text-slate-800">
-                            {activeTab === 'balances' ? filteredSummaries.length : filteredOrders.length}
-                        </span> من{' '}
+                        عرض{' '}
                         <span className="font-bold text-slate-800">
-                            {activeTab === 'balances' ? summaries.length : orders.filter(o => o.status === 'Closed').length}
-                        </span> {activeTab === 'balances' ? 'مورد' : 'أمر'}
+                            {activeTab === 'balances'
+                                ? filteredSummaries.length
+                                : filteredOrders.length}
+                        </span>{' '}
+                        من{' '}
+                        <span className="font-bold text-slate-800">
+                            {activeTab === 'balances'
+                                ? summaries.length
+                                : orders.filter(o => o.status === 'Closed').length}
+                        </span>{' '}
+                        {activeTab === 'balances' ? 'مورد' : 'أمر'}
                     </span>
                 </div>
             )}
@@ -487,23 +899,37 @@ const SupplierOutstandingPage: React.FC = () => {
                         <table className="w-full">
                             <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                                 <tr>
-                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
-                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">إجمالي الفواتير</th>
-                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">إجمالي المرتجعات</th>
-                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">إجمالي المدفوعات</th>
-                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">الرصيد الحالي</th>
-                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">حد الائتمان</th>
-                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                        المورد
+                                    </th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">
+                                        إجمالي الفواتير
+                                    </th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">
+                                        إجمالي المرتجعات
+                                    </th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">
+                                        إجمالي المدفوعات
+                                    </th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">
+                                        الرصيد الحالي
+                                    </th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">
+                                        حد الائتمان
+                                    </th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                        إجراءات
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <TableSkeleton columns={6} />
+                                    <TableSkeleton columns={7} />
                                 ) : filteredSummaries.length === 0 ? (
                                     <EmptyState
                                         icon={DollarSign}
                                         message="لم يتم العثور على موردين مطابقين للبحث"
-                                        columns={6}
+                                        columns={7}
                                     />
                                 ) : (
                                     filteredSummaries.map((summary, index) => (
@@ -512,6 +938,16 @@ const SupplierOutstandingPage: React.FC = () => {
                                             summary={summary}
                                             index={index}
                                             onView={handleViewSupplier}
+                                            isExpanded={
+                                                expandedSupplierId === summary.id
+                                            }
+                                            onToggleExpand={handleToggleExpand}
+                                            invoices={allInvoices.filter(
+                                                inv => inv.supplierId === summary.id
+                                            )}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
                                         />
                                     ))
                                 )}
@@ -521,12 +957,24 @@ const SupplierOutstandingPage: React.FC = () => {
                         <table className="w-full">
                             <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                                 <tr>
-                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم الأمر</th>
-                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>
-                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
-                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الإجمالي</th>
-                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">الحالة</th>
-                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                        رقم الأمر
+                                    </th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                        التاريخ
+                                    </th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                        المورد
+                                    </th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                        الإجمالي
+                                    </th>
+                                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">
+                                        الحالة
+                                    </th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                        إجراءات
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -545,6 +993,9 @@ const SupplierOutstandingPage: React.FC = () => {
                                             order={order}
                                             index={index}
                                             onView={handleViewOrder}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
                                         />
                                     ))
                                 )}

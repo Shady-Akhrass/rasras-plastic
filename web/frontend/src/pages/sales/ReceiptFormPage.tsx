@@ -14,10 +14,10 @@ const RECEIPT_TYPES: { value: ReceiptType; label: string }[] = [
 ];
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
-    { value: 'CASH', label: 'نقداً' },
-    { value: 'CHEQUE', label: 'شيك' },
-    { value: 'BANK_TRANSFER', label: 'تحويل بنكي' },
-    { value: 'PROMISSORY_NOTE', label: 'كمبيالة' }
+    { value: 'Cash', label: 'نقداً' },
+    { value: 'Cheque', label: 'شيك' },
+    { value: 'BankTransfer', label: 'تحويل بنكي' },
+    { value: 'PromissoryNote', label: 'كمبيالة' }
 ];
 
 const ReceiptFormPage: React.FC = () => {
@@ -32,10 +32,10 @@ const ReceiptFormPage: React.FC = () => {
     const [invoices, setInvoices] = useState<any[]>([]);
 
     const [form, setForm] = useState<ReceiptDto>({
-        receiptDate: new Date().toISOString().split('T')[0],
+        voucherDate: new Date().toISOString().split('T')[0],
         receiptType: 'FROM_CUSTOMER',
-        paymentMethod: 'CASH',
-        receivedAmount: 0,
+        paymentMethod: 'Cash',
+        amount: 0,
         invoiceTotal: 0,
         earlyDiscount: 0,
         refundOrReturn: 0,
@@ -64,7 +64,7 @@ const ReceiptFormPage: React.FC = () => {
                 invoiceDate: inv.invoiceDate,
                 invoiceTotal: inv.totalAmount,
                 saleOrderNumber: inv.saleOrderNumber,
-                receivedAmount: inv.balanceAmount ?? inv.totalAmount ?? 0
+                amount: inv.balanceAmount ?? inv.totalAmount ?? 0
             }));
         }
     };
@@ -89,7 +89,7 @@ const ReceiptFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.receivedAmount || form.receivedAmount <= 0) { toast.error('أدخل المبلغ المقبوض'); return; }
+        if (!form.amount || form.amount <= 0) { toast.error('أدخل المبلغ المقبوض'); return; }
         setSaving(true);
         try {
             await receiptService.create(form);
@@ -101,13 +101,13 @@ const ReceiptFormPage: React.FC = () => {
         } finally { setSaving(false); }
     };
 
-    if (!isNew && !form.receiptNumber && loading) return <div className="p-8 text-center">جاري التحميل...</div>;
+    if (!isNew && !form.voucherNumber && loading) return <div className="p-8 text-center">جاري التحميل...</div>;
 
     return (
         <div className="space-y-6 max-w-2xl mx-auto pb-12">
             <div className="flex items-center gap-4">
                 <button onClick={() => navigate('/dashboard/sales/receipts')} className="p-2 hover:bg-slate-100 rounded-xl"><ChevronRight className="w-6 h-6" /></button>
-                <h1 className="text-xl font-bold text-slate-800">{isNew ? 'سند قبض جديد' : `سند قبض ${form.receiptNumber || ''}`}</h1>
+                <h1 className="text-xl font-bold text-slate-800">{isNew ? 'سند قبض جديد' : `سند قبض ${form.voucherNumber || ''}`}</h1>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -122,7 +122,7 @@ const ReceiptFormPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">تاريخ السند *</label>
-                            <input type="date" value={form.receiptDate || ''} onChange={(e) => setForm((f) => ({ ...f, receiptDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required />
+                            <input type="date" value={form.voucherDate || ''} onChange={(e) => setForm((f) => ({ ...f, voucherDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required />
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">اسم المُودِع</label>
@@ -153,7 +153,7 @@ const ReceiptFormPage: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">المبلغ المقبوض *</label>
-                            <input type="number" min={0.01} step={0.01} value={form.receivedAmount ?? ''} onChange={(e) => setForm((f) => ({ ...f, receivedAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required />
+                            <input type="number" min={0.01} step={0.01} value={form.amount ?? ''} onChange={(e) => setForm((f) => ({ ...f, amount: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required />
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">طريقة الدفع *</label>
@@ -161,19 +161,19 @@ const ReceiptFormPage: React.FC = () => {
                                 {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                             </select>
                         </div>
-                        {form.paymentMethod === 'CHEQUE' && (
+                        {form.paymentMethod === 'Cheque' && (
                             <>
                                 <div><label className="block text-sm font-semibold text-slate-700 mb-1">رقم الشيك</label><input type="text" value={form.chequeNo || ''} onChange={(e) => setForm((f) => ({ ...f, chequeNo: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" /></div>
                                 <div><label className="block text-sm font-semibold text-slate-700 mb-1">البنك</label><input type="text" value={form.chequeBank || ''} onChange={(e) => setForm((f) => ({ ...f, chequeBank: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" /></div>
                             </>
                         )}
-                        {form.paymentMethod === 'BANK_TRANSFER' && (
+                        {form.paymentMethod === 'BankTransfer' && (
                             <>
                                 <div><label className="block text-sm font-semibold text-slate-700 mb-1">رقم الحساب</label><input type="text" value={form.bankAccountNo || ''} onChange={(e) => setForm((f) => ({ ...f, bankAccountNo: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" /></div>
                                 <div><label className="block text-sm font-semibold text-slate-700 mb-1">رقم التحويل</label><input type="text" value={form.transferRef || ''} onChange={(e) => setForm((f) => ({ ...f, transferRef: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" /></div>
                             </>
                         )}
-                        {form.paymentMethod === 'PROMISSORY_NOTE' && (
+                        {form.paymentMethod === 'PromissoryNote' && (
                             <>
                                 <div><label className="block text-sm font-semibold text-slate-700 mb-1">رقم الكمبيالة</label><input type="text" value={form.promissoryNo || ''} onChange={(e) => setForm((f) => ({ ...f, promissoryNo: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" /></div>
                                 <div><label className="block text-sm font-semibold text-slate-700 mb-1">تاريخ استحقاق الكمبيالة</label><input type="date" value={form.promissoryDueDate || ''} onChange={(e) => setForm((f) => ({ ...f, promissoryDueDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" /></div>

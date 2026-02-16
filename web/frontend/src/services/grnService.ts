@@ -12,6 +12,7 @@ export interface GRNItemDto {
     unitNameAr?: string;
     unitCost?: number;
     totalCost?: number;
+    rejectedQty?: number;
     lotNumber?: string;
     manufactureDate?: string;
     expiryDate?: string;
@@ -32,7 +33,12 @@ export interface GoodsReceiptNoteDto {
     supplierInvoiceNo?: string;
     receivedByUserId: number;
     status?: string;
+    approvalStatus?: string;
     totalReceivedQty?: number;
+    shippingCost?: number;
+    otherCosts?: number;
+    totalAmount?: number;
+    currency?: string;
     notes?: string;
     items: GRNItemDto[];
 }
@@ -63,5 +69,8 @@ export const grnService = {
         const url = userId != null ? `/inventory/grn/${id}/submit?userId=${userId}` : `/inventory/grn/${id}/submit`;
         const response = await apiClient.post<{ data: GoodsReceiptNoteDto }>(url);
         return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
+    },
+    deleteGRN: async (id: number) => {
+        await apiClient.post(`/inventory/grn/${id}/delete`);
     },
 };

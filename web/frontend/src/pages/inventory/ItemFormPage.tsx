@@ -78,6 +78,70 @@ const FormInput: React.FC<{
     );
 };
 
+// Category Select - يعرض نوع التصنيف (أساسي/فرعي) بخط صغير
+const CategoryFormSelect: React.FC<{
+    label: string;
+    value: number | string;
+    onChange: (value: string) => void;
+    categories: ItemCategoryDto[];
+    icon?: React.ElementType;
+    required?: boolean;
+    placeholder?: string;
+}> = ({ label, value, onChange, categories, icon: Icon, required, placeholder }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const selected = categories.find(c => c.id === value || String(c.id) === String(value));
+    const typeLabel = (cat: ItemCategoryDto) => cat.parentCategoryId ? 'فرعي' : 'أساسي';
+
+    return (
+        <div className="space-y-2">
+            <label className={`block text-sm font-semibold transition-colors duration-200
+                ${isFocused ? 'text-brand-primary' : 'text-slate-700'}`}>
+                {label}
+                {required && <span className="text-rose-500 mr-1">*</span>}
+            </label>
+            <div className="relative">
+                {Icon && (
+                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 z-10 transition-all duration-200
+                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+                )}
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(!isOpen)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => { setIsFocused(false); setTimeout(() => setIsOpen(false), 150); }}
+                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none text-right
+                        appearance-none bg-white cursor-pointer flex items-center justify-between
+                        ${Icon ? 'pr-12' : ''}
+                        ${isFocused || isOpen
+                            ? 'border-brand-primary shadow-lg shadow-brand-primary/10'
+                            : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                    <span className={selected ? 'text-slate-800' : 'text-slate-400'}>
+                        {selected ? selected.categoryNameAr : placeholder}
+                    </span>
+                    <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? 'rotate-90' : 'rotate-[270deg]'}`} />
+                </button>
+                {isOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 py-1 bg-white border-2 border-brand-primary/30 rounded-xl shadow-lg z-50 max-h-60 overflow-auto">
+                        {categories.map(cat => (
+                            <button
+                                key={cat.id}
+                                type="button"
+                                onMouseDown={(e) => { e.preventDefault(); onChange(String(cat.id!)); setIsOpen(false); }}
+                                className={`w-full px-4 py-2.5 text-right hover:bg-brand-primary/5 flex flex-col items-end gap-0.5 ${selected?.id === cat.id ? 'bg-brand-primary/10' : ''}`}
+                            >
+                                <span className="font-medium text-slate-800">{cat.categoryNameAr}</span>
+                                <span className="text-[11px] text-slate-400 font-normal">{typeLabel(cat)}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // Form Select Component
 const FormSelect: React.FC<{
     label: string;
@@ -361,10 +425,13 @@ const ItemFormPage: React.FC = () => {
     });
 
     const [formData, setFormData] = useState<ItemDto>({
-        itemCode: '',
         itemNameAr: '',
         itemNameEn: '',
-        gradeName: '',
+        grade: '',
+        gradeName: undefined as number | undefined,
+        mi2: '',
+        mi21: '',
+        density: '',
         categoryId: 0,
         unitId: 0,
         barcode: '',
@@ -449,8 +516,62 @@ const ItemFormPage: React.FC = () => {
         }
     };
 
+    /** فحص المدخلات قبل الحفظ */
+    const validateForm = (): { valid: boolean; error?: string } => {
+        const nameAr = (formData.itemNameAr || '').trim();
+
+        if (!nameAr) return { valid: false, error: 'الاسم العربي مطلوب' };
+        if (!formData.categoryId) return { valid: false, error: 'يرجى اختيار التصنيف' };
+        if (!formData.unitId) return { valid: false, error: 'يرجى اختيار وحدة القياس' };
+
+        const min = Number(formData.minStockLevel) || 0;
+        const reorder = Number(formData.reorderLevel) || 0;
+        const max = Number(formData.maxStockLevel) || 0;
+
+        if (min <= 0 || reorder <= 0 || max <= 0) {
+            return {
+                valid: false,
+                error: 'مستويات المخزون (الحد الأدنى، حد إعادة الطلب، الحد الأقصى) مطلوبة ويجب أن تكون أكبر من صفر'
+            };
+        }
+        if (max > 0 && (min > reorder || reorder > max)) {
+            return { valid: false, error: 'الحد الأدنى ≤ حد إعادة الطلب ≤ الحد الأقصى' };
+        }
+
+        const cost = Number(formData.standardCost) || 0;
+        const purchase = Number(formData.lastPurchasePrice) || 0;
+        const sale = Number(formData.lastSalePrice) || 0;
+        const replacement = Number(formData.replacementPrice) || 0;
+        if (cost < 0 || purchase < 0 || sale < 0 || replacement < 0) {
+            return { valid: false, error: 'الأسعار والتكاليف لا يمكن أن تكون سالبة' };
+        }
+        if (cost <= 0 || purchase <= 0 || sale <= 0 || replacement <= 0) {
+            return {
+                valid: false,
+                error: 'الأسعار والتكاليف (التكلفة المعيارية، آخر سعر شراء، آخر سعر بيع، السعر الاستبدالي) مطلوبة ويجب أن تكون أكبر من صفر'
+            };
+        }
+
+        const vat = Number(formData.defaultVatRate) ?? 14;
+        if (vat < 0 || vat > 100) {
+            return { valid: false, error: 'نسبة الضريبة يجب أن تكون بين 0 و 100' };
+        }
+
+        const avg = Number(formData.avgMonthlyConsumption) || 0;
+        if (avg < 0) return { valid: false, error: 'متوسط الاستهلاك الشهري لا يمكن أن يكون سالباً' };
+
+        return { valid: true };
+    };
+
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
+
+        const { valid, error } = validateForm();
+        if (!valid) {
+            toast.error(error || 'يرجى تصحيح المدخلات');
+            return;
+        }
+
         try {
             setLoading(true);
             if (isEdit && id) {
@@ -463,7 +584,8 @@ const ItemFormPage: React.FC = () => {
             navigate('/dashboard/inventory/items');
         } catch (error: any) {
             console.error('Error saving item:', error);
-            toast.error(error.response?.data?.message || 'فشل في حفظ الصنف');
+            const msg = error.response?.data?.message || error.message || 'فشل في حفظ الصنف';
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -534,7 +656,7 @@ const ItemFormPage: React.FC = () => {
                                     {isEdit ? 'تعديل بيانات الصنف' : 'إضافة صنف جديد'}
                                 </h1>
                                 <p className="text-white/70">
-                                    {isEdit ? `تعديل: ${formData.itemCode}` : 'أدخل التفاصيل الفنية والمالية للصنف'}
+                                    {isEdit ? `تعديل: ${formData.itemNameAr || formData.grade || formData.itemCode}` : 'أدخل التفاصيل الفنية والمالية للصنف'}
                                 </p>
                             </div>
                         </div>
@@ -596,14 +718,23 @@ const ItemFormPage: React.FC = () => {
                             description="البيانات الرئيسية للصنف"
                         >
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {isEdit && formData.itemCode && (
+                                    <FormInput
+                                        label="كود الصنف"
+                                        value={formData.itemCode || ''}
+                                        onChange={() => { }}
+                                        icon={Barcode}
+                                        disabled
+                                        hint="يُولَّد تلقائياً ولا يمكن تعديله"
+                                    />
+                                )}
                                 <FormInput
-                                    label="كود الصنف"
-                                    value={formData.itemCode}
-                                    onChange={(v) => updateForm('itemCode', v)}
+                                    label=" الجريد/ Grade"
+                                    value={formData.grade || ''}
+                                    onChange={(v) => updateForm('grade', v)}
                                     icon={Tag}
-                                    placeholder="POLY-HD-001"
-                                    required
-                                    hint="كود فريد لتعريف الصنف"
+                                    placeholder="مثال: HP1106K"
+
                                 />
                                 <div className="md:col-span-2">
                                     <FormInput
@@ -626,11 +757,34 @@ const ItemFormPage: React.FC = () => {
                                     />
                                 </div>
                                 <FormInput
-                                    label="العلامة التجارية / Grade"
-                                    value={formData.gradeName || ''}
-                                    onChange={(v) => updateForm('gradeName', v)}
+                                    label="MFR (معدل تدفق الذوبان)"
+                                    value={formData.gradeName ?? ''}
+                                    onChange={(v) => updateForm('gradeName', v ? parseFloat(v) : undefined)}
                                     icon={Layers}
-                                    placeholder="Sabic 5000S"
+                                    type="number"
+                                    placeholder="مثال: 12"
+                                    hint="مقياس لسيولة البلاستيك المصهور"
+                                />
+                                <FormInput
+                                    label="MI2"
+                                    value={formData.mi2 || ''}
+                                    onChange={(v) => updateForm('mi2', v)}
+                                    icon={Scale}
+                                    placeholder=" "
+                                />
+                                <FormInput
+                                    label="MI21"
+                                    value={formData.mi21 || ''}
+                                    onChange={(v) => updateForm('mi21', v)}
+                                    icon={Scale}
+                                    placeholder=" "
+                                />
+                                <FormInput
+                                    label="Density (الكثافة)"
+                                    value={formData.density || ''}
+                                    onChange={(v) => updateForm('density', v)}
+                                    icon={Scale}
+                                    placeholder=" "
                                 />
                             </div>
                         </FormSection>
@@ -642,17 +796,14 @@ const ItemFormPage: React.FC = () => {
                                 description="تصنيف الصنف ووحدة القياس"
                             >
                                 <div className="space-y-4">
-                                    <FormSelect
+                                    <CategoryFormSelect
                                         label="التصنيف"
                                         value={formData.categoryId || ''}
-                                        onChange={(v) => updateForm('categoryId', parseInt(v))}
+                                        onChange={(v) => updateForm('categoryId', parseInt(v) || 0)}
+                                        categories={categories}
                                         icon={Layers}
                                         required
                                         placeholder="اختر التصنيف"
-                                        options={categories.map(cat => ({
-                                            value: cat.id!,
-                                            label: cat.categoryNameAr
-                                        }))}
                                     />
                                     <FormSelect
                                         label="وحدة القياس الأساسية"
@@ -692,7 +843,7 @@ const ItemFormPage: React.FC = () => {
                                         rows={3}
                                     />
                                     <FormTextarea
-                                        label="المواصفات الفنية"
+                                        label="التطبيقات النموذجية"
                                         value={formData.technicalSpecs || ''}
                                         onChange={(v) => updateForm('technicalSpecs', v)}
                                         icon={Settings}
@@ -750,6 +901,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={DollarSign}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                                 <FormInput
                                     label="آخر سعر شراء"
@@ -758,6 +910,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={ShoppingCart}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                                 <FormInput
                                     label="آخر سعر بيع"
@@ -766,6 +919,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={ShoppingBag}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                                 <FormInput
                                     label="السعر الاستبدالي"
@@ -774,6 +928,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={TrendingUp}
                                     type="number"
                                     placeholder="0.00"
+                                    required
                                 />
                             </div>
 
@@ -842,6 +997,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={AlertCircle}
                                     type="number"
                                     placeholder="0"
+                                    required
                                     hint="تنبيه عند الوصول لهذا المستوى"
                                     colorClass="text-rose-600 font-bold"
                                 />
@@ -852,6 +1008,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={RefreshCw}
                                     type="number"
                                     placeholder="0"
+                                    required
                                     hint="مستوى طلب إعادة التوريد"
                                     colorClass="text-amber-600 font-bold"
                                 />
@@ -862,6 +1019,7 @@ const ItemFormPage: React.FC = () => {
                                     icon={TrendingUp}
                                     type="number"
                                     placeholder="0"
+                                    required
                                     hint="الحد الأقصى للمخزون"
                                     colorClass="text-emerald-600 font-bold"
                                 />

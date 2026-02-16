@@ -1,22 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Plus, Search, Package, Calendar, Truck, Building2, FileText,
-    ChevronRight, RefreshCw, Eye, XCircle
+    Plus, Search, Package, FileText,
+    RefreshCw, Eye
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../../services/grnService';
+import Pagination from '../../../components/common/Pagination';
+import { formatDate } from '../../../utils/format';
 import { toast } from 'react-hot-toast';
 
+/**
+ * تم دمج هذه الصفحة مع صفحة GRN الموحدة في قسم المشتريات
+ * يتم إعادة التوجيه تلقائياً إلى /dashboard/procurement/grn
+ */
 const GRNListPage: React.FC = () => {
     const navigate = useNavigate();
     const [list, setList] = useState<GoodsReceiptNoteDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => {
         fetchList();
     }, []);
+    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
 
     const fetchList = async () => {
         try {
@@ -31,16 +40,28 @@ const GRNListPage: React.FC = () => {
         }
     };
 
-    const filtered = list.filter(
-        (g) => {
+    const filtered = useMemo(() => {
+        const f = list.filter((g) => {
             const matchesSearch = !search ||
                 (g.grnNumber || '').toLowerCase().includes(search.toLowerCase()) ||
                 (g.poNumber || '').toLowerCase().includes(search.toLowerCase()) ||
                 (g.supplierNameAr || '').toLowerCase().includes(search.toLowerCase());
             const matchesStatus = statusFilter === 'all' || g.status === statusFilter;
             return matchesSearch && matchesStatus;
-        }
-    );
+        });
+        // الأحدث في الأعلى
+        return [...f].sort((a, b) => {
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : 0;
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
+        });
+    }, [list, search, statusFilter]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
 
     return (
         <div className="space-y-6">
@@ -142,7 +163,7 @@ const GRNListPage: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((g) => (
+                                paginated.map((g) => (
                                     <tr
                                         key={g.id}
                                         className="border-b border-slate-100 hover:bg-emerald-50/50"
@@ -151,15 +172,14 @@ const GRNListPage: React.FC = () => {
                                             <span className="font-mono font-bold text-emerald-700">{g.grnNumber || '—'}</span>
                                         </td>
                                         <td className="px-6 py-4 text-slate-600">
-                                            {g.grnDate ? new Date(g.grnDate).toLocaleDateString('ar-EG') : '—'}
+                                            {g.grnDate ? formatDate(g.grnDate) : '—'}
                                         </td>
                                         <td className="px-6 py-4 text-slate-700">{g.poNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{g.supplierNameAr || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">المستودع #{g.warehouseId}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${
-                                                g.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                                            }`}>
+                                            <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${g.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                                                }`}>
                                                 {g.status === 'Completed' ? 'مكتمل' : g.status || '—'}
                                             </span>
                                         </td>
@@ -177,6 +197,9 @@ const GRNListPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filtered.length > 0 && (
+                    <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                )}
             </div>
         </div>
     );

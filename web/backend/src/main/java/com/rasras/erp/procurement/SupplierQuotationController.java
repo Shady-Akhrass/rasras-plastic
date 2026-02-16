@@ -28,4 +28,23 @@ public class SupplierQuotationController {
     public ResponseEntity<ApiResponse<SupplierQuotationDto>> createQuotation(@RequestBody SupplierQuotationDto dto) {
         return ResponseEntity.ok(ApiResponse.success(quotationService.createQuotation(dto)));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<SupplierQuotationDto>> updateQuotation(
+            @PathVariable Integer id,
+            @RequestBody SupplierQuotationDto dto) {
+        return ResponseEntity.ok(ApiResponse.success(quotationService.updateQuotation(id, dto)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteQuotation(@PathVariable Integer id) {
+        quotationService.deleteQuotation(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<ApiResponse<Void>> deleteQuotationPost(@PathVariable Integer id) {
+        quotationService.deleteQuotation(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }

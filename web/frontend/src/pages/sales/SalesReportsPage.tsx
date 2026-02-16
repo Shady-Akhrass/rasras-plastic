@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart3, FileText, TrendingUp, DollarSign, Percent, AlertCircle } from 'lucide-react';
 import { salesInvoiceService } from '../../services/salesInvoiceService';
 import { receiptService } from '../../services/receiptService';
+import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const StatCard: React.FC<{ icon: React.ElementType; label: string; value: string | number; sub?: string; color?: string }> = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
@@ -82,7 +83,7 @@ const SalesReportsPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-3">
                         <select value={month} onChange={(e) => setMonth(parseInt(e.target.value))} className="px-4 py-2 bg-white/10 rounded-xl text-white border border-white/20">
-                            {[1,2,3,4,5,6,7,8,9,10,11,12].map((m) => <option key={m} value={m}>{new Date(2000, m - 1).toLocaleDateString('ar-EG', { month: 'long' })}</option>)}
+                            {[1,2,3,4,5,6,7,8,9,10,11,12].map((m) => <option key={m} value={m}>{formatDate(new Date(2000, m - 1), { month: 'long' })}</option>)}
                         </select>
                         <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="px-4 py-2 bg-white/10 rounded-xl text-white border border-white/20">
                             {[year, year - 1, year - 2].map((y) => <option key={y} value={y}>{y}</option>)}
@@ -92,10 +93,10 @@ const SalesReportsPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard icon={TrendingUp} label="إجمالي المبيعات (الفترة)" value={totalSales.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} sub={`${invInPeriod.length} فاتورة`} color="blue" />
-                <StatCard icon={FileText} label="عدد الفواتير" value={invInPeriod.length} sub={`متوسط: ${avgInvoice.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}`} color="emerald" />
-                <StatCard icon={DollarSign} label="الديون المعلقة" value={totalOutstanding.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} color="amber" />
-                <StatCard icon={Percent} label="نسبة التحصيل" value={`${collectionRate}%`} sub={`مقبوض: ${totalCollected.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}`} color="rose" />
+                <StatCard icon={TrendingUp} label="إجمالي المبيعات (الفترة)" value={formatNumber(totalSales, { minimumFractionDigits: 2 })} sub={`${invInPeriod.length} فاتورة`} color="blue" />
+                <StatCard icon={FileText} label="عدد الفواتير" value={invInPeriod.length} sub={`متوسط: ${formatNumber(avgInvoice, { minimumFractionDigits: 2 })}`} color="emerald" />
+                <StatCard icon={DollarSign} label="الديون المعلقة" value={formatNumber(totalOutstanding, { minimumFractionDigits: 2 })} color="amber" />
+                <StatCard icon={Percent} label="نسبة التحصيل" value={`${collectionRate}%`} sub={`مقبوض: ${formatNumber(totalCollected, { minimumFractionDigits: 2 })}`} color="rose" />
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 p-6">
@@ -104,7 +105,7 @@ const SalesReportsPage: React.FC = () => {
                     <div className="p-4 bg-slate-50 rounded-xl">
                         <p className="text-sm text-slate-600">أكبر عميل (الفترة)</p>
                         <p className="text-lg font-bold text-slate-900 mt-1">{topCustomer.name}</p>
-                        <p className="text-brand-primary font-semibold">{topCustomer.amount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-brand-primary font-semibold">{formatNumber(topCustomer.amount, { minimumFractionDigits: 2 })}</p>
                     </div>
                     <div className="p-4 bg-amber-50 rounded-xl flex items-start gap-3">
                         <AlertCircle className="w-8 h-8 text-amber-600 shrink-0" />

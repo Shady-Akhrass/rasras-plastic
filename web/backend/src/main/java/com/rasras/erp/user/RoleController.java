@@ -1,12 +1,13 @@
 package com.rasras.erp.user;
 
+import com.rasras.erp.user.dto.AssignPermissionsRequest;
 import com.rasras.erp.user.dto.RoleDto;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/roles")
@@ -43,12 +44,8 @@ public class RoleController {
 
     @PostMapping("/{id}/permissions")
     public ResponseEntity<Void> assignPermissions(@PathVariable Integer id,
-            @RequestBody Map<String, List<Integer>> payload) {
-        List<Integer> permissionIds = payload.get("permissionIds");
-        if (permissionIds == null) {
-            return ResponseEntity.badRequest().build();
-        }
-        roleService.assignPermissions(id, permissionIds);
+            @Valid @RequestBody AssignPermissionsRequest request) {
+        roleService.assignPermissions(id, request.getPermissionIds());
         return ResponseEntity.ok().build();
     }
 }

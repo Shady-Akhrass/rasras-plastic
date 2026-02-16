@@ -14,6 +14,7 @@ export interface PurchaseOrderItemDto {
     taxPercentage?: number;
     taxAmount?: number;
     totalPrice: number;
+    polymerGrade?: string;
     receivedQty?: number;
     remainingQty?: number;
     status?: string;
@@ -25,6 +26,7 @@ export interface PurchaseOrderDto {
     poDate?: string;
     prId?: number;
     quotationId?: number;
+    comparisonId?: number;
     supplierId: number;
     supplierNameAr?: string;
     expectedDeliveryDate?: string;
@@ -45,6 +47,7 @@ export interface PurchaseOrderDto {
     approvalStatus?: string;
     notes?: string;
     termsAndConditions?: string;
+    deliveryDays?: number; // Added
     items: PurchaseOrderItemDto[];
 }
 
@@ -57,8 +60,26 @@ export const purchaseOrderService = {
         const response = await apiClient.get<{ data: PurchaseOrderDto }>(`/procurement/po/${id}`);
         return response.data.data;
     },
+    getWaitingForArrivalPOs: async () => {
+        const response = await apiClient.get<{ data: PurchaseOrderDto[] }>('/procurement/po/waiting');
+        return response.data.data;
+    },
+    getUninvoicedPOs: async () => {
+        const response = await apiClient.get<{ data: PurchaseOrderDto[] }>('/procurement/po/uninvoiced');
+        return response.data.data;
+    },
     createPO: async (po: PurchaseOrderDto) => {
         const response = await apiClient.post<{ data: PurchaseOrderDto }>('/procurement/po', po);
+        return response.data.data;
+    },
+    deletePO: async (id: number) => {
+        await apiClient.post(`/procurement/po/${id}/delete`);
+    },
+    markAsArrived: async (poId: number, userId?: number) => {
+        const url = userId != null
+            ? `/procurement/po/${poId}/mark-arrived?userId=${userId}`
+            : `/procurement/po/${poId}/mark-arrived`;
+        const response = await apiClient.post<{ data: any }>(url);
         return response.data.data;
     }
 };

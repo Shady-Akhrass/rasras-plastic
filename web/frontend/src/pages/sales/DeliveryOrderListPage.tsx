@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Truck, RefreshCw, Eye, FileText } from 'lucide-react';
 import { deliveryOrderService, type DeliveryOrderDto } from '../../services/deliveryOrderService';
+import Pagination from '../../components/common/Pagination';
+import { formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const DeliveryOrderListPage: React.FC = () => {
@@ -9,8 +11,11 @@ const DeliveryOrderListPage: React.FC = () => {
     const [list, setList] = useState<DeliveryOrderDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => { fetchList(); }, []);
+    useEffect(() => { setCurrentPage(1); }, [search]);
 
     const fetchList = async () => {
         try {
@@ -23,12 +28,26 @@ const DeliveryOrderListPage: React.FC = () => {
         } finally { setLoading(false); }
     };
 
-    const filtered = list.filter((d) =>
-        !search ||
-        (d.deliveryOrderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-        (d.issueNoteNumber || d.saleOrderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-        (d.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = useMemo(() => {
+        const f = list.filter((d) =>
+            !search ||
+            (d.deliveryOrderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+            (d.issueNoteNumber || d.saleOrderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+            (d.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
+        );
+        // الأحدث في الأعلى
+        return [...f].sort((a, b) => {
+            const dateA = (a.orderDate || a.deliveryDate) ? new Date(a.orderDate || a.deliveryDate!).getTime() : 0;
+            const dateB = (b.orderDate || b.deliveryDate) ? new Date(b.orderDate || b.deliveryDate!).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
+        });
+    }, [list, search]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
 
     return (
         <div className="space-y-6">
@@ -94,10 +113,10 @@ const DeliveryOrderListPage: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((d) => (
+                                paginated.map((d) => (
                                     <tr key={d.id} className="border-b border-slate-100 hover:bg-amber-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-amber-700">{d.deliveryOrderNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{d.orderDate ? new Date(d.orderDate).toLocaleDateString('ar-EG') : (d.deliveryDate ? new Date(d.deliveryDate).toLocaleDateString('ar-EG') : '—')}</td>
+                                        <td className="px-6 py-4 text-slate-600">{d.orderDate ? formatDate(d.orderDate) : (d.deliveryDate ? formatDate(d.deliveryDate) : '—')}</td>
                                         <td className="px-6 py-4 text-slate-700">{d.issueNoteNumber || d.saleOrderNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{d.customerNameAr || '—'}</td>
                                         <td className="px-6 py-4"><span className="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">{d.status || '—'}</span></td>
@@ -110,6 +129,9 @@ const DeliveryOrderListPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filtered.length > 0 && (
+                    <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
+                )}
             </div>
         </div>
     );

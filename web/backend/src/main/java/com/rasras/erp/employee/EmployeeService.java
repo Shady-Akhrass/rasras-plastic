@@ -1,7 +1,9 @@
 package com.rasras.erp.employee;
 
 import com.rasras.erp.employee.dto.*;
+import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
+import com.rasras.erp.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +19,7 @@ public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public Page<EmployeeDto> getAllEmployees(Pageable pageable) {
@@ -111,9 +114,21 @@ public class EmployeeService {
     }
 
     @Transactional
+    public EmployeeDto updateMyProfile(Integer employeeId, UpdateMyProfileRequest request) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee", "id", employeeId));
+        if (request.getFirstNameAr() != null) employee.setFirstNameAr(request.getFirstNameAr());
+        if (request.getLastNameAr() != null) employee.setLastNameAr(request.getLastNameAr());
+        return mapToDto(employeeRepository.save(employee));
+    }
+
+    @Transactional
     public void deleteEmployee(Integer id) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", "id", id));
+        if (userRepository.existsByEmployeeId(id)) {
+            throw new BadRequestException("لا يمكن حذف الموظف لأنه مرتبط بمستخدم في النظام. قم بفك ربط المستخدم أو حذفه أولاً.");
+        }
         employeeRepository.delete(employee);
     }
 

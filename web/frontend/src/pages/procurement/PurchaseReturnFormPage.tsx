@@ -13,28 +13,39 @@ import {
     FileText,
     TrendingDown,
     Building2,
-    User
+    User,
+    Eye,
+    CheckCircle2,
+    XCircle,
+    RefreshCw
 } from 'lucide-react';
+import { approvalService } from '../../services/approvalService';
 import { purchaseReturnService, type PurchaseReturnDto, type PurchaseReturnItemDto } from '../../services/purchaseReturnService';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import { grnService } from '../../services/grnService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 
 const PurchaseReturnFormPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
     const isEdit = !!id;
     const queryParams = new URLSearchParams(location.search);
     const grnId = queryParams.get('grnId');
+    const isView = queryParams.get('mode') === 'view';
+    const approvalId = queryParams.get('approvalId');
 
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [grns, setGrns] = useState<any[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [saving, setSaving] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
     const [formData, setFormData] = useState<PurchaseReturnDto>({
         returnNumber: `RET-${Date.now().toString().slice(-6)}`,
@@ -123,7 +134,7 @@ const PurchaseReturnFormPage: React.FC = () => {
                 }));
             }
         } catch (e) {
-            toast.error('فشل تحميل بيانات إذن الاستلام');
+            toast.error('فشل تحميل بيانات إذن الإضافة');
         }
     };
 
@@ -183,6 +194,22 @@ const PurchaseReturnFormPage: React.FC = () => {
         }
     };
 
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/procurement/approvals');
+        } catch (error) {
+            console.error('Failed to take action:', error);
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     return (
         <div className="space-y-6 pb-20" dir="rtl">
             <style>{`
@@ -229,20 +256,54 @@ const PurchaseReturnFormPage: React.FC = () => {
                             <p className="text-white/80 text-lg">تسجيل رد بضاعة للمورد وتعديل أرصدة المخزون</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={saving}
-                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                        {saving ? (
-                            <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                        ) : (
-                            <Save className="w-5 h-5" />
-                        )}
-                        <span>{saving ? 'جاري الحفظ...' : 'اعتماد المرتجع'}</span>
-                    </button>
+                    {!isView && (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={saving}
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                            {saving ? (
+                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                            ) : (
+                                <Save className="w-5 h-5" />
+                            )}
+                            <span>{saving ? 'جاري الحفظ...' : 'اعتماد المرتجع'}</span>
+                        </button>
+                    )}
+                    {isView && (
+                        <div className="flex items-center gap-3">
+                            {approvalId && (
+                                <>
+                                    <button
+                                        onClick={() => handleApprovalAction('Approved')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                        <span>اعتماد</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprovalAction('Rejected')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                        <span>رفض</span>
+                                    </button>
+                                </>
+                            )}
+                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm whitespace-nowrap">
+                                <Eye className="w-5 h-5" />
+                                <span className="font-bold">وضع العرض فقط</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -270,8 +331,10 @@ const PurchaseReturnFormPage: React.FC = () => {
                                 <select
                                     value={formData.supplierId}
                                     onChange={(e) => setFormData({ ...formData, supplierId: parseInt(e.target.value) })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
                                     <option value="0">اختر مورد...</option>
                                     {suppliers.map(s => (
@@ -282,15 +345,17 @@ const PurchaseReturnFormPage: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <FileText className="w-4 h-4 text-brand-primary" />
-                                    مرجع الاستلام (GRN)
+                                    مرجع إذن الإضافة (GRN)
                                 </label>
                                 <select
                                     value={formData.grnId || 0}
                                     onChange={(e) => loadGRNData(parseInt(e.target.value))}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-mono font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-mono font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
-                                    <option value="0">اختياري: اختر إذن استلام...</option>
+                                    <option value="0">اختياري: اختر إذن إضافة...</option>
                                     {grns.map(g => (
                                         <option key={g.id} value={g.id}>
                                             #{g.grnNumber} - {g.supplierNameAr}
@@ -315,16 +380,18 @@ const PurchaseReturnFormPage: React.FC = () => {
                                         <p className="text-slate-500 text-sm">حدد الأصناف والكميات المرتجعة</p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={addItem}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
-                                        font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
-                                        hover:scale-105 active:scale-95"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    إضافة صنف
-                                </button>
+                                {!isView && (
+                                    <button
+                                        type="button"
+                                        onClick={addItem}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
+                                            font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
+                                            hover:scale-105 active:scale-95"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        إضافة صنف
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -347,8 +414,10 @@ const PurchaseReturnFormPage: React.FC = () => {
                                                 <select
                                                     value={item.itemId}
                                                     onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) })}
-                                                    className="w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
-                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    disabled={isView}
+                                                    className={`w-full min-w-[200px] px-3 py-2 border-2 border-slate-200 
+                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 >
                                                     <option value="0">اختر صنف...</option>
                                                     {items.map(i => (
@@ -361,9 +430,11 @@ const PurchaseReturnFormPage: React.FC = () => {
                                                     type="number"
                                                     value={item.returnedQty}
                                                     onChange={(e) => updateItem(idx, { returnedQty: parseFloat(e.target.value) })}
-                                                    className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                    disabled={isView}
+                                                    className={`w-24 px-3 py-2 border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-brand-primary outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                        focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70 text-brand-primary/50' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
@@ -371,24 +442,28 @@ const PurchaseReturnFormPage: React.FC = () => {
                                                     type="number"
                                                     value={item.unitPrice}
                                                     onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) })}
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-bold outline-none focus:border-brand-primary transition-all"
+                                                    disabled={isView}
+                                                    className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                        text-sm text-center font-bold outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center font-semibold text-slate-600 text-sm">
-                                                {item.taxAmount.toLocaleString()}
+                                                {formatNumber(item.taxAmount)}
                                             </td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                {item.totalPrice.toLocaleString()}
+                                                {formatNumber(item.totalPrice)}
                                             </td>
                                             <td className="py-4 pr-4">
                                                 <input
                                                     type="text"
                                                     value={item.returnReason || ''}
                                                     onChange={(e) => updateItem(idx, { returnReason: e.target.value })}
-                                                    className="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-xs outline-none focus:border-brand-primary transition-all"
-                                                    placeholder="سبب الإرجاع..."
+                                                    disabled={isView}
+                                                    className={`w-full px-3 py-2 border-2 border-slate-200 rounded-xl 
+                                                        text-xs outline-none focus:border-brand-primary transition-all
+                                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                                    placeholder={isView ? '' : "سبب الإرجاع..."}
                                                 />
                                             </td>
                                             <td className="py-4 pl-6 text-left">
@@ -398,8 +473,7 @@ const PurchaseReturnFormPage: React.FC = () => {
                                                         ...p,
                                                         items: p.items.filter((_, i) => i !== idx)
                                                     }))}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
-                                                        rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                    className={`p-2 hover:bg-rose-50 rounded-lg transition-all ${isView ? 'hidden' : 'text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100'}`}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -436,19 +510,23 @@ const PurchaseReturnFormPage: React.FC = () => {
                         <div className="space-y-5 mt-6">
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60">قيمة البضاعة</span>
-                                <span className="font-bold text-lg">{formData.subTotal.toLocaleString()} ج.م</span>
+                                <span className="font-bold text-lg">{formatNumber(formData.subTotal)} ج.م</span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                                 <span className="text-emerald-400 font-semibold">الضريبة المستردة</span>
                                 <span className="font-bold text-lg text-emerald-400">
-                                    {formData.taxAmount.toLocaleString()} ج.م
+                                    {formatNumber(formData.taxAmount)} ج.م
                                 </span>
                             </div>
                             <div className="pt-6 border-t border-white/10">
-                                <div className="text-xs text-white/40 mb-2">إجمالي قيمة المرتجع</div>
+                                <div className="text-xs text-white/40 mb-2">إجمالي المرتجع النهائي</div>
                                 <div className="text-4xl font-black text-emerald-400">
-                                    {formData.totalAmount.toLocaleString()}
-                                    <span className="text-sm font-bold mr-2">ج.م</span>
+                                    {formatNumber(formData.totalAmount)} <span className="text-xl font-bold">{getCurrencyLabel(formData.currency || defaultCurrency)}</span>
+                                    {(formData.currency && formData.currency !== defaultCurrency) && (
+                                        <div className="text-sm font-bold text-white/60 mt-1 font-sans">
+                                            (≈ {formatNumber(convertAmount(formData.totalAmount, formData.currency))} {getCurrencyLabel(defaultCurrency)})
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -475,8 +553,10 @@ const PurchaseReturnFormPage: React.FC = () => {
                                     type="date"
                                     value={formData.returnDate.split('T')[0]}
                                     onChange={(e) => setFormData({ ...formData, returnDate: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -487,8 +567,10 @@ const PurchaseReturnFormPage: React.FC = () => {
                                 <select
                                     value={formData.warehouseId}
                                     onChange={(e) => setFormData({ ...formData, warehouseId: parseInt(e.target.value) })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    disabled={isView}
+                                    className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary outline-none transition-all font-semibold
+                                        ${isView ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
                                 >
                                     {warehouses.map(w => (
                                         <option key={w.id} value={w.id}>{w.warehouseNameAr}</option>

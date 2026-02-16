@@ -5,6 +5,7 @@ export interface WarehouseLocationDto {
     warehouseId: number;
     locationCode: string;
     locationName?: string;
+    locationNameAr?: string;
     row?: string;
     shelf?: string;
     bin?: string;

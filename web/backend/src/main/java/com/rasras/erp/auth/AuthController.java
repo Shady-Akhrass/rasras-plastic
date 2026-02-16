@@ -1,6 +1,7 @@
 package com.rasras.erp.auth;
 
 import com.rasras.erp.auth.dto.ChangePasswordRequest;
+import com.rasras.erp.auth.dto.CurrentUserDto;
 import com.rasras.erp.auth.dto.LoginRequest;
 import com.rasras.erp.auth.dto.LoginResponse;
 import com.rasras.erp.auth.dto.RefreshTokenRequest;
@@ -21,6 +22,18 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+
+    @GetMapping("/me")
+    @Operation(summary = "Current User", description = "Get current user with permissions (for refresh without re-login)")
+    public ResponseEntity<ApiResponse<CurrentUserDto>> getCurrentUser(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("غير مصرح"));
+        }
+        CurrentUserDto user = authService.getCurrentUser(currentUser.getUsername());
+        return ResponseEntity.ok(ApiResponse.success(user));
+    }
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticate user and return JWT tokens")

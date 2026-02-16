@@ -23,7 +23,7 @@ public class SupplierService {
 
     @Transactional(readOnly = true)
     public List<SupplierDto> getAllSuppliers() {
-        return supplierRepository.findAll().stream()
+        return supplierRepository.findActiveSuppliers().stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -42,6 +42,14 @@ public class SupplierService {
 
         updateEntityFromDto(supplier, dto);
         return mapToDto(supplierRepository.save(supplier));
+    }
+
+    @Transactional
+    public void deleteSupplier(Integer id) {
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("المورد غير موجود"));
+        supplier.setIsActive(false);
+        supplierRepository.save(supplier);
     }
 
     @Transactional
@@ -236,11 +244,13 @@ public class SupplierService {
                 .minOrderQty(item.getMinOrderQty())
                 .isPreferred(item.getIsPreferred())
                 .isActive(item.getIsActive())
+                .currency(item.getSupplier().getCurrency())
                 .build();
     }
 
     private String generateSupplierCode() {
-        return "SUP-" + System.currentTimeMillis();
+        long n = supplierRepository.count() + 1;
+        return "SUP-" + n;
     }
 
     private SupplierDto mapToDto(Supplier supplier) {

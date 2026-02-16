@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, type Variants } from 'framer-motion';
+import WarehouseDashboard from './WarehouseDashboard';
+import ManagementDashboard from './ManagementDashboard';
+import ProcurementDashboard from './ProcurementDashboard';
+import QualityControlDashboard from './QualityControlDashboard';
 import {
     Users, Package, TrendingUp, ArrowUpRight, ArrowDownRight, User,
     Loader2, FileText, DollarSign, Calendar, Clock,
@@ -11,8 +15,16 @@ import {
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
 import apiClient from '../../services/apiClient';
+import { formatDate as formatDateEn } from '../../utils/format';
 import ExchangeRateWidget from '../../components/ExchangeRate/ExchangeRateWidget';
 import ExchangeRateCompact from '../../components/ExchangeRate/ExchangeRateCompact';
+
+interface DashboardStats {
+    totalEmployees?: number;
+    activeEmployees?: number;
+    totalDepartments?: number;
+    employeeGrowthRate?: number;
+}
 
 // Animation variants
 const containerVariants: Variants = {
@@ -333,13 +345,23 @@ const CircularProgress = ({
 const DashboardHome: React.FC = () => {
     usePageTitle('لوحة التحكم');
     const navigate = useNavigate();
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<DashboardStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
     const employeeDisplayName = user?.fullNameAr || user?.username || 'المستخدم';
+    const userRole = (user?.roleCode || user?.roleName || '').toUpperCase();
+    const userPermissions: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
+
+    // مراقب الجودة: إما دور مخصص (QC / QUALITY / ...) أو صلاحية العمليات فقط دون المشتريات/المخازن/المبيعات
+    const isQualityController =
+        ['QC', 'QUALITY', 'QUALITY_CONTROL', 'QUALITY_INSPECTOR'].includes(userRole) ||
+        (userPermissions.includes('SECTION_OPERATIONS') &&
+            !userPermissions.includes('SECTION_PROCUREMENT') &&
+            !userPermissions.includes('SECTION_WAREHOUSE') &&
+            !userPermissions.includes('SECTION_SALES'));
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -360,6 +382,12 @@ const DashboardHome: React.FC = () => {
         return () => clearInterval(timer);
     }, []);
 
+    // تخصيص لوحة التحكم حسب الدور
+    if (userRole === 'WHM') return <WarehouseDashboard />;
+    if (userRole === 'PM' || userRole === 'BUYER') return <ProcurementDashboard />;
+    if (userRole === 'GM' || userRole === 'ADMIN') return <ManagementDashboard />;
+    if (isQualityController) return <QualityControlDashboard />;
+
     const getGreeting = () => {
         const hour = currentTime.getHours();
         if (hour < 12) return 'صباح الخير';
@@ -368,7 +396,7 @@ const DashboardHome: React.FC = () => {
     };
 
     const formatDate = () => {
-        return currentTime.toLocaleDateString('ar-EG', {
+        return formatDateEn(currentTime, {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
@@ -516,9 +544,9 @@ const DashboardHome: React.FC = () => {
                         title="نسبة النمو"
                         value={`${stats?.employeeGrowthRate || 0}%`}
                         icon={TrendingUp}
-                        trend={stats?.employeeGrowthRate >= 0 ? 'up' : 'down'}
-                        trendValue={`${stats?.employeeGrowthRate || 0}%`}
-                        color={stats?.employeeGrowthRate >= 0 ? 'success' : 'danger'}
+                        trend={(stats?.employeeGrowthRate ?? 0) >= 0 ? 'up' : 'down'}
+                        trendValue={`${stats?.employeeGrowthRate ?? 0}%`}
+                        color={(stats?.employeeGrowthRate ?? 0) >= 0 ? 'success' : 'danger'}
                         subtitle="مقارنة بالشهر الماضي"
                     />
                 </motion.div>

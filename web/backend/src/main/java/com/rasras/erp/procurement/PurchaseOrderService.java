@@ -2,6 +2,10 @@ package com.rasras.erp.procurement;
 
 import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitRepository;
+import com.rasras.erp.inventory.WarehouseRepository;
+import com.rasras.erp.inventory.GRNService;
+import com.rasras.erp.inventory.GoodsReceiptNoteDto;
+import com.rasras.erp.inventory.GRNItemDto;
 import com.rasras.erp.supplier.Supplier;
 import com.rasras.erp.supplier.SupplierRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +25,37 @@ public class PurchaseOrderService {
         private final SupplierRepository supplierRepo;
         private final ItemRepository itemRepo;
         private final UnitRepository unitRepo;
+        private final WarehouseRepository warehouseRepo;
+        private final GRNService grnService;
         private final com.rasras.erp.approval.ApprovalService approvalService;
+        private final com.rasras.erp.supplier.SupplierInvoiceRepository invoiceRepo;
 
         @Transactional(readOnly = true)
         public List<PurchaseOrderDto> getAllPOs() {
                 return poRepo.findAll().stream()
+                                .map(this::mapToDto)
+                                .collect(Collectors.toList());
+        }
+
+        @Transactional(readOnly = true)
+        public List<PurchaseOrderDto> getWaitingForArrivalPOs() {
+                return poRepo.findAll().stream()
+                                .filter(po -> "Approved".equals(po.getApprovalStatus())
+                                                && ("Confirmed".equals(po.getStatus())
+                                                                || "Approved".equals(po.getStatus()))
+                                                && !"PartiallyReceived".equals(po.getStatus())
+                                                && !"Received".equals(po.getStatus())
+                                                && !"Closed".equals(po.getStatus()))
+                                .map(this::mapToDto)
+                                .collect(Collectors.toList());
+        }
+
+        @Transactional(readOnly = true)
+        public List<PurchaseOrderDto> getUninvoicedPOs() {
+                List<Integer> invoicedPoIds = invoiceRepo.findAllInvoicedPoIds();
+                return poRepo.findAll().stream()
+                                .filter(po -> !invoicedPoIds.contains(po.getId()))
+                                .filter(po -> "Approved".equals(po.getApprovalStatus()))
                                 .map(this::mapToDto)
                                 .collect(Collectors.toList());
         }
@@ -49,6 +79,7 @@ public class PurchaseOrderService {
                                 .quotationId(dto.getQuotationId())
                                 .supplier(supplier)
                                 .expectedDeliveryDate(dto.getExpectedDeliveryDate())
+                                .deliveryDays(dto.getDeliveryDays())
                                 .shippingMethod(dto.getShippingMethod())
                                 .shippingTerms(dto.getShippingTerms())
                                 .paymentTerms(dto.getPaymentTerms())
@@ -97,11 +128,83 @@ public class PurchaseOrderService {
                 return mapToDto(saved);
         }
 
+        @Transactional
+        public GoodsReceiptNoteDto markAsArrived(Integer poId, Integer userId) {
+                PurchaseOrder po = poRepo.findById(poId)
+                                .orElseThrow(() -> new RuntimeException("Purchase Order not found"));
+
+                // Verify PO is in waiting status
+                if (!"Approved".equals(po.getApprovalStatus()) ||
+                                (!"Confirmed".equals(po.getStatus()) && !"Approved".equals(po.getStatus()))) {
+                        throw new RuntimeException("Purchase Order is not in approved/confirmed status");
+                }
+
+                // Get first active warehouse
+                Integer warehouseId = warehouseRepo.findByIsActiveTrue().stream()
+                                .findFirst()
+                                .map(warehouse -> warehouse.getId())
+                                .orElseThrow(() -> new RuntimeException(
+                                                "No active warehouses available. Please create a warehouse first."));
+
+                // Create GRN DTO with all PO items
+                GoodsReceiptNoteDto grnDto = GoodsReceiptNoteDto.builder()
+                                .poId(poId)
+                                .supplierId(po.getSupplier().getId())
+                                .warehouseId(warehouseId)
+                                .receivedByUserId(userId != null ? userId : 1)
+                                .status("Pending Inspection")
+                                .approvalStatus("Pending")
+                                .qualityStatus("Pending")
+                                .shippingCost(po.getShippingCost())
+                                .otherCosts(po.getOtherCosts())
+                                .notes("تم إنشاء تلقائياً عند وصول الشحنة من أمر الشراء: " + po.getPoNumber())
+                                .items(po.getItems() != null ? po.getItems().stream()
+                                                .map(poItem -> GRNItemDto.builder()
+                                                                .poItemId(poItem.getId())
+                                                                .itemId(poItem.getItem().getId())
+                                                                .itemNameAr(poItem.getItem().getItemNameAr())
+                                                                .orderedQty(poItem.getOrderedQty())
+                                                                .receivedQty(poItem.getOrderedQty()) // Full quantity
+                                                                                                     // received
+                                                                .acceptedQty(poItem.getOrderedQty()) // Initially all
+                                                                                                     // accepted
+                                                                .unitId(poItem.getUnit().getId())
+                                                                .unitNameAr(poItem.getUnit().getUnitNameAr())
+                                                                .unitCost(poItem.getUnitPrice())
+                                                                .totalCost(poItem.getTotalPrice())
+                                                                .build())
+                                                .collect(Collectors.toList()) : null)
+                                .build();
+
+                // Initial totalAmount
+                BigDecimal itemsTotal = grnDto.getItems() != null ? grnDto.getItems().stream()
+                                .map(i -> i.getTotalCost() != null ? i.getTotalCost() : BigDecimal.ZERO)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO;
+                grnDto.setTotalAmount(itemsTotal
+                                .add(grnDto.getShippingCost() != null ? grnDto.getShippingCost() : BigDecimal.ZERO)
+                                .add(grnDto.getOtherCosts() != null ? grnDto.getOtherCosts() : BigDecimal.ZERO));
+
+                // Create GRN using GRNService
+                GoodsReceiptNoteDto createdGRN = grnService.createGRN(grnDto);
+
+                // Update PO status to PartiallyReceived (will be updated to Closed when all
+                // items received)
+                po.setStatus("PartiallyReceived");
+                poRepo.save(po);
+
+                return createdGRN;
+        }
+
+        @Transactional
+        public void deletePO(Integer id) {
+                PurchaseOrder po = poRepo.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Purchase Order not found"));
+                poRepo.delete(po);
+        }
+
         private String generatePONumber() {
-                // Simple generation for now: PO-YYYY-MM-count
                 long count = poRepo.count() + 1;
-                LocalDateTime now = LocalDateTime.now();
-                return String.format("PO-%d%02d-%03d", now.getYear(), now.getMonthValue(), count);
+                return String.format("PO-%d", count);
         }
 
         private PurchaseOrderItem mapToItemEntity(PurchaseOrder po, PurchaseOrderItemDto dto) {
@@ -117,6 +220,7 @@ public class PurchaseOrderService {
                                 .taxPercentage(dto.getTaxPercentage())
                                 .taxAmount(dto.getTaxAmount())
                                 .totalPrice(dto.getTotalPrice())
+                                .polymerGrade(dto.getPolymerGrade())
                                 .receivedQty(BigDecimal.ZERO)
                                 .status("Pending")
                                 .notes(dto.getNotes())
@@ -133,6 +237,7 @@ public class PurchaseOrderService {
                                 .supplierId(entity.getSupplier().getId())
                                 .supplierNameAr(entity.getSupplier().getSupplierNameAr())
                                 .expectedDeliveryDate(entity.getExpectedDeliveryDate())
+                                .deliveryDays(entity.getDeliveryDays())
                                 .shippingMethod(entity.getShippingMethod())
                                 .shippingTerms(entity.getShippingTerms())
                                 .paymentTerms(entity.getPaymentTerms())
@@ -171,6 +276,7 @@ public class PurchaseOrderService {
                                 .taxPercentage(item.getTaxPercentage())
                                 .taxAmount(item.getTaxAmount())
                                 .totalPrice(item.getTotalPrice())
+                                .polymerGrade(item.getPolymerGrade())
                                 .receivedQty(item.getReceivedQty())
                                 .remainingQty(item.getRemainingQty())
                                 .status(item.getStatus())

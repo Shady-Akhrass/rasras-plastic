@@ -50,6 +50,7 @@ export interface SupplierItemDto {
     minOrderQty?: number;
     isPreferred?: boolean;
     isActive?: boolean;
+    currency?: string;
 }
 
 export interface SupplierBankDto {

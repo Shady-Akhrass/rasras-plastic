@@ -187,12 +187,10 @@ export const salesQuotationService = {
             return [];
         }
     },
-    getById: async (id: number): Promise<SalesQuotationDto | LegacySalesQuotationDto | null> => {
+    getById: async (id: number): Promise<SalesQuotationDto | null> => {
         try {
             const res = await apiClient.get<{ data?: SalesQuotationDto }>(`${_api}/${id}`);
-            const dto = (res.data as any)?.data ?? null;
-            // Return in legacy format for backward compatibility
-            return dto ? mapToLegacy(dto) : null;
+            return (res.data as any)?.data ?? null;
         } catch {
             return null;
         }

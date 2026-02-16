@@ -12,13 +12,17 @@ import com.rasras.erp.procurement.QuotationComparisonRepository;
 import com.rasras.erp.procurement.SupplierQuotationRepository;
 import com.rasras.erp.procurement.PurchaseOrder;
 import com.rasras.erp.procurement.PurchaseOrderItem;
+import com.rasras.erp.procurement.PurchaseReturnRepository;
 import com.rasras.erp.procurement.SupplierQuotation;
-import com.rasras.erp.procurement.SupplierQuotationItem;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.inventory.ItemRepository;
+import com.rasras.erp.inventory.WarehouseRepository;
+import com.rasras.erp.finance.PaymentVoucherRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,6 +39,7 @@ public class ApprovalService {
     private final ApprovalRequestRepository requestRepo;
     private final ApprovalActionRepository actionRepo;
     private final UserRepository userRepo;
+    private final ApprovalLimitRepository limitRepo;
 
     private final PurchaseOrderRepository poRepo;
     private final SupplierRepository supplierRepo;
@@ -44,8 +49,11 @@ public class ApprovalService {
     private final InventoryService inventoryService;
     private final QuotationComparisonRepository comparisonRepo;
     private final SupplierQuotationRepository quotationRepo;
+    private final PurchaseReturnRepository returnRepo;
     private final ItemRepository itemRepo;
     private final UnitRepository unitRepo;
+    private final WarehouseRepository warehouseRepo;
+    private final PaymentVoucherRepository voucherRepo;
 
     @Transactional
     public ApprovalRequest initiateApproval(String workflowCode, String docType, Integer docId,
@@ -77,10 +85,51 @@ public class ApprovalService {
                 .requestedByUser(requester)
                 .totalAmount(amount)
                 .status("Pending")
-                .currentStep(steps.get(0)) // Start at first step
+                .currentStep(resolveInitialStep(workflowCode, steps, amount)) // الخطوة الأولى وفق حدود الاعتماد
                 .build();
 
         return requestRepo.save(request);
+    }
+
+    /**
+     * يحدد أول خطوة اعتماد بناءً على حدود الموافقة (ApprovalLimit) والمبلغ الكلي.
+     * إذا لم توجد حدود أو لم تنطبق أي منها، يتم استخدام أول خطوة في سير العمل
+     * كافتراض.
+     */
+    private ApprovalWorkflowStep resolveInitialStep(String workflowCode, List<ApprovalWorkflowStep> steps,
+            BigDecimal amount) {
+        if (amount == null) {
+            return steps.get(0);
+        }
+
+        // نستخدم workflowCode كنشاط (ActivityType) في حدود الموافقة (مثل PO_APPROVAL)
+        List<ApprovalLimit> limits = limitRepo.findByActivityTypeAndIsActiveTrue(workflowCode);
+        if (limits == null || limits.isEmpty()) {
+            return steps.get(0);
+        }
+
+        for (ApprovalWorkflowStep step : steps) {
+            if (step.getApproverRole() == null) {
+                continue;
+            }
+            Integer roleId = step.getApproverRole().getRoleId();
+            boolean matches = limits.stream().anyMatch(limit -> {
+                if (limit.getRole() == null || !roleId.equals(limit.getRole().getRoleId())) {
+                    return false;
+                }
+                BigDecimal min = limit.getMinAmount() != null ? limit.getMinAmount() : BigDecimal.ZERO;
+                BigDecimal max = limit.getMaxAmount();
+                boolean gteMin = amount.compareTo(min) >= 0;
+                boolean lteMax = (max == null) || amount.compareTo(max) <= 0;
+                return gteMin && lteMax;
+            });
+            if (matches) {
+                return step;
+            }
+        }
+
+        // إذا لم تنطبق أي حدود على أي خطوة، نعود لأول خطوة كافتراض
+        return steps.get(0);
     }
 
     @Transactional(readOnly = true)
@@ -113,30 +162,88 @@ public class ApprovalService {
         return filteredRequests.stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
+    /** سجل الاعتمادات — آخر الإجراءات (من اعتمد ومتى) للشفافية والتدقيق */
+    @Transactional(readOnly = true)
+    public List<ApprovalAuditDto> getRecentApprovalActions(int limit) {
+        return actionRepo.findAllByOrderByActionDateDesc(PageRequest.of(0, Math.min(limit, 200)))
+                .stream()
+                .map(this::mapActionToAuditDto)
+                .collect(Collectors.toList());
+    }
+
+    private ApprovalAuditDto mapActionToAuditDto(ApprovalAction action) {
+        ApprovalRequest req = action.getRequest();
+        return ApprovalAuditDto.builder()
+                .actionId(action.getId())
+                .requestId(req.getId())
+                .documentType(req.getDocumentType())
+                .documentId(req.getDocumentId())
+                .documentNumber(req.getDocumentNumber())
+                .workflowName(req.getWorkflow().getWorkflowName())
+                .stepName(action.getStep().getStepName())
+                .actionType(action.getActionType())
+                .actionByUser(action.getActionByUser().getUsername())
+                .actionDate(action.getActionDate())
+                .comments(action.getComments())
+                .totalAmount(req.getTotalAmount())
+                .requestStatus(req.getStatus())
+                .build();
+    }
+
     private ApprovalRequestDto mapToDto(ApprovalRequest req) {
+        BigDecimal amountToUse = req.getTotalAmount();
+        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix
+        // display)
+        if ("QuotationComparison".equals(req.getDocumentType())
+                && (amountToUse == null || amountToUse.compareTo(BigDecimal.ZERO) == 0)) {
+            amountToUse = comparisonRepo.findById(req.getDocumentId())
+                    .map(qc -> qc.getSelectedQuotation() != null ? qc.getSelectedQuotation().getTotalAmount() : null)
+                    .filter(java.util.Objects::nonNull)
+                    .orElse(amountToUse);
+        }
+        if (amountToUse == null) {
+            amountToUse = BigDecimal.ZERO;
+        }
+        final BigDecimal finalAmount = amountToUse;
         return ApprovalRequestDto.builder()
                 .id(req.getId())
                 .workflowName(req.getWorkflow().getWorkflowName())
                 .documentType(req.getDocumentType())
                 .documentId(req.getDocumentId())
                 .documentNumber(req.getDocumentNumber())
-                .requestedByName(req.getRequestedByUser().getUsername()) // or e.g. getEmployee().getFullName()
-                .totalAmount(req.getTotalAmount())
+                .requestedByName(req.getRequestedByUser().getUsername())
+                .totalAmount(finalAmount)
                 .status(req.getStatus())
                 .currentStepName(req.getCurrentStep() != null ? req.getCurrentStep().getStepName() : "")
                 .requestedDate(req.getRequestedDate())
                 .completedDate(req.getCompletedDate())
-                .priority("Normal") // Default, logic can be added later
+                .priority("Normal")
                 .build();
     }
 
     @Transactional
-    public void processAction(Integer requestId, Integer actionByUserId, String actionType, String comments) {
+    public void processAction(Integer requestId, Integer actionByUserId, String actionType, String comments,
+            Integer warehouseId) {
         ApprovalRequest request = requestRepo.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
 
         User actor = userRepo.findById(actionByUserId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // عند اعتماد إذن الإضافة: تحديث المخزن المختار قبل تطبيق الاعتماد
+        if ("GoodsReceiptNote".equalsIgnoreCase(request.getDocumentType()) && "Approved".equalsIgnoreCase(actionType)
+                && warehouseId != null) {
+            grnRepo.findById(request.getDocumentId()).ifPresent(grn -> {
+                // ⚠️ CRITICAL: GRN must be inspected by Quality before approval
+                if (!"Inspected".equals(grn.getStatus()) && !"Approved".equals(grn.getStatus())
+                        && !"Pending Approval".equals(grn.getStatus())) {
+                    throw new RuntimeException(
+                            "لا يمكن اعتماد إذن الإضافة قبل فحص الجودة. الرجاء إرسال الفحص للاعتماد من صفحة فحص الجودة أولاً.");
+                }
+                grn.setWarehouseId(warehouseId);
+                grnRepo.save(grn);
+            });
+        }
 
         // 1. Log the action
         ApprovalAction action = ApprovalAction.builder()
@@ -150,38 +257,142 @@ public class ApprovalService {
 
         // 2. Update request state
         if ("Approved".equalsIgnoreCase(actionType)) {
+            handleIntermediateDocumentStatus(request, actionByUserId);
             moveToNextStep(request, actionByUserId);
         } else if ("Rejected".equalsIgnoreCase(actionType)) {
-            request.setStatus("Rejected");
+            // ✅ Strategy B: إغلاق الطلب نهائياً (لا إعادة استخدام)
+            request.setStatus("Rejected"); // يمكن استخدام "Cancelled" إذا كان متوفراً في enum
             request.setCompletedDate(LocalDateTime.now());
+            request.setCurrentStep(null); // ✅ تصفير CurrentStep (يُكتب NULL في CurrentStepID)
+
+            // تحديث الوثيقة المرتبطة (سيعيدها إلى Draft)
             updateLinkedDocumentStatus(request, "Rejected", actionByUserId);
+
+            // ✅ ملاحظة: CurrentStep يصبح null وهذا طبيعي لأن الطلب مُغلق
+            // Audit Trail محفوظ في approvalactions - CurrentStep مجرد مؤشر تشغيلي
+            // عند إعادة الإرسال، submitForApproval() سينشئ approvalrequest جديد تماماً
         }
 
         requestRepo.save(request);
     }
 
+    @Transactional
+    public void syncAction(String docType, Integer docId, String actionType, Integer userId) {
+        requestRepo.findByDocumentTypeAndDocumentIdAndStatus(docType, docId, "InProgress")
+                .ifPresent(request -> {
+                    // Similar logic to processAction but for sync
+                    if ("Approved".equalsIgnoreCase(actionType)) {
+                        handleIntermediateDocumentStatus(request, userId);
+                        moveToNextStep(request, userId);
+                    } else if ("Rejected".equalsIgnoreCase(actionType)) {
+                        // ✅ Strategy B: إغلاق الطلب نهائياً
+                        request.setStatus("Rejected");
+                        request.setCompletedDate(LocalDateTime.now());
+                        request.setCurrentStep(null); // ✅ تصفير CurrentStep
+                        updateLinkedDocumentStatus(request, "Rejected", userId);
+                    }
+                    requestRepo.save(request);
+                });
+
+        // Also check "Pending" status
+        requestRepo.findByDocumentTypeAndDocumentIdAndStatus(docType, docId, "Pending")
+                .ifPresent(request -> {
+                    if ("Approved".equalsIgnoreCase(actionType)) {
+                        handleIntermediateDocumentStatus(request, userId);
+                        moveToNextStep(request, userId);
+                    } else if ("Rejected".equalsIgnoreCase(actionType)) {
+                        // ✅ Strategy B: إغلاق الطلب نهائياً
+                        request.setStatus("Rejected");
+                        request.setCompletedDate(LocalDateTime.now());
+                        request.setCurrentStep(null); // ✅ تصفير CurrentStep
+                        updateLinkedDocumentStatus(request, "Rejected", userId);
+                    }
+                    requestRepo.save(request);
+                });
+    }
+
+    private void handleIntermediateDocumentStatus(ApprovalRequest request, Integer userId) {
+        String type = request.getDocumentType();
+        Integer id = request.getDocumentId();
+        User actor = userRepo.findById(userId).orElse(null);
+        String actorName = actor != null ? actor.getUsername() : "System";
+
+        if ("PaymentVoucher".equalsIgnoreCase(type) || "PV".equalsIgnoreCase(type)) {
+            voucherRepo.findById(id).ifPresent(pv -> {
+                ApprovalWorkflowStep currentStep = request.getCurrentStep();
+                if (currentStep != null) {
+                    if (currentStep.getStepNumber() == 1) {
+                        pv.setApprovalStatus("FinanceApproved");
+                        pv.setApprovedByFinanceManager(actorName);
+                        pv.setFinanceManagerApprovalDate(LocalDate.now());
+                    } else if (currentStep.getStepNumber() == 2) {
+                        pv.setApprovalStatus("GMApproved");
+                        pv.setApprovedByGeneralManager(actorName);
+                        pv.setGeneralManagerApprovalDate(LocalDate.now());
+                    }
+                }
+                voucherRepo.save(pv);
+            });
+        }
+    }
+
     private void moveToNextStep(ApprovalRequest request, Integer userId) {
+        if (request.getWorkflow() == null) {
+            return;
+        }
         List<ApprovalWorkflowStep> steps = stepRepo
                 .findByWorkflowWorkflowIdOrderByStepNumberAsc(request.getWorkflow().getWorkflowId());
 
         int currentIdx = -1;
-        for (int i = 0; i < steps.size(); i++) {
-            if (steps.get(i).getStepId().equals(request.getCurrentStep().getStepId())) {
-                currentIdx = i;
-                break;
+        ApprovalWorkflowStep currentStep = request.getCurrentStep();
+        if (currentStep != null) {
+            for (int i = 0; i < steps.size(); i++) {
+                if (steps.get(i).getStepId().equals(currentStep.getStepId())) {
+                    currentIdx = i;
+                    break;
+                }
             }
         }
 
-        if (currentIdx != -1 && currentIdx < steps.size() - 1) {
-            // Move to next step
-            request.setCurrentStep(steps.get(currentIdx + 1));
-            request.setStatus("InProgress");
-        } else {
-            // No more steps, fully approved
-            request.setStatus("Approved");
-            request.setCompletedDate(LocalDateTime.now());
-            updateLinkedDocumentStatus(request, "Approved", userId);
+        BigDecimal amount = request.getTotalAmount();
+        List<ApprovalLimit> limits = null;
+        if (amount != null) {
+            limits = limitRepo.findByActivityTypeAndIsActiveTrue(request.getWorkflow().getWorkflowCode());
         }
+
+        // ابحث عن أول خطوة تالية تنطبق عليها حدود الموافقة للمبلغ الحالي
+        if (currentIdx != -1) {
+            for (int i = currentIdx + 1; i < steps.size(); i++) {
+                ApprovalWorkflowStep candidate = steps.get(i);
+                if (amount != null && limits != null && !limits.isEmpty() && candidate.getApproverRole() != null) {
+                    Integer roleId = candidate.getApproverRole().getRoleId();
+                    boolean matches = limits.stream().anyMatch(limit -> {
+                        if (limit.getRole() == null || !roleId.equals(limit.getRole().getRoleId())) {
+                            return false;
+                        }
+                        BigDecimal min = limit.getMinAmount() != null ? limit.getMinAmount() : BigDecimal.ZERO;
+                        BigDecimal max = limit.getMaxAmount();
+                        boolean gteMin = amount.compareTo(min) >= 0;
+                        boolean lteMax = (max == null) || amount.compareTo(max) <= 0;
+                        return gteMin && lteMax;
+                    });
+                    if (!matches) {
+                        // هذه الخطوة ليست ضمن حدود المبلغ — يتم تجاوزها
+                        continue;
+                    }
+                }
+
+                // وجدنا خطوة مناسبة تالية
+                request.setCurrentStep(candidate);
+                request.setStatus("InProgress");
+                return;
+            }
+        }
+
+        // لا مزيد من الخطوات المطلوبة، الطلب معتمد بالكامل
+        request.setStatus("Approved");
+        request.setCompletedDate(LocalDateTime.now());
+        updateLinkedDocumentStatus(request, "Approved", userId);
     }
 
     private void updateLinkedDocumentStatus(ApprovalRequest request, String status, Integer userId) {
@@ -193,6 +404,9 @@ public class ApprovalService {
                 po.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     po.setStatus("Confirmed");
+                    // Auto GRN creation disabled to avoid unexpected failures on PO approval.
+                    // GRN will be created explicitly from the receiving workflow instead.
+                    // createGRNFromPO(po, userId);
                 }
                 poRepo.save(po);
             });
@@ -216,27 +430,39 @@ public class ApprovalService {
                 prRepo.save(pr);
             });
         } else if ("GoodsReceiptNote".equalsIgnoreCase(type)) {
-            grnRepo.findById(id).ifPresent(grn -> {
+            grnRepo.findByIdWithItems(id).ifPresent(grn -> {
                 grn.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
-                    grn.setStatus("Completed");
-                    supplierInvoiceService.createInvoiceFromGRN(grn.getId());
+                    grn.setStatus("Approved");
 
-                    // Auto-update stock levels
-                    if (grn.getItems() != null) {
+                    // تحديث أرصدة المخزون تلقائياً عند الاعتماد (أولاً لضمان ظهور الأصناف)
+                    if (grn.getItems() != null && grn.getWarehouseId() != null) {
                         for (GRNItem item : grn.getItems()) {
-                            inventoryService.updateStock(
-                                    item.getItem().getId(),
-                                    grn.getWarehouseId(),
-                                    item.getAcceptedQty() != null ? item.getAcceptedQty() : java.math.BigDecimal.ZERO,
-                                    "IN",
-                                    "GRN",
-                                    "GoodsReceiptNote",
-                                    grn.getId(),
-                                    grn.getGrnNumber(),
-                                    item.getUnitCost(),
-                                    userId);
+                            BigDecimal qtyToRecord = item.getAcceptedQty() != null ? item.getAcceptedQty()
+                                    : item.getReceivedQty();
+                            if (qtyToRecord != null && qtyToRecord.compareTo(BigDecimal.ZERO) > 0) {
+                                inventoryService.updateStock(
+                                        item.getItem().getId(),
+                                        grn.getWarehouseId(),
+                                        qtyToRecord,
+                                        "IN",
+                                        "GRN",
+                                        "GoodsReceiptNote",
+                                        grn.getId(),
+                                        grn.getGrnNumber(),
+                                        item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO,
+                                        userId);
+                            }
                         }
+                        grn.setStatus("Completed");
+                        grn.setUpdatedBy(userId);
+                        grn.setUpdatedAt(LocalDateTime.now());
+                    }
+
+                    try {
+                        supplierInvoiceService.createInvoiceFromGRN(grn.getId());
+                    } catch (Exception e) {
+                        // فاتورة المورد قد تفشل لكن المخزون تم تحديثه
                     }
                 }
                 grnRepo.save(grn);
@@ -246,21 +472,172 @@ public class ApprovalService {
                 qc.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     qc.setStatus("Approved");
-                    // NEW: Automatically create PO and initiate its approval
-                    createPOFromComparison(qc, userId);
+
+                    // ✅ Idempotent PO Creation: إنشاء PO مرة واحدة فقط
+                    if (qc.getSelectedQuotation() != null) {
+                        boolean poExists = poRepo.findByQuotationId(qc.getSelectedQuotation().getId()).isPresent();
+
+                        if (!poExists) {
+                            // NEW: Automatically create PO and initiate its approval
+                            createPOFromComparison(qc, userId);
+                        } else {
+                            System.out.println("PO already exists for quotation " +
+                                    qc.getSelectedQuotation().getId() + " - skipping creation");
+                        }
+                    }
                 } else if ("Rejected".equals(status)) {
-                    qc.setStatus("Rejected");
+                    // ✅ إعادة المقارنة إلى Draft للسماح بالتعديل وإعادة الإرسال
+                    qc.setStatus("Draft");
+                    qc.setApprovalStatus("Rejected"); // تتبع آخر محاولة رفض
+
+                    // ✅ تتبع عدد مرات الرفض
+                    Integer rejectionCount = qc.getRejectionCount() != null ? qc.getRejectionCount() : 0;
+                    qc.setRejectionCount(rejectionCount + 1);
+                    qc.setLastRejectionDate(LocalDateTime.now());
+
+                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل
+                    // تاريخي
+                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات
+                    // المُغلقة
                 }
                 comparisonRepo.save(qc);
+            });
+        } else if ("PurchaseReturn".equalsIgnoreCase(type)) {
+            returnRepo.findById(id).ifPresent(ret -> {
+                ret.setStatus(status);
+                if ("Approved".equals(status)) {
+                    ret.setApprovedByUserId(userId);
+                    ret.setApprovedDate(LocalDateTime.now());
+
+                    // Logic from PurchaseReturnService.processApprovalEffects
+                    // 1. Update Stock (Decrement) - ONLY if items were originally accepted into
+                    // stock
+                    // If return is for items rejected during inspection, they were never in stock
+                    // (AcceptedQty only was added)
+                    boolean isRejectionReturn = ret.getReturnReason() != null &&
+                            ret.getReturnReason().contains("Rejected during Quality Inspection");
+
+                    if (!isRejectionReturn) {
+                        for (com.rasras.erp.procurement.PurchaseReturnItem item : ret.getItems()) {
+                            inventoryService.updateStock(
+                                    item.getItem().getId(),
+                                    ret.getWarehouse().getId(),
+                                    item.getReturnedQty(),
+                                    "OUT",
+                                    "RETURN",
+                                    "PurchaseReturn",
+                                    ret.getId(),
+                                    ret.getReturnNumber(),
+                                    item.getUnitPrice(),
+                                    userId);
+                        }
+                    }
+
+                    // 2. Update Supplier Balance (Decrease) & Total Returned (Increase)
+                    com.rasras.erp.supplier.Supplier supplier = ret.getSupplier();
+                    BigDecimal currentBalance = supplier.getCurrentBalance() != null ? supplier.getCurrentBalance()
+                            : BigDecimal.ZERO;
+                    BigDecimal currentReturned = supplier.getTotalReturned() != null ? supplier.getTotalReturned()
+                            : BigDecimal.ZERO;
+
+                    supplier.setCurrentBalance(currentBalance.subtract(ret.getTotalAmount()));
+                    supplier.setTotalReturned(currentReturned.add(ret.getTotalAmount()));
+                    supplierRepo.save(supplier);
+
+                    // 3. Update GRN status if reference exists
+                    if (ret.getGrnId() != null) {
+                        grnRepo.findById(ret.getGrnId()).ifPresent(grn -> {
+                            grn.setStatus("Returned");
+                            grnRepo.save(grn);
+                        });
+                    }
+                }
+                returnRepo.save(ret);
+            });
+        } else if ("PaymentVoucher".equalsIgnoreCase(type) || "PV".equalsIgnoreCase(type)) {
+            voucherRepo.findById(id).ifPresent(pv -> {
+                pv.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    // Final Step (Disbursement) is approved.
+                    // This is equivalent to confirming payment.
+                    User actor = userRepo.findById(userId).orElse(null);
+                    String actorName = actor != null ? actor.getUsername() : "System";
+
+                    // Trigger disbursement effects
+                    supplierInvoiceService.recordPayment(
+                            pv.getSupplierInvoice().getId(),
+                            pv.getPaymentAmount(),
+                            actorName);
+
+                    pv.setStatus("Paid");
+                    pv.setPaidBy(actorName);
+                    pv.setPaidDate(LocalDate.now());
+                } else if ("Rejected".equals(status)) {
+                    pv.setStatus("Rejected");
+                }
+                voucherRepo.save(pv);
             });
         }
     }
 
+    private void createGRNFromPO(PurchaseOrder po, Integer userId) {
+        // Create GRN with status "Pending Inspection"
+        com.rasras.erp.inventory.GoodsReceiptNote grn = new com.rasras.erp.inventory.GoodsReceiptNote();
+        grn.setGrnNumber("GRN-" + System.currentTimeMillis()); // simplified generation
+        grn.setGrnDate(LocalDateTime.now());
+        grn.setPurchaseOrder(po);
+        grn.setSupplier(po.getSupplier());
+        grn.setStatus("Pending Inspection");
+        grn.setApprovalStatus("Pending");
+        grn.setCreatedBy(userId);
+        grn.setReceivedByUserId(userId);
+
+        // Fetch first available warehouse from database
+        // TODO: Implement proper warehouse selection logic (e.g., from PO or system
+        // config)
+        Integer warehouseId = warehouseRepo.findByIsActiveTrue().stream()
+                .findFirst()
+                .map(com.rasras.erp.inventory.Warehouse::getId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Cannot create GRN: No active warehouses available in the system. Please create a warehouse first."));
+        grn.setWarehouseId(warehouseId);
+
+        if (po.getItems() != null) {
+            List<GRNItem> grnItems = po.getItems().stream().map(poItem -> {
+                GRNItem item = new GRNItem();
+                item.setGrn(grn);
+                item.setPoItemId(poItem.getId());
+                item.setItem(poItem.getItem());
+                item.setUnit(poItem.getUnit());
+                item.setOrderedQty(poItem.getOrderedQty());
+                item.setReceivedQty(poItem.getOrderedQty()); // Default to ordered
+                item.setAcceptedQty(poItem.getOrderedQty()); // Default Accepted to Received until inspected
+                item.setRejectedQty(java.math.BigDecimal.ZERO);
+                item.setUnitCost(poItem.getUnitPrice());
+                return item;
+            }).collect(Collectors.toList());
+            grn.setItems(grnItems);
+        }
+
+        grnRepo.save(grn);
+    }
+
     private void createPOFromComparison(com.rasras.erp.procurement.QuotationComparison qc, Integer userId) {
-        if (qc.getSelectedQuotation() == null)
+        if (qc.getSelectedQuotation() == null) {
+            System.err.println(
+                    "Cannot create PO from Comparison " + qc.getComparisonNumber() + ": No quotation selected.");
             return;
+        }
 
         SupplierQuotation quoted = qc.getSelectedQuotation();
+        if (quoted.getSupplier() == null) {
+            throw new RuntimeException("Cannot create PO: Selected quotation has no supplier.");
+        }
+
+        BigDecimal deliveryCost = quoted.getDeliveryCost() != null ? quoted.getDeliveryCost() : BigDecimal.ZERO;
+        BigDecimal otherCosts = quoted.getOtherCosts() != null ? quoted.getOtherCosts() : BigDecimal.ZERO;
+        BigDecimal grandTotal = quoted.getTotalAmount() != null ? quoted.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal subTotal = grandTotal.subtract(deliveryCost).subtract(otherCosts);
 
         // 1. Create the PO record
         PurchaseOrder po = PurchaseOrder.builder()
@@ -273,8 +650,10 @@ public class ApprovalService {
                         LocalDate.now().plusDays(quoted.getDeliveryDays() != null ? quoted.getDeliveryDays() : 7))
                 .currency(quoted.getCurrency())
                 .exchangeRate(quoted.getExchangeRate())
-                .subTotal(quoted.getTotalAmount())
-                .totalAmount(quoted.getTotalAmount())
+                .shippingCost(deliveryCost)
+                .otherCosts(otherCosts)
+                .subTotal(subTotal)
+                .totalAmount(grandTotal)
                 .status("Pending")
                 .approvalStatus("Pending")
                 .notes("Auto-generated from Approved Comparison: " + qc.getComparisonNumber())
@@ -302,19 +681,17 @@ public class ApprovalService {
 
         PurchaseOrder savedPo = poRepo.save(po);
 
-        // 3. Initiate PO Approval Workflow
-        initiateApproval(
-                "PO_APPROVAL",
-                "PurchaseOrder",
-                savedPo.getId(),
-                savedPo.getPoNumber(),
-                userId,
-                savedPo.getTotalAmount());
+        // 3. تم تعطيل approval workflow للـ PO لأنه معتمد تلقائياً بعد اعتماد المقارنة
+        // PO يُنشأ فقط من مقارنة معتمدة، لذلك يُعتبر معتمداً مباشرة
+        savedPo.setStatus("Confirmed");  // معتمد مباشرة
+        savedPo.setApprovalStatus("Approved");  // معتمد تلقائياً
+        poRepo.save(savedPo);
+        
+        System.out.println("✅ PO " + savedPo.getPoNumber() + " created and auto-approved from comparison " + qc.getComparisonNumber());
     }
 
     private String generatePONumber() {
         long count = poRepo.count() + 1;
-        LocalDateTime now = LocalDateTime.now();
-        return String.format("PO-%d%02d-%03d", now.getYear(), now.getMonthValue(), count);
+        return String.format("PO-%d", count);
     }
 }

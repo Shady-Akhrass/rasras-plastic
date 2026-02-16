@@ -1,16 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-    Plus, Search, Edit2, Trash2, Package, Filter, Download, Upload,
+    Plus, Search, Edit2, Trash2, Package, Download, Upload,
     RefreshCw, CheckCircle2, XCircle, Eye, ChevronLeft, ChevronRight,
     ChevronsLeft, ChevronsRight, DollarSign, Layers,
     Tag, Box, TrendingUp, TrendingDown, AlertTriangle,
     Barcode, ShoppingCart, ShoppingBag, Percent, Scale,
-    BarChart3, Info
+    Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { stockBalanceService } from '../../services/stockBalanceService';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatNumber } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 // Stat Card Component
@@ -121,8 +122,9 @@ const ItemRow: React.FC<{
     onEdit: () => void;
     onDelete: () => void;
     onView: () => void;
+    canDelete: boolean;
     index: number;
-}> = ({ item, onEdit, onDelete, onView, index }) => {
+}> = ({ item, onEdit, onDelete, onView, canDelete, index }) => {
     // Calculate profit margin
     const profitMargin = item.lastSalePrice && item.lastPurchasePrice
         ? ((item.lastSalePrice - item.lastPurchasePrice) / item.lastPurchasePrice * 100).toFixed(1)
@@ -136,15 +138,15 @@ const ItemRow: React.FC<{
                 animation: 'fadeInUp 0.3s ease-out forwards'
             }}
         >
-            {/* Item Code & Barcode */}
+            {/* كود الصنف والباركود */}
             <td className="px-4 py-4">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                         rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Package className="w-5 h-5 text-brand-primary" />
+                        <Barcode className="w-5 h-5 text-brand-primary" />
                     </div>
                     <div>
-                        <span className="font-mono font-bold text-brand-primary text-sm block">{item.itemCode}</span>
+                        <span className="font-mono font-bold text-brand-primary text-sm block">{item.itemCode || '—'}</span>
                         {item.barcode && (
                             <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
                                 <Barcode className="w-3 h-3" />
@@ -153,6 +155,18 @@ const ItemRow: React.FC<{
                         )}
                     </div>
                 </div>
+            </td>
+
+            {/* العلامة التجارية / Grade */}
+            <td className="px-4 py-4">
+                {item.grade ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg">
+                        <Tag className="w-3.5 h-3.5" />
+                        {item.grade}
+                    </span>
+                ) : (
+                    <span className="text-slate-400 text-sm">—</span>
+                )}
             </td>
 
             {/* Item Name */}
@@ -164,12 +178,20 @@ const ItemRow: React.FC<{
                     {item.itemNameEn && (
                         <p className="text-xs text-slate-400 truncate" dir="ltr">{item.itemNameEn}</p>
                     )}
-                    {item.gradeName && (
-                        <p className="text-[10px] text-brand-primary/70 mt-0.5">
-                            <span className="bg-brand-primary/10 px-1.5 py-0.5 rounded">{item.gradeName}</span>
-                        </p>
-                    )}
                 </div>
+            </td>
+
+            {/* MFR */}
+            <td className="px-4 py-4">
+                {item.gradeName ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-primary/10 text-brand-primary 
+                        text-xs font-medium rounded-lg" title="معدل تدفق الذوبان (Melt Flow Rate)">
+                        <Layers className="w-3.5 h-3.5" />
+                        {item.gradeName}
+                    </span>
+                ) : (
+                    <span className="text-slate-400 text-sm">—</span>
+                )}
             </td>
 
             {/* Category & Type */}
@@ -201,7 +223,7 @@ const ItemRow: React.FC<{
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
                         <span className="text-lg font-bold text-slate-800">
-                            {(item.currentStock || 0).toLocaleString()}
+                            {formatNumber(item.currentStock ?? 0)}
                         </span>
                         <StockStatusBadge
                             currentStock={item.currentStock}
@@ -234,14 +256,14 @@ const ItemRow: React.FC<{
                     <div className="flex items-center gap-2">
                         <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
                         <span className="text-sm text-slate-600">
-                            {item.lastPurchasePrice ? `${item.lastPurchasePrice.toLocaleString()}` : '---'}
+                            {item.lastPurchasePrice != null ? formatNumber(item.lastPurchasePrice) : '---'}
                         </span>
                     </div>
                     {/* Standard Cost */}
                     <div className="flex items-center gap-2">
                         <DollarSign className="w-3.5 h-3.5 text-slate-400" />
                         <span className="text-xs text-slate-400">
-                            تكلفة: {item.standardCost ? `${item.standardCost.toLocaleString()}` : '---'}
+                            تكلفة: {item.standardCost != null ? formatNumber(item.standardCost) : '---'}
                         </span>
                     </div>
                 </div>
@@ -253,7 +275,7 @@ const ItemRow: React.FC<{
                     <div className="flex items-center gap-2">
                         <ShoppingBag className="w-3.5 h-3.5 text-emerald-500" />
                         <span className="font-bold text-emerald-600">
-                            {item.lastSalePrice ? `${item.lastSalePrice.toLocaleString()}` : '---'}
+                            {item.lastSalePrice != null ? formatNumber(item.lastSalePrice) : '---'}
                         </span>
                     </div>
                     {profitMargin && (
@@ -328,10 +350,13 @@ const ItemRow: React.FC<{
                         <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                        onClick={onDelete}
-                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 
-                            rounded-lg transition-all duration-200"
-                        title="حذف"
+                        onClick={canDelete ? onDelete : undefined}
+                        disabled={!canDelete}
+                        className={`p-2 rounded-lg transition-all duration-200 ${canDelete
+                            ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
+                            : 'text-slate-300 cursor-not-allowed opacity-60'
+                            }`}
+                        title={canDelete ? 'حذف' : 'لا يمكن الحذف: يوجد كمية في المخزون. يجب أن تكون الكمية صفراً.'}
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
@@ -359,6 +384,8 @@ const TableSkeleton: React.FC = () => (
                     <div className="h-4 w-32 bg-slate-200 rounded mb-1" />
                     <div className="h-3 w-24 bg-slate-100 rounded" />
                 </td>
+                <td className="px-4 py-4"><div className="h-6 w-20 bg-slate-100 rounded-lg" /></td>
+                <td className="px-4 py-4"><div className="h-7 w-14 bg-slate-100 rounded-lg" /></td>
                 <td className="px-4 py-4">
                     <div className="h-6 w-20 bg-slate-100 rounded-lg mb-1" />
                     <div className="h-5 w-16 bg-slate-100 rounded-lg" />
@@ -396,7 +423,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string; onAdd: () => void }> = ({ searchTerm, onAdd }) => (
     <tr>
-        <td colSpan={10} className="px-6 py-16">
+        <td colSpan={12} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm ? <Search className="w-12 h-12 text-slate-400" /> : <Package className="w-12 h-12 text-slate-400" />}
@@ -482,14 +509,18 @@ const ItemsMasterPage: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (!itemToDelete) return;
+        const idToDelete = itemToDelete;
         setIsDeleting(true);
         try {
-            await itemService.deleteItem(itemToDelete);
-            toast.success('تم حذف الصنف بنجاح', { icon: '🗑️' });
-            fetchItems();
+            await itemService.deleteItem(idToDelete);
+            setItems(prev => prev.filter(i => i.id !== idToDelete));
             setIsDeleteModalOpen(false);
-        } catch (error) {
-            toast.error('فشل في حذف الصنف');
+            setItemToDelete(null);
+            toast.success('تم حذف الصنف نهائياً', { icon: '🗑️' });
+            await fetchItems();
+            setItems(prev => prev.filter(i => i.id !== idToDelete));
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'فشل في حذف الصنف');
         } finally {
             setIsDeleting(false);
         }
@@ -506,14 +537,15 @@ const ItemsMasterPage: React.FC = () => {
 
     // Filtered Items
     const filteredItems = useMemo(() => {
-        return items.filter(item => {
+        const filtered = items.filter(item => {
             // Search filter
             const matchesSearch =
                 item.itemNameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (item.itemCode && item.itemCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (item.grade && item.grade.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.itemNameEn && item.itemNameEn.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.barcode && item.barcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.gradeName && item.gradeName.toLowerCase().includes(searchTerm.toLowerCase()));
+                (item.gradeName != null && String(item.gradeName).includes(searchTerm));
 
             // Status filter
             const matchesStatus = filterStatus === 'all' ||
@@ -538,6 +570,8 @@ const ItemsMasterPage: React.FC = () => {
 
             return matchesSearch && matchesStatus && matchesType && matchesCategory && matchesStock;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [items, searchTerm, filterStatus, filterType, filterCategory, filterStock]);
 
     // Pagination
@@ -698,7 +732,7 @@ const ItemsMasterPage: React.FC = () => {
                             ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                         <input
                             type="text"
-                            placeholder="بحث بكود الصنف، الاسم، الباركود، أو العلامة التجارية..."
+                            placeholder="بحث بالعلامة التجارية/Grade، الاسم، الباركود، أو MFR..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => setIsSearchFocused(true)}
@@ -867,13 +901,25 @@ const ItemsMasterPage: React.FC = () => {
                                 <th className="px-4 py-4 text-right text-xs font-semibold text-slate-600 uppercase">
                                     <div className="flex items-center gap-2">
                                         <Barcode className="w-4 h-4" />
-                                        الكود / الباركود
+                                        كود الصنف
+                                    </div>
+                                </th>
+                                <th className="px-4 py-4 text-right text-xs font-semibold text-slate-600 uppercase">
+                                    <div className="flex items-center gap-2">
+                                        <Tag className="w-4 h-4" />
+                                        العلامة التجارية / Grade
                                     </div>
                                 </th>
                                 <th className="px-4 py-4 text-right text-xs font-semibold text-slate-600 uppercase">
                                     <div className="flex items-center gap-2">
                                         <Package className="w-4 h-4" />
                                         اسم الصنف
+                                    </div>
+                                </th>
+                                <th className="px-4 py-4 text-right text-xs font-semibold text-slate-600 uppercase">
+                                    <div className="flex items-center gap-2">
+                                        <Layers className="w-4 h-4" />
+                                        MFR
                                     </div>
                                 </th>
                                 <th className="px-4 py-4 text-right text-xs font-semibold text-slate-600 uppercase">
@@ -927,6 +973,7 @@ const ItemsMasterPage: React.FC = () => {
                                         onEdit={() => navigate(`/dashboard/inventory/items/${item.id}`)}
                                         onDelete={() => item.id && handleDeleteClick(item.id)}
                                         onView={() => navigate(`/dashboard/inventory/items/${item.id}`)}
+                                        canDelete={(item.currentStock ?? 0) <= 0}
                                         index={index}
                                     />
                                 ))
@@ -1019,12 +1066,12 @@ const ItemsMasterPage: React.FC = () => {
             {/* Delete Modal */}
             <ConfirmModal
                 isOpen={isDeleteModalOpen}
-                title="حذف صنف"
-                message="هل أنت متأكد من حذف هذا الصنف؟ سيتم تعطيله في النظام ولن يظهر في العمليات الجديدة."
-                confirmText="حذف"
+                title="حذف صنف نهائياً"
+                message="هل أنت متأكد من حذف هذا الصنف؟ سيتم حذفه من النظام نهائياً. الحذف مسموح فقط عندما تكون الكمية في المخزون صفراً."
+                confirmText="حذف نهائياً"
                 cancelText="إلغاء"
                 onConfirm={handleDeleteConfirm}
-                onCancel={() => setIsDeleteModalOpen(false)}
+                onCancel={() => { setIsDeleteModalOpen(false); setItemToDelete(null); }}
                 isLoading={isDeleting}
                 variant="danger"
             />

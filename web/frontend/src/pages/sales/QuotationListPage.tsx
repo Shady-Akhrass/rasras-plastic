@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Tag, RefreshCw, Eye, FileText } from 'lucide-react';
 import { salesQuotationService, type SalesQuotationDto } from '../../services/salesQuotationService';
+import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 const QuotationListPage: React.FC = () => {
@@ -9,8 +11,12 @@ const QuotationListPage: React.FC = () => {
     const [list, setList] = useState<SalesQuotationDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
 
     useEffect(() => { fetchList(); }, []);
+
+    useEffect(() => { setCurrentPage(1); }, [search]);
 
     const fetchList = async () => {
         try {
@@ -23,11 +29,25 @@ const QuotationListPage: React.FC = () => {
         } finally { setLoading(false); }
     };
 
-    const filtered = list.filter((q) =>
-        !search ||
-        (q.quotationNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-        (q.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = useMemo(() => {
+        const f = list.filter((q) =>
+            !search ||
+            (q.quotationNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+            (q.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
+        );
+        // الأحدث في الأعلى
+        return [...f].sort((a, b) => {
+            const dateA = a.quotationDate ? new Date(a.quotationDate).getTime() : 0;
+            const dateB = b.quotationDate ? new Date(b.quotationDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
+        });
+    }, [list, search]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
 
     return (
         <div className="space-y-6">
@@ -93,13 +113,13 @@ const QuotationListPage: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((q) => (
+                                paginated.map((q) => (
                                     <tr key={q.id} className="border-b border-slate-100 hover:bg-blue-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-blue-700">{q.quotationNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{q.quotationDate ? new Date(q.quotationDate).toLocaleDateString('ar-EG') : '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{q.quotationDate ? formatDate(q.quotationDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{q.customerNameAr || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{q.validUntil ? new Date(q.validUntil).toLocaleDateString('ar-EG') : '—'}</td>
-                                        <td className="px-6 py-4">{(q.totalAmount ?? 0).toLocaleString('ar-EG')} {q.currency || ''}</td>
+                                        <td className="px-6 py-4 text-slate-600">{q.validUntilDate ? formatDate(q.validUntilDate) : '—'}</td>
+                                        <td className="px-6 py-4">{formatNumber(q.totalAmount ?? 0)} {q.currency || ''}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/quotations/${q.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
                                         </td>
@@ -109,6 +129,15 @@ const QuotationListPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {!loading && filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filtered.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                    />
+                )}
             </div>
         </div>
     );

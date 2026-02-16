@@ -2,6 +2,7 @@ package com.rasras.erp.procurement;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.Map;
 @RequestMapping("/procurement/po")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
 public class PurchaseOrderController {
 
     private final PurchaseOrderService poService;
@@ -18,6 +20,16 @@ public class PurchaseOrderController {
     @GetMapping
     public ResponseEntity<Map<String, List<PurchaseOrderDto>>> getAllPOs() {
         return ResponseEntity.ok(Map.of("data", poService.getAllPOs()));
+    }
+
+    @GetMapping("/waiting")
+    public ResponseEntity<Map<String, List<PurchaseOrderDto>>> getWaitingForArrivalPOs() {
+        return ResponseEntity.ok(Map.of("data", poService.getWaitingForArrivalPOs()));
+    }
+
+    @GetMapping("/uninvoiced")
+    public ResponseEntity<Map<String, List<PurchaseOrderDto>>> getUninvoicedPOs() {
+        return ResponseEntity.ok(Map.of("data", poService.getUninvoicedPOs()));
     }
 
     @GetMapping("/{id}")
@@ -34,5 +46,24 @@ public class PurchaseOrderController {
     public ResponseEntity<Map<String, PurchaseOrderDto>> submitForApproval(@PathVariable Integer id) {
         // Keeping Map<String, Dto> format as per other methods in this controller
         return ResponseEntity.ok(Map.of("data", poService.submitPO(id)));
+    }
+
+    @PostMapping("/{id}/mark-arrived")
+    public ResponseEntity<Map<String, com.rasras.erp.inventory.GoodsReceiptNoteDto>> markAsArrived(
+            @PathVariable Integer id,
+            @RequestParam(required = false) Integer userId) {
+        return ResponseEntity.ok(Map.of("data", poService.markAsArrived(id, userId)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Void>> deletePO(@PathVariable Integer id) {
+        poService.deletePO(id);
+        return ResponseEntity.ok(Map.of("data", null));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<Map<String, Void>> deletePOPost(@PathVariable Integer id) {
+        poService.deletePO(id);
+        return ResponseEntity.ok(Map.of("data", null));
     }
 }

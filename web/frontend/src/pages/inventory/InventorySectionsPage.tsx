@@ -119,7 +119,7 @@ const InventorySectionsPage: React.FC = () => {
                         icon={Scale}
                         title="وحدات القياس"
                         description="كجم، طن، وغيرها"
-                        to="/dashboard/inventory/units"
+                        to="/dashboard/settings/units"
                         color="blue"
                     />
                     <SectionCard
@@ -164,7 +164,7 @@ const InventorySectionsPage: React.FC = () => {
                         icon={LogIn}
                         title="إذن إضافة (GRN)"
                         description="استلام مواد بعد موافقة الجودة وربطها بأمر الشراء"
-                        to="/dashboard/inventory/warehouse/grn"
+                        to="/dashboard/procurement/grn"
                         color="emerald"
                     />
                     <SectionCard

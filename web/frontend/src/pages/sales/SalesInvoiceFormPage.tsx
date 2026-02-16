@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronRight, Save, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, Save, Plus, Trash2, Receipt, Clock, CheckCircle2, Lock, Info, Calendar, DollarSign, Package, FileText } from 'lucide-react';
 import { salesInvoiceService, type SalesInvoiceDto, type SalesInvoiceItemDto } from '../../services/salesInvoiceService';
 import { saleOrderService } from '../../services/saleOrderService';
 import customerService from '../../services/customerService';
 import { itemService } from '../../services/itemService';
 import { toast } from 'react-hot-toast';
+import { formatNumber } from '../../utils/format';
+
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
+        'Draft': { icon: Receipt, className: 'bg-slate-50 text-slate-700 border-slate-200', label: 'مسودة' },
+        'Pending': { icon: Clock, className: 'bg-amber-50 text-amber-700 border-amber-200', label: 'قيد الاعتماد' },
+        'Approved': { icon: CheckCircle2, className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'معتمد' },
+        'Paid': { icon: CheckCircle2, className: 'bg-purple-50 text-purple-700 border-purple-200', label: 'مدفوع' },
+        'Partial': { icon: Clock, className: 'bg-blue-50 text-blue-700 border-blue-200', label: 'مدفوع جزئياً' }
+    };
+    const { icon: Icon, className, label } = config[status] || config['Draft'];
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+        </span>
+    );
+};
 
 const SalesInvoiceFormPage: React.FC = () => {
     const navigate = useNavigate();
@@ -13,6 +31,8 @@ const SalesInvoiceFormPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const saleOrderIdParam = searchParams.get('saleOrderId');
     const isNew = !id || id === 'new';
+    const isView = searchParams.get('mode') === 'view';
+    const isEdit = !!id && !isNew;
 
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -24,16 +44,19 @@ const SalesInvoiceFormPage: React.FC = () => {
         invoiceDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         customerId: 0,
-        saleOrderId: 0,
+        salesOrderId: 0,
         currency: 'EGP',
         exchangeRate: 1,
         paymentTerms: '',
-        discountPercent: 0,
-        taxPercent: 0,
+        discountPercentage: 0,
+        taxAmount: 0,
         paidAmount: 0,
         notes: '',
+        status: 'Draft',
         items: []
     });
+
+    const isReadOnly = isView || (isEdit && form.status !== 'Draft');
 
     useEffect(() => {
         (async () => {
@@ -52,7 +75,7 @@ const SalesInvoiceFormPage: React.FC = () => {
 
     const loadFromSaleOrder = async (soId: number) => {
         if (!soId) {
-            setForm((f) => ({ ...f, saleOrderId: 0, saleOrderNumber: undefined, customerId: 0, customerNameAr: undefined, items: [] }));
+            setForm((f) => ({ ...f, salesOrderId: 0, soNumber: undefined, customerId: 0, customerNameAr: undefined, items: [] }));
             return;
         }
         try {
@@ -60,22 +83,23 @@ const SalesInvoiceFormPage: React.FC = () => {
             if (so) {
                 setForm((f) => ({
                     ...f,
-                    saleOrderId: so.id!,
-                    saleOrderNumber: so.orderNumber,
+                    salesOrderId: so.id!,
+                    soNumber: so.soNumber,
                     customerId: so.customerId,
                     customerNameAr: so.customerNameAr,
                     paymentTerms: so.paymentTerms ?? f.paymentTerms,
-                    discountPercent: so.discountPercent ?? 0,
-                    taxPercent: so.taxPercent ?? 0,
+                    discountPercentage: so.discountPercentage ?? 0,
+                    taxAmount: so.taxAmount ?? 0,
                     items: (so.items || []).map((i) => ({
                         itemId: i.itemId,
                         itemNameAr: i.itemNameAr,
                         itemCode: i.itemCode,
-                        qty: i.qty,
+                        quantity: i.orderedQty,
                         unitId: i.unitId,
                         unitNameAr: i.unitNameAr,
                         unitPrice: i.unitPrice,
-                        discountPercent: i.discountPercent
+                        discountPercentage: i.discountPercentage,
+                        totalPrice: i.totalPrice
                     }))
                 }));
             }
@@ -100,7 +124,7 @@ const SalesInvoiceFormPage: React.FC = () => {
         }
     }, [id, isNew, navigate]);
 
-    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, qty: 1, unitId: 0, unitPrice: 0, discountPercent: 0 }] })); };
+    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, quantity: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, totalPrice: 0 }] })); };
     const removeItem = (idx: number) => { setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
     const updateItem = (idx: number, u: Partial<SalesInvoiceItemDto>) => {
         setForm((f) => {
@@ -112,21 +136,22 @@ const SalesInvoiceFormPage: React.FC = () => {
         });
     };
 
-    const subtotal = form.items.reduce((s, i) => s + (i.qty || 0) * (i.unitPrice || 0) * (1 - (i.discountPercent || 0) / 100), 0);
-    const disc = subtotal * ((form.discountPercent || 0) / 100);
+    const subtotal = form.items.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0) * (1 - (i.discountPercentage || 0) / 100), 0);
+    const disc = subtotal * ((form.discountPercentage || 0) / 100);
     const afterDisc = subtotal - disc;
-    const tax = afterDisc * ((form.taxPercent || 0) / 100);
+    const tax = form.taxAmount || 0;
     const total = afterDisc + tax;
     const paid = form.paidAmount ?? 0;
     const balance = total - paid;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isReadOnly) return;
         if (!form.customerId) { toast.error('اختر العميل'); return; }
         if (form.items.length === 0) { toast.error('أضف بنداً واحداً على الأقل'); return; }
         setSaving(true);
         try {
-            const payload: SalesInvoiceDto = { ...form, subTotal: subtotal, discountAmount: disc, taxAmount: tax, totalAmount: total, balanceAmount: balance, items: form.items };
+            const payload: SalesInvoiceDto = { ...form, subTotal: subtotal, discountAmount: disc, taxAmount: tax, totalAmount: total, remainingAmount: balance, items: form.items };
             await salesInvoiceService.create(payload);
             toast.success('تم إنشاء الفاتورة');
             navigate('/dashboard/sales/invoices');
@@ -136,105 +161,202 @@ const SalesInvoiceFormPage: React.FC = () => {
         } finally { setSaving(false); }
     };
 
+    const inputClass = (extra = '') =>
+        `w-full px-4 py-3 border-2 border-transparent rounded-xl 
+        focus:border-purple-600 outline-none transition-all font-semibold
+        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'} ${extra}`;
+
+    const smallInputClass = (extra = '') =>
+        `px-3 py-2 border-2 border-transparent rounded-xl text-sm outline-none transition-all font-semibold
+        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white focus:border-purple-600'} ${extra}`;
+
     if (!isNew && !form.invoiceNumber && loading) return <div className="p-8 text-center">جاري التحميل...</div>;
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto pb-12">
-            <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/dashboard/sales/invoices')} className="p-2 hover:bg-slate-100 rounded-xl"><ChevronRight className="w-6 h-6" /></button>
-                <h1 className="text-xl font-bold text-slate-800">{isNew ? 'فاتورة مبيعات جديدة' : `فاتورة ${form.invoiceNumber || ''}`}</h1>
+        <div className="space-y-6 pb-20" dir="rtl">
+            <style>{`
+                @keyframes slideInRight { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+                .animate-slide-in { animation: slideInRight 0.4s ease-out; }
+            `}</style>
+            {/* ═══ HEADER ═══ */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-purple-600/95 to-purple-600/90 rounded-3xl p-8 text-white shadow-2xl">
+                <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <button onClick={() => navigate('/dashboard/sales/invoices')} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20"><Receipt className="w-10 h-10" /></div>
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <h1 className="text-3xl font-bold">{isNew ? 'فاتورة مبيعات جديدة' : `فاتورة ${form.invoiceNumber || ''}`}</h1>
+                                {!isNew && <StatusBadge status={form.status || 'Draft'} />}
+                                {isReadOnly && <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20"><Lock className="w-3 h-3" /> للعرض فقط</span>}
+                            </div>
+                            <p className="text-white/80 text-lg">إصدار ومتابعة فواتير العملاء</p>
+                        </div>
+                    </div>
+                    {!isReadOnly && !isNew && (
+                        <button onClick={() => { if (window.confirm('حذف الفاتورة؟')) { /* Delete Logic */ } }} className="p-3 bg-white/10 backdrop-blur-sm text-white hover:bg-rose-500/80 rounded-2xl border border-white/20 transition-all">
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-                    <h2 className="font-bold text-slate-800 border-b pb-2">البيانات الأساسية</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">أمر البيع (تحميل منه)</label>
-                            <select value={form.saleOrderId || ''} onChange={(e) => loadFromSaleOrder(parseInt(e.target.value) || 0)} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none">
-                                <option value="">—</option>
-                                {saleOrders.map((o) => <option key={o.id} value={o.id}>{o.orderNumber} — {o.customerNameAr}</option>)}
-                            </select>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    {/* ═══ BASIC INFORMATION ═══ */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-purple-100/50 rounded-xl"><Info className="w-5 h-5 text-purple-600" /></div>
+                                <div><h3 className="font-bold text-slate-800 text-lg">البيانات الأساسية</h3><p className="text-slate-500 text-sm">بيانات العميل والفاتورة</p></div>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">العميل *</label>
-                            <select value={form.customerId || ''} onChange={(e) => setForm((f) => ({ ...f, customerId: parseInt(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required>
-                                <option value="">اختر العميل...</option>
-                                {customers.map((c) => <option key={c.id} value={c.id}>{c.customerNameAr}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">تاريخ الفاتورة *</label>
-                            <input type="date" value={form.invoiceDate || ''} onChange={(e) => setForm((f) => ({ ...f, invoiceDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">تاريخ الاستحقاق</label>
-                            <input type="date" value={form.dueDate || ''} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">شروط الدفع</label>
-                            <input type="text" value={form.paymentTerms || ''} onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">خصم %</label>
-                            <input type="number" min={0} max={100} step={0.01} value={form.discountPercent || ''} onChange={(e) => setForm((f) => ({ ...f, discountPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">ضريبة %</label>
-                            <input type="number" min={0} step={0.01} value={form.taxPercent || ''} onChange={(e) => setForm((f) => ({ ...f, taxPercent: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">المدفوع مسبقاً</label>
-                            <input type="number" min={0} step={0.01} value={form.paidAmount ?? ''} onChange={(e) => setForm((f) => ({ ...f, paidAmount: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none" />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">ملاحظات</label>
-                            <textarea value={form.notes || ''} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none resize-none" />
-                        </div>
-                    </div>
-                </div>
 
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
-                    <div className="flex items-center justify-between border-b pb-2 mb-4">
-                        <h2 className="font-bold text-slate-800">البنود</h2>
-                        <button type="button" onClick={addItem} className="inline-flex items-center gap-1 px-4 py-2 bg-brand-primary text-white rounded-xl text-sm font-medium"><Plus className="w-4 h-4" />إضافة بند</button>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">أمر البيع (تحميل منه)</label>
+                                <select disabled={isReadOnly} value={form.salesOrderId || ''} onChange={(e) => loadFromSaleOrder(parseInt(e.target.value) || 0)} className={inputClass()}>
+                                    <option value="">—</option>
+                                    {saleOrders.map((o) => <option key={o.id} value={o.id}>{o.soNumber} — {o.customerNameAr}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">العميل *</label>
+                                <select disabled={isReadOnly} value={form.customerId || ''} onChange={(e) => setForm((f) => ({ ...f, customerId: parseInt(e.target.value) || 0 }))} className={inputClass()} required>
+                                    <option value="">اختر العميل...</option>
+                                    {customers.map((c) => <option key={c.id} value={c.id}>{c.customerNameAr}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600"><Calendar className="w-4 h-4 text-purple-600" /> تاريخ الفاتورة *</label>
+                                <input disabled={isReadOnly} type="date" value={form.invoiceDate || ''} onChange={(e) => setForm((f) => ({ ...f, invoiceDate: e.target.value }))} className={inputClass()} required />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">تاريخ الاستحقاق</label>
+                                <input disabled={isReadOnly} type="date" value={form.dueDate || ''} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className={inputClass()} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">شروط الدفع</label>
+                                <input disabled={isReadOnly} type="text" value={form.paymentTerms || ''} onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))} className={inputClass()} />
+                            </div>
+                        </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[640px]">
-                            <thead>
-                                <tr className="bg-slate-50 border-b"><th className="px-2 py-2 text-right text-xs font-semibold">الصنف</th><th className="px-2 py-2 text-right text-xs font-semibold">الكمية</th><th className="px-2 py-2 text-right text-xs font-semibold">السعر</th><th className="px-2 py-2 text-right text-xs font-semibold">خصم %</th><th></th></tr>
-                            </thead>
-                            <tbody>
-                                {form.items.map((it, idx) => (
-                                    <tr key={idx} className="border-b">
-                                        <td className="px-2 py-2">
-                                            <select value={it.itemId || ''} onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })} className="w-full max-w-[200px] px-2 py-1.5 border rounded text-sm">
-                                                <option value="">اختر الصنف...</option>
-                                                {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr || i.itemCode}</option>)}
-                                            </select>
-                                        </td>
-                                        <td className="px-2 py-2"><input type="number" min={0.001} value={it.qty || ''} onChange={(e) => updateItem(idx, { qty: parseFloat(e.target.value) || 0 })} className="w-20 px-2 py-1 border rounded" /></td>
-                                        <td className="px-2 py-2"><input type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className="w-24 px-2 py-1 border rounded" /></td>
-                                        <td className="px-2 py-2"><input type="number" min={0} max={100} step={0.01} value={it.discountPercent || ''} onChange={(e) => updateItem(idx, { discountPercent: parseFloat(e.target.value) || 0 })} className="w-16 px-2 py-1 border rounded" /></td>
-                                        <td className="px-2 py-2"><button type="button" onClick={() => removeItem(idx)} className="p-1 text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
+
+                    {/* ═══ ITEMS TABLE ═══ */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '100ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-purple-100/50 rounded-xl"><Package className="w-5 h-5 text-purple-600" /></div>
+                                    <div><h3 className="font-bold text-slate-800 text-lg">الأصناف</h3><p className="text-slate-500 text-sm">{form.items.length} صنف مضاف</p></div>
+                                </div>
+                                {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg hover:scale-105 active:scale-95"><Plus className="w-4 h-4" /> إضافة صنف</button>}
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-600 text-sm font-bold border-b border-slate-200">
+                                        <th className="py-4 pr-6 text-right">الصنف</th>
+                                        <th className="py-4 px-4 text-center">الكمية</th>
+                                        <th className="py-4 px-4 text-center">السعر</th>
+                                        <th className="py-4 px-4 text-center">خصم %</th>
+                                        <th className="py-4 px-4 text-center">الإجمالي</th>
+                                        {!isReadOnly && <th className="py-4 pl-6"></th>}
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="mt-4 flex flex-wrap justify-end gap-4 text-slate-700">
-                        <span>الإجمالي: {subtotal.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                        <span>الخصم: {disc.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                        <span>الضريبة: {tax.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                        <span className="font-bold">الإجمالي النهائي: {total.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} {form.currency}</span>
-                        <span>المدفوع: {paid.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                        <span className="font-bold text-amber-600">الرصيد: {balance.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {form.items.map((it, idx) => (
+                                        <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                                            <td className="py-4 pr-6">
+                                                <select disabled={isReadOnly} value={it.itemId || ''} onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })} className={smallInputClass('min-w-[200px]')}>
+                                                    <option value="">اختر الصنف...</option>
+                                                    {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr || i.itemCode}</option>)}
+                                                </select>
+                                            </td>
+                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0.001} value={it.quantity || ''} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-bold text-purple-600')} /></td>
+                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-24 text-center font-bold')} /></td>
+                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0} max={100} step={0.01} value={it.discountPercentage || ''} onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-medium text-rose-600')} /></td>
+                                            <td className="py-4 px-4 text-center font-bold text-slate-800 tabular-nums">
+                                                {formatNumber(((it.quantity || 0) * (it.unitPrice || 0) * (1 - (it.discountPercentage || 0) / 100)))}
+                                            </td>
+                                            {!isReadOnly && (
+                                                <td className="py-4 pl-6 text-left">
+                                                    <button type="button" onClick={() => removeItem(idx)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-4 h-4" /></button>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex gap-3">
-                    <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold disabled:opacity-50"><Save className="w-5 h-5" />{saving ? 'جاري الحفظ...' : 'حفظ'}</button>
-                    <button type="button" onClick={() => navigate('/dashboard/sales/invoices')} className="px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50">إلغاء</button>
+                {/* ═══ SIDEBAR ═══ */}
+                <div className="space-y-6">
+                    {/* Financial Summary */}
+                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-2xl animate-slide-in" style={{ animationDelay: '200ms' }}>
+                        <div className="flex items-center gap-3 pb-6 border-b border-white/10">
+                            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl"><DollarSign className="w-6 h-6 text-purple-400" /></div>
+                            <h3 className="font-bold text-xl">الملخص المالي</h3>
+                            {isReadOnly && <Lock className="w-4 h-4 text-white/30 mr-auto" />}
+                        </div>
+                        <div className="space-y-4 mt-6">
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                <span className="text-white/60">المجموع الفرعي</span>
+                                <span className="font-bold text-lg text-white/90 tabular-nums">{formatNumber(subtotal)} {form.currency}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                <span className="text-white/60">الخصم الإضافي %</span>
+                                {isReadOnly ? <span className="font-bold">{form.discountPercentage || 0}%</span> : <input type="number" value={form.discountPercentage || ''} onChange={(e) => setForm({ ...form, discountPercentage: parseFloat(e.target.value) || 0 })} className="w-20 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-purple-500 outline-none" />}
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                <span className="text-white/60">الضريبة</span>
+                                {isReadOnly ? <span className="font-bold">{formatNumber(form.taxAmount || 0)}</span> : <input type="number" value={form.taxAmount || ''} onChange={(e) => setForm({ ...form, taxAmount: parseFloat(e.target.value) || 0 })} className="w-24 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-purple-500 outline-none" />}
+                            </div>
+                            <div className="pt-4 mt-2 border-t border-white/10">
+                                <div className="flex justify-between items-center p-5 bg-purple-600 rounded-2xl shadow-lg shadow-purple-500/20">
+                                    <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
+                                    <div className="text-3xl font-black text-white">{formatNumber(total)} <span className="text-lg font-bold">{form.currency}</span></div>
+                                </div>
+                            </div>
+                            <div className="mt-4 p-4 border border-white/5 rounded-2xl bg-white/5 space-y-3">
+                                <div className="flex justify-between text-xs text-white/40">
+                                    <span>المدفوع</span>
+                                    {isReadOnly ? <span className="tabular-nums">{formatNumber(paid)}</span> : <input type="number" value={form.paidAmount ?? ''} onChange={(e) => setForm({ ...form, paidAmount: parseFloat(e.target.value) || 0 })} className="w-20 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-emerald-500 outline-none" />}
+                                </div>
+                                <div className="flex justify-between text-xs text-amber-400 font-bold">
+                                    <span>المتبقي</span>
+                                    <span className="tabular-nums">{formatNumber(balance)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ═══ NOTES ═══ */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '300ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 rounded-xl"><FileText className="w-5 h-5 text-blue-600" /></div>
+                                <h3 className="font-bold text-slate-800">ملاحظات</h3>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            <textarea value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} disabled={isReadOnly} className={`w-full p-4 border-2 rounded-xl outline-none transition-all h-40 resize-none ${isReadOnly ? 'bg-slate-50 border-slate-200' : 'focus:border-purple-500'}`} placeholder="ملاحظات..." />
+                        </div>
+                    </div>
+
+                    {!isReadOnly && (
+                        <button type="submit" disabled={saving} className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
+                            <Save className="w-5 h-5" />
+                            <span>{saving ? 'جاري الحفظ...' : 'حفظ الفاتورة'}</span>
+                        </button>
+                    )}
                 </div>
             </form>
         </div>

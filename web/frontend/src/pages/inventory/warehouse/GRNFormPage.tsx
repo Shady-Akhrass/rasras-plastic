@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
-    ChevronRight, Save, Package, FileText, Building2, Truck, Calendar,
-    X, RefreshCw, Plus, AlertCircle, CheckCircle, Info, DollarSign
+    ChevronRight, Save, Truck,
+    RefreshCw, CheckCircle, Info, DollarSign
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto, type GRNItemDto } from '../../../services/grnService';
 import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto } from '../../../services/purchaseOrderService';
@@ -10,6 +10,10 @@ import warehouseService from '../../../services/warehouseService';
 import type { WarehouseDto, WarehouseLocationDto } from '../../../services/warehouseService';
 import { toast } from 'react-hot-toast';
 
+/**
+ * تم دمج هذه الصفحة مع صفحة GRN الموحدة في قسم المشتريات
+ * يتم إعادة التوجيه تلقائياً إلى /dashboard/procurement/grn
+ */
 const GRNFormPage: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
@@ -65,7 +69,13 @@ const GRNFormPage: React.FC = () => {
                     const g = await grnService.getGRNById(parseInt(id));
                     if (g) {
                         setForm({ ...g, items: g.items || [] });
-                        setSelectedPo({ supplierId: g.supplierId!, supplierNameAr: g.supplierNameAr, items: g.items || [] } as PurchaseOrderDto);
+                        setSelectedPo({
+                            supplierId: g.supplierId!,
+                            supplierNameAr: g.supplierNameAr,
+                            items: g.items || [],
+                            subTotal: 0,
+                            totalAmount: 0
+                        } as unknown as PurchaseOrderDto);
                     }
                 } catch {
                     toast.error('فشل تحميل إذن الإضافة');
@@ -167,13 +177,13 @@ const GRNFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Validation
         if (!form.poId || !form.supplierId || !form.warehouseId) {
             toast.error('الرجاء اختيار أمر الشراء والمستودع');
             return;
         }
-        
+
         const items = buildItems();
         if (items.length === 0) {
             toast.error('يجب إضافة صنف واحد على الأقل بكمية مستلمة');
@@ -377,94 +387,94 @@ const GRNFormPage: React.FC = () => {
                                 </div>
                             </div>
                             <table className="w-full min-w-[900px]">
-                            <thead>
-                                <tr className="bg-slate-50 border-b">
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">الصنف</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">المتبقي</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">المستلم *</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">مقبول</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">اللوت</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">تاريخ الإنتاج</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">الصلاحية</th>
-                                    <th className="px-3 py-2 text-right text-xs font-semibold">الموقع</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {selectedPo.items
-                                    ?.filter((i) => maxRem(i) > 0)
-                                    .map((i) => (
-                                        <tr key={i.id} className="border-b">
-                                            <td className="px-3 py-2">{i.itemNameAr}</td>
-                                            <td className="px-3 py-2">{maxRem(i)}</td>
-                                            <td className="px-3 py-2">
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    max={maxRem(i)}
-                                                    step="0.001"
-                                                    value={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
-                                                        updateRow(i.id!, { 
-                                                            receivedQty: val, 
-                                                            acceptedQty: val 
-                                                        });
-                                                    }}
-                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    max={rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                    step="0.001"
-                                                    value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
-                                                    onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 })}
-                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <input
-                                                    type="text"
-                                                    value={rows[i.id!]?.lotNumber || ''}
-                                                    onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value || undefined })}
-                                                    placeholder="رقم اللوت"
-                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <input
-                                                    type="date"
-                                                    value={rows[i.id!]?.manufactureDate || ''}
-                                                    onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
-                                                    className="w-36 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <input
-                                                    type="date"
-                                                    value={rows[i.id!]?.expiryDate || ''}
-                                                    onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined })}
-                                                    className="w-36 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <select
-                                                    value={rows[i.id!]?.locationId || ''}
-                                                    onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
-                                                    className="w-32 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
-                                                >
-                                                    <option value="">اختر الموقع</option>
-                                                    {locations.map((l) => (
-                                                        <option key={l.id} value={l.id}>{l.locationCode} {l.locationNameAr ? `- ${l.locationNameAr}` : ''}</option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                        </tr>
-                                    ))}
-                            </tbody>
-                        </table>
+                                <thead>
+                                    <tr className="bg-slate-50 border-b">
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">الصنف</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">المتبقي</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">المستلم *</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">مقبول</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">اللوت</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">تاريخ الإنتاج</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">الصلاحية</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold">الموقع</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedPo.items
+                                        ?.filter((i) => maxRem(i) > 0)
+                                        .map((i) => (
+                                            <tr key={i.id} className="border-b">
+                                                <td className="px-3 py-2">{i.itemNameAr}</td>
+                                                <td className="px-3 py-2">{maxRem(i)}</td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={maxRem(i)}
+                                                        step="0.001"
+                                                        value={rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value) || 0;
+                                                            updateRow(i.id!, {
+                                                                receivedQty: val,
+                                                                acceptedQty: val
+                                                            });
+                                                        }}
+                                                        className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                        step="0.001"
+                                                        value={rows[i.id!]?.acceptedQty ?? rows[i.id!]?.receivedQty ?? maxRem(i)}
+                                                        onChange={(e) => updateRow(i.id!, { acceptedQty: parseFloat(e.target.value) || 0 })}
+                                                        className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        type="text"
+                                                        value={rows[i.id!]?.lotNumber || ''}
+                                                        onChange={(e) => updateRow(i.id!, { lotNumber: e.target.value || undefined })}
+                                                        placeholder="رقم اللوت"
+                                                        className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        type="date"
+                                                        value={rows[i.id!]?.manufactureDate || ''}
+                                                        onChange={(e) => updateRow(i.id!, { manufactureDate: e.target.value || undefined })}
+                                                        className="w-36 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        type="date"
+                                                        value={rows[i.id!]?.expiryDate || ''}
+                                                        onChange={(e) => updateRow(i.id!, { expiryDate: e.target.value || undefined })}
+                                                        className="w-36 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <select
+                                                        value={rows[i.id!]?.locationId || ''}
+                                                        onChange={(e) => updateRow(i.id!, { locationId: e.target.value ? parseInt(e.target.value) : undefined })}
+                                                        className="w-32 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                                                    >
+                                                        <option value="">اختر الموقع</option>
+                                                        {locations.map((l) => (
+                                                            <option key={l.id} value={l.id}>{l.locationCode} {l.locationNameAr ? `- ${l.locationNameAr}` : ''}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
                         </div>
 
                         {/* Summary Card */}
@@ -488,7 +498,7 @@ const GRNFormPage: React.FC = () => {
                                 <div className="text-center">
                                     <p className="text-xs text-slate-500 mb-1">متوسط التكلفة</p>
                                     <p className="text-lg font-bold text-slate-800">
-                                        {totals.totalQty > 0 
+                                        {totals.totalQty > 0
                                             ? (totals.totalCost / totals.totalQty).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                             : '0.00'}
                                     </p>

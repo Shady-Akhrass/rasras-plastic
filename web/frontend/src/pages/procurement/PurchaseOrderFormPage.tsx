@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useOptimistic, startTransition } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
@@ -13,22 +13,80 @@ import {
     Info,
     FileText,
     AlertCircle,
-    CheckCircle2
+    CheckCircle2,
+    Eye,
+    XCircle,
+    RefreshCw,
+    Clock,
+    Lock,
+    Edit3,
 } from 'lucide-react';
+import { approvalService } from '../../services/approvalService';
 import { purchaseOrderService, type PurchaseOrderDto, type PurchaseOrderItemDto } from '../../services/purchaseOrderService';
-import purchaseService from '../../services/purchaseService'; // For Quotation lookup
+import purchaseService from '../../services/purchaseService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
+import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
+
+// ─── Centralized Calculation Helper ───
+const calculateOrderTotals = (po: PurchaseOrderDto): PurchaseOrderDto => {
+    let subTotal = 0;
+    let totalDiscountAmount = 0;
+    let totalTaxAmount = 0;
+
+    const updatedItems = (po.items || []).map(item => {
+        const qty = Number(item.orderedQty) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const discountRate = (Number(item.discountPercentage) || 0) / 100;
+        const taxRate = (Number(item.taxPercentage) || 0) / 100;
+
+        const grossAmount = qty * price;
+        const discountAmount = grossAmount * discountRate;
+        const taxableAmount = grossAmount - discountAmount;
+        const taxAmount = taxableAmount * taxRate;
+        const totalPrice = taxableAmount + taxAmount;
+
+        subTotal += grossAmount;
+        totalDiscountAmount += discountAmount;
+        totalTaxAmount += taxAmount;
+
+        return { ...item, discountAmount, taxAmount, totalPrice };
+    });
+
+    const shipping = Number(po.shippingCost) || 0;
+    const other = Number(po.otherCosts) || 0;
+    const grandTotal = (subTotal - totalDiscountAmount) + totalTaxAmount + shipping + other;
+
+    return {
+        ...po,
+        items: updatedItems,
+        subTotal,
+        discountAmount: totalDiscountAmount,
+        taxAmount: totalTaxAmount,
+        totalAmount: grandTotal,
+    };
+};
 
 const PurchaseOrderFormPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const { id } = useParams<{ id: string }>();
+
     const navigate = useNavigate();
     const location = useLocation();
     const isEdit = !!id;
     const queryParams = new URLSearchParams(location.search);
     const quotationId = queryParams.get('quotationId');
+    const comparisonId = queryParams.get('comparisonId');
+    const isView = queryParams.get('mode') === 'view';
+    const approvalId = queryParams.get('approvalId');
+
+    // ─── Determine if form is read-only ───
+    // Lock all fields when in view mode OR when editing an existing record
+    const isReadOnly = isView || isEdit;
 
     // Data State
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
@@ -36,12 +94,14 @@ const PurchaseOrderFormPage: React.FC = () => {
     const [units, setUnits] = useState<UnitDto[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
-    // Form State
+    // Initial Form State
     const [formData, setFormData] = useState<PurchaseOrderDto>({
         supplierId: 0,
-        currency: 'EGP',
+        currency: defaultCurrency,
         exchangeRate: 1,
+
         subTotal: 0,
         discountAmount: 0,
         taxAmount: 0,
@@ -50,148 +110,254 @@ const PurchaseOrderFormPage: React.FC = () => {
         totalAmount: 0,
         status: 'Pending',
         approvalStatus: 'Pending',
-        items: []
+        items: [],
     });
 
+    // ─── Optimistic Logic ───
+    type POAction =
+        | { type: 'SET_DATA'; payload: PurchaseOrderDto }
+        | { type: 'UPDATE_FIELD'; field: keyof PurchaseOrderDto; value: any }
+        | { type: 'UPDATE_ITEM'; index: number; item: Partial<PurchaseOrderItemDto> }
+        | { type: 'ADD_ITEM' }
+        | { type: 'REMOVE_ITEM'; index: number };
+
+    const poReducer = (state: PurchaseOrderDto, action: POAction): PurchaseOrderDto => {
+        let newState = { ...state };
+        switch (action.type) {
+            case 'SET_DATA':
+                newState = { ...action.payload };
+                const savedTotal = Number(newState.totalAmount) || 0;
+                const itemsT = (newState.items || []).reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+                const otherC = Number(newState.otherCosts) || 0;
+                if (savedTotal > itemsT + otherC && (!newState.shippingCost || newState.shippingCost === 0)) {
+                    newState.shippingCost = Math.round((savedTotal - (itemsT + otherC)) * 100) / 100;
+                }
+                break;
+            case 'UPDATE_FIELD':
+                if (action.field === 'totalAmount') {
+                    const newTotal = parseFloat(action.value) || 0;
+                    const subT = Number(newState.subTotal) || 0;
+                    const disc = Number(newState.discountAmount) || 0;
+                    const tax = Number(newState.taxAmount) || 0;
+                    const otherCosts = Number(newState.otherCosts) || 0;
+                    const itemsTotal = (subT - disc) + tax;
+                    newState.shippingCost = Math.round((newTotal - itemsTotal - otherCosts) * 100) / 100;
+                    newState.totalAmount = newTotal;
+                } else {
+                    newState = { ...newState, [action.field]: action.value };
+                }
+                break;
+            case 'UPDATE_ITEM':
+                const newItems = [...(newState.items || [])];
+                newItems[action.index] = { ...newItems[action.index], ...action.item };
+                newState.items = newItems;
+                break;
+            case 'ADD_ITEM':
+                newState.items = [
+                    ...(newState.items || []),
+                    { itemId: 0, unitId: 0, orderedQty: 1, unitPrice: 0, totalPrice: 0, discountPercentage: 0, taxPercentage: 0, polymerGrade: '' },
+                ];
+                break;
+            case 'REMOVE_ITEM':
+                newState.items = (newState.items || []).filter((_, i) => i !== action.index);
+                break;
+        }
+        return calculateOrderTotals(newState);
+    };
+
+    const [optimisticPO, updateOptimistic] = useOptimistic(formData, poReducer);
+
+    const handleUpdate = (action: POAction) => {
+        // Block all mutations when read-only (except SET_DATA for loading)
+        if (isReadOnly && action.type !== 'SET_DATA') return;
+
+        startTransition(() => {
+            updateOptimistic(action);
+            setFormData(prev => poReducer(prev, action));
+        });
+    };
+
+    // ─── Data Loading ───
     useEffect(() => {
-        loadSuppliers(); loadItems(); loadUnits();
-        if (isEdit) { loadPO(); }
-        else if (quotationId) { loadQuotationData(parseInt(quotationId)); }
+        loadSuppliers();
+        loadItems();
+        loadUnits();
+        if (isEdit) loadPO();
+        else if (quotationId) loadQuotationData(parseInt(quotationId));
     }, [id, quotationId]);
 
     const loadPO = async () => {
         try {
             setLoading(true);
             const data = await purchaseOrderService.getPOById(parseInt(id!));
-            setFormData(data);
-        } catch (error) {
-            console.error('Failed to load PO:', error);
+            handleUpdate({ type: 'SET_DATA', payload: data });
+        } catch {
             toast.error('فشل تحميل بيانات أمر الشراء');
         } finally {
             setLoading(false);
         }
     };
 
-    const loadSuppliers = async () => { const d = await supplierService.getAllSuppliers(); setSuppliers(d.data || []); };
-    const loadItems = async () => { const d = await itemService.getActiveItems(); setItems(d.data || []); };
-    const loadUnits = async () => { const d = await unitService.getAllUnits(); setUnits(d.data || []); };
+    const loadSuppliers = async () => {
+        const d = await supplierService.getAllSuppliers();
+        setSuppliers(d.data || []);
+    };
+    const loadItems = async () => {
+        const d = await itemService.getActiveItems();
+        setItems(d.data || []);
+    };
+    const loadUnits = async () => {
+        const d = await unitService.getAllUnits();
+        setUnits(d.data || []);
+    };
 
     const loadQuotationData = async (qId: number) => {
         try {
-            console.log('Fetching Quotation:', qId);
             const quotation = await purchaseService.getQuotationById(qId);
-            console.log('Quotation Data:', quotation);
-
             if (quotation) {
-                setFormData(prev => ({
-                    ...prev,
+                let comparisonDetail: any = null;
+                try {
+                    const allComparisons = await purchaseService.getAllComparisons();
+                    for (const comp of allComparisons) {
+                        const detail = comp.details?.find((d: any) => d.quotationId === qId);
+                        if (detail) {
+                            comparisonDetail = detail;
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch comparison details:', err);
+                }
+
+                const getFinalDeliveryCost = (q: any) => {
+                    const explicit = q.deliveryCost;
+                    if (explicit !== undefined && explicit !== null && Number(explicit) > 0) return Number(explicit);
+                    const itemsTotal = q.items?.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0) || 0;
+                    const derived = Number(q.totalAmount) - itemsTotal;
+                    return derived > 0.01 ? Math.round(derived * 100) / 100 : 0;
+                };
+
+                const finalShippingCost =
+                    comparisonDetail && comparisonDetail.deliveryCost > 0
+                        ? comparisonDetail.deliveryCost
+                        : getFinalDeliveryCost(quotation);
+
+                const finalOtherCosts =
+                    comparisonDetail && (comparisonDetail.otherCosts || 0) > 0
+                        ? (comparisonDetail.otherCosts || 0)
+                        : (quotation.otherCosts || 0);
+
+                const mappedPO: PurchaseOrderDto = {
+                    ...formData,
                     supplierId: quotation.supplierId,
                     quotationId: quotation.id,
-                    currency: quotation.currency || 'EGP',
-                    exchangeRate: quotation.exchangeRate || 1,
-                    subTotal: quotation.totalAmount,
-                    totalAmount: quotation.totalAmount,
-                    notes: `تم الإنشاء بناءً على عرض السعر: ${quotation.quotationNumber}\n${quotation.notes || ''}`,
-                    items: quotation.items.map(qi => ({
+                    comparisonId: comparisonId ? parseInt(comparisonId) : undefined,
+                    currency: quotation.currency || defaultCurrency,
+
+                    shippingCost: finalShippingCost,
+                    otherCosts: finalOtherCosts,
+                    deliveryDays: comparisonDetail?.deliveryDays || quotation.deliveryDays || 0,
+                    paymentTerms: quotation.paymentTerms || '',
+                    notes: `تم الإنشاء بناءً على عرض السعر: ${quotation.quotationNumber} \n${quotation.notes || ''} `,
+                    items: (quotation.items || []).map((qi: any) => ({
                         itemId: qi.itemId,
                         unitId: qi.unitId,
                         orderedQty: qi.offeredQty,
                         unitPrice: qi.unitPrice,
+                        polymerGrade: qi.polymerGrade || '',
                         discountPercentage: qi.discountPercentage || 0,
-                        discountAmount: qi.discountAmount || 0,
                         taxPercentage: qi.taxPercentage || 0,
-                        taxAmount: qi.taxAmount || 0,
                         totalPrice: qi.totalPrice,
-                        status: 'Pending'
-                    }))
-                }));
-                toast.success(`تم تحميل بيانات عرض السعر رقم ${quotation.quotationNumber}`);
+                    })),
+                };
+                handleUpdate({ type: 'SET_DATA', payload: calculateOrderTotals(mappedPO) });
+                toast.success('تم تحميل بيانات عرض السعر');
             }
         } catch (e) {
-            console.error('Error loading quotation:', e);
+            console.error('Failed to load quotation data:', e);
             toast.error('فشل تحميل بيانات عرض السعر');
         }
     };
 
-    useEffect(() => { calculateTotals(); }, [formData.items, formData.discountAmount, formData.taxAmount, formData.shippingCost, formData.otherCosts]);
-
-    const calculateTotals = () => {
-        const subTotal = formData.items?.reduce((acc, item) => acc + (item.totalPrice || 0), 0) || 0;
-        const totalAmount = subTotal - (formData.discountAmount || 0) + (formData.taxAmount || 0) + (formData.shippingCost || 0) + (formData.otherCosts || 0);
-        setFormData(prev => ({ ...prev, subTotal, totalAmount }));
-    };
-
-    const addItem = () => {
-        const newItem: PurchaseOrderItemDto = { itemId: 0, unitId: 0, orderedQty: 1, unitPrice: 0, totalPrice: 0 };
-        setFormData(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
-    };
-
-    const updateItem = (index: number, updates: Partial<PurchaseOrderItemDto>) => {
-        setFormData(prev => {
-            const newItems = [...(prev.items || [])];
-            const item = { ...newItems[index], ...updates };
-            item.totalPrice = (item.orderedQty || 0) * (item.unitPrice || 0);
-            newItems[index] = item;
-            return { ...prev, items: newItems };
-        });
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (formData.approvalStatus === 'Approved') return;
-
-        if (!formData.supplierId || !formData.items || formData.items.length === 0) {
+        if (isReadOnly) return; // Extra guard
+        if (optimisticPO.approvalStatus === 'Approved') return;
+        if (!optimisticPO.supplierId || !optimisticPO.items?.length) {
             toast.error('يرجى التحقق من المورد والأصناف');
             return;
         }
         try {
             setSaving(true);
-            if (isEdit) {
-                // Actually we might need updatePO, but let's stick to create for the workflow demo
-                // if the backend supports it. For now, assume creation triggers the flow.
-                await purchaseOrderService.createPO(formData);
-                toast.success('تم تحديث أمر الشراء وإرساله للاعتماد');
-            } else {
-                await purchaseOrderService.createPO({
-                    ...formData,
-                    status: 'Pending',
-                    approvalStatus: 'Pending'
-                });
-                toast.success('تم حفظ أمر الشراء وإرساله للاعتماد بنجاح');
+            const savedPO = await purchaseOrderService.createPO(optimisticPO);
+            toast.success('تم حفظ أمر الشراء وإرساله للاعتماد بنجاح');
+
+            const createInvoice = queryParams.get('createInvoice') === 'true';
+            const createOutstanding = queryParams.get('createOutstanding') === 'true';
+            const poId = savedPO?.id || undefined;
+            const qId = savedPO?.quotationId || optimisticPO.quotationId;
+            const compId = savedPO?.comparisonId || optimisticPO.comparisonId;
+
+            if (createInvoice && poId) {
+                navigate(`/ dashboard / procurement / invoice / create ? poId = ${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''} `);
+                return;
+            }
+            if (createOutstanding && poId) {
+                navigate(`/ dashboard / procurement / outstanding / create ? poId = ${poId}${qId ? `&quotationId=${qId}` : ''}${compId ? `&comparisonId=${compId}` : ''} `);
+                return;
             }
             navigate('/dashboard/procurement/po');
-        } catch (err) { toast.error('فشل حفظ أمر الشراء'); }
-        finally { setSaving(false); }
+        } catch {
+            toast.error('فشل حفظ أمر الشراء');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    if (loading) return (
-        <div className="flex items-center justify-center h-96">
-            <div className="w-12 h-12 border-4 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-        </div>
-    );
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/procurement/approvals');
+        } catch {
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    // ─── Shared input class generator ───
+    const inputClass = (extra = '') =>
+        `w-full px-4 py-3 border-2 border-transparent rounded-xl 
+        focus:border-brand-primary outline-none transition-all font-semibold
+        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'} ${extra}`;
+
+    const smallInputClass = (extra = '') =>
+        `px-3 py-2 border-2 border-transparent rounded-xl text-sm outline-none transition-all font-semibold
+        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white focus:border-brand-primary'} ${extra}`;
+
+    if (loading)
+        return (
+            <div className="flex items-center justify-center h-96">
+                <div className="w-12 h-12 border-4 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+            </div>
+        );
 
     return (
         <div className="space-y-6 pb-20" dir="rtl">
             <style>{`
-                @keyframes slideInRight {
-                    from {
-                        opacity: 0;
-                        transform: translateX(-20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(0);
-                    }
-                }
-                .animate-slide-in {
-                    animation: slideInRight 0.4s ease-out;
-                }
-            `}</style>
+@keyframes slideInRight {
+                    from { opacity: 0; transform: translateX(-20px); }
+                    to { opacity: 1; transform: translateX(0); }
+}
+                .animate - slide -in { animation: slideInRight 0.4s ease- out; }
+`}</style>
 
-            {/* Enhanced Header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
-                rounded-3xl p-8 text-white shadow-2xl">
-                {/* Decorative Elements */}
+            {/* ═══ HEADER ═══ */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white shadow-2xl">
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
                 <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
@@ -201,8 +367,7 @@ const PurchaseOrderFormPage: React.FC = () => {
                     <div className="flex items-center gap-5">
                         <button
                             onClick={() => navigate(-1)}
-                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 
-                                hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
+                            className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95"
                         >
                             <ArrowRight className="w-5 h-5" />
                         </button>
@@ -210,40 +375,114 @@ const PurchaseOrderFormPage: React.FC = () => {
                             <ShoppingCart className="w-10 h-10" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-bold mb-2">
-                                {isEdit ? 'تعديل أمر شراء' : 'إنشاء أمر شراء'}
-                            </h1>
-                            <p className="text-white/80 text-lg">إصدار طلب توريد رسمي للمورد بناءً على المواصفات والأسعار المعتمدة</p>
+                            <div className="flex items-center gap-3 mb-2">
+                                <h1 className="text-3xl font-bold">
+                                    {isEdit ? `أمر شراء رقم: ${optimisticPO.poNumber || ''} ` : 'إنشاء أمر شراء جديد'}
+                                </h1>
+                                {isReadOnly && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20">
+                                        <Lock className="w-3 h-3" />
+                                        للعرض فقط
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-white/80 text-lg">
+                                {isReadOnly
+                                    ? 'عرض تفاصيل أمر الشراء — البيانات محمية من التعديل'
+                                    : 'إصدار طلب توريد رسمي للمورد بناءً على المواصفات والأسعار المعتمدة'}
+                            </p>
                         </div>
                     </div>
-                    {formData.approvalStatus !== 'Approved' && (
-                        <button
-                            onClick={handleSubmit}
-                            disabled={saving}
-                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                            {saving ? (
-                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                            ) : (
-                                <Save className="w-5 h-5" />
-                            )}
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ وإرسال للاعتماد'}</span>
-                        </button>
-                    )}
-                    {formData.approvalStatus === 'Approved' && (
-                        <div className="flex items-center gap-2 px-6 py-4 bg-emerald-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
-                            <CheckCircle2 className="w-5 h-5" />
-                            <span className="font-bold">طلب معتمد ومؤكد</span>
-                        </div>
-                    )}
+
+                    <div className="flex gap-3 flex-wrap">
+                        {/* Status badges */}
+                        {isEdit && optimisticPO.approvalStatus !== 'Draft' && optimisticPO.approvalStatus !== 'Approved' && !isView && (
+                            <div className="px-5 py-2.5 bg-amber-50 text-amber-600 rounded-xl font-bold flex items-center gap-2 border border-amber-100 italic">
+                                <Clock className="w-5 h-5" />
+                                <span>بانتظار الاعتماد</span>
+                            </div>
+                        )}
+
+                        {/* Save button — only for new creation */}
+                        {!isReadOnly && optimisticPO.approvalStatus !== 'Approved' && (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={saving}
+                                className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                                {saving ? (
+                                    <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                                ) : (
+                                    <Save className="w-5 h-5" />
+                                )}
+                                <span>{saving ? 'جاري الحفظ...' : 'حفظ وإرسال للاعتماد'}</span>
+                            </button>
+                        )}
+
+                        {optimisticPO.approvalStatus === 'Approved' && (
+                            <div className="flex items-center gap-2 px-6 py-4 bg-emerald-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                <CheckCircle2 className="w-5 h-5" />
+                                <span className="font-bold">طلب معتمد ومؤكد</span>
+                            </div>
+                        )}
+
+                        {isView && (
+                            <div className="flex items-center gap-3 flex-wrap">
+                                {approvalId && (
+                                    <>
+                                        <button
+                                            onClick={() => handleApprovalAction('Approved')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                            <span>اعتماد</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleApprovalAction('Rejected')}
+                                            disabled={processing}
+                                            className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                        >
+                                            {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                            <span>رفض</span>
+                                        </button>
+                                    </>
+                                )}
+                                <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                    <Eye className="w-5 h-5" />
+                                    <span className="font-bold">وضع العرض فقط</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
+            {/* ═══ READ-ONLY BANNER ═══ */}
+            {isReadOnly && (
+                <div className="flex items-center gap-4 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl animate-slide-in">
+                    <div className="p-2.5 bg-amber-100 rounded-xl flex-shrink-0">
+                        <Lock className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-amber-800 font-bold text-sm">
+                            {isView
+                                ? 'أنت في وضع العرض — جميع الحقول مقفلة ولا يمكن تعديلها'
+                                : 'هذا الطلب تم إرساله للاعتماد — لا يمكن تعديل البيانات بعد الإرسال'}
+                        </p>
+                    </div>
+                    {isEdit && !isView && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 rounded-lg text-amber-700 text-xs font-bold flex-shrink-0">
+                            <Edit3 className="w-3 h-3" />
+                            التعديل مغلق
+                        </div>
+                    )}
+                </div>
+            )}
+
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Basic Information */}
+                    {/* ═══ BASIC INFORMATION ═══ */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in">
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center gap-3">
@@ -256,41 +495,86 @@ const PurchaseOrderFormPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div className="space-y-2 md:col-span-2">
+
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Truck className="w-4 h-4 text-brand-primary" />
-                                    المورد
+                                    <Truck className="w-4 h-4 text-brand-primary" /> المورد
+                                    {isReadOnly && <Lock className="w-3 h-3 text-slate-400" />}
                                 </label>
-                                <select
-                                    value={formData.supplierId}
-                                    onChange={(e) => setFormData({ ...formData, supplierId: parseInt(e.target.value) })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
-                                >
-                                    <option value="0">اختر المورد...</option>
-                                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.supplierNameAr}</option>)}
-                                </select>
+                                {isReadOnly ? (
+                                    <div className={inputClass()}>
+                                        {suppliers.find(s => s.id === optimisticPO.supplierId)?.supplierNameAr || 'غير محدد'}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={optimisticPO.supplierId}
+                                        onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'supplierId', value: parseInt(e.target.value) })}
+                                        className={inputClass()}
+                                    >
+                                        <option value="0">اختر المورد...</option>
+                                        {suppliers.map(s => (
+                                            <option key={s.id} value={s.id}>{s.supplierNameAr}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-brand-primary" />
                                     تاريخ التسليم المتوقع
+                                    {isReadOnly && <Lock className="w-3 h-3 text-slate-400" />}
                                 </label>
                                 <input
-                                    type="date"
-                                    value={formData.expectedDeliveryDate || ''}
-                                    onChange={(e) => setFormData({ ...formData, expectedDeliveryDate: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    type={isReadOnly ? 'text' : 'date'}
+                                    readOnly={isReadOnly}
+                                    tabIndex={isReadOnly ? -1 : undefined}
+                                    min={isReadOnly ? undefined : new Date().toISOString().split('T')[0]}
+                                    value={optimisticPO.expectedDeliveryDate || (isReadOnly ? 'غير محدد' : '')}
+                                    onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'expectedDeliveryDate', value: e.target.value })}
+                                    className={inputClass()}
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <Clock className="w-4 h-4 text-brand-primary" /> مدة التوصيل (أيام)
+                                    {isReadOnly && <Lock className="w-3 h-3 text-slate-400" />}
+                                </label>
+                                <input
+                                    type="number"
+                                    readOnly={isReadOnly}
+                                    tabIndex={isReadOnly ? -1 : undefined}
+                                    value={optimisticPO.deliveryDays || 0}
+                                    onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'deliveryDays', value: parseInt(e.target.value) || 0 })}
+                                    className={inputClass()}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <DollarSign className="w-4 h-4 text-brand-primary" /> العملة
+                                    {isReadOnly && <Lock className="w-3 h-3 text-slate-400" />}
+                                </label>
+                                {isReadOnly ? (
+                                    <div className={inputClass()}>
+                                        {getCurrencyLabel(optimisticPO.currency || defaultCurrency)}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={optimisticPO.currency}
+                                        onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'currency', value: e.target.value })}
+                                        className={inputClass()}
+                                    >
+                                        <option value="EGP">ج.م (EGP)</option>
+                                        <option value="SAR">ر.س (SAR)</option>
+                                        <option value="USD">$ (USD)</option>
+                                    </select>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Items Table */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
-                        style={{ animationDelay: '100ms' }}>
+
+                    {/* ═══ ITEMS TABLE ═══ */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '100ms' }}>
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -298,20 +582,24 @@ const PurchaseOrderFormPage: React.FC = () => {
                                         <Package className="w-5 h-5 text-purple-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المطلوبة</h3>
-                                        <p className="text-slate-500 text-sm">قائمة المواد والكميات المطلوب توريدها</p>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المسعرة</h3>
+                                        <p className="text-slate-500 text-sm">
+                                            {isReadOnly
+                                                ? `${optimisticPO.items?.length || 0} أصناف مسجلة في هذا الأمر`
+                                                : 'قائمة المواد والكميات المطلوب توريدها'}
+                                        </p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={addItem}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
-                                        font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
-                                        hover:scale-105 active:scale-95"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    إضافة صنف
-                                </button>
+                                {/* Add item button — ONLY when NOT read-only */}
+                                {!isReadOnly && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleUpdate({ type: 'ADD_ITEM' })}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20 hover:scale-105 active:scale-95"
+                                    >
+                                        <Plus className="w-4 h-4" /> إضافة صنف
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -321,162 +609,299 @@ const PurchaseOrderFormPage: React.FC = () => {
                                         <th className="py-4 pr-6 text-right">الصنف</th>
                                         <th className="py-4 px-4 text-center">الكمية</th>
                                         <th className="py-4 px-4 text-center">الوحدة</th>
-                                        <th className="py-4 px-4 text-center">سعر الوحدة</th>
+                                        <th className="py-4 px-4 text-center">السعر</th>
+                                        <th className="py-4 px-4 text-center">درجة البوليمر</th>
+                                        <th className="py-4 px-4 text-center">خصم %</th>
+                                        <th className="py-4 px-4 text-center">الضريبة %</th>
                                         <th className="py-4 px-4 text-center">الإجمالي</th>
-                                        <th className="py-4 pl-6"></th>
+                                        {/* Delete column — only when NOT read-only */}
+                                        {!isReadOnly && <th className="py-4 pl-6"></th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {(formData.items || []).map((item, idx) => (
+                                    {(optimisticPO.items || []).map((item, idx) => (
                                         <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
                                             <td className="py-4 pr-6">
-                                                <select
-                                                    value={item.itemId}
-                                                    onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) })}
-                                                    className="w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
-                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all"
-                                                >
-                                                    <option value="0">اختر صنف...</option>
-                                                    {items.map(i => <option key={i.id} value={i.id}>{i.itemNameAr}</option>)}
-                                                </select>
+                                                {isReadOnly ? (
+                                                    <div className={smallInputClass('min-w-[200px] font-semibold text-slate-800')}>
+                                                        {items.find(i => i.id === item.itemId)?.itemNameAr || `صنف #${item.itemId} `}
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={item.itemId}
+                                                        onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { itemId: parseInt(e.target.value) } })}
+                                                        className={smallInputClass('min-w-[200px] font-semibold')}
+                                                    >
+                                                        <option value="0">اختر صنف...</option>
+                                                        {items.map(i => (
+                                                            <option key={i.id} value={i.id}>{i.itemNameAr}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
                                             </td>
                                             <td className="py-4 px-4">
                                                 <input
                                                     type="number"
+                                                    readOnly={isReadOnly}
+                                                    tabIndex={isReadOnly ? -1 : undefined}
                                                     value={item.orderedQty}
-                                                    onChange={(e) => updateItem(idx, { orderedQty: parseFloat(e.target.value) })}
-                                                    className="w-24 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-bold text-brand-primary outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                    onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { orderedQty: parseFloat(e.target.value) || 0 } })}
+                                                    className={smallInputClass('w-20 text-center font-bold text-brand-primary')}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
-                                                <select
-                                                    value={item.unitId}
-                                                    onChange={(e) => updateItem(idx, { unitId: parseInt(e.target.value) })}
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm font-semibold outline-none focus:border-brand-primary transition-all"
-                                                >
-                                                    <option value="0">الوحدة...</option>
-                                                    {units.map(u => <option key={u.id} value={u.id}>{u.unitNameAr}</option>)}
-                                                </select>
+                                                {isReadOnly ? (
+                                                    <div className={smallInputClass('w-24 text-center font-semibold')}>
+                                                        {units.find(u => u.id === item.unitId)?.unitNameAr || '-'}
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={item.unitId}
+                                                        onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitId: parseInt(e.target.value) } })}
+                                                        className={smallInputClass('w-24 font-semibold')}
+                                                    >
+                                                        <option value="0">الوحدة...</option>
+                                                        {units.map(u => (
+                                                            <option key={u.id} value={u.id}>{u.unitNameAr}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
                                             </td>
                                             <td className="py-4 px-4">
                                                 <input
                                                     type="number"
+                                                    readOnly={isReadOnly}
+                                                    tabIndex={isReadOnly ? -1 : undefined}
                                                     value={item.unitPrice}
-                                                    onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) })}
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm text-center font-bold text-emerald-600 outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                    onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { unitPrice: parseFloat(e.target.value) || 0 } })}
+                                                    className={smallInputClass('w-24 text-center font-bold text-emerald-600')}
                                                 />
                                             </td>
-                                            <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                {(item.totalPrice || 0).toLocaleString()}
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="text"
+                                                    readOnly={isReadOnly}
+                                                    tabIndex={isReadOnly ? -1 : undefined}
+                                                    value={item.polymerGrade || ''}
+                                                    onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { polymerGrade: e.target.value } })}
+                                                    className={smallInputClass('w-32 text-center font-medium text-slate-700')}
+                                                    placeholder={isReadOnly ? '-' : 'مثلاً: Grade A'}
+                                                />
                                             </td>
-                                            <td className="py-4 pl-6 text-left">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setFormData(p => ({ ...p, items: p.items.filter((_, i) => i !== idx) }))}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
-                                                        rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="number"
+                                                    readOnly={isReadOnly}
+                                                    tabIndex={isReadOnly ? -1 : undefined}
+                                                    value={item.discountPercentage}
+                                                    onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { discountPercentage: parseFloat(e.target.value) || 0 } })}
+                                                    className={smallInputClass(`w - 16 text - center font - bold text - rose - 600 ${isReadOnly ? '' : 'bg-rose-50 border-rose-100 focus:border-rose-400'} `)}
+                                                />
                                             </td>
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="number"
+                                                    readOnly={isReadOnly}
+                                                    tabIndex={isReadOnly ? -1 : undefined}
+                                                    value={item.taxPercentage}
+                                                    onChange={e => handleUpdate({ type: 'UPDATE_ITEM', index: idx, item: { taxPercentage: parseFloat(e.target.value) || 0 } })}
+                                                    className={smallInputClass(`w - 16 text - center font - bold text - amber - 600 ${isReadOnly ? '' : 'bg-amber-50 border-amber-100 focus:border-amber-400'} `)}
+                                                />
+                                            </td>
+                                            <td className="py-4 px-4 text-center font-bold text-slate-800 tabular-nums">
+                                                {formatNumber(item.totalPrice ?? 0)}
+                                            </td>
+                                            {/* Delete button — only when NOT read-only */}
+                                            {!isReadOnly && (
+                                                <td className="py-4 pl-6 text-left">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUpdate({ type: 'REMOVE_ITEM', index: idx })}
+                                                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
+                                    {(!optimisticPO.items || optimisticPO.items.length === 0) && (
+                                        <tr>
+                                            <td colSpan={isReadOnly ? 8 : 9} className="py-20 text-center">
+                                                <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                                    <Package className="w-10 h-10 text-slate-400" />
+                                                </div>
+                                                <p className="text-slate-400 font-semibold">لا توجد أصناف مضافة</p>
+                                                {!isReadOnly && (
+                                                    <p className="text-slate-400 text-sm mt-1">انقر على "إضافة صنف" لبدء الإضافة</p>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
-                            {formData.items.length === 0 && (
-                                <div className="py-20 text-center">
-                                    <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
-                                        <Package className="w-10 h-10 text-slate-400" />
-                                    </div>
-                                    <p className="text-slate-400 font-semibold">لا توجد أصناف مضافة</p>
-                                    <p className="text-slate-400 text-sm mt-1">انقر على "إضافة صنف" لبدء الإضافة</p>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Sidebar */}
+                {/* ═══ SIDEBAR ═══ */}
                 <div className="space-y-6">
                     {/* Financial Summary */}
-                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
-                        rounded-3xl p-6 text-white shadow-2xl animate-slide-in"
-                        style={{ animationDelay: '200ms' }}>
+                    <div
+                        className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-2xl animate-slide-in"
+                        style={{ animationDelay: '200ms' }}
+                    >
                         <div className="flex items-center gap-3 pb-6 border-b border-white/10">
                             <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
                                 <DollarSign className="w-6 h-6 text-emerald-400" />
                             </div>
                             <h3 className="font-bold text-xl">الملخص المالي</h3>
+                            {isReadOnly && <Lock className="w-4 h-4 text-white/30 mr-auto" />}
                         </div>
-                        <div className="space-y-5 mt-6">
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                <span className="text-white/60">الإجمالي الفرعي</span>
-                                <span className="font-bold text-lg">
-                                    {formData.subTotal.toLocaleString()} {formData.currency}
+
+                        {/* Delivery date display */}
+                        <div className="mt-4 flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                            <span className="text-white/60 text-sm flex items-center gap-2">
+                                <Calendar className="w-4 h-4" /> تاريخ التسليم
+                            </span>
+                            <span className="font-bold text-sm text-white/90">
+                                {optimisticPO.expectedDeliveryDate || 'غير محدد'}
+                            </span>
+                        </div>
+
+                        <div className="space-y-4 mt-6">
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                <span className="text-white/60">إجمالي الأصناف (صافي)</span>
+                                <span className="font-bold text-lg text-white/90 tabular-nums">
+                                    {formatNumber(optimisticPO.totalAmount - (optimisticPO.shippingCost || 0))} {getCurrencyLabel(optimisticPO.currency || defaultCurrency)}
                                 </span>
                             </div>
-                            <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                                <span className="text-emerald-400 font-semibold">الضريبة (VAT)</span>
-                                <input
-                                    type="number"
-                                    value={formData.taxAmount}
-                                    onChange={(e) => setFormData({ ...formData, taxAmount: parseFloat(e.target.value) || 0 })}
-                                    className="w-28 px-3 py-2 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-lg 
-                                        text-emerald-400 font-bold text-right outline-none focus:border-emerald-500/50 transition-all"
-                                />
+
+
+                            <div className="flex justify-between items-center p-4 bg-brand-primary/10 rounded-xl border border-brand-primary/20">
+                                <span className="text-brand-primary-light font-semibold">مصاريف الشحن</span>
+                                {isReadOnly ? (
+                                    <span className="font-bold text-white tabular-nums">
+                                        {formatNumber(optimisticPO.shippingCost || 0)} {optimisticPO.currency}
+                                    </span>
+                                ) : (
+                                    <input
+                                        type="number"
+                                        value={optimisticPO.shippingCost}
+                                        onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'shippingCost', value: parseFloat(e.target.value) || 0 })}
+                                        className="w-28 px-3 py-2 border-2 border-brand-primary/30 rounded-lg bg-brand-primary/10 text-white font-bold text-right outline-none focus:border-brand-primary/50 transition-all"
+                                    />
+                                )}
                             </div>
-                            <div className="pt-6 border-t border-white/10">
-                                <div className="text-xs text-white/40 mb-2">الإجمالي النهائي</div>
-                                <div className="text-4xl font-black text-emerald-400">
-                                    {formData.totalAmount.toLocaleString()}
-                                    <span className="text-sm font-bold mr-2">{formData.currency}</span>
+
+                            <div className="flex justify-between items-center p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                                <span className="text-amber-400 font-semibold">مصاريف أخرى</span>
+                                {isReadOnly ? (
+                                    <span className="font-bold text-white tabular-nums">
+                                        {formatNumber(optimisticPO.otherCosts || 0)} {optimisticPO.currency}
+                                    </span>
+                                ) : (
+                                    <input
+                                        type="number"
+                                        value={optimisticPO.otherCosts}
+                                        onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'otherCosts', value: parseFloat(e.target.value) || 0 })}
+                                        className="w-28 px-3 py-2 border-2 border-amber-500/30 rounded-lg bg-amber-500/10 text-white font-bold text-right outline-none focus:border-amber-500/50 transition-all"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="pt-4 mt-2 border-t border-white/10">
+                                <div className="flex justify-between items-center p-5 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20">
+                                    <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
+                                    {isReadOnly ? (
+                                        <div className="text-4xl font-black text-white">
+                                            {formatNumber(optimisticPO.totalAmount)} <span className="text-xl font-bold">{getCurrencyLabel(optimisticPO.currency || defaultCurrency)}</span>
+                                            {(optimisticPO.currency && optimisticPO.currency !== defaultCurrency) && (
+                                                <div className="text-sm font-bold text-white/60 mt-1">
+                                                    (≈ {formatNumber(convertAmount(optimisticPO.totalAmount, optimisticPO.currency))} {getCurrencyLabel(defaultCurrency)})
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+
+                                        <>
+                                            <input
+                                                type="number"
+                                                value={optimisticPO.totalAmount}
+                                                onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'totalAmount', value: e.target.value })}
+                                                className="w-36 px-3 py-2 bg-white/10 border-2 border-white/20 rounded-xl text-white font-black text-xl text-right outline-none focus:border-white/50 transition-all hover:bg-white/20"
+                                            />
+                                            <span className="mr-2 font-bold">{optimisticPO.currency}</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Detailed breakdown */}
+                            <div className="mt-4 p-4 border border-white/5 rounded-2xl bg-white/5 space-y-3">
+                                <div className="flex justify-between text-xs text-white/40">
+                                    <span>المجموع (قبل الخصم)</span>
+                                    <span className="tabular-nums">{formatNumber(optimisticPO.subTotal ?? 0)} {optimisticPO.currency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-rose-400/60">
+                                    <span>إجمالي الخصم</span>
+                                    <span className="tabular-nums">- {formatNumber(optimisticPO.discountAmount ?? 0)} {optimisticPO.currency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-emerald-400/60">
+                                    <span>إجمالي الضريبة</span>
+                                    <span className="tabular-nums">{formatNumber(optimisticPO.taxAmount ?? 0)} {optimisticPO.currency}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Notes */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
-                        style={{ animationDelay: '300ms' }}>
-                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-blue-100 rounded-xl">
-                                    <FileText className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
+                {/* ═══ NOTES ═══ */}
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '300ms' }}>
+                    <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-blue-100 rounded-xl">
+                                <FileText className="w-5 h-5 text-blue-600" />
                             </div>
-                        </div>
-                        <div className="p-6">
-                            <textarea
-                                value={formData.notes || ''}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
-                                    focus:border-brand-primary focus:bg-white outline-none transition-all 
-                                    text-sm leading-relaxed h-40 resize-none"
-                                placeholder="اكتب أي ملاحظات أو تعليمات خاصة للمورد..."
-                            />
+                            <h3 className="font-bold text-slate-800">ملاحظات إضافية</h3>
+                            {isReadOnly && <Lock className="w-3.5 h-3.5 text-slate-400 mr-auto" />}
                         </div>
                     </div>
+                    <div className="p-6">
+                        <textarea
+                            value={optimisticPO.notes || ''}
+                            readOnly={isReadOnly}
+                            tabIndex={isReadOnly ? -1 : undefined}
+                            onChange={e => handleUpdate({ type: 'UPDATE_FIELD', field: 'notes', value: e.target.value })}
+                            className={`w - full p - 4 border - 2 rounded - xl outline - none transition - all text - sm leading - relaxed h - 40 resize - none ${isReadOnly
+                                ? 'bg-slate-50 border-slate-200 text-slate-700 cursor-default pointer-events-none'
+                                : 'bg-slate-50 border-transparent focus:border-brand-primary focus:bg-white'
+                                } `}
+                            placeholder={isReadOnly ? '' : 'اكتب أي ملاحظات أو تعليمات خاصة للمورد...'}
+                        />
+                    </div>
+                </div>
 
-                    {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
-                        flex gap-4 animate-slide-in shadow-lg"
-                        style={{ animationDelay: '400ms' }}>
-                        <div className="p-3 bg-blue-100 rounded-xl h-fit">
-                            <AlertCircle className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
-                            <p className="text-sm leading-relaxed text-blue-700">
-                                سيتم إرسال أمر الشراء للمورد فور الاعتماد. تأكد من مراجعة
-                                <strong> الكميات والأسعار</strong> قبل الحفظ.
-                            </p>
-                        </div>
+                {/* ═══ INFO ALERT ═══ */}
+                <div
+                    className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 flex gap-4 animate-slide-in shadow-lg"
+                    style={{ animationDelay: '400ms' }}
+                >
+                    <div className="p-3 bg-blue-100 rounded-xl h-fit">
+                        <AlertCircle className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-blue-800 mb-2">معلومة هامة</h4>
+                        <p className="text-sm leading-relaxed text-blue-700">
+                            {isReadOnly
+                                ? 'هذا الطلب في وضع العرض فقط. للتعديل، يرجى إنشاء أمر شراء جديد أو التواصل مع المسؤول.'
+                                : (
+                                    <>
+                                        سيتم إرسال أمر الشراء للمورد فور الاعتماد. تأكد من مراجعة
+                                        <strong> الكميات والأسعار</strong> قبل الحفظ.
+                                    </>
+                                )}
+                        </p>
                     </div>
                 </div>
             </form>

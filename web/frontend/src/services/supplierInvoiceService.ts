@@ -7,7 +7,10 @@ export interface SupplierInvoiceDto {
     invoiceDate: string;
     dueDate: string;
     poId?: number;
+    poNumber?: string;
     grnId?: number;
+    grnNumber?: string;
+    quotationId?: number;
     supplierId: number;
     supplierNameAr?: string;
     currency: string;
@@ -15,6 +18,8 @@ export interface SupplierInvoiceDto {
     subTotal: number;
     discountAmount?: number;
     taxAmount?: number;
+    deliveryCost?: number;
+    otherCosts?: number;
     totalAmount: number;
     paidAmount?: number;
     remainingAmount?: number;
@@ -63,5 +68,16 @@ export const supplierInvoiceService = {
             params: { userId, approved }
         });
         return response.data;
+    },
+
+    downloadPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/suppliers/invoices/${id}/pdf`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    },
+
+    deleteInvoice: async (id: number) => {
+        await apiClient.post(`/suppliers/invoices/${id}/delete`);
     }
 };

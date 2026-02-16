@@ -1,22 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-    CheckCircle2,
-    XCircle,
     Search,
     Package,
     ClipboardCheck,
     Save,
     RotateCcw,
-    AlertCircle,
-    RefreshCw,
+    Clock,
     X,
-    TrendingUp,
-    Clock
+    Info
 } from 'lucide-react';
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
 import { qualityService } from '../../services/qualityService';
+import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -70,21 +67,9 @@ const GRNCard: React.FC<{
                 group-hover:scale-110 transition-transform duration-300">
                 <Package className="w-6 h-6" />
             </div>
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border
-                ${grn.status === 'Inspected'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                {grn.status === 'Inspected' ? (
-                    <>
-                        <CheckCircle2 className="w-3 h-3" />
-                        تم الفحص
-                    </>
-                ) : (
-                    <>
-                        <Clock className="w-3 h-3" />
-                        بانتظار الفحص
-                    </>
-                )}
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
+                <Clock className="w-3 h-3" />
+                بانتظار الفحص
             </span>
         </div>
         <h3 className="font-bold text-lg text-slate-800 mb-1 group-hover:text-brand-primary transition-colors">
@@ -93,7 +78,7 @@ const GRNCard: React.FC<{
         <p className="text-slate-500 text-sm mb-4">{grn.supplierNameAr}</p>
         <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100">
             <div className="text-xs text-slate-400">
-                {new Date(grn.grnDate!).toLocaleDateString('ar-EG')}
+                {formatDate(grn.grnDate!)}
             </div>
             <button
                 onClick={() => onInspect(grn)}
@@ -143,19 +128,19 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
         <p className="text-slate-500 max-w-md mx-auto">
             {searchTerm
                 ? `لم يتم العثور على شحنات تطابق "${searchTerm}"`
-                : 'لا توجد إشعارات استلام بانتظار الفحص حالياً'}
+                : 'لا توجد أذونات إضافة بانتظار الفحص حالياً'}
         </p>
     </div>
 );
 
 const QualityInspectionPage: React.FC = () => {
-    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [grns, setGrns] = useState<GoodsReceiptNoteDto[]>([]);
     const [selectedGrn, setSelectedGrn] = useState<GoodsReceiptNoteDto | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
     useEffect(() => {
         fetchPendingGRNs();
@@ -165,7 +150,9 @@ const QualityInspectionPage: React.FC = () => {
         try {
             setLoading(true);
             const allGrns = await grnService.getAllGRNs();
-            setGrns(allGrns.filter(g => g.status === 'Pending Inspection' || g.status === 'Inspected'));
+            const list = Array.isArray(allGrns) ? allGrns : [];
+            // Only show GRNs that need inspection - exclude those already sent for approval
+            setGrns(list.filter(g => g.status === 'Pending Inspection'));
         } catch (error) {
             console.error('Error fetching GRNs:', error);
             toast.error('فشل تحميل الشحنات');
@@ -175,9 +162,10 @@ const QualityInspectionPage: React.FC = () => {
     };
 
     const handleRecordInspection = (grn: GoodsReceiptNoteDto) => {
+        const items = Array.isArray(grn.items) ? grn.items : [];
         const grnWithDetails = {
             ...grn,
-            items: grn.items.map(item => ({
+            items: items.map(item => ({
                 ...item,
                 acceptedQty: item.acceptedQty || item.receivedQty,
                 rejectedQty: item.rejectedQty || 0,
@@ -187,13 +175,14 @@ const QualityInspectionPage: React.FC = () => {
         setSelectedGrn(grnWithDetails);
     };
 
-    const handleSaveInspection = async () => {
+    const handleSaveInspection = async (submit: boolean = false) => {
         if (!selectedGrn) return;
 
         try {
             setSaving(true);
             const inspectionData = {
                 inspectedByUserId: 1,
+                submit: submit,
                 overallResult: selectedGrn.items.every(i => i.rejectedQty === 0) ? 'Passed' : 'Failed',
                 items: selectedGrn.items.map(item => ({
                     itemId: item.itemId,
@@ -205,28 +194,45 @@ const QualityInspectionPage: React.FC = () => {
             };
 
             await qualityService.recordInspection(selectedGrn.id!, inspectionData);
-            toast.success('تم حفظ تقرير الفحص بنجاح');
+
+            if (submit) {
+                toast.success('تم إرسال الفحص للاعتماد بنجاح');
+                setShowSubmitConfirm(false);
+            } else {
+                toast.success('تم حفظ تقرير الفحص بنجاح');
+            }
+
             setSelectedGrn(null);
             fetchPendingGRNs();
         } catch (error) {
             console.error('Error saving inspection:', error);
-            toast.error('فشل حفظ تقرير الفحص');
+            toast.error(submit ? 'فشل إرسال الفحص للاعتماد' : 'فشل حفظ تقرير الفحص');
         } finally {
             setSaving(false);
         }
     };
 
+    const handleSubmitForApproval = async () => {
+        await handleSaveInspection(true);
+    };
+
     const filteredGRNs = useMemo(() => {
-        return grns.filter(grn =>
+        const filtered = grns.filter(grn =>
             grn.grnNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             grn.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase())
         );
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => {
+            const dateA = a.grnDate ? new Date(a.grnDate).getTime() : 0;
+            const dateB = b.grnDate ? new Date(b.grnDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
+        });
     }, [grns, searchTerm]);
 
     const stats = useMemo(() => ({
         total: grns.length,
         pending: grns.filter(g => g.status === 'Pending Inspection').length,
-        inspected: grns.filter(g => g.status === 'Inspected').length,
     }), [grns]);
 
     return (
@@ -260,7 +266,7 @@ const QualityInspectionPage: React.FC = () => {
                     </div>
                     <div>
                         <h1 className="text-3xl font-bold mb-2">فحص الجودة</h1>
-                        <p className="text-white/70 text-lg">مراجعة وفحص الشحنات الواردة قبل الإضافة للمخزون</p>
+                        <p className="text-white/70 text-lg">مراجعة وفحص الشحنات الواردة — الكميات المقبولة والمرفوضة فقط (اختيار المخزن يتم في إذن الإضافة)</p>
                     </div>
                 </div>
             </div>
@@ -268,7 +274,7 @@ const QualityInspectionPage: React.FC = () => {
             {!selectedGrn ? (
                 <>
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <StatCard
                             icon={Package}
                             value={stats.total}
@@ -280,12 +286,6 @@ const QualityInspectionPage: React.FC = () => {
                             value={stats.pending}
                             label="بانتظار الفحص"
                             color="warning"
-                        />
-                        <StatCard
-                            icon={CheckCircle2}
-                            value={stats.inspected}
-                            label="تم الفحص"
-                            color="success"
                         />
                     </div>
 
@@ -379,7 +379,7 @@ const QualityInspectionPage: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {selectedGrn.items.map((item, idx) => (
+                                {(selectedGrn.items || []).map((item, idx) => (
                                     <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                                         <td className="py-4 pr-4 font-bold text-slate-800">{item.itemNameAr}</td>
                                         <td className="py-4 px-4 text-center font-semibold text-slate-600">
@@ -389,8 +389,10 @@ const QualityInspectionPage: React.FC = () => {
                                             <input
                                                 type="number"
                                                 value={item.acceptedQty}
+                                                max={item.receivedQty}
+                                                min={0}
                                                 onChange={(e) => {
-                                                    const val = parseFloat(e.target.value) || 0;
+                                                    const val = Math.min(item.receivedQty, Math.max(0, parseFloat(e.target.value) || 0));
                                                     const newItems = [...selectedGrn.items];
                                                     newItems[idx].acceptedQty = val;
                                                     newItems[idx].rejectedQty = item.receivedQty - val;
@@ -398,16 +400,25 @@ const QualityInspectionPage: React.FC = () => {
                                                 }}
                                                 className="w-28 px-3 py-2 rounded-lg border-2 border-emerald-200 
                                                     focus:border-emerald-500 outline-none text-emerald-600 font-bold text-center
-                                                    bg-emerald-50"
+                                                    bg-emerald-50 transition-all focus:ring-4 focus:ring-emerald-500/10"
                                             />
                                         </td>
                                         <td className="py-4 px-4 text-center">
                                             <input
                                                 type="number"
                                                 value={item.rejectedQty}
-                                                readOnly
-                                                className="w-28 px-3 py-2 rounded-lg bg-rose-50 border-2 border-rose-200 
-                                                    text-rose-600 font-bold outline-none text-center"
+                                                max={item.receivedQty}
+                                                min={0}
+                                                onChange={(e) => {
+                                                    const val = Math.min(item.receivedQty, Math.max(0, parseFloat(e.target.value) || 0));
+                                                    const newItems = [...selectedGrn.items];
+                                                    newItems[idx].rejectedQty = val;
+                                                    newItems[idx].acceptedQty = item.receivedQty - val;
+                                                    setSelectedGrn({ ...selectedGrn, items: newItems });
+                                                }}
+                                                className="w-28 px-3 py-2 rounded-lg border-2 border-rose-200 
+                                                    focus:border-rose-500 outline-none text-rose-600 font-bold text-center
+                                                    bg-rose-50 transition-all focus:ring-4 focus:ring-rose-500/10"
                                             />
                                         </td>
                                         <td className="py-4 pl-4">
@@ -424,6 +435,23 @@ const QualityInspectionPage: React.FC = () => {
                         </table>
                     </div>
 
+                    {/* Purchase Return Notice */}
+                    {selectedGrn.items.some(item => (item.rejectedQty || 0) > 0) && (
+                        <div className="mx-6 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="mt-1 p-2 bg-amber-100 rounded-lg shrink-0">
+                                <Info className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-amber-900 leading-none">سيتم إنشاء مرتجع مشتريات تلقائي</h4>
+                                <p className="text-amber-700 text-sm mt-2">
+                                    تم تحديد كميات مرفوضة. سيقوم النظام بإنشاء طلب مرتجع مشتريات بـ {
+                                        selectedGrn.items.reduce((sum, item) => sum + (item.rejectedQty || 0), 0)
+                                    } وحدة وتحويله للاعتماد تلقائياً عند إرسال الفحص.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                         <button
                             onClick={() => setSelectedGrn(null)}
@@ -434,18 +462,45 @@ const QualityInspectionPage: React.FC = () => {
                             إلغاء
                         </button>
                         <button
-                            onClick={handleSaveInspection}
+                            onClick={() => handleSaveInspection(false)}
                             disabled={saving}
-                            className="flex items-center gap-2 px-8 py-3 bg-brand-primary text-white rounded-xl 
-                                font-bold shadow-lg shadow-brand-primary/20 hover:scale-105 transition-all
+                            className="flex items-center gap-2 px-6 py-3 bg-white border border-brand-primary text-brand-primary 
+                                rounded-xl font-bold hover:bg-brand-primary/5 transition-all
                                 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Save className="w-5 h-5" />
-                            <span>{saving ? 'جاري الحفظ...' : 'حفظ تقرير الفحص'}</span>
+                            <span>{saving ? 'جاري الحفظ...' : 'حفظ مسودة'}</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (selectedGrn?.id) {
+                                    setShowSubmitConfirm(true);
+                                }
+                            }}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl 
+                                font-bold shadow-lg shadow-emerald-500/20 hover:scale-105 hover:bg-emerald-700 transition-all
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <ClipboardCheck className="w-5 h-5" />
+                            <span>إرسال للاعتماد</span>
                         </button>
                     </div>
                 </div>
             )}
+
+            {/* Submit for Approval Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showSubmitConfirm}
+                title="تأكيد إرسال الفحص للاعتماد"
+                message="هل أنت متأكد من إرسال نتيجة فحص الجودة للاعتماد؟ لن تتمكن من التعديل بعد الإرسال."
+                confirmText="إرسال للاعتماد"
+                cancelText="إلغاء"
+                onConfirm={handleSubmitForApproval}
+                onCancel={() => setShowSubmitConfirm(false)}
+                isLoading={saving}
+                variant="info"
+            />
         </div>
     );
 };

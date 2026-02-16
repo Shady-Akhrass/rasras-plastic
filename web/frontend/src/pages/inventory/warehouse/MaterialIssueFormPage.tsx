@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronRight, Save, Plus, Trash2, RefreshCw, AlertCircle, CheckCircle, Info, Package, Truck } from 'lucide-react';
+import { ChevronRight, Save, Plus, Trash2, RefreshCw, AlertCircle, CheckCircle, Package } from 'lucide-react';
 import materialIssueService, { type MaterialIssueDto, type MaterialIssueItemDto, type IssueType } from '../../../services/materialIssueService';
 import warehouseService from '../../../services/warehouseService';
 import type { WarehouseDto } from '../../../services/warehouseService';
@@ -190,6 +190,10 @@ const MaterialIssueFormPage: React.FC = () => {
             toast.error('يجب اختيار أمر بيع لتحميل المرجع والبنود عند نوع الصرف "صرف لأمر بيع"');
             return;
         }
+        if (form.issueType !== 'SALE_ORDER' && (!form.referenceNo || form.referenceNo.trim() === '')) {
+            toast.error('يجب إدخال رقم المرجع (أمر التشغيل أو المشروع)');
+            return;
+        }
 
         setLoading(true);
         try {
@@ -258,7 +262,7 @@ const MaterialIssueFormPage: React.FC = () => {
         const available = stockLevels[itemId] || 0;
         if (available === 0) return { status: 'none', text: 'غير متوفر', color: 'text-rose-600 bg-rose-50' };
         if (available < requestedQty) return { status: 'low', text: `متوفر: ${available}`, color: 'text-amber-600 bg-amber-50' };
-        return { status: 'ok', text: `متوفر: ${available}`, color: 'text-emerald-600 bg-emerald-50' };
+        return { status: 'ok', text: `متوفر: ${available}`, color: 'text-brand-primary bg-brand-primary/10' };
     };
 
     return (
@@ -293,15 +297,15 @@ const MaterialIssueFormPage: React.FC = () => {
                                 <select
                                     value={form.referenceNo ? saleOrders.find((o) => (o.orderNumber || `SO-${o.id}`) === form.referenceNo)?.id ?? '' : ''}
                                     onChange={(e) => onSaleOrderSelect(parseInt(e.target.value) || 0)}
-                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all"
                                 >
                                     <option value="">— اختر أمر بيع لتعبئة المرجع والبنود...</option>
                                     {saleOrders.map((o) => <option key={o.id} value={o.id}>{o.orderNumber} — {o.customerNameAr}</option>)}
                                 </select>
-                                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="mt-2 p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-lg">
                                     <div className="flex items-start gap-2">
-                                        <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                                        <p className="text-xs text-amber-800">يمنع الصرف دون أمر بيع معتمد. اختيار أمر البيع يملأ رقم المرجع وبنود الصرف تلقائياً.</p>
+                                        <AlertCircle className="w-4 h-4 text-brand-primary mt-0.5 shrink-0" />
+                                        <p className="text-xs text-slate-700">يمنع الصرف دون أمر بيع معتمد. اختيار أمر البيع يملأ رقم المرجع وبنود الصرف تلقائياً.</p>
                                     </div>
                                 </div>
                             </div>
@@ -343,7 +347,7 @@ const MaterialIssueFormPage: React.FC = () => {
                         <button
                             type="button"
                             onClick={addItem}
-                            className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-xl font-medium hover:bg-amber-200 transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 text-brand-primary rounded-xl font-medium hover:bg-brand-primary/20 transition-colors"
                         >
                             <Plus className="w-4 h-4" /> إضافة صنف
                         </button>
@@ -364,16 +368,16 @@ const MaterialIssueFormPage: React.FC = () => {
                                 {form.items.map((it, idx) => {
                                     const stockStatus = it.itemId ? getStockStatus(it.itemId, it.issuedQty) : null;
                                     return (
-                                        <tr key={idx} className="border-b hover:bg-amber-50/30">
+                                        <tr key={idx} className="border-b hover:bg-brand-primary/5">
                                             <td className="px-3 py-2">
                                                 <select
                                                     value={it.itemId || ''}
                                                     onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })}
-                                                    className="w-full min-w-[200px] px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                                                    className="w-full min-w-[200px] px-2 py-1.5 border border-slate-300 rounded-lg focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none"
                                                     required
                                                 >
                                                     <option value="">اختر الصنف...</option>
-                                                    {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr} ({i.itemCode})</option>)}
+                                                    {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr} ({i.grade || i.itemCode || ''})</option>)}
                                                 </select>
                                             </td>
                                             <td className="px-3 py-2">
@@ -383,7 +387,7 @@ const MaterialIssueFormPage: React.FC = () => {
                                                     step="0.001"
                                                     value={it.requestedQty || ''}
                                                     onChange={(e) => updateItem(idx, { requestedQty: parseFloat(e.target.value) || 0 })}
-                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                                                    className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -395,8 +399,8 @@ const MaterialIssueFormPage: React.FC = () => {
                                                     value={it.issuedQty || ''}
                                                     onChange={(e) => updateItem(idx, { issuedQty: parseFloat(e.target.value) || 0 })}
                                                     className={`w-24 px-2 py-1.5 border rounded-lg focus:ring-1 outline-none ${stockStatus?.status === 'none' || (it.issuedQty > (stockLevels[it.itemId] || 0))
-                                                            ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
-                                                            : 'border-slate-300 focus:border-amber-500 focus:ring-amber-500'
+                                                        ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
+                                                        : 'border-slate-300 focus:border-brand-primary focus:ring-brand-primary'
                                                         }`}
                                                     required
                                                 />
@@ -416,7 +420,7 @@ const MaterialIssueFormPage: React.FC = () => {
                                                     value={it.lotNumber || ''}
                                                     onChange={(e) => updateItem(idx, { lotNumber: e.target.value || undefined })}
                                                     placeholder="رقم اللوت"
-                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none text-sm"
+                                                    className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none text-sm"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -447,7 +451,7 @@ const MaterialIssueFormPage: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading || form.items.length === 0}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-amber-500/25"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-brand-primary/25"
                         >
                             {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                             {isNew ? 'حفظ إذن الصرف' : 'تحديث إذن الصرف'}
@@ -457,7 +461,7 @@ const MaterialIssueFormPage: React.FC = () => {
                                 type="button"
                                 onClick={handleFinalize}
                                 disabled={finalizing}
-                                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 disabled:opacity-50 transition-colors"
                             >
                                 {finalizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
                                 إتمام الصرف وتحديث المخزون
@@ -465,7 +469,7 @@ const MaterialIssueFormPage: React.FC = () => {
                         )}
                         {form.items.length > 0 && (
                             <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <CheckCircle className="w-4 h-4 text-amber-600" />
+                                <CheckCircle className="w-4 h-4 text-brand-primary" />
                                 <span>{form.items.length} صنف</span>
                             </div>
                         )}

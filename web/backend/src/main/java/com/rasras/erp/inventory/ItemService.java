@@ -2,11 +2,18 @@ package com.rasras.erp.inventory;
 
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import com.rasras.erp.procurement.PurchaseReturnItem;
+import com.rasras.erp.procurement.PurchaseReturnItemRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +22,10 @@ public class ItemService {
         private final ItemRepository itemRepository;
         private final ItemCategoryRepository itemCategoryRepository;
         private final UnitRepository unitRepository;
+        private final StockBalanceRepository stockBalanceRepository;
+        private final StockMovementRepository stockMovementRepository;
+        private final GRNItemRepository grnItemRepository;
+        private final PurchaseReturnItemRepository purchaseReturnItemRepository;
 
         public List<ItemDto> getAllItems() {
                 List<Item> items = itemRepository.findAll();
@@ -42,13 +53,43 @@ public class ItemService {
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
         }
 
+        private String generateItemCode() {
+                try {
+                        Integer maxSeq = itemRepository.findMaxItemCodeSequence();
+                        int next = (maxSeq != null ? maxSeq : 0) + 1;
+                        return String.format("ITEM-%05d", next);
+                } catch (Exception e) {
+                        long n = itemRepository.count() + 1;
+                        return String.format("ITEM-%05d", n);
+                }
+        }
+
         @Transactional
         public ItemDto createItem(ItemDto dto) {
+                if (dto.getCategoryId() == null || dto.getCategoryId() <= 0) {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.BAD_REQUEST, "يرجى اختيار التصنيف");
+                }
+                if (dto.getUnitId() == null || dto.getUnitId() <= 0) {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.BAD_REQUEST, "يرجى اختيار وحدة القياس");
+                }
+                if (dto.getItemNameAr() == null || dto.getItemNameAr().trim().isEmpty()) {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.BAD_REQUEST, "الاسم العربي مطلوب");
+                }
+
+                validateStockLevels(dto);
+                validatePriceFields(dto);
                 Item item = Item.builder()
-                                .itemCode(dto.getItemCode())
+                                .itemCode(generateItemCode())
                                 .itemNameAr(dto.getItemNameAr())
                                 .itemNameEn(dto.getItemNameEn())
+                                .grade(dto.getGrade())
                                 .gradeName(dto.getGradeName())
+                                .mi2(dto.getMi2())
+                                .mi21(dto.getMi21())
+                                .density(dto.getDensity())
                                 .categoryId(dto.getCategoryId())
                                 .unitId(dto.getUnitId())
                                 .barcode(dto.getBarcode())
@@ -69,7 +110,12 @@ public class ItemService {
                                 .isPurchasable(dto.getIsPurchasable() != null ? dto.getIsPurchasable() : true)
                                 .createdAt(java.time.LocalDateTime.now())
                                 .build();
-                return mapToDto(itemRepository.save(item));
+                try {
+                        return mapToDto(itemRepository.save(item));
+                } catch (DataIntegrityViolationException e) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "البيانات المرتبطة غير صحيحة - تحقق من الحقول المرتبطة (مندوب المبيعات، قائمة الأسعار، التصنيف، أو وحدة القياس)");
+                }
         }
 
         @Transactional
@@ -77,10 +123,16 @@ public class ItemService {
                 Item item = itemRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
 
-                item.setItemCode(dto.getItemCode());
+                validateStockLevels(dto);
+                validatePriceFields(dto);
+
                 item.setItemNameAr(dto.getItemNameAr());
                 item.setItemNameEn(dto.getItemNameEn());
+                item.setGrade(dto.getGrade());
                 item.setGradeName(dto.getGradeName());
+                item.setMi2(dto.getMi2());
+                item.setMi21(dto.getMi21());
+                item.setDensity(dto.getDensity());
                 item.setCategoryId(dto.getCategoryId());
                 item.setUnitId(dto.getUnitId());
                 item.setBarcode(dto.getBarcode());
@@ -100,15 +152,90 @@ public class ItemService {
                 item.setIsSellable(dto.getIsSellable());
                 item.setIsPurchasable(dto.getIsPurchasable());
 
-                return mapToDto(itemRepository.save(item));
+                try {
+                        return mapToDto(itemRepository.save(item));
+                } catch (DataIntegrityViolationException e) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "البيانات المرتبطة غير صحيحة - تحقق من الحقول المرتبطة (مندوب المبيعات، قائمة الأسعار، التصنيف، أو وحدة القياس)");
+                }
+        }
+
+        private void validateStockLevels(ItemDto dto) {
+                BigDecimal min = dto.getMinStockLevel();
+                BigDecimal reorder = dto.getReorderLevel();
+                BigDecimal max = dto.getMaxStockLevel();
+
+                if (min == null || reorder == null || max == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "مستويات المخزون (الحد الأدنى، حد إعادة الطلب، الحد الأقصى) مطلوبة");
+                }
+
+                if (min.compareTo(BigDecimal.ZERO) <= 0
+                                || reorder.compareTo(BigDecimal.ZERO) <= 0
+                                || max.compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "مستويات المخزون يجب أن تكون أكبر من صفر");
+                }
+
+                if (min.compareTo(reorder) > 0 || reorder.compareTo(max) > 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الحد الأدنى يجب أن يكون ≤ حد إعادة الطلب ≤ الحد الأقصى");
+                }
+        }
+
+        private void validatePriceFields(ItemDto dto) {
+                BigDecimal standardCost = dto.getStandardCost();
+                BigDecimal lastPurchasePrice = dto.getLastPurchasePrice();
+                BigDecimal lastSalePrice = dto.getLastSalePrice();
+                BigDecimal replacementPrice = dto.getReplacementPrice();
+
+                if (standardCost == null || lastPurchasePrice == null
+                                || lastSalePrice == null || replacementPrice == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الأسعار والتكاليف (التكلفة المعيارية، آخر سعر شراء، آخر سعر بيع، السعر الاستبدالي) مطلوبة");
+                }
+
+                if (standardCost.compareTo(BigDecimal.ZERO) <= 0
+                                || lastPurchasePrice.compareTo(BigDecimal.ZERO) <= 0
+                                || lastSalePrice.compareTo(BigDecimal.ZERO) <= 0
+                                || replacementPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الأسعار والتكاليف يجب أن تكون أكبر من صفر");
+                }
         }
 
         @Transactional
         public void deleteItem(Integer id) {
                 Item item = itemRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Item", "id", id));
-                item.setIsActive(false);
-                itemRepository.save(item);
+
+                List<StockBalance> balances = stockBalanceRepository.findByItemId(id);
+                BigDecimal totalStock = balances.stream()
+                                .map(StockBalance::getQuantityOnHand)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                if (totalStock.compareTo(BigDecimal.ZERO) > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "لا يمكن حذف الصنف لوجود كمية في المخزون. يجب أن تكون الكمية صفراً للحذف.");
+                }
+
+                try {
+                        List<GRNItem> grnItems = grnItemRepository.findByItemId(id);
+                        List<Integer> grnItemIds = grnItems.stream().map(GRNItem::getId).toList();
+                        if (!grnItemIds.isEmpty()) {
+                                List<PurchaseReturnItem> returnItems = purchaseReturnItemRepository
+                                                .findByGrnItemIdIn(grnItemIds);
+                                purchaseReturnItemRepository.deleteAll(returnItems);
+                        }
+                        grnItemRepository.deleteAll(grnItems);
+                        List<StockMovement> movements = stockMovementRepository.findByItemId(id);
+                        stockMovementRepository.deleteAll(movements);
+                        stockBalanceRepository.deleteAll(balances);
+                        itemRepository.delete(item);
+                } catch (DataIntegrityViolationException e) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "لا يمكن حذف الصنف لوجود استخدامات له في مستندات أخرى (مثل عروض الأسعار، أوامر الشراء/البيع، قوائم الأسعار، ...). يرجى مراجعة المستندات المرتبطة أولاً.");
+                }
         }
 
         private ItemDto mapToDto(Item entity) {
@@ -134,7 +261,11 @@ public class ItemService {
                                 .itemCode(entity.getItemCode())
                                 .itemNameAr(entity.getItemNameAr())
                                 .itemNameEn(entity.getItemNameEn())
+                                .grade(entity.getGrade())
                                 .gradeName(entity.getGradeName())
+                                .mi2(entity.getMi2())
+                                .mi21(entity.getMi21())
+                                .density(entity.getDensity())
                                 .categoryId(entity.getCategoryId())
                                 .categoryName(categoryName)
                                 .unitId(entity.getUnitId())

@@ -11,10 +11,14 @@ import {
     Search,
     RefreshCw,
     X,
-    ShoppingCart,
-    Eye
+    Edit3,
+    Trash2,
+    Filter
 } from 'lucide-react';
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
+import Pagination from '../../components/common/Pagination';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import toast from 'react-hot-toast';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -93,14 +97,15 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         </span>
     );
 };
-
 // Table Row Component
 const ComparisonTableRow: React.FC<{
     comparison: QuotationComparison;
     index: number;
     onView: (id: number) => void;
-    onCreatePO: (compId: number, quotId: number) => void;
-}> = ({ comparison, index, onView, onCreatePO }) => (
+    onDelete: (comparison: QuotationComparison) => void;
+    isSelected: boolean;
+    onToggleSelect: (id: number) => void;
+}> = ({ comparison, index, onView, onDelete, isSelected, onToggleSelect }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -108,6 +113,14 @@ const ComparisonTableRow: React.FC<{
             animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
+        <td className="px-4 py-4 text-center">
+            <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                checked={isSelected}
+                onChange={() => comparison.id && onToggleSelect(comparison.id)}
+            />
+        </td>
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
@@ -115,12 +128,8 @@ const ComparisonTableRow: React.FC<{
                     <Scale className="w-5 h-5 text-brand-primary" />
                 </div>
                 <div>
-                    <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors block">
-                        #{comparison.comparisonNumber || 'بدون رقم'}
-                    </span>
-                    {comparison.prNumber && (
-                        <span className="text-xs text-slate-400">طلب شراء #{comparison.prNumber}</span>
-                    )}
+                    <div className="text-sm font-bold text-slate-800">{comparison.comparisonNumber}</div>
+                    <div className="text-xs text-slate-500 font-medium">{comparison.prNumber}</div>
                 </div>
             </div>
         </td>
@@ -149,20 +158,21 @@ const ComparisonTableRow: React.FC<{
             <div className="flex items-center justify-end gap-2">
                 <button
                     onClick={() => onView(comparison.id!)}
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                    title="عرض التفاصيل"
+                    className={`p-2 rounded-lg transition-all ${comparison.status === 'Approved'
+                        ? 'text-blue-500 hover:bg-blue-50'
+                        : 'text-brand-primary hover:bg-brand-primary/10'
+                        }`}
+                    title={comparison.status === 'Approved' ? 'عرض' : 'تعديل'}
                 >
-                    <Eye className="w-4 h-4" />
+                    <Edit3 className="w-4 h-4" />
                 </button>
-
-
-                {comparison.status === 'Approved' && comparison.selectedQuotationId && (
+                {comparison.status !== 'Approved' && (
                     <button
-                        onClick={() => onCreatePO(comparison.id!, comparison.selectedQuotationId!)}
-                        className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
-                        title="إصدار أمر شراء"
+                        onClick={() => onDelete(comparison)}
+                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                        title="حذف"
                     >
-                        <ShoppingCart className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                     </button>
                 )}
             </div>
@@ -175,6 +185,9 @@ const TableSkeleton: React.FC = () => (
     <>
         {[1, 2, 3, 4, 5].map(i => (
             <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-4 py-4 text-center">
+                    <div className="w-4 h-4 bg-slate-100 rounded" />
+                </td>
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg" />
@@ -200,23 +213,23 @@ const TableSkeleton: React.FC = () => (
 );
 
 // Empty State
-const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
+const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
-        <td colSpan={6} className="px-6 py-16">
+        <td colSpan={7} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
-                    {searchTerm ? (
+                    {searchTerm || statusFilter !== 'All' ? (
                         <Search className="w-12 h-12 text-slate-400" />
                     ) : (
                         <Scale className="w-12 h-12 text-slate-400" />
                     )}
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">
-                    {searchTerm ? 'لا توجد نتائج' : 'لا توجد مقارنات'}
+                    {searchTerm || statusFilter !== 'All' ? 'لا توجد نتائج' : 'لا توجد مقارنات'}
                 </h3>
                 <p className="text-slate-500 max-w-md mx-auto">
-                    {searchTerm
-                        ? `لم يتم العثور على مقارنات تطابق "${searchTerm}"`
+                    {searchTerm || statusFilter !== 'All'
+                        ? `لم يتم العثور على مقارنات تطابق معايير البحث`
                         : 'ابدأ بإنشاء مقارنة جديدة لعروض الأسعار'}
                 </p>
             </div>
@@ -229,11 +242,22 @@ const QuotationComparisonPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [comparisons, setComparisons] = useState<QuotationComparison[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [comparisonToDelete, setComparisonToDelete] = useState<QuotationComparison | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchComparisons();
     }, []);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
 
     const fetchComparisons = async () => {
         try {
@@ -248,13 +272,22 @@ const QuotationComparisonPage: React.FC = () => {
     };
 
     const filteredComparisons = useMemo(() => {
-        return comparisons.filter(comp => {
-            return comp.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        const filtered = comparisons.filter(comp => {
+            const matchesSearch = comp.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.prNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.selectedSupplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comp.comparisonNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = statusFilter === 'All' || comp.status === statusFilter;
+            return matchesSearch && matchesStatus;
         });
-    }, [comparisons, searchTerm]);
+        // الأحدث فوق والأقدم تحت
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+    }, [comparisons, searchTerm, statusFilter]);
+
+    const paginatedComparisons = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredComparisons.slice(start, start + pageSize);
+    }, [filteredComparisons, currentPage, pageSize]);
 
     const stats = useMemo(() => ({
         total: comparisons.length,
@@ -263,13 +296,58 @@ const QuotationComparisonPage: React.FC = () => {
         approved: comparisons.filter(c => c.status === 'Approved').length,
     }), [comparisons]);
 
-
-    const handleCreatePO = (compId: number, quotId: number) => {
-        navigate(`/dashboard/procurement/po/new?comparisonId=${compId}&quotationId=${quotId}`);
+    const handleView = (id: number) => {
+        navigate(`/dashboard/procurement/comparison/${id}`);
     };
 
-    const handleViewComparison = (id: number) => {
-        navigate(`/dashboard/procurement/comparison/${id}`);
+    const handleDeleteClick = (comparison: QuotationComparison) => {
+        setComparisonToDelete(comparison);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleToggleSelect = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAllPage = () => {
+        const pageIds = paginatedComparisons.map(c => c.id!).filter(Boolean);
+        const allSelected = pageIds.every(id => selectedIds.includes(id));
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+        }
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (selectedIds.length === 0) {
+            toast.error('يرجى اختيار مقارنات أولاً');
+            return;
+        }
+        setComparisonToDelete(null);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        const idsToDelete = comparisonToDelete?.id ? [comparisonToDelete.id] : selectedIds;
+        if (!idsToDelete.length) return;
+        setIsDeleting(true);
+        try {
+            for (const id of idsToDelete) {
+                await purchaseService.deleteComparison(id);
+            }
+            toast.success('تم حذف مقارنات العروض بنجاح');
+            fetchComparisons();
+            setIsDeleteModalOpen(false);
+            setComparisonToDelete(null);
+            setSelectedIds([]);
+        } catch (error) {
+            toast.error('فشل حذف مقارنة العروض');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
@@ -379,15 +457,35 @@ const QuotationComparisonPage: React.FC = () => {
                         )}
                     </div>
 
-                    <button
-                        onClick={fetchComparisons}
-                        disabled={loading}
-                        className="p-3 rounded-xl border border-slate-200 text-slate-600 
-                            hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
-                            disabled:opacity-50"
-                    >
-                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent
+                            hover:border-slate-200 transition-all duration-200">
+                            <Filter className="text-slate-400 w-5 h-5" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                            >
+                                <option value="All">جميع الحالات</option>
+                                <option value="Draft">مسودة</option>
+                                <option value="Pending Finance">مراجعة مالية</option>
+                                <option value="Pending Management">اعتماد الإدارة</option>
+                                <option value="Pending Approval">بانتظار الاعتماد</option>
+                                <option value="Approved">معتمد</option>
+                                <option value="Rejected">مرفوض</option>
+                            </select>
+                        </div>
+
+                        <button
+                            onClick={() => { fetchComparisons(); }}
+                            disabled={loading}
+                            className="p-3 rounded-xl border border-slate-200 text-slate-600 
+                                hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
+                                disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -408,6 +506,17 @@ const QuotationComparisonPage: React.FC = () => {
                     <table className="w-full">
                         <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                             <tr>
+                                <th className="px-4 py-4 text-center text-sm font-bold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                                        checked={
+                                            paginatedComparisons.length > 0 &&
+                                            paginatedComparisons.every(c => c.id && selectedIds.includes(c.id))
+                                        }
+                                        onChange={handleToggleSelectAllPage}
+                                    />
+                                </th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم المقارنة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الصنف</th>
                                 <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">عدد العروض</th>
@@ -420,22 +529,63 @@ const QuotationComparisonPage: React.FC = () => {
                             {loading ? (
                                 <TableSkeleton />
                             ) : filteredComparisons.length === 0 ? (
-                                <EmptyState searchTerm={searchTerm} />
+                                <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
                             ) : (
-                                filteredComparisons.map((comparison, index) => (
+                                paginatedComparisons.map((comparison, index) => (
                                     <ComparisonTableRow
                                         key={comparison.id}
                                         comparison={comparison}
                                         index={index}
-                                        onView={handleViewComparison}
-                                        onCreatePO={handleCreatePO}
+                                        onView={handleView}
+                                        onDelete={handleDeleteClick}
+                                        isSelected={!!comparison.id && selectedIds.includes(comparison.id)}
+                                        onToggleSelect={handleToggleSelect}
                                     />
                                 ))
                             )}
                         </tbody>
                     </table>
                 </div>
+                {!loading && filteredComparisons.length > 0 && (
+                    <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleBulkDeleteClick}
+                                disabled={selectedIds.length === 0 || isDeleting}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold
+                                    border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100
+                                    disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                حذف المحدد ({selectedIds.length})
+                            </button>
+                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filteredComparisons.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                        />
+                    </div>
+                )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف مقارنة العروض"
+                message={
+                    comparisonToDelete
+                        ? `هل أنت متأكد من حذف مقارنة العروض رقم ${comparisonToDelete.comparisonNumber}؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`
+                        : `هل أنت متأكد من حذف عدد ${selectedIds.length} من مقارنات العروض؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`
+                }
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setComparisonToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

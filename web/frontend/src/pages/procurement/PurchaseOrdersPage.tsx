@@ -8,15 +8,21 @@ import {
     CheckCircle2,
     Clock,
     Filter,
-    Package,
     ShoppingCart,
     X,
     Eye,
     TrendingUp,
     RefreshCw,
-    DollarSign
+    DollarSign,
+    Trash2
 } from 'lucide-react';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
+import Pagination from '../../components/common/Pagination';
+import { formatNumber, formatDate } from '../../utils/format';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { toast } from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -106,8 +112,15 @@ const POTableRow: React.FC<{
     order: PurchaseOrderDto;
     index: number;
     onView: (id: number) => void;
-    onReceive: (id: number) => void;
-}> = ({ order, index, onView, onReceive }) => (
+    onDelete: (order: PurchaseOrderDto) => void;
+    isSelected: boolean;
+    onToggleSelect: (id: number) => void;
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ order, index, onView, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -115,6 +128,14 @@ const POTableRow: React.FC<{
             animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
+        <td className="px-4 py-4 text-center">
+            <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                checked={isSelected}
+                onChange={() => order.id && onToggleSelect(order.id)}
+            />
+        </td>
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
@@ -122,14 +143,14 @@ const POTableRow: React.FC<{
                     <ShoppingCart className="w-5 h-5 text-brand-primary" />
                 </div>
                 <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
-                    #{order.poNumber}
+                    {order.poNumber}
                 </span>
             </div>
         </td>
         <td className="px-6 py-4 text-sm text-slate-600">
             <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{new Date(order.poDate!).toLocaleDateString('ar-EG')}</span>
+                <span>{formatDate(order.poDate!)}</span>
             </div>
         </td>
         <td className="px-6 py-4 text-sm font-medium text-slate-700">
@@ -137,9 +158,14 @@ const POTableRow: React.FC<{
         </td>
         <td className="px-6 py-4 text-right">
             <span className="font-bold text-emerald-600">
-                {order.totalAmount.toLocaleString()} {order.currency}
+                {formatNumber(convertAmount(order.totalAmount, order.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
+
+        <td className="px-6 py-4 text-center font-bold text-blue-600">
+            {formatNumber(convertAmount(order.shippingCost || 0, order.currency || 'EGP'))}
+        </td>
+
         <td className="px-6 py-4">
             <StatusBadge status={order.status!} />
         </td>
@@ -152,15 +178,13 @@ const POTableRow: React.FC<{
                 >
                     <Eye className="w-4 h-4" />
                 </button>
-                {(order.status === 'Draft' || order.status === 'Pending' || order.status === 'PartiallyReceived') && (
-                    <button
-                        onClick={() => onReceive(order.id!)}
-                        className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                        title="تسجيل استلام"
-                    >
-                        <Package className="w-4 h-4" />
-                    </button>
-                )}
+                <button
+                    onClick={() => onDelete(order)}
+                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                    title="حذف"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
             </div>
         </td>
     </tr>
@@ -171,6 +195,9 @@ const TableSkeleton: React.FC = () => (
     <>
         {[1, 2, 3, 4, 5].map(i => (
             <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-4 py-4 text-center">
+                    <div className="w-4 h-4 bg-slate-100 rounded" />
+                </td>
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg" />
@@ -203,7 +230,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
-        <td colSpan={6} className="px-6 py-16">
+        <td colSpan={8} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm || statusFilter !== 'All' ? (
@@ -226,12 +253,21 @@ const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ se
 );
 
 const PurchaseOrdersPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
+
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState<PurchaseOrderDto[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(15);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState<PurchaseOrderDto | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const queryParams = new URLSearchParams(location.search);
     const prIdFilter = queryParams.get('prId');
@@ -253,7 +289,7 @@ const PurchaseOrdersPage: React.FC = () => {
     };
 
     const filteredOrders = useMemo(() => {
-        return orders.filter(o => {
+        const filtered = orders.filter(o => {
             const matchesSearch =
                 o.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 o.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -261,21 +297,85 @@ const PurchaseOrdersPage: React.FC = () => {
             const matchesPR = !prIdFilter || o.prId === parseInt(prIdFilter);
             return matchesSearch && matchesStatus && matchesPR;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => {
+            const dateA = a.poDate ? new Date(a.poDate).getTime() : 0;
+            const dateB = b.poDate ? new Date(b.poDate).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.id ?? 0) - (a.id ?? 0);
+        });
     }, [orders, searchTerm, statusFilter, prIdFilter]);
+
+    const paginatedOrders = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredOrders.slice(start, start + pageSize);
+    }, [filteredOrders, currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, prIdFilter]);
 
     const stats = useMemo(() => ({
         total: orders.length,
         pending: orders.filter(o => o.status === 'Draft' || o.status === 'Pending').length,
         active: orders.filter(o => o.status === 'PartiallyReceived').length,
-        totalValue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString()
-    }), [orders]);
+        totalValue: formatNumber(orders.reduce((sum, o) => sum + convertAmount(o.totalAmount || 0, o.currency || 'EGP'), 0))
+    }), [orders, defaultCurrency, convertAmount]);
+
 
     const handleViewOrder = (id: number) => {
         navigate(`/dashboard/procurement/po/${id}`);
     };
 
-    const handleReceiveOrder = (id: number) => {
-        navigate(`/dashboard/procurement/grn/new?poId=${id}`);
+    const handleDeleteClick = (order: PurchaseOrderDto) => {
+        setOrderToDelete(order);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleToggleSelect = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAllPage = () => {
+        const pageIds = paginatedOrders.map(o => o.id!).filter(Boolean);
+        const allSelected = pageIds.every(id => selectedIds.includes(id));
+        if (allSelected) {
+            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+        }
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (selectedIds.length === 0) {
+            toast.error('يرجى اختيار أوامر شراء أولاً');
+            return;
+        }
+        setOrderToDelete(null);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        const idsToDelete = orderToDelete?.id ? [orderToDelete.id] : selectedIds;
+        if (!idsToDelete.length) return;
+        setIsDeleting(true);
+        try {
+            for (const id of idsToDelete) {
+                await purchaseOrderService.deletePO(id);
+            }
+            toast.success(idsToDelete.length === 1 ? "تم حذف أمر الشراء بنجاح" : "تم حذف أوامر الشراء بنجاح");
+            await fetchOrders();
+            setIsDeleteModalOpen(false);
+            setOrderToDelete(null);
+            setSelectedIds([]);
+        } catch (error: any) {
+            const apiMessage = error?.response?.data?.message as string | undefined;
+            toast.error(apiMessage || 'فشل حذف أمر الشراء');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
@@ -360,10 +460,11 @@ const PurchaseOrdersPage: React.FC = () => {
                 />
                 <StatCard
                     icon={DollarSign}
-                    value={`${stats.totalValue} ج.م`}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
                     label="قيمة المشتريات"
                     color="success"
                 />
+
             </div>
 
             {/* Filters */}
@@ -447,10 +548,22 @@ const PurchaseOrdersPage: React.FC = () => {
                     <table className="w-full">
                         <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
                             <tr>
+                                <th className="px-4 py-4 text-center text-sm font-bold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                                        checked={
+                                            paginatedOrders.length > 0 &&
+                                            paginatedOrders.every(o => o.id && selectedIds.includes(o.id))
+                                        }
+                                        onChange={handleToggleSelectAllPage}
+                                    />
+                                </th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم الأمر</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الإجمالي</th>
+                                <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">مصاريف الشحن</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>
@@ -461,20 +574,69 @@ const PurchaseOrdersPage: React.FC = () => {
                             ) : filteredOrders.length === 0 ? (
                                 <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
                             ) : (
-                                filteredOrders.map((order, index) => (
+                                paginatedOrders.map((order, index) => (
                                     <POTableRow
                                         key={order.id}
                                         order={order}
                                         index={index}
                                         onView={handleViewOrder}
-                                        onReceive={handleReceiveOrder}
+                                        onDelete={handleDeleteClick}
+                                        isSelected={!!order.id && selectedIds.includes(order.id)}
+                                        onToggleSelect={handleToggleSelect}
+                                        getCurrencyLabel={getCurrencyLabel}
+                                        defaultCurrency={defaultCurrency}
+                                        convertAmount={convertAmount}
                                     />
+
+
                                 ))
                             )}
                         </tbody>
                     </table>
                 </div>
+                {!loading && filteredOrders.length > 0 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleBulkDeleteClick}
+                                disabled={selectedIds.length === 0 || isDeleting}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold
+                                    border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100
+                                    disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                حذف المحدد ({selectedIds.length})
+                            </button>
+                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filteredOrders.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={(size) => {
+                                setPageSize(size);
+                                setCurrentPage(1);
+                            }}
+                        />
+                    </div>
+                )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="حذف أمر الشراء"
+                message={
+                    orderToDelete
+                        ? `هل أنت متأكد من حذف أمر الشراء رقم ${orderToDelete.poNumber}؟ سيتم حذف جميع البيانات المرتبطة به ولا يمكن التراجع عن هذه الخطوة.`
+                        : `هل أنت متأكد من حذف عدد ${selectedIds.length} من أوامر الشراء؟ سيتم حذف جميع البيانات المرتبطة بها ولا يمكن التراجع عن هذه الخطوة.`
+                }
+                confirmText="حذف"
+                cancelText="إلغاء"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => { setIsDeleteModalOpen(false); setOrderToDelete(null); }}
+                isLoading={isDeleting}
+                variant="danger"
+            />
         </div>
     );
 };

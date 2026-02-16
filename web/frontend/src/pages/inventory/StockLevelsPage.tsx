@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Activity,
     Search,
     Filter,
     Package,
     AlertTriangle,
-    TrendingUp,
     RefreshCw,
     Download,
-    Plus,
     Edit,
     Trash2,
     X,
@@ -19,7 +16,10 @@ import {
 import { stockBalanceService, type StockBalanceDto } from '../../services/stockBalanceService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import warehouseService, { type WarehouseDto } from '../../services/warehouseService';
+import { formatNumber, formatDate } from '../../utils/format';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import toast from 'react-hot-toast';
+
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -60,7 +60,11 @@ const StockTableRow: React.FC<{
     index: number;
     onEdit: (stock: StockBalanceDto) => void;
     onDelete: (id: number) => void;
-}> = ({ stock, index, onEdit, onDelete }) => (
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ stock, index, onEdit, onDelete, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -99,15 +103,17 @@ const StockTableRow: React.FC<{
             </span>
         </td>
         <td className="px-6 py-4 text-center text-slate-600 font-medium">
-            {(stock.averageCost || 0).toLocaleString()} ج.م
+            {formatNumber(convertAmount(stock.averageCost || 0, 'EGP'))} {getCurrencyLabel(defaultCurrency)}
         </td>
+
         <td className="px-6 py-4 text-center">
             <span className="font-bold text-brand-primary">
-                {((stock.quantityOnHand || 0) * (stock.averageCost || 0)).toLocaleString()} ج.م
+                {formatNumber(convertAmount((stock.quantityOnHand || 0) * (stock.averageCost || 0), 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
+
         <td className="px-6 py-4 text-center text-xs text-slate-400">
-            {stock.lastMovementDate ? new Date(stock.lastMovementDate).toLocaleDateString('ar-EG') : '-'}
+            {stock.lastMovementDate ? formatDate(stock.lastMovementDate) : '-'}
         </td>
         <td className="px-6 py-4">
             <div className="flex items-center justify-center gap-2">
@@ -188,7 +194,9 @@ const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
 );
 
 const StockLevelsPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
     const [loading, setLoading] = useState(true);
+
     const [stocks, setStocks] = useState<StockBalanceDto[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
@@ -269,24 +277,16 @@ const StockLevelsPage: React.FC = () => {
         setShowModal(true);
     };
 
-    const openCreate = () => {
-        setCurrentStock({
-            itemId: undefined,
-            warehouseId: undefined,
-            quantityOnHand: 0,
-            quantityReserved: 0,
-            averageCost: 0
-        });
-        setShowModal(true);
-    };
 
     const filteredStocks = useMemo(() => {
-        return stocks.filter(s => {
+        const filtered = stocks.filter(s => {
             const matchesSearch = (s.itemNameAr?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
                 (s.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
             const matchesWarehouse = warehouseFilter === 'all' || s.warehouseId === warehouseFilter;
             return matchesSearch && matchesWarehouse;
         });
+        // الأحدث في الأعلى (بالـ id)
+        return [...filtered].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     }, [stocks, searchTerm, warehouseFilter]);
 
     const stats = useMemo(() => {
@@ -297,11 +297,12 @@ const StockLevelsPage: React.FC = () => {
 
         return {
             totalItems,
-            totalValue: totalValue.toLocaleString(),
+            totalValue: formatNumber(convertAmount(totalValue, 'EGP')),
             lowStock,
-            totalQuantity: totalQuantity.toLocaleString()
+            totalQuantity: formatNumber(totalQuantity)
         };
-    }, [stocks]);
+    }, [stocks, defaultCurrency, convertAmount]);
+
 
     return (
         <div className="space-y-6">
@@ -355,15 +356,6 @@ const StockLevelsPage: React.FC = () => {
                             <Download className="w-5 h-5" />
                             <span className="hidden sm:inline">تصدير</span>
                         </button>
-                        <button
-                            onClick={openCreate}
-                            className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
-                                hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
-                                hover:shadow-xl hover:scale-105"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>إضافة رصيد</span>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -378,7 +370,7 @@ const StockLevelsPage: React.FC = () => {
                 />
                 <StatCard
                     icon={DollarSign}
-                    value={`${stats.totalValue} ج.م`}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
                     label="قيمة المخزون"
                     color="success"
                 />
@@ -487,7 +479,11 @@ const StockLevelsPage: React.FC = () => {
                                         index={index}
                                         onEdit={openEdit}
                                         onDelete={handleDelete}
+                                        getCurrencyLabel={getCurrencyLabel}
+                                        defaultCurrency={defaultCurrency}
+                                        convertAmount={convertAmount}
                                     />
+
                                 ))
                             )}
                         </tbody>

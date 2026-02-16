@@ -17,6 +17,7 @@ public class QualityInspectionService {
         private final ItemRepository itemRepo;
         private final QualityParameterRepository parameterRepo;
         private final GRNService grnService;
+        private final com.rasras.erp.procurement.PurchaseReturnService returnService;
 
         @Transactional
         public void recordBulkInspection(Integer grnId, QualityInspectionRequestDto bulkRequest) {
@@ -81,7 +82,7 @@ public class QualityInspectionService {
                 boolean allInspected = grn.getItems().stream()
                                 .allMatch(gi -> gi.getQualityStatus() != null);
 
-                if (allInspected) {
+                if (allInspected && bulkRequest.isSubmit()) {
                         grn.setStatus("Inspected");
                         grn.setQualityStatus(bulkRequest.getOverallResult());
 
@@ -92,15 +93,79 @@ public class QualityInspectionService {
                                         .map(gi -> gi.getRejectedQty() != null ? gi.getRejectedQty() : BigDecimal.ZERO)
                                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                        grn.setTotalAcceptedQty(totalAcc);
-                        grn.setTotalRejectedQty(totalRej);
+                grn.setTotalAcceptedQty(totalAcc);
+                grn.setTotalRejectedQty(totalRej);
 
-                        grnRepo.save(grn);
+                grnRepo.save(grn);
 
-                        // Auto-submit for approval
-                        grnService.submitGRN(grnId, bulkRequest.getInspectedByUserId());
+                // Recalculate GRN amounts based on accepted quantities
+                // This ensures tax and discount are recalculated while keeping shipping/other costs unchanged
+                grnService.recalculateGRNAmountsAfterQC(grnId);
+
+                // NEW: Create Purchase Return for rejected quantities
+                if (totalRej.compareTo(BigDecimal.ZERO) > 0) {
+                        createPurchaseReturnFromInspection(grn, bulkRequest.getInspectedByUserId());
+                }
+
+                // Auto-submit for approval
+                grnService.submitGRN(grnId, bulkRequest.getInspectedByUserId());
                 } else {
+                        if (allInspected) {
+                                grn.setStatus("Inspected");
+                        }
                         grnRepo.save(grn);
+                }
+        }
+
+        private void createPurchaseReturnFromInspection(GoodsReceiptNote grn, Integer userId) {
+                com.rasras.erp.procurement.dto.PurchaseReturnDto returnDto = new com.rasras.erp.procurement.dto.PurchaseReturnDto();
+                returnDto.setReturnNumber("RET-" + System.currentTimeMillis());
+                returnDto.setReturnDate(LocalDateTime.now());
+                returnDto.setGrnId(grn.getId());
+                returnDto.setSupplierId(grn.getSupplier().getId());
+                returnDto.setWarehouseId(grn.getWarehouseId());
+                returnDto.setReturnReason("Rejected during Quality Inspection");
+                returnDto.setStatus("Draft");
+
+                java.util.List<com.rasras.erp.procurement.dto.PurchaseReturnItemDto> returnItems = new java.util.ArrayList<>();
+                BigDecimal subTotal = BigDecimal.ZERO;
+                BigDecimal taxAmount = BigDecimal.ZERO;
+
+                for (GRNItem gi : grn.getItems()) {
+                        if (gi.getRejectedQty() != null && gi.getRejectedQty().compareTo(BigDecimal.ZERO) > 0) {
+                                com.rasras.erp.procurement.dto.PurchaseReturnItemDto itemDto = new com.rasras.erp.procurement.dto.PurchaseReturnItemDto();
+                                itemDto.setItemId(gi.getItem().getId());
+                                itemDto.setGrnItemId(gi.getId());
+                                itemDto.setReturnedQty(gi.getRejectedQty());
+                                itemDto.setUnitId(gi.getUnit().getId());
+                                BigDecimal unitPrice = gi.getUnitCost() != null ? gi.getUnitCost() : BigDecimal.ZERO;
+                                itemDto.setUnitPrice(unitPrice);
+
+                                // Fetch tax from PO item if possible, or default to 0
+                                BigDecimal taxPct = BigDecimal.ZERO;
+                                itemDto.setTaxPercentage(taxPct);
+
+                                BigDecimal itemTotal = unitPrice.multiply(gi.getRejectedQty());
+                                BigDecimal itemTax = itemTotal.multiply(
+                                                taxPct.divide(new BigDecimal(100), 4, java.math.RoundingMode.HALF_UP));
+
+                                itemDto.setTaxAmount(itemTax);
+                                itemDto.setTotalPrice(itemTotal.add(itemTax));
+                                itemDto.setReturnReason("Quality Failure");
+
+                                returnItems.add(itemDto);
+                                subTotal = subTotal.add(itemTotal);
+                                taxAmount = taxAmount.add(itemTax);
+                        }
+                }
+
+                if (!returnItems.isEmpty()) {
+                        returnDto.setItems(returnItems);
+                        returnDto.setSubTotal(subTotal);
+                        returnDto.setTaxAmount(taxAmount);
+                        returnDto.setTotalAmount(subTotal.add(taxAmount));
+
+                        returnService.createReturn(returnDto);
                 }
         }
 }

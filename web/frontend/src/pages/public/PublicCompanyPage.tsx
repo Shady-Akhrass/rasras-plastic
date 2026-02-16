@@ -66,25 +66,25 @@ const AnimatedCounter: React.FC<{ end: number; suffix?: string; duration?: numbe
     return <span ref={ref}>{count}{suffix}</span>;
 };
 
-// Floating Particles Background
+// جزيئات عائمة ناعمة - أقل تشتيتاً
 const FloatingParticles: React.FC = () => (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(12)].map((_, i) => (
             <div
                 key={i}
-                className="absolute w-2 h-2 bg-white/10 rounded-full animate-float"
+                className="absolute w-1.5 h-1.5 md:w-2 md:h-2 bg-white/15 rounded-full animate-float"
                 style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    animationDelay: `${Math.random() * 5}s`,
-                    animationDuration: `${5 + Math.random() * 10}s`
+                    left: `${10 + (i * 7) % 80}%`,
+                    top: `${15 + (i * 11) % 70}%`,
+                    animationDelay: `${i * 0.5}s`,
+                    animationDuration: `${6 + (i % 4)}s`
                 }}
             />
         ))}
     </div>
 );
 
-// Contact Card Component
+// Contact Card - انسياب وظهور تدريجي
 const ContactCard: React.FC<{
     icon: React.ReactNode;
     label: string;
@@ -97,44 +97,41 @@ const ContactCard: React.FC<{
     const content = (
         <div
             ref={ref}
-            className={`group relative bg-white p-6 rounded-2xl border border-slate-200 
-                hover:border-brand-primary/30 hover:shadow-xl hover:shadow-brand-primary/5 
-                transition-all duration-500 cursor-pointer overflow-hidden
-                ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-            style={{ transitionDelay: `${delay}ms` }}
+            className={`group relative bg-white p-6 rounded-2xl border border-slate-100 
+                hover:border-brand-primary/25 hover:shadow-lg hover:shadow-brand-primary/5 
+                transition-all duration-400 ease-out overflow-hidden
+                ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            style={{ transitionDelay: `${delay}ms`, transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
         >
-            {/* Gradient Overlay on Hover */}
             <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/5 to-transparent 
-                opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                opacity-0 group-hover:opacity-100 transition-opacity duration-400" />
 
-            {/* Icon */}
-            <div className="relative w-14 h-14 bg-gradient-to-br from-brand-primary to-brand-primary/80 
+            <div className="relative w-12 h-12 bg-gradient-to-br from-brand-primary to-brand-primary/90 
                 rounded-xl flex items-center justify-center mb-4 
-                group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                group-hover:scale-105 transition-transform duration-300 ease-out">
                 <div className="text-white">{icon}</div>
             </div>
 
-            {/* Content */}
-            <p className="text-sm text-slate-500 mb-1">{label}</p>
+            <p className="text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">{label}</p>
             <p className="font-semibold text-slate-800 group-hover:text-brand-primary 
-                transition-colors duration-300" dir="ltr">
+                transition-colors duration-300 text-[15px]" dir="ltr">
                 {value}
             </p>
 
-            {/* Arrow indicator */}
             {href && (
                 <ExternalLink className="absolute top-4 left-4 w-4 h-4 text-slate-300 
-                    group-hover:text-brand-primary transition-colors duration-300" />
+                    group-hover:text-brand-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 
+                    transition-all duration-300" />
             )}
         </div>
     );
 
     return href ? (
-        <a href={href} target="_blank" rel="noreferrer">{content}</a>
+        <a href={href} target="_blank" rel="noreferrer" className="block">{content}</a>
     ) : content;
 };
 
-// Stats Item Component
+// Stats Item - ظهور انسيابي
 const StatItem: React.FC<{
     icon: React.ReactNode;
     value: number;
@@ -147,23 +144,23 @@ const StatItem: React.FC<{
     return (
         <div
             ref={ref}
-            className={`text-center p-6 transition-all duration-700
-                ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-            style={{ transitionDelay: `${delay}ms` }}
+            className={`text-center p-5 md:p-6 transition-all duration-700 ease-out
+                ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            style={{ transitionDelay: `${delay}ms`, transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
         >
-            <div className="w-16 h-16 mx-auto mb-4 bg-white/10 backdrop-blur-sm rounded-2xl 
-                flex items-center justify-center text-white">
+            <div className="w-14 h-14 md:w-16 md:h-16 mx-auto mb-4 bg-white/15 backdrop-blur-md rounded-2xl 
+                flex items-center justify-center text-white border border-white/10">
                 {icon}
             </div>
-            <div className="text-4xl font-bold text-white mb-2">
+            <div className="text-3xl md:text-4xl font-bold text-white mb-1.5">
                 <AnimatedCounter end={value} suffix={suffix} />
             </div>
-            <p className="text-white/70">{label}</p>
+            <p className="text-white/75 text-sm md:text-base font-medium">{label}</p>
         </div>
     );
 };
 
-// Feature Card Component
+// Feature Card Component - انسياب عند الظهور
 const FeatureCard: React.FC<{
     icon: React.ReactNode;
     title: string;
@@ -175,24 +172,23 @@ const FeatureCard: React.FC<{
     return (
         <div
             ref={ref}
-            className={`group relative bg-white p-8 rounded-3xl border border-slate-100 
-                hover:shadow-2xl hover:shadow-brand-primary/10 transition-all duration-500
-                ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
-            style={{ transitionDelay: `${delay}ms` }}
+            className={`group relative bg-white/95 backdrop-blur-sm p-7 md:p-8 rounded-3xl border border-slate-100 
+                hover:border-brand-primary/20 hover:shadow-xl hover:shadow-brand-primary/5 
+                transition-all duration-500 ease-out
+                ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            style={{ transitionDelay: `${delay}ms`, transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
         >
-            {/* Decorative gradient */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br 
-                from-brand-primary/10 to-transparent rounded-bl-full opacity-0 
-                group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-brand-primary/5 to-transparent 
+                rounded-bl-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
             <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-brand-primary/10 to-brand-primary/5 
-                    rounded-2xl flex items-center justify-center mb-6 
-                    group-hover:scale-110 transition-transform duration-300">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-brand-primary/10 to-brand-primary/5 
+                    rounded-2xl flex items-center justify-center mb-5 
+                    group-hover:scale-105 transition-transform duration-300 ease-out">
                     <div className="text-brand-primary">{icon}</div>
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-3">{title}</h3>
-                <p className="text-slate-600 leading-relaxed">{description}</p>
+                <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-2">{title}</h3>
+                <p className="text-slate-600 leading-relaxed text-[15px] md:text-base">{description}</p>
             </div>
         </div>
     );
@@ -279,16 +275,17 @@ const PublicCompanyPage: React.FC = () => {
     const getImageUrl = (url: string) => {
         if (!url) return '';
         if (url.startsWith('http') || url.startsWith('blob:')) return url;
-        return `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+        const baseUrl = import.meta.env.VITE_API_URL || 'https://api.rasrasplastic.com';
+        return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 font-readex" dir="rtl">
-            {/* Custom Styles */}
+        <div className="min-h-screen bg-slate-50 font-readex antialiased scroll-smooth" dir="rtl">
+            {/* Custom Styles - انسيابية وتدفق بصري */}
             <style>{`
                 @keyframes float {
-                    0%, 100% { transform: translateY(0) rotate(0deg); }
-                    50% { transform: translateY(-20px) rotate(180deg); }
+                    0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+                    50% { transform: translateY(-12px) scale(1.05); opacity: 0.9; }
                 }
                 @keyframes shimmer {
                     0% { background-position: -200% 0; }
@@ -298,39 +295,42 @@ const PublicCompanyPage: React.FC = () => {
                     0%, 100% { background-position: 0% 50%; }
                     50% { background-position: 100% 50%; }
                 }
-                .animate-float { animation: float linear infinite; }
-                .animate-shimmer { animation: shimmer 2s infinite; }
-                .animate-gradient { 
-                    background-size: 200% 200%;
-                    animation: gradient 15s ease infinite; 
+                @keyframes fadeUp {
+                    from { opacity: 0; transform: translateY(24px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
+                .animate-float { animation: float 8s ease-in-out infinite; }
+                .animate-shimmer { animation: shimmer 2.5s ease-in-out infinite; }
+                .animate-gradient { background-size: 200% 200%; animation: gradient 18s ease infinite; }
+                .animate-fade-up { animation: fadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+                .section-flow { transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
             `}</style>
 
-            {/* Hero Section */}
-            <section className="relative min-h-[85vh] flex items-center overflow-hidden">
+            {/* Hero Section - انسياب من الأعلى */}
+            <section className="relative min-h-[90vh] flex items-center overflow-hidden">
                 {/* Background */}
                 {company.headerPath ? (
                     <>
                         <img
                             src={getImageUrl(company.headerPath)}
                             alt="Header"
-                            className="absolute inset-0 w-full h-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover scale-105 transition-transform duration-[2s] ease-out"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70 transition-opacity duration-500" />
                     </>
                 ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-brand-primary via-brand-primary/90 to-slate-900 animate-gradient" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-brand-primary via-brand-primary/95 to-slate-800 animate-gradient" />
                 )}
 
                 <FloatingParticles />
 
-                {/* Content */}
-                <div className="relative container mx-auto px-6 py-20">
-                    <div className="max-w-4xl">
+                {/* Content - ظهور تدريجي */}
+                <div className="relative container mx-auto px-6 py-24 max-w-6xl">
+                    <div className="max-w-3xl space-y-8">
                         {/* Logo */}
                         {company.logoPath && (
-                            <div className="w-28 h-28 bg-white/10 backdrop-blur-md rounded-3xl p-3 
-                                mb-8 shadow-2xl border border-white/20 animate-fade-in">
+                            <div className="w-24 h-24 md:w-28 md:h-28 bg-white/15 backdrop-blur-xl rounded-3xl p-3 
+                                shadow-2xl border border-white/25 animate-fade-up" style={{ animationDelay: '0.1s' }}>
                                 <img
                                     src={getImageUrl(company.logoPath)}
                                     alt="Logo"
@@ -339,47 +339,45 @@ const PublicCompanyPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Text Content */}
-                        <div className="space-y-6">
-                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 
-                                backdrop-blur-sm rounded-full text-white/80 text-sm">
+                        <div className="space-y-5">
+                            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/15 
+                                backdrop-blur-md rounded-full text-white/90 text-sm font-medium 
+                                animate-fade-up border border-white/20" style={{ animationDelay: '0.2s' }}>
                                 <Sparkles className="w-4 h-4" />
                                 <span>مرحباً بكم في</span>
                             </div>
 
-                            <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
+                            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.15] tracking-tight animate-fade-up" style={{ animationDelay: '0.25s' }}>
                                 {company.companyNameAr}
                             </h1>
 
-                            <p className="text-2xl text-white/70 font-light" dir="ltr">
+                            <p className="text-xl md:text-2xl text-white/75 font-light leading-relaxed animate-fade-up" dir="ltr" style={{ animationDelay: '0.3s' }}>
                                 {company.companyNameEn}
                             </p>
 
-                            <p className="text-xl text-white/60 max-w-2xl leading-relaxed">
+                            <p className="text-lg md:text-xl text-white/60 max-w-xl leading-relaxed animate-fade-up" style={{ animationDelay: '0.35s' }}>
                                 نحن ملتزمون بتقديم أعلى معايير الجودة والتميز في خدماتنا،
                                 ونسعى دائماً لتحقيق رضا عملائنا.
                             </p>
 
-                            {/* CTA Buttons */}
-                            <div className="flex flex-wrap gap-4 pt-6">
+                            <div className="flex flex-wrap gap-4 pt-4 animate-fade-up" style={{ animationDelay: '0.45s' }}>
                                 <a
                                     href={`mailto:${company.email}`}
-                                    className="group inline-flex items-center gap-3 px-8 py-4 
+                                    className="group inline-flex items-center gap-3 px-7 py-3.5 
                                         bg-white text-brand-primary rounded-2xl font-bold 
-                                        hover:bg-white/90 hover:shadow-2xl hover:shadow-white/20 
-                                        transition-all duration-300"
+                                        hover:bg-white/95 hover:shadow-2xl hover:shadow-white/25 hover:-translate-y-0.5
+                                        transition-all duration-300 ease-out"
                                 >
                                     <MessageCircle className="w-5 h-5" />
                                     <span>تواصل معنا</span>
                                 </a>
-
                                 {company.phone && (
                                     <a
                                         href={`tel:${company.phone}`}
-                                        className="group inline-flex items-center gap-3 px-8 py-4 
-                                            bg-white/10 backdrop-blur-sm text-white rounded-2xl 
-                                            font-bold border border-white/20 hover:bg-white/20 
-                                            transition-all duration-300"
+                                        className="group inline-flex items-center gap-3 px-7 py-3.5 
+                                            bg-white/15 backdrop-blur-md text-white rounded-2xl 
+                                            font-bold border border-white/25 hover:bg-white/25 hover:-translate-y-0.5
+                                            transition-all duration-300 ease-out"
                                     >
                                         <Phone className="w-5 h-5" />
                                         <span dir="ltr">{company.phone}</span>
@@ -390,29 +388,33 @@ const PublicCompanyPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Scroll Indicator */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50 
-                    animate-bounce cursor-pointer" onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}>
-                    <ChevronDown className="w-8 h-8" />
-                </div>
+                {/* Scroll Indicator - انسياب */}
+                <button
+                    type="button"
+                    onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+                    className="absolute bottom-10 left-1/2 -translate-x-1/2 text-white/60 hover:text-white 
+                        transition-colors duration-300 cursor-pointer flex flex-col items-center gap-1"
+                >
+                    <span className="text-xs font-medium">اكتشف المزيد</span>
+                    <ChevronDown className="w-8 h-8 animate-bounce" />
+                </button>
 
-                {/* Decorative Bottom Wave */}
-                <div className="absolute bottom-0 left-0 right-0">
-                    <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path
-                            d="M0 120L48 110C96 100 192 80 288 70C384 60 480 60 576 65C672 70 768 80 864 85C960 90 1056 90 1152 85C1248 80 1344 70 1392 65L1440 60V120H1392C1344 120 1248 120 1152 120C1056 120 960 120 864 120C768 120 672 120 576 120C480 120 384 120 288 120C192 120 96 120 48 120H0Z"
-                            fill="#f8fafc"
-                        />
+                {/* موجة انسيابية ناعمة */}
+                <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none">
+                    <svg viewBox="0 0 1440 120" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+                        <path d="M0 120C360 80 720 40 1080 70C1260 85 1380 95 1440 100V120H0Z" fill="#f8fafc" className="transition-all duration-700" />
+                        <path d="M0 120C300 90 600 60 900 75C1200 90 1320 100 1440 105V120H0Z" fill="#f1f5f9" className="transition-all duration-700" opacity="0.8" />
                     </svg>
                 </div>
             </section>
 
-            {/* Stats Section */}
-            <section className="relative py-20 bg-gradient-to-br from-brand-primary via-brand-primary to-slate-800 overflow-hidden">
+            {/* Stats Section - تدفق مع الخلفية */}
+            <section className="relative -mt-1 py-16 md:py-24 bg-gradient-to-b from-slate-100 to-white overflow-hidden section-flow">
+                <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/90 via-brand-primary to-slate-800 opacity-95" />
                 <FloatingParticles />
 
-                <div className="relative container mx-auto px-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div className="relative container mx-auto px-6 max-w-6xl">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
                         <StatItem
                             icon={<Users className="w-8 h-8" />}
                             value={500}
@@ -445,29 +447,28 @@ const PublicCompanyPage: React.FC = () => {
                 </div>
             </section>
 
-            {/* About Section */}
-            <section className="py-24 bg-slate-50">
-                <div className="container mx-auto px-6">
-                    <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* About Section - انسياب ناعم */}
+            <section className="relative py-20 md:py-28 bg-gradient-to-b from-white to-slate-50/80 overflow-hidden">
+                <div className="container mx-auto px-6 max-w-6xl">
+                    <div className="grid lg:grid-cols-2 gap-14 lg:gap-20 items-center">
                         {/* Text Content */}
                         <div className="space-y-8">
-                            <div className="space-y-4">
-                                <span className="inline-block px-4 py-2 bg-brand-primary/10 text-brand-primary 
-                                    rounded-full text-sm font-medium">
+                            <div className="space-y-5">
+                                <span className="inline-block px-5 py-2.5 bg-brand-primary/10 text-brand-primary 
+                                    rounded-full text-sm font-semibold tracking-wide">
                                     من نحن
                                 </span>
-                                <h2 className="text-4xl md:text-5xl font-bold text-slate-800 leading-tight">
+                                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-slate-800 leading-[1.2] tracking-tight">
                                     نبني المستقبل مع
                                     <span className="text-brand-primary"> شركائنا</span>
                                 </h2>
-                                <p className="text-xl text-slate-600 leading-relaxed">
+                                <p className="text-lg md:text-xl text-slate-600 leading-relaxed max-w-xl">
                                     {company.companyNameAr} هي مؤسسة رائدة في مجالها، نسعى لتقديم
                                     أفضل الخدمات والحلول المبتكرة لعملائنا في {company.city} وجميع
                                     أنحاء {company.country}.
                                 </p>
                             </div>
 
-                            {/* Features List */}
                             <div className="space-y-4">
                                 {[
                                     'فريق متخصص من الخبراء',
@@ -475,19 +476,19 @@ const PublicCompanyPage: React.FC = () => {
                                     'دعم فني على مدار الساعة',
                                     'التزام بأعلى معايير الجودة'
                                 ].map((feature, idx) => (
-                                    <div key={idx} className="flex items-center gap-3">
-                                        <div className="w-6 h-6 bg-green-100 rounded-full 
-                                            flex items-center justify-center">
-                                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                    <div key={idx} className="flex items-center gap-3 group">
+                                        <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center 
+                                            group-hover:scale-110 transition-transform duration-300">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                                         </div>
-                                        <span className="text-slate-700">{feature}</span>
+                                        <span className="text-slate-700 font-medium">{feature}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
                         {/* Vision & Mission Cards */}
-                        <div className="space-y-6">
+                        <div className="space-y-5 lg:space-y-6">
                             <FeatureCard
                                 icon={<Eye className="w-8 h-8" />}
                                 title="رؤيتنا"
@@ -514,25 +515,23 @@ const PublicCompanyPage: React.FC = () => {
                 </div>
             </section>
 
-            {/* Contact Section */}
-            <section className="py-24 bg-white">
-                <div className="container mx-auto px-6">
-                    {/* Section Header */}
-                    <div className="text-center mb-16">
-                        <span className="inline-block px-4 py-2 bg-brand-primary/10 text-brand-primary 
-                            rounded-full text-sm font-medium mb-4">
+            {/* Contact Section - تدفق بصري */}
+            <section className="relative py-20 md:py-28 bg-gradient-to-b from-slate-50/50 to-white overflow-hidden">
+                <div className="container mx-auto px-6 max-w-6xl">
+                    <div className="text-center mb-14 md:mb-16">
+                        <span className="inline-block px-5 py-2.5 bg-brand-primary/10 text-brand-primary 
+                            rounded-full text-sm font-semibold mb-5">
                             تواصل معنا
                         </span>
-                        <h2 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-slate-800 mb-4 leading-tight">
                             نحن هنا لمساعدتك
                         </h2>
-                        <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+                        <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
                             يسعدنا تواصلك معنا في أي وقت، فريقنا جاهز للإجابة على جميع استفساراتك
                         </p>
                     </div>
 
-                    {/* Contact Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
                         <ContactCard
                             icon={<MapPin className="w-6 h-6" />}
                             label="العنوان"
@@ -582,65 +581,59 @@ const PublicCompanyPage: React.FC = () => {
                 </div>
             </section>
 
-            {/* CTA Section */}
-            <section className="py-24 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+            {/* CTA Section - انسياب مع الخلفية */}
+            <section className="relative py-20 md:py-28 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-900 overflow-hidden">
                 <FloatingParticles />
+                <div className="absolute top-0 left-0 w-[32rem] h-[32rem] bg-brand-primary/15 rounded-full 
+                    blur-3xl -translate-x-1/2 -translate-y-1/2 transition-opacity duration-700" />
+                <div className="absolute bottom-0 right-0 w-[28rem] h-[28rem] bg-brand-primary/10 rounded-full 
+                    blur-3xl translate-x-1/2 translate-y-1/2 transition-opacity duration-700" />
 
-                {/* Decorative Elements */}
-                <div className="absolute top-0 left-0 w-96 h-96 bg-brand-primary/20 rounded-full 
-                    blur-3xl -translate-x-1/2 -translate-y-1/2" />
-                <div className="absolute bottom-0 right-0 w-96 h-96 bg-brand-primary/10 rounded-full 
-                    blur-3xl translate-x-1/2 translate-y-1/2" />
+                <div className="relative container mx-auto px-6 max-w-4xl text-center">
+                    <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 
+                        backdrop-blur-md rounded-full text-white/90 text-sm font-medium mb-8 border border-white/10">
+                        <Clock className="w-4 h-4" />
+                        <span>نحن متاحون على مدار الساعة</span>
+                    </span>
 
-                <div className="relative container mx-auto px-6 text-center">
-                    <div className="max-w-3xl mx-auto">
-                        <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 
-                            backdrop-blur-sm rounded-full text-white/80 text-sm mb-8">
-                            <Clock className="w-4 h-4" />
-                            <span>نحن متاحون على مدار الساعة</span>
-                        </span>
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-5 leading-tight">
+                        هل أنت مستعد للبدء؟
+                    </h2>
+                    <p className="text-lg md:text-xl text-white/60 mb-10 leading-relaxed max-w-2xl mx-auto">
+                        تواصل معنا اليوم واكتشف كيف يمكننا مساعدتك في تحقيق أهدافك
+                    </p>
 
-                        <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                            هل أنت مستعد للبدء؟
-                        </h2>
-                        <p className="text-xl text-white/60 mb-10">
-                            تواصل معنا اليوم واكتشف كيف يمكننا مساعدتك في تحقيق أهدافك
-                        </p>
-
-                        <div className="flex flex-wrap justify-center gap-4">
+                    <div className="flex flex-wrap justify-center gap-4">
+                        <a
+                            href={`mailto:${company.email}`}
+                            className="inline-flex items-center gap-3 px-8 py-4 bg-brand-primary 
+                                text-white rounded-2xl font-bold hover:bg-brand-primary/90 
+                                hover:shadow-xl hover:shadow-brand-primary/25 
+                                transition-all duration-300 ease-out hover:-translate-y-0.5"
+                        >
+                            <Mail className="w-5 h-5" />
+                            <span>أرسل رسالة</span>
+                        </a>
+                        {company.phone && (
                             <a
-                                href={`mailto:${company.email}`}
-                                className="inline-flex items-center gap-3 px-8 py-4 bg-brand-primary 
-                                    text-white rounded-2xl font-bold hover:bg-brand-primary/90 
-                                    hover:shadow-2xl hover:shadow-brand-primary/30 
-                                    transition-all duration-300 hover:-translate-y-1"
+                                href={`tel:${company.phone}`}
+                                className="inline-flex items-center gap-3 px-8 py-4 bg-white/10 
+                                    backdrop-blur-md text-white rounded-2xl font-bold 
+                                    border border-white/20 hover:bg-white/20 
+                                    transition-all duration-300 ease-out hover:-translate-y-0.5"
                             >
-                                <Mail className="w-5 h-5" />
-                                <span>أرسل رسالة</span>
+                                <Phone className="w-5 h-5" />
+                                <span>اتصل الآن</span>
                             </a>
-
-                            {company.phone && (
-                                <a
-                                    href={`tel:${company.phone}`}
-                                    className="inline-flex items-center gap-3 px-8 py-4 bg-white/10 
-                                        backdrop-blur-sm text-white rounded-2xl font-bold 
-                                        border border-white/20 hover:bg-white/20 
-                                        transition-all duration-300 hover:-translate-y-1"
-                                >
-                                    <Phone className="w-5 h-5" />
-                                    <span>اتصل الآن</span>
-                                </a>
-                            )}
-                        </div>
+                        )}
                     </div>
                 </div>
             </section>
 
-            {/* Footer */}
-            <footer className="bg-slate-900 text-white pt-16 pb-8">
-                <div className="container mx-auto px-6">
-                    {/* Footer Content */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+            {/* Footer - تدفق مع CTA */}
+            <footer className="relative bg-slate-900 text-white pt-16 pb-10 overflow-hidden">
+                <div className="container mx-auto px-6 max-w-6xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 mb-12">
                         {/* Company Info */}
                         <div className="lg:col-span-2">
                             <div className="flex items-center gap-4 mb-6">
@@ -718,15 +711,17 @@ const PublicCompanyPage: React.FC = () => {
                 </div>
             </footer>
 
-            {/* Scroll to Top Button */}
+            {/* زر العودة للأعلى - انسياب */}
             <button
+                type="button"
                 onClick={scrollToTop}
-                className={`fixed bottom-8 left-8 w-14 h-14 bg-brand-primary text-white 
-                    rounded-2xl shadow-lg shadow-brand-primary/30 flex items-center justify-center
-                    hover:bg-brand-primary/90 transition-all duration-300 z-50
-                    ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}
+                className={`fixed bottom-6 left-6 md:bottom-8 md:left-8 w-12 h-12 md:w-14 md:h-14 
+                    bg-brand-primary text-white rounded-2xl shadow-lg shadow-brand-primary/25 
+                    flex items-center justify-center hover:bg-brand-primary/90 hover:scale-105 
+                    transition-all duration-400 ease-out z-50
+                    ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'}`}
             >
-                <ArrowUp className="w-6 h-6" />
+                <ArrowUp className="w-5 h-5 md:w-6 md:h-6" />
             </button>
         </div>
     );

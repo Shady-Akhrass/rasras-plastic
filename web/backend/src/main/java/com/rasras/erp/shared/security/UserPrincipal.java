@@ -24,16 +24,16 @@ public class UserPrincipal implements UserDetails {
     private Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal create(User user) {
-        List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority("ROLE_" + user.getRole().getRoleCode()));
+        String roleCode = (user.getRole() != null) ? user.getRole().getRoleCode() : "USER";
+        List<GrantedAuthority> authorities = new java.util.ArrayList<>(
+                List.of(new SimpleGrantedAuthority("ROLE_" + roleCode)));
 
         // Add permissions as authorities
-        if (user.getRole().getRolePermissions() != null) {
+        if (user.getRole() != null && user.getRole().getRolePermissions() != null) {
             List<GrantedAuthority> permissionAuthorities = user.getRole().getRolePermissions().stream()
-                    .filter(rp -> rp.getIsAllowed())
+                    .filter(rp -> Boolean.TRUE.equals(rp.getIsAllowed()) && rp.getPermission() != null)
                     .map(rp -> new SimpleGrantedAuthority(rp.getPermission().getPermissionCode()))
                     .collect(Collectors.toList());
-            authorities = new java.util.ArrayList<>(authorities);
             authorities.addAll(permissionAuthorities);
         }
 
@@ -42,8 +42,8 @@ public class UserPrincipal implements UserDetails {
                 user.getUsername(),
                 user.getPasswordHash(),
                 user.getEmployeeId(),
-                user.getIsActive(),
-                user.getIsLocked(),
+                Boolean.TRUE.equals(user.getIsActive()),
+                Boolean.TRUE.equals(user.getIsLocked()),
                 authorities);
     }
 

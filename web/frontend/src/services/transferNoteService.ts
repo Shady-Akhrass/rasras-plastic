@@ -30,9 +30,15 @@ export interface TransferNoteDto {
     fromWarehouseNameAr?: string;
     toWarehouseId: number;
     toWarehouseNameAr?: string;
+    /** من طلب إذن التحويل — يُملأ تلقائياً من المستخدم الحالي عند الحفظ */
+    requestedByUserId?: number;
+    /** من أنشأ السجل في النظام — يُملأ تلقائياً من المستخدم الحالي عند الحفظ */
+    createdBy?: number;
     reason: TransferReason;
     reasonOther?: string;
     notes?: string;
+    /** تكلفة النقل — مصاريف تشغيلية (اختياري) */
+    transferCostAmount?: number;
     status?: string;
     items: TransferItemDto[];
 }

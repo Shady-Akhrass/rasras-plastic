@@ -36,6 +36,16 @@ const employeeService = {
         const response = await apiClient.get(`/employees/${id}`);
         return response.data.data;
     },
+    /** بيانات الموظف للمستخدم الحالي (لا يتطلب صلاحية HR) */
+    getMyEmployee: async () => {
+        const response = await apiClient.get('/employees/me');
+        return response.data.data;
+    },
+    /** تعديل الاسم فقط (للمستخدم الحالي) */
+    updateMyProfile: async (data: { firstNameAr: string; lastNameAr: string }) => {
+        const response = await apiClient.put('/employees/me', data);
+        return response.data.data;
+    },
     create: async (data: any) => {
         const response = await apiClient.post('/employees', data);
         return response.data.data;

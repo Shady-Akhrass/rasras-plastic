@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { 
-    Plus, Search, Edit2, Users, UserCheck, 
+import {
+    Plus, Search, Edit2, Users, UserCheck,
     UserX, Lock, RefreshCw, Clock, CheckCircle2, XCircle,
     TrendingUp, Trash2, Shield, LayoutGrid, LayoutList
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import userService from '../../services/userService';
 import UserForm from './UserForm';
 import usePageTitle from '../../hooks/usePageTitle';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatDate } from '../../utils/format';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -61,7 +62,9 @@ const UserCard: React.FC<{
     onDelete: (id: number) => void;
     index: number;
 }> = ({ user, onEdit, onDelete, index }) => {
-    const [isHovered, setIsHovered] = useState(false);
+
+    const displayName = user.displayNameAr || user.username;
+    const roleDisplay = user.roleNameAr || user.roleName;
 
     const getInitials = (name: string) => {
         return name.slice(0, 2).toUpperCase();
@@ -80,16 +83,14 @@ const UserCard: React.FC<{
     };
 
     return (
-        <div 
+        <div
             className="group relative bg-white rounded-2xl border border-slate-100 
                 hover:border-brand-primary/30 hover:shadow-xl hover:shadow-brand-primary/10 
                 transition-all duration-300 overflow-hidden"
-            style={{ 
+            style={{
                 animationDelay: `${index * 50}ms`,
                 animation: 'fadeInUp 0.4s ease-out forwards'
             }}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
         >
             {/* Top Gradient Bar */}
             <div className={`h-1 w-full bg-gradient-to-r 
@@ -104,21 +105,21 @@ const UserCard: React.FC<{
                         <div className={`relative w-14 h-14 rounded-xl bg-gradient-to-br ${getAvatarColor(user.username)} 
                             flex items-center justify-center text-white font-bold text-lg shadow-lg
                             group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                            {getInitials(user.username)}
+                            {getInitials(displayName)}
                             {/* Online Indicator */}
                             <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white
                                 ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                         </div>
-                        
+
                         <div>
                             <h3 className="text-lg font-bold text-slate-900 group-hover:text-brand-primary 
                                 transition-colors duration-300">
-                                {user.username}
+                                {displayName}
                             </h3>
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-brand-primary/10 
                                 text-brand-primary text-xs font-semibold rounded-full">
                                 <Shield className="w-3 h-3" />
-                                {user.roleName}
+                                {roleDisplay}
                             </span>
                         </div>
                     </div>
@@ -127,8 +128,8 @@ const UserCard: React.FC<{
                 {/* Status Badges */}
                 <div className="flex items-center gap-2 mb-4">
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5
-                        ${user.isActive 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                        ${user.isActive
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : 'bg-slate-50 text-slate-600 border border-slate-200'}`}>
                         {user.isActive ? (
                             <>
@@ -156,12 +157,12 @@ const UserCard: React.FC<{
                     <Clock className="w-4 h-4 text-slate-400" />
                     <span>آخر دخول: </span>
                     <span className="text-slate-700 font-medium">
-                        {user.lastLoginAt 
-                            ? new Date(user.lastLoginAt).toLocaleDateString('ar-EG', {
+                        {user.lastLoginAt
+                            ? formatDate(user.lastLoginAt, {
                                 year: 'numeric',
                                 month: 'short',
                                 day: 'numeric'
-                            }) 
+                            })
                             : 'لم يدخل بعد'}
                     </span>
                 </div>
@@ -201,6 +202,9 @@ const UserTableRow: React.FC<{
     onDelete: (id: number) => void;
     index: number;
 }> = ({ user, onEdit, onDelete, index }) => {
+    const displayName = user.displayNameAr || user.username;
+    const roleDisplay = user.roleNameAr || user.roleName;
+
     const getInitials = (name: string) => name.slice(0, 2).toUpperCase();
 
     const getAvatarColor = (name: string) => {
@@ -215,9 +219,9 @@ const UserTableRow: React.FC<{
     };
 
     return (
-        <tr 
+        <tr
             className="group hover:bg-brand-primary/5 transition-colors duration-200"
-            style={{ 
+            style={{
                 animationDelay: `${index * 30}ms`,
                 animation: 'fadeInUp 0.3s ease-out forwards'
             }}
@@ -228,13 +232,13 @@ const UserTableRow: React.FC<{
                     <div className={`relative w-10 h-10 rounded-xl bg-gradient-to-br ${getAvatarColor(user.username)} 
                         flex items-center justify-center text-white font-bold text-sm shadow-md
                         group-hover:scale-110 transition-transform duration-300`}>
-                        {getInitials(user.username)}
+                        {getInitials(displayName)}
                         <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white
                             ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     </div>
                     <div>
                         <p className="font-semibold text-slate-900 group-hover:text-brand-primary transition-colors">
-                            {user.username}
+                            {displayName}
                         </p>
                     </div>
                 </div>
@@ -245,7 +249,7 @@ const UserTableRow: React.FC<{
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-primary/10 
                     text-brand-primary text-xs font-semibold rounded-full">
                     <Shield className="w-3 h-3" />
-                    {user.roleName}
+                    {roleDisplay}
                 </span>
             </td>
 
@@ -253,8 +257,8 @@ const UserTableRow: React.FC<{
             <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5
-                        ${user.isActive 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                        ${user.isActive
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
                         {user.isActive ? (
                             <>
@@ -283,12 +287,12 @@ const UserTableRow: React.FC<{
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                     <Clock className="w-4 h-4" />
                     <span>
-                        {user.lastLoginAt 
-                            ? new Date(user.lastLoginAt).toLocaleDateString('ar-EG', {
+                        {user.lastLoginAt
+                            ? formatDate(user.lastLoginAt, {
                                 year: 'numeric',
                                 month: 'short',
                                 day: 'numeric'
-                            }) 
+                            })
                             : 'لم يدخل بعد'}
                     </span>
                 </div>
@@ -333,7 +337,7 @@ const EmptyState: React.FC<{ searchTerm: string; onAdd: () => void }> = ({ searc
             {searchTerm ? 'لا توجد نتائج' : 'لا يوجد مستخدمين'}
         </h3>
         <p className="text-slate-500 mb-6 max-w-md mx-auto">
-            {searchTerm 
+            {searchTerm
                 ? `لم يتم العثور على مستخدمين يطابقون "${searchTerm}"`
                 : 'ابدأ بإضافة مستخدمين جدد للنظام لإدارة الصلاحيات والوصول'}
         </p>
@@ -469,16 +473,22 @@ const UserList: React.FC = () => {
 
     // Filtered and computed data
     const filteredUsers = useMemo(() => {
-        return users.filter(user => {
+        const filtered = users.filter(user => {
+            const displayName = user.displayNameAr || user.username;
+            const roleDisplay = user.roleNameAr || user.roleName;
             const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                user.roleName.toLowerCase().includes(searchTerm.toLowerCase());
-            
-            const matchesFilter = filterStatus === 'all' || 
+                displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                user.roleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                roleDisplay.toLowerCase().includes(searchTerm.toLowerCase());
+
+            const matchesFilter = filterStatus === 'all' ||
                 (filterStatus === 'active' && user.isActive) ||
                 (filterStatus === 'inactive' && !user.isActive);
 
             return matchesSearch && matchesFilter;
         });
+        // الأحدث في الأعلى
+        return [...filtered].sort((a, b) => b.userId - a.userId);
     }, [users, searchTerm, filterStatus]);
 
     const stats = useMemo(() => ({
@@ -550,8 +560,8 @@ const UserList: React.FC = () => {
                             <span className="text-sm text-emerald-600">تم التحديث بنجاح</span>
                         </div>
                     </div>
-                    <button 
-                        onClick={() => setSuccessMessage('')} 
+                    <button
+                        onClick={() => setSuccessMessage('')}
                         className="p-2 hover:bg-emerald-100 rounded-lg transition-colors"
                     >
                         <XCircle className="w-5 h-5" />
@@ -561,26 +571,26 @@ const UserList: React.FC = () => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard 
+                <StatCard
                     icon={Users}
                     value={stats.total}
                     label="إجمالي المستخدمين"
                     color="primary"
                 />
-                <StatCard 
+                <StatCard
                     icon={UserCheck}
                     value={stats.active}
                     label="مستخدم نشط"
                     trend={stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}%` : undefined}
                     color="success"
                 />
-                <StatCard 
+                <StatCard
                     icon={UserX}
                     value={stats.inactive}
                     label="حساب معطل"
                     color="warning"
                 />
-                <StatCard 
+                <StatCard
                     icon={Lock}
                     value={stats.locked}
                     label="حساب مغلق"
@@ -601,8 +611,8 @@ const UserList: React.FC = () => {
                             placeholder="بحث باسم المستخدم أو الدور..."
                             className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
                                 outline-none bg-slate-50
-                                ${isSearchFocused 
-                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10' 
+                                ${isSearchFocused
+                                    ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
                                     : 'border-transparent hover:border-slate-200'}`}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}

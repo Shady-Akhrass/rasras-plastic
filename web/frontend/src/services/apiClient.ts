@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { clearSession } from './authUtils';
 
 const apiClient = axios.create({
-    baseURL: 'http://localhost:8080/api',
+    baseURL: `${import.meta.env.VITE_API_URL}/api`,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -24,9 +25,7 @@ apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
+            clearSession();
         }
         return Promise.reject(error);
     }

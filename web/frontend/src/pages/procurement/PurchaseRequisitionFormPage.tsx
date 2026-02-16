@@ -1,30 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
     ArrowRight,
     Plus,
     Trash2,
     AlertCircle,
-    Calendar,
     FileText,
     Package,
     Building2,
-    User,
     Flag,
     ClipboardList,
+    Eye,
+    XCircle,
+    RefreshCw,
     CheckCircle2
 } from 'lucide-react';
+import { approvalService } from '../../services/approvalService';
 import purchaseService, { type PurchaseRequisition, type PurchaseRequisitionItem } from '../../services/purchaseService';
 import { itemService } from '../../services/itemService';
 import { unitService } from '../../services/unitService';
 import employeeService, { type Department } from '../../services/employeeService';
 import toast from 'react-hot-toast';
+import { formatNumber } from '../../utils/format';
+import PRLifecycleTracker from '../../components/procurement/PRLifecycleTracker';
+import { type PRLifecycle } from '../../services/purchaseService';
 
 interface Item {
     id: number;
     itemNameAr: string;
     itemCode: string;
+    grade?: string;
     unitId?: number;
 }
 
@@ -36,12 +42,18 @@ interface Unit {
 const PurchaseRequisitionFormPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const location = useLocation();
     const isEditMode = !!id;
+    const queryParams = new URLSearchParams(location.search);
+    const isViewMode = queryParams.get('mode') === 'view';
+    const approvalId = queryParams.get('approvalId');
 
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState<Item[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
+    const [processing, setProcessing] = useState(false);
+    const [lifecycle, setLifecycle] = useState<PRLifecycle | null>(null);
 
     // Form State
     const [formData, setFormData] = useState<Partial<PurchaseRequisition>>({
@@ -74,8 +86,20 @@ const PurchaseRequisitionFormPage = () => {
         loadMasterData();
         if (isEditMode) {
             loadPR(parseInt(id));
+            if (isViewMode) {
+                loadLifecycle(parseInt(id));
+            }
         }
     }, [id]);
+
+    const loadLifecycle = async (prId: number) => {
+        try {
+            const data = await purchaseService.getPRLifecycle(prId);
+            setLifecycle(data);
+        } catch (error) {
+            console.error('Failed to load PR lifecycle', error);
+        }
+    };
 
     const loadMasterData = async () => {
         try {
@@ -136,7 +160,7 @@ const PurchaseRequisitionFormPage = () => {
     const updateItem = (index: number, field: keyof PurchaseRequisitionItem, value: any) => {
         const newItems = [...(formData.items || [])];
         newItems[index] = { ...newItems[index], [field]: value };
-        
+
         // Auto-select unit when item is selected
         if (field === 'itemId') {
             const selectedItem = items.find(i => i.id === value);
@@ -144,7 +168,7 @@ const PurchaseRequisitionFormPage = () => {
                 newItems[index].unitId = selectedItem.unitId;
             }
         }
-        
+
         setFormData(prev => ({ ...prev, items: newItems }));
     };
 
@@ -156,7 +180,7 @@ const PurchaseRequisitionFormPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!formData.requestedByDeptId) {
             toast.error('الرجاء اختيار القسم');
             return;
@@ -195,10 +219,14 @@ const PurchaseRequisitionFormPage = () => {
 
             if (isEditMode) {
                 await purchaseService.updatePR(parseInt(id), submissionData as PurchaseRequisition);
-                toast.success('تم تحديث طلب الشراء بنجاح');
+                await purchaseService.submitPR(parseInt(id));
+                toast.success('تم تحديث طلب الشراء وإرساله للاعتماد بنجاح');
             } else {
-                await purchaseService.createPR(submissionData as PurchaseRequisition);
-                toast.success('تم إنشاء طلب الشراء بنجاح');
+                const createdPr = await purchaseService.createPR(submissionData as PurchaseRequisition);
+                if (createdPr && createdPr.id) {
+                    await purchaseService.submitPR(createdPr.id);
+                }
+                toast.success('تم إنشاء طلب الشراء وإرساله للاعتماد بنجاح');
             }
             navigate('/dashboard/procurement/pr');
         } catch (error) {
@@ -206,6 +234,22 @@ const PurchaseRequisitionFormPage = () => {
             toast.error('حدث خطأ أثناء حفظ الطلب');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleApprovalAction = async (action: 'Approved' | 'Rejected') => {
+        if (!approvalId) return;
+        try {
+            setProcessing(true);
+            const toastId = toast.loading('جاري تنفيذ الإجراء...');
+            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
+            navigate('/dashboard/procurement/approvals');
+        } catch (error) {
+            console.error('Failed to take action:', error);
+            toast.error('فشل تنفيذ الإجراء');
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -271,22 +315,60 @@ const PurchaseRequisitionFormPage = () => {
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading || totalItems === 0}
-                        className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
-                            font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
-                            disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                        {loading ? (
-                            <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
-                        ) : (
-                            <Save className="w-5 h-5" />
-                        )}
-                        <span>{loading ? 'جاري الحفظ...' : 'حفظ الطلب'}</span>
-                    </button>
+                    {!isViewMode && (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={loading || totalItems === 0}
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
+                                font-bold shadow-xl hover:scale-105 active:scale-95 transition-all 
+                                disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                            {loading ? (
+                                <div className="w-5 h-5 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin" />
+                            ) : (
+                                <Save className="w-5 h-5" />
+                            )}
+                            <span>{loading ? 'جاري الحفظ...' : 'حفظ الطلب'}</span>
+                        </button>
+                    )}
+                    {isViewMode && (
+                        <div className="flex items-center gap-3">
+                            {approvalId && (
+                                <>
+                                    <button
+                                        onClick={() => handleApprovalAction('Approved')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-emerald-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                        <span>اعتماد</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprovalAction('Rejected')}
+                                        disabled={processing}
+                                        className="flex items-center gap-2 px-6 py-4 bg-rose-500 text-white rounded-2xl 
+                                            font-bold shadow-xl hover:bg-rose-600 transition-all hover:scale-105 active:scale-95
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {processing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                                        <span>رفض</span>
+                                    </button>
+                                </>
+                            )}
+                            <div className="flex items-center gap-2 px-6 py-4 bg-amber-500/20 text-white rounded-2xl border border-white/30 backdrop-blur-sm">
+                                <Eye className="w-5 h-5" />
+                                <span className="font-bold">وضع العرض فقط</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {isViewMode && lifecycle && (
+                <PRLifecycleTracker lifecycle={lifecycle} prId={formData.id} />
+            )}
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
@@ -306,7 +388,6 @@ const PurchaseRequisitionFormPage = () => {
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-slate-400" />
                                     تاريخ الطلب
                                 </label>
                                 <input
@@ -321,17 +402,19 @@ const PurchaseRequisitionFormPage = () => {
 
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Calendar className="w-4 h-4 text-brand-primary" />
                                     تاريخ الاحتياج <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                     type="date"
                                     name="requiredDate"
                                     required
+                                    min={new Date().toISOString().split('T')[0]}
+                                    disabled={isViewMode}
                                     value={formData.requiredDate ? new Date(formData.requiredDate).toISOString().split('T')[0] : ''}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
+                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                 />
                             </div>
 
@@ -343,10 +426,12 @@ const PurchaseRequisitionFormPage = () => {
                                 <select
                                     name="requestedByDeptId"
                                     value={formData.requestedByDeptId}
+                                    disabled={isViewMode}
                                     onChange={(e) => setFormData(prev => ({ ...prev, requestedByDeptId: parseInt(e.target.value) }))}
                                     required
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
+                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                 >
                                     <option value="">اختر القسم...</option>
                                     {departments.map(dept => (
@@ -365,9 +450,11 @@ const PurchaseRequisitionFormPage = () => {
                                 <select
                                     name="priority"
                                     value={formData.priority}
+                                    disabled={isViewMode}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
+                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                 >
                                     <option value="Normal">عادية</option>
                                     <option value="High">عالية</option>
@@ -383,11 +470,13 @@ const PurchaseRequisitionFormPage = () => {
                                 <input
                                     type="text"
                                     name="justification"
+                                    disabled={isViewMode}
                                     value={formData.justification || ''}
                                     onChange={handleInputChange}
-                                    placeholder="لماذا يتم طلب هذه المواد؟"
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    placeholder={isViewMode ? '' : "لماذا يتم طلب هذه المواد؟"}
+                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
+                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
+                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                 />
                             </div>
                         </div>
@@ -411,23 +500,25 @@ const PurchaseRequisitionFormPage = () => {
                                     <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 rounded-xl">
                                         <Package className="w-4 h-4 text-brand-primary" />
                                         <span className="text-sm font-bold text-brand-primary">
-                                            {totalItems} صنف
+                                            <span dir="ltr">{totalItems}</span> صنف
                                         </span>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={addItem}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
-                                            font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
-                                            hover:scale-105 active:scale-95"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        إضافة صنف
-                                    </button>
+                                    {!isViewMode && (
+                                        <button
+                                            type="button"
+                                            onClick={addItem}
+                                            className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl 
+                                                font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20
+                                                hover:scale-105 active:scale-95"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            إضافة صنف
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
@@ -453,17 +544,21 @@ const PurchaseRequisitionFormPage = () => {
                                             <td className="py-4 px-4">
                                                 <select
                                                     value={item.itemId}
+                                                    disabled={isViewMode}
                                                     onChange={(e) => updateItem(index, 'itemId', parseInt(e.target.value))}
                                                     required
-                                                    className="w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
-                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    className={`w-full min-w-[200px] px-3 py-2 bg-white border-2 border-slate-200 
+                                                        rounded-xl text-sm font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 >
                                                     <option value={0}>اختر الصنف...</option>
-                                                    {items.map(i => (
-                                                        <option key={i.id} value={i.id}>
-                                                            {i.itemNameAr} ({i.itemCode})
-                                                        </option>
-                                                    ))}
+                                                    {items
+                                                        .filter(i => !formData.items?.some((added, idx) => added.itemId === i.id && idx !== index))
+                                                        .map(i => (
+                                                            <option key={i.id} value={i.id}>
+                                                                {i.itemNameAr} ({i.grade || i.itemCode || ''})
+                                                            </option>
+                                                        ))}
                                                 </select>
                                             </td>
                                             <td className="py-4 px-4">
@@ -471,20 +566,24 @@ const PurchaseRequisitionFormPage = () => {
                                                     type="number"
                                                     min="0.001"
                                                     step="0.001"
+                                                    disabled={isViewMode}
                                                     value={item.requestedQty}
                                                     onChange={(e) => updateItem(index, 'requestedQty', parseFloat(e.target.value) || 0)}
                                                     required
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                    className={`w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-brand-primary outline-none 
-                                                        focus:border-brand-primary transition-all"
+                                                        focus:border-brand-primary transition-all
+                                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 />
                                             </td>
                                             <td className="py-4 px-4">
                                                 <select
                                                     value={item.unitId}
+                                                    disabled={isViewMode}
                                                     onChange={(e) => updateItem(index, 'unitId', parseInt(e.target.value))}
-                                                    className="w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm font-semibold outline-none focus:border-brand-primary transition-all"
+                                                    className={`w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm font-semibold outline-none focus:border-brand-primary transition-all
+                                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 >
                                                     {units.map(u => (
                                                         <option key={u.id} value={u.id}>{u.unitNameAr}</option>
@@ -494,22 +593,26 @@ const PurchaseRequisitionFormPage = () => {
                                             <td className="py-4 px-4">
                                                 <input
                                                     type="text"
+                                                    disabled={isViewMode}
                                                     value={item.notes || ''}
                                                     onChange={(e) => updateItem(index, 'notes', e.target.value)}
-                                                    placeholder="تفاصيل إضافية..."
-                                                    className="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
-                                                        text-sm outline-none focus:border-brand-primary transition-all"
+                                                    placeholder={isViewMode ? '' : "تفاصيل إضافية..."}
+                                                    className={`w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
+                                                        text-sm outline-none focus:border-brand-primary transition-all
+                                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 />
                                             </td>
                                             <td className="py-4 pl-6 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeItem(index)}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
-                                                        rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {!isViewMode && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeItem(index)}
+                                                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 
+                                                            rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -543,12 +646,12 @@ const PurchaseRequisitionFormPage = () => {
                         <div className="space-y-5 mt-6">
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">عدد الأصناف</span>
-                                <span className="font-bold text-lg">{totalItems}</span>
+                                <span className="font-bold text-lg" dir="ltr">{totalItems}</span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                                 <span className="text-white/60 text-sm">إجمالي الكميات</span>
-                                <span className="font-bold text-lg text-emerald-400">
-                                    {totalQuantity.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                <span className="font-bold text-lg text-emerald-400" dir="ltr">
+                                    {formatNumber(totalQuantity, { minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                             <div className="pt-6 border-t border-white/10">
@@ -577,17 +680,19 @@ const PurchaseRequisitionFormPage = () => {
                             <textarea
                                 name="notes"
                                 value={formData.notes || ''}
+                                disabled={isViewMode}
                                 onChange={handleInputChange}
-                                className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
+                                className={`w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl 
                                     focus:border-brand-primary focus:bg-white outline-none transition-all 
-                                    text-sm leading-relaxed h-40 resize-none"
-                                placeholder="أي ملاحظات إضافية حول الطلب..."
+                                    text-sm leading-relaxed h-40 resize-none
+                                    ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                placeholder={isViewMode ? '' : "أي ملاحظات إضافية حول الطلب..."}
                             />
                         </div>
                     </div>
 
                     {/* Info Alert */}
-                    <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 
+                    <div className="p-5 bg-gradient-to-br from-brand-primary/5 to-brand-primary/10 rounded-2xl border-2 border-brand-primary/20 
                         flex gap-4 animate-slide-in shadow-lg"
                         style={{ animationDelay: '400ms' }}>
                         <div className="p-3 bg-blue-100 rounded-xl h-fit">
