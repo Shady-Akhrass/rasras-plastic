@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
     Shield, Search, Plus, Edit2, Trash2, X, Save, RefreshCw,
-    CheckCircle2, XCircle, LayoutGrid,
+    CheckCircle2, XCircle, LayoutGrid, ChevronDown, ChevronUp,
     Tag, Type, FileText, Users, Key, Lock, DollarSign
 } from 'lucide-react';
 import { roleService, type RoleDto, type PermissionDto } from '../../services/roleService';
@@ -546,6 +546,7 @@ const RolesPage: React.FC = () => {
     // Approval Limits
     const [approvalLimits, setApprovalLimits] = useState<ApprovalLimitDto[]>([]);
     const [limitsLoading, setLimitsLoading] = useState(false);
+    const [limitsExpanded, setLimitsExpanded] = useState(true);
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [editingLimit, setEditingLimit] = useState<ApprovalLimitDto | null>(null);
     const [limitForm, setLimitForm] = useState<{ minAmount?: number; maxAmount?: number | null; minPercentage?: number; maxPercentage?: number | null; isActive: boolean }>({ isActive: true });
@@ -673,8 +674,10 @@ const RolesPage: React.FC = () => {
         if (!currentRoleForPerms?.roleId) return;
         try {
             setIsSavingPerms(true);
-            // إزالة التكرار لتجنب خطأ "صلاحية مكررة"
-            const uniquePerms = [...new Set(selectedPermissions)];
+            // إزالة التكرار وضمان أن القيم أعداد صحيحة (لتجنب 400 من الباكند)
+            const uniquePerms = [...new Set(selectedPermissions)]
+                .map(p => (typeof p === 'number' ? p : parseInt(String(p), 10)))
+                .filter(n => !isNaN(n));
             await roleService.assignPermissions(currentRoleForPerms.roleId, uniquePerms);
             toast.success('تم تحديث الصلاحيات بنجاح', { icon: '🔐' });
             setShowPermModal(false);
@@ -802,15 +805,21 @@ const RolesPage: React.FC = () => {
                     <LayoutGrid className="w-4 h-4 text-brand-primary" />
                     الأدوار: وصول الأقسام وحدود الاعتماد المالية
                 </h3>
-                <p className="text-xs text-slate-600 mb-3">
+                <p className="text-xs text-slate-600 mb-2">
                     الأدوار تحكم وصول الأقسام (ظهور القوائم في الشريط الجانبي) وحدود الاعتماد المالية (مصفوفة الصلاحيات). انظر الدورة المستندية الشاملة للمزيد.
+                </p>
+                <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mb-3">
+                    القائمة الفعلية للصلاحيات تعتمد على قاعدة البيانات — هذا صندوق توضيحي فقط.
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-slate-600 mb-2">
                     <li><strong className="text-slate-800">دورة المشتريات:</strong> PM, BUYER, ADMIN, GM</li>
                     <li><strong className="text-slate-800">دورة المبيعات:</strong> SM, ADMIN, GM</li>
-                    <li><strong className="text-slate-800">المخازن والأصناف:</strong> ADMIN, GM</li>
+                    <li><strong className="text-slate-800">المخازن:</strong> WHM, ADMIN, GM</li>
                     <li><strong className="text-slate-800">العمليات (جودة، وحدات، أسعار):</strong> ADMIN, GM, SM</li>
                     <li><strong className="text-slate-800">العملاء (CRM):</strong> SM, ADMIN, GM</li>
+                    <li title="تحمي /dashboard/finance/*">
+                        <strong className="text-slate-800">المالية والمحاسبة:</strong> FM, ACC, ADMIN, GM
+                    </li>
                     <li><strong className="text-slate-800">الإعدادات:</strong> ADMIN</li>
                 </ul>
                 <p className="text-xs text-slate-500">مصفوفة حدود الموافقة: المشتريات (PM/FM/GM)، الشيكات/الدفع (ACC/FM/GM)، الخصم (SM/FM/GM)</p>
@@ -820,7 +829,10 @@ const RolesPage: React.FC = () => {
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-slate-100 bg-gradient-to-l from-slate-50 to-white">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setLimitsExpanded(!limitsExpanded)}
+                            className="flex items-center gap-3 flex-1 text-right hover:opacity-80 transition-opacity"
+                        >
                             <div className="p-3 bg-brand-primary/10 rounded-xl">
                                 <DollarSign className="w-6 h-6 text-brand-primary" />
                             </div>
@@ -828,12 +840,19 @@ const RolesPage: React.FC = () => {
                                 <h3 className="text-lg font-bold text-slate-800">مصفوفة حدود الموافقة</h3>
                                 <p className="text-sm text-slate-500">حدود الاعتماد المالية لكل دور (أوامر الشراء، اعتماد الدفع، خصم المبيعات)</p>
                             </div>
-                        </div>
-                        <button onClick={fetchApprovalLimits} disabled={limitsLoading} className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                            <RefreshCw className={`w-5 h-5 ${limitsLoading ? 'animate-spin' : ''}`} />
+                            {limitsExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                         </button>
+                        <div className="flex items-center gap-2">
+                            <button onClick={fetchApprovalLimits} disabled={limitsLoading} className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50" title="تحديث">
+                                <RefreshCw className={`w-5 h-5 ${limitsLoading ? 'animate-spin' : ''}`} />
+                            </button>
+                            <button onClick={() => setLimitsExpanded(!limitsExpanded)} className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50" title={limitsExpanded ? 'تصغير' : 'تكبير'}>
+                                {limitsExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                            </button>
+                        </div>
                     </div>
                 </div>
+                {limitsExpanded && (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
@@ -883,6 +902,7 @@ const RolesPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                )}
             </div>
 
             {/* Stats Grid */}

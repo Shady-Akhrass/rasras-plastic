@@ -22,6 +22,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -158,6 +160,34 @@ public class ApprovalService {
 
         // Map to DTOs
         return filteredRequests.stream().map(this::mapToDto).collect(Collectors.toList());
+    }
+
+    /** سجل الاعتمادات — آخر الإجراءات (من اعتمد ومتى) للشفافية والتدقيق */
+    @Transactional(readOnly = true)
+    public List<ApprovalAuditDto> getRecentApprovalActions(int limit) {
+        return actionRepo.findAllByOrderByActionDateDesc(PageRequest.of(0, Math.min(limit, 200)))
+                .stream()
+                .map(this::mapActionToAuditDto)
+                .collect(Collectors.toList());
+    }
+
+    private ApprovalAuditDto mapActionToAuditDto(ApprovalAction action) {
+        ApprovalRequest req = action.getRequest();
+        return ApprovalAuditDto.builder()
+                .actionId(action.getId())
+                .requestId(req.getId())
+                .documentType(req.getDocumentType())
+                .documentId(req.getDocumentId())
+                .documentNumber(req.getDocumentNumber())
+                .workflowName(req.getWorkflow().getWorkflowName())
+                .stepName(action.getStep().getStepName())
+                .actionType(action.getActionType())
+                .actionByUser(action.getActionByUser().getUsername())
+                .actionDate(action.getActionDate())
+                .comments(action.getComments())
+                .totalAmount(req.getTotalAmount())
+                .requestStatus(req.getStatus())
+                .build();
     }
 
     private ApprovalRequestDto mapToDto(ApprovalRequest req) {

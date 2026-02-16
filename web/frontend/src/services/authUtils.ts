@@ -1,10 +1,11 @@
 /**
  * Central auth utilities: session clear and JWT expiry for auto-logout when session ends.
+ * ملاحظة: لا تعتمد على localStorage فقط — استخدم refreshUserPermissions من authService لتحديث الصلاحيات.
  */
 
-const ACCESS_TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-const USER_KEY = 'user';
+export const ACCESS_TOKEN_KEY = 'accessToken';
+export const REFRESH_TOKEN_KEY = 'refreshToken';
+export const USER_KEY = 'user';
 const LOGIN_PATH = '/login';
 
 /**

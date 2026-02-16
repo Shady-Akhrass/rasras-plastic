@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.List;
 @RequestMapping("/finance/payment-vouchers")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'FM', 'ACC') or hasAuthority('SECTION_FINANCE')")
 public class PaymentVoucherController {
 
     private final PaymentVoucherService voucherService;

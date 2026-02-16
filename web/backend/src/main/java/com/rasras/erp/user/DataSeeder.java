@@ -145,6 +145,7 @@ public class DataSeeder implements CommandLineRunner {
                 { "SECTION_MAIN", "الرئيسية والاعتمادات", "Main & Approvals", "MENU" },
                 { "SECTION_USERS", "المستخدمين", "Users", "MENU" },
                 { "SECTION_EMPLOYEES", "الموظفين", "Employees", "MENU" },
+                { "SECTION_FINANCE", "المالية والمحاسبة", "Finance & Accounting", "MENU" },
                 { "SECTION_WAREHOUSE", "المخازن", "Warehouse", "MENU" },
                 { "SECTION_OPERATIONS", "العمليات", "Operations", "MENU" },
                 { "SECTION_SALES", "المبيعات", "Sales", "MENU" },
@@ -192,7 +193,7 @@ public class DataSeeder implements CommandLineRunner {
     private void seedDefaultRoleSectionPermissions() {
         log.info("Seeding default role section permissions...");
         List<String> allSectionCodes = java.util.Arrays.asList(
-                "SECTION_MAIN", "SECTION_USERS", "SECTION_EMPLOYEES", "SECTION_WAREHOUSE",
+                "SECTION_MAIN", "SECTION_USERS", "SECTION_EMPLOYEES", "SECTION_FINANCE", "SECTION_WAREHOUSE",
                 "SECTION_OPERATIONS", "SECTION_SALES", "SECTION_CRM", "SECTION_PROCUREMENT", "SECTION_SYSTEM");
         java.util.Map<String, java.util.List<String>> roleSectionMap = new java.util.HashMap<>();
         roleSectionMap.put("PM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_PROCUREMENT"));
@@ -201,8 +202,8 @@ public class DataSeeder implements CommandLineRunner {
         roleSectionMap.put("WHM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_WAREHOUSE"));
         roleSectionMap.put("QC", java.util.Arrays.asList("SECTION_MAIN", "SECTION_OPERATIONS"));
         roleSectionMap.put("GM", allSectionCodes);
-        roleSectionMap.put("FM", java.util.Arrays.asList("SECTION_MAIN"));
-        roleSectionMap.put("ACC", java.util.Arrays.asList("SECTION_MAIN"));
+        roleSectionMap.put("FM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_FINANCE"));
+        roleSectionMap.put("ACC", java.util.Arrays.asList("SECTION_MAIN", "SECTION_FINANCE"));
 
         for (java.util.Map.Entry<String, java.util.List<String>> e : roleSectionMap.entrySet()) {
             Role role = roleRepository.findByRoleCode(e.getKey()).orElse(null);
@@ -491,6 +492,92 @@ public class DataSeeder implements CommandLineRunner {
                         .approverRole(accRole)
                         .build();
                 stepRepo.save(step3);
+            }
+        }
+
+        // 8. Sales Order Approval Workflow (SO_APPROVAL) — mandatory before go-live
+        if (!workflowRepo.findByWorkflowCode("SO_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow soWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("SO_APPROVAL")
+                    .workflowName("اعتماد أوامر البيع")
+                    .documentType("SalesOrder")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(soWorkflow);
+
+            Role smRole = roleRepository.findByRoleCode("SM").orElse(null);
+            Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+            Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+            int soStep = 1;
+            if (smRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(soWorkflow)
+                        .stepNumber(soStep++)
+                        .stepName("مدير المبيعات")
+                        .approverType("ROLE")
+                        .approverRole(smRole)
+                        .build());
+            }
+            if (fmRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(soWorkflow)
+                        .stepNumber(soStep++)
+                        .stepName("المدير المالي")
+                        .approverType("ROLE")
+                        .approverRole(fmRole)
+                        .build());
+            }
+            if (gmRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(soWorkflow)
+                        .stepNumber(soStep)
+                        .stepName("المدير العام")
+                        .approverType("ROLE")
+                        .approverRole(gmRole)
+                        .build());
+            }
+        }
+
+        // 9. Sales Discount Approval Workflow (DISC_APPROVAL) — mandatory, uses SALES_DISCOUNT limits
+        if (!workflowRepo.findByWorkflowCode("DISC_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow discWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("DISC_APPROVAL")
+                    .workflowName("اعتماد الخصومات")
+                    .documentType("SalesDiscount")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(discWorkflow);
+
+            Role smRole = roleRepository.findByRoleCode("SM").orElse(null);
+            Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+            Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+            int discStep = 1;
+            if (smRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(discWorkflow)
+                        .stepNumber(discStep++)
+                        .stepName("مدير المبيعات (حتى الحد المسموح)")
+                        .approverType("ROLE")
+                        .approverRole(smRole)
+                        .build());
+            }
+            if (fmRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(discWorkflow)
+                        .stepNumber(discStep++)
+                        .stepName("المدير المالي")
+                        .approverType("ROLE")
+                        .approverRole(fmRole)
+                        .build());
+            }
+            if (gmRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(discWorkflow)
+                        .stepNumber(discStep)
+                        .stepName("المدير العام")
+                        .approverType("ROLE")
+                        .approverRole(gmRole)
+                        .build());
             }
         }
     }

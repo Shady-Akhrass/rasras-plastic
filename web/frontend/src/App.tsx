@@ -76,6 +76,7 @@ import { Toaster } from 'react-hot-toast';
 import StockLevelsPage from './pages/inventory/StockLevelsPage';
 import QualityInspectionPage from './pages/inventory/QualityInspectionPage';
 import ApprovalsInbox from './pages/procurement/ApprovalsInbox';
+import ApprovalsAuditPage from './pages/dashboard/ApprovalsAuditPage';
 import PurchaseOrdersPage from './pages/procurement/PurchaseOrdersPage';
 import PurchaseOrderFormPage from './pages/procurement/PurchaseOrderFormPage';
 import WaitingImportsPage from './pages/procurement/WaitingImportsPage';
@@ -113,6 +114,7 @@ function App() {
         }>
           <Route index element={<DashboardHome />} />
           <Route path="approvals" element={<ApprovalsInbox />} />
+          <Route path="audit" element={<ApprovalsAuditPage />} />
           <Route path="employees" element={<EmployeeList />} />
           <Route path="hr">
             <Route path="leave-types" element={<LeaveTypesPage />} />
