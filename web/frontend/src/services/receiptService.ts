@@ -37,6 +37,7 @@ export interface PaymentReceiptDto {
     referenceId?: number;
     description?: string;
     status?: string;
+    approvalStatus?: string;
     journalEntryId?: number;
     receivedByUserId?: number;
     receivedByUserName?: string;
@@ -88,6 +89,14 @@ export const receiptService = {
             return true;
         } catch {
             return false;
+        }
+    },
+    submitForApproval: async (id: number): Promise<PaymentReceiptDto | null> => {
+        try {
+            const res = await apiClient.post<{ data?: PaymentReceiptDto }>(`${_api}/${id}/submit`);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
         }
     },
 };

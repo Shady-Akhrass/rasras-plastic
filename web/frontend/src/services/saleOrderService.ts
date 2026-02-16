@@ -56,6 +56,7 @@ export interface SaleOrderDto {
     paymentTerms?: string;
     paymentTermDays?: number;
     status?: string;
+    approvalStatus?: string;
     creditCheckStatus?: string;
     creditCheckBy?: number;
     creditCheckDate?: string;
@@ -240,6 +241,14 @@ export const saleOrderService = {
     checkCreditLimit: async (id: number): Promise<SaleOrderDto | null> => {
         try {
             const res = await apiClient.post<{ data?: SaleOrderDto }>(`${_api}/${id}/check-credit`);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
+        }
+    },
+    submitForApproval: async (id: number): Promise<SaleOrderDto | null> => {
+        try {
+            const res = await apiClient.post<{ data?: SaleOrderDto }>(`${_api}/${id}/submit`);
             return (res.data as any)?.data ?? null;
         } catch {
             return null;

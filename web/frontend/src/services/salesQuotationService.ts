@@ -47,6 +47,7 @@ export interface SalesQuotationDto {
     paymentTerms?: string;
     deliveryTerms?: string;
     status?: string;
+    approvalStatus?: string;
     sentDate?: string;
     acceptedDate?: string;
     rejectedReason?: string;
@@ -220,6 +221,14 @@ export const salesQuotationService = {
     convertToSalesOrder: async (id: number): Promise<SalesQuotationDto | null> => {
         try {
             const res = await apiClient.post<{ data?: SalesQuotationDto }>(`${_api}/${id}/convert-to-order`);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
+        }
+    },
+    submitForApproval: async (id: number): Promise<SalesQuotationDto | null> => {
+        try {
+            const res = await apiClient.post<{ data?: SalesQuotationDto }>(`${_api}/${id}/submit`);
             return (res.data as any)?.data ?? null;
         } catch {
             return null;

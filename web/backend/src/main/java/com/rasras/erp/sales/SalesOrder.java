@@ -96,6 +96,10 @@ public class SalesOrder extends AuditableEntity {
     @Builder.Default
     private String status = "Draft";
 
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
+
     @Column(name = "CreditCheckStatus", length = 20)
     private String creditCheckStatus;
 

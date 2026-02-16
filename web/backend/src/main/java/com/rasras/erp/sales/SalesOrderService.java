@@ -10,6 +10,7 @@ import com.rasras.erp.inventory.UnitOfMeasure;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.inventory.Warehouse;
 import com.rasras.erp.inventory.WarehouseRepository;
+import com.rasras.erp.approval.ApprovalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class SalesOrderService {
     private final UnitRepository unitRepository;
     private final PriceListRepository priceListRepository;
     private final WarehouseRepository warehouseRepository;
+    private final ApprovalService approvalService;
 
     @Transactional(readOnly = true)
     public List<SalesOrderDto> getAllOrders() {
@@ -50,33 +52,34 @@ public class SalesOrderService {
     public SalesOrderDto createOrder(SalesOrderDto dto) {
         SalesOrder order = new SalesOrder();
         order.setSoNumber(generateOrderNumber());
-        order.setSoDate(dto.getSoDate() != null ? dto.getSoDate() : LocalDateTime.now());
-        
+        order.setSoDate(dto.getSoDate() != null ? dto.getSoDate().atStartOfDay() : LocalDateTime.now());
+
         if (dto.getSalesQuotationId() != null) {
             SalesQuotation quotation = quotationRepository.findById(dto.getSalesQuotationId())
                     .orElse(null);
             order.setSalesQuotation(quotation);
         }
-        
+
         Customer customer = customerRepository.findById(dto.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
         order.setCustomer(customer);
-        
+
         order.setContactId(dto.getContactId());
         order.setSalesRepId(dto.getSalesRepId());
         order.setShippingAddress(dto.getShippingAddress());
         order.setExpectedDeliveryDate(dto.getExpectedDeliveryDate());
         order.setCurrency(dto.getCurrency() != null ? dto.getCurrency() : "EGP");
         order.setExchangeRate(dto.getExchangeRate() != null ? dto.getExchangeRate() : BigDecimal.ONE);
-        
+
         if (dto.getPriceListId() != null) {
             PriceList priceList = priceListRepository.findById(dto.getPriceListId())
                     .orElse(null);
             order.setPriceList(priceList);
         }
-        
+
         order.setSubTotal(dto.getSubTotal() != null ? dto.getSubTotal() : BigDecimal.ZERO);
-        order.setDiscountPercentage(dto.getDiscountPercentage() != null ? dto.getDiscountPercentage() : BigDecimal.ZERO);
+        order.setDiscountPercentage(
+                dto.getDiscountPercentage() != null ? dto.getDiscountPercentage() : BigDecimal.ZERO);
         order.setDiscountAmount(dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO);
         order.setTaxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO);
         order.setShippingCost(dto.getShippingCost() != null ? dto.getShippingCost() : BigDecimal.ZERO);
@@ -84,6 +87,7 @@ public class SalesOrderService {
         order.setPaymentTerms(dto.getPaymentTerms());
         order.setPaymentTermDays(dto.getPaymentTermDays());
         order.setStatus(dto.getStatus() != null ? dto.getStatus() : "Draft");
+        order.setApprovalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : "Pending");
         order.setNotes(dto.getNotes());
         order.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy() : 1);
 
@@ -105,7 +109,7 @@ public class SalesOrderService {
     public SalesOrderDto createOrderFromQuotation(Integer quotationId) {
         SalesQuotation quotation = quotationRepository.findById(quotationId)
                 .orElseThrow(() -> new RuntimeException("Sales Quotation not found"));
-        
+
         if (!"Accepted".equals(quotation.getStatus())) {
             throw new RuntimeException("Quotation must be accepted before creating Sales Order");
         }
@@ -159,8 +163,13 @@ public class SalesOrderService {
         SalesOrder order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Order not found"));
 
-        if (!"Draft".equals(order.getStatus())) {
-            throw new RuntimeException("Cannot edit order that is not in Draft status");
+        if (!"Draft".equals(order.getStatus()) && !"Rejected".equals(order.getStatus())) {
+            throw new RuntimeException("Cannot edit order that is not in Draft or Rejected status");
+        }
+
+        // Reset approval status if rejected and being edited
+        if ("Rejected".equals(order.getStatus())) {
+            order.setApprovalStatus("Pending");
         }
 
         order.setExpectedDeliveryDate(dto.getExpectedDeliveryDate());
@@ -196,14 +205,34 @@ public class SalesOrderService {
     }
 
     @Transactional
+    public SalesOrderDto submitForApproval(Integer id) {
+        SalesOrder order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Sales Order not found"));
+
+        if (!"Draft".equals(order.getStatus()) && !"Rejected".equals(order.getStatus())) {
+            throw new RuntimeException("Sales Order must be in Draft or Rejected status to submit");
+        }
+
+        order.setStatus("Pending");
+        SalesOrder saved = orderRepository.save(order);
+
+        // Initiate approval workflow
+        approvalService.initiateApproval("SO_APPROVAL", "SalesOrder", saved.getId(),
+                saved.getSoNumber(), saved.getCreatedBy() != null ? saved.getCreatedBy() : 1,
+                saved.getTotalAmount());
+
+        return mapToDto(saved);
+    }
+
+    @Transactional
     public void deleteOrder(Integer id) {
         SalesOrder order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Order not found"));
-        
-        if (!"Draft".equals(order.getStatus())) {
-            throw new RuntimeException("Cannot delete order that is not in Draft status");
+
+        if (!"Draft".equals(order.getStatus()) && !"Pending".equals(order.getStatus()) && !"Rejected".equals(order.getStatus())) {
+            throw new RuntimeException("Cannot delete order that is not in Draft, Pending, or Rejected status");
         }
-        
+
         orderRepository.delete(order);
     }
 
@@ -211,22 +240,23 @@ public class SalesOrderService {
     public SalesOrderDto checkCreditLimit(Integer orderId) {
         SalesOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Sales Order not found"));
-        
+
         // Credit check logic - check customer's credit limit
         Customer customer = order.getCustomer();
-        BigDecimal currentBalance = customer.getCurrentBalance() != null ? customer.getCurrentBalance() : BigDecimal.ZERO;
+        BigDecimal currentBalance = customer.getCurrentBalance() != null ? customer.getCurrentBalance()
+                : BigDecimal.ZERO;
         BigDecimal creditLimit = customer.getCreditLimit() != null ? customer.getCreditLimit() : BigDecimal.ZERO;
         BigDecimal availableCredit = creditLimit.subtract(currentBalance);
-        
+
         if (order.getTotalAmount().compareTo(availableCredit) > 0) {
             order.setCreditCheckStatus("Rejected");
             throw new RuntimeException("Order amount exceeds available credit limit");
         }
-        
+
         order.setCreditCheckStatus("Approved");
         order.setCreditCheckDate(LocalDateTime.now());
         // creditCheckBy should be set from security context
-        
+
         return mapToDto(orderRepository.save(order));
     }
 
@@ -238,7 +268,7 @@ public class SalesOrderService {
         SalesOrderDto dto = SalesOrderDto.builder()
                 .id(order.getId())
                 .soNumber(order.getSoNumber())
-                .soDate(order.getSoDate())
+                .soDate(order.getSoDate() != null ? order.getSoDate().toLocalDate() : null)
                 .customerId(order.getCustomer().getId())
                 .customerNameAr(order.getCustomer().getCustomerNameAr())
                 .customerCode(order.getCustomer().getCustomerCode())
@@ -257,6 +287,7 @@ public class SalesOrderService {
                 .paymentTerms(order.getPaymentTerms())
                 .paymentTermDays(order.getPaymentTermDays())
                 .status(order.getStatus())
+                .approvalStatus(order.getApprovalStatus())
                 .creditCheckStatus(order.getCreditCheckStatus())
                 .creditCheckBy(order.getCreditCheckBy())
                 .creditCheckDate(order.getCreditCheckDate())
@@ -325,7 +356,7 @@ public class SalesOrderService {
     private SalesOrderItem mapItemToEntity(SalesOrderItemDto dto, SalesOrder order) {
         Item item = itemRepository.findById(dto.getItemId())
                 .orElseThrow(() -> new RuntimeException("Item not found"));
-        
+
         UnitOfMeasure unit = unitRepository.findById(dto.getUnitId())
                 .orElseThrow(() -> new RuntimeException("Unit not found"));
 

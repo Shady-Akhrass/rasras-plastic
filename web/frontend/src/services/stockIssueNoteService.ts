@@ -43,6 +43,7 @@ export interface StockIssueNoteDto {
     vehicleNo?: string;
     driverName?: string;
     status?: string;
+    approvalStatus?: string;
     deliveryDate?: string;
     notes?: string;
     createdAt?: string;
@@ -160,6 +161,14 @@ export const stockIssueNoteService = {
         try {
             const params = approvedByUserId != null ? `?approvedByUserId=${approvedByUserId}` : '';
             const res = await apiClient.post<{ data?: StockIssueNoteDto }>(`${_api}/${id}/approve${params}`);
+            return (res.data as any)?.data ?? null;
+        } catch {
+            return null;
+        }
+    },
+    submitForApproval: async (id: number): Promise<StockIssueNoteDto | null> => {
+        try {
+            const res = await apiClient.post<{ data?: StockIssueNoteDto }>(`${_api}/${id}/submit`);
             return (res.data as any)?.data ?? null;
         } catch {
             return null;

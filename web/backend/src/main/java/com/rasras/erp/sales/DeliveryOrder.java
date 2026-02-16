@@ -84,6 +84,10 @@ public class DeliveryOrder extends AuditableEntity {
     @Builder.Default
     private String status = "Pending";
 
+    @Column(name = "ApprovalStatus", length = 20)
+    @Builder.Default
+    private String approvalStatus = "Pending";
+
     @Column(name = "ReceiverName", length = 100)
     private String receiverName;
 

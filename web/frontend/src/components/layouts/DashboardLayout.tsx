@@ -202,10 +202,7 @@ const DashboardLayout: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    // ══════════════════════════════════════════
-    // ✅ SINGLE HOOK replaces ALL 3 polling effects
-    // ══════════════════════════════════════════
-    const { pendingApprovals, pendingInspections, waitingImports } =
+    const { pendingApprovals, pendingInspections, waitingImports, pendingCustomerRequests } =
         useNotificationPolling(location.pathname);
 
     const userString = localStorage.getItem('user');
@@ -284,6 +281,7 @@ const DashboardLayout: React.FC = () => {
     const ROLES_SYSTEM = [ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN, ROLE_CODES.SYSTEM_ADMIN];
     /** GM و ADMIN لهم override access دائمًا — راجع توثيق_الصلاحيات.md */
     const ROLES_FINANCE = [ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN, ROLE_CODES.SYSTEM_ADMIN, ROLE_CODES.GM, ROLE_CODES.FINANCE_MANAGER, ROLE_CODES.ACCOUNTANT];
+    const ROLES_CRM = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
 
     // ─── Nav items (use hook counts) ───
     const navItems: Array<{
@@ -294,7 +292,7 @@ const DashboardLayout: React.FC = () => {
             { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
             {
                 to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات',
-                section: 'main', badge: pendingApprovals || undefined
+                section: 'main', badge: (pendingApprovals + pendingCustomerRequests) || undefined
             },
             {
                 to: '/dashboard/audit', icon: FileText, label: 'سجل الاعتمادات',
@@ -387,11 +385,6 @@ const DashboardLayout: React.FC = () => {
                 section: 'procurement', order: 10, roles: ROLES_PROCUREMENT,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
-            {
-                to: '/dashboard/procurement/suppliers/items', icon: Package,
-                label: 'أصناف الموردين', section: 'procurement', order: 11,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
-            },
 
             // Sales
             {
@@ -400,37 +393,54 @@ const DashboardLayout: React.FC = () => {
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
             },
             {
+                to: '/dashboard/sales/purchase-requisitions', icon: ClipboardList,
+                label: 'طلبات الشراء', section: 'sales', order: 2, roles: ROLES_SALES,
+                requiredPermission: 'SECTION_SALES'
+            },
+            {
+                to: '/dashboard/sales/customer-requests', icon: User, label: 'طلبات العملاء',
+                section: 'sales', order: 2.5, roles: ROLES_SALES,
+                requiredPermission: 'SECTION_SALES',
+                badge: pendingCustomerRequests || undefined
+            },
+            {
                 to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار',
-                section: 'sales', order: 2, roles: ROLES_SALES,
+                section: 'sales', order: 3, roles: ROLES_SALES,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/orders', icon: ClipboardList,
-                label: 'أوامر البيع (SO)', section: 'sales', order: 3,
+                label: 'أوامر البيع (SO)', section: 'sales', order: 4,
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/issue-notes', icon: Package,
-                label: 'إذونات الصرف', section: 'sales', order: 4,
+                label: 'إذونات الصرف', section: 'sales', order: 5,
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/delivery-orders', icon: Truck,
-                label: 'أوامر التوصيل', section: 'sales', order: 5,
+                label: 'أوامر التوصيل', section: 'sales', order: 6,
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/invoices', icon: FileText,
-                label: 'فواتير المبيعات', section: 'sales', order: 6,
+                label: 'فواتير المبيعات', section: 'sales', order: 7,
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/receipts', icon: Receipt,
-                label: 'إيصالات الدفع', section: 'sales', order: 7,
+                label: 'إيصالات الدفع', section: 'sales', order: 8,
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
             },
 
-            // Finance (SECTION_FINANCE — Emergency Security Patch)
+            // CRM
+            {
+                to: '/dashboard/crm/customers', icon: Users, label: 'العملاء',
+                section: 'crm', roles: ROLES_CRM, requiredPermission: 'SECTION_CRM'
+            },
+
+            // Finance (SECTION_FINANCE)
             {
                 to: '/dashboard/finance/payment-vouchers', icon: Receipt,
                 label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE,
@@ -771,8 +781,8 @@ const DashboardLayout: React.FC = () => {
                                 (item.to !== '/dashboard' &&
                                     location.pathname.startsWith(item.to))
                             )}
-                        badge={pendingApprovals || undefined}
-                        blink={pendingApprovals > 0}
+                        badge={(pendingApprovals + pendingCustomerRequests) || undefined}
+                        blink={(pendingApprovals + pendingCustomerRequests) > 0}
                     >
                         {filteredNavItems.filter(i => i.section === 'main')
                             .map(item => (

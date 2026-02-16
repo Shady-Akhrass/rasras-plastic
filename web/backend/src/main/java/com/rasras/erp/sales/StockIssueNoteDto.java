@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,7 +17,7 @@ import java.util.List;
 public class StockIssueNoteDto {
     private Integer id;
     private String issueNoteNumber;
-    private LocalDateTime issueDate;
+    private LocalDate issueDate;
     private String issueType; // SALE_ORDER, PRODUCTION, PROJECT, INTERNAL
     private String referenceType;
     private Integer referenceId;
@@ -36,7 +37,8 @@ public class StockIssueNoteDto {
     private String vehicleNo;
     private String driverName;
     private String status;
-    private LocalDateTime deliveryDate;
+    private String approvalStatus;
+    private LocalDate deliveryDate;
     private String notes;
     private LocalDateTime createdAt;
     private Integer createdBy;
