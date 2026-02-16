@@ -75,13 +75,13 @@ const MaterialIssueListPage: React.FC = () => {
                             ) : (
                                 list.map((m) => (
                                     <tr key={m.id} className="border-b hover:bg-amber-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-amber-700">{m.issueNumber || '—'}</td>
-                                        <td className="px-6 py-4">{typeLabel[m.issueType as string] || m.issueType}</td>
-                                        <td className="px-6 py-4">{m.referenceNo || '—'}</td>
-                                        <td className="px-6 py-4">{m.receiverName || '—'}</td>
+                                        <td className="px-6 py-4 font-mono font-bold text-amber-700">{(m as any).issueNoteNumber || m.issueNumber || '—'}</td>
+                                        <td className="px-6 py-4">{typeLabel[((m as any).salesOrderId ? 'SALE_ORDER' : m.issueType) as string] || m.issueType || '—'}</td>
+                                        <td className="px-6 py-4">{(m as any).soNumber || m.referenceNo || '—'}</td>
+                                        <td className="px-6 py-4">{(m as any).receivedByName || m.receiverName || '—'}</td>
                                         <td className="px-6 py-4">
-                                            <button 
-                                                onClick={() => navigate(`/dashboard/inventory/warehouse/issue/${m.id}`)} 
+                                            <button
+                                                onClick={() => navigate(`/dashboard/inventory/warehouse/issue/${m.id}`)}
                                                 className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                                             >
                                                 <Eye className="w-5 h-5" />

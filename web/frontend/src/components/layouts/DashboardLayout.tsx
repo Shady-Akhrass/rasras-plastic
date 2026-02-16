@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
-    Settings, User, X, ChevronLeft, ChevronRight,
+    Settings, User, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
     HelpCircle, Shield, Sparkles, Building2,
-    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart, ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine
+    Calendar, Clock, Command, Maximize2, Minimize2, Microscope, DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart, ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine,
+    Receipt, ClipboardList, BarChart2, AlertTriangle, Activity, ClipboardCheck, GitCompare
 } from 'lucide-react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 
@@ -14,7 +15,8 @@ const SidebarLink = ({
     label,
     active,
     collapsed,
-    badge
+    badge,
+    search
 }: {
     to: string;
     icon: React.ElementType;
@@ -22,9 +24,10 @@ const SidebarLink = ({
     active: boolean;
     collapsed: boolean;
     badge?: number;
+    search?: string;
 }) => (
     <Link
-        to={to}
+        to={search ? { pathname: to, search } : to}
         className={`group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300
             ${active
                 ? 'bg-gradient-to-l from-brand-primary to-brand-primary/90 text-white shadow-lg shadow-brand-primary/25'
@@ -63,7 +66,16 @@ const SidebarLink = ({
     </Link>
 );
 
-// Section Header for Sidebar
+// Sub-group title inside a dropdown (e.g. وحدة إدارة الأصناف والمخزون)
+const SidebarSubGroupTitle = ({ title, collapsed }: { title: string; collapsed: boolean }) => (
+    !collapsed && (
+        <div className="px-3 py-2 mt-3 mb-1 first:mt-0">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
+        </div>
+    )
+);
+
+// Section Header for Sidebar (plain, non-dropdown)
 const SidebarSection = ({ title, collapsed }: { title: string; collapsed: boolean }) => (
     !collapsed ? (
         <div className="px-4 py-2 mt-6 mb-2">
@@ -73,6 +85,67 @@ const SidebarSection = ({ title, collapsed }: { title: string; collapsed: boolea
         <div className="my-4 mx-3 border-t border-slate-200" />
     )
 );
+
+// Collapsible Dropdown Section for Sidebar
+const SidebarDropdownSection = ({
+    id,
+    title,
+    icon: Icon,
+    collapsed,
+    isOpen,
+    onToggle,
+    hasActiveChild,
+    children
+}: {
+    id: string;
+    title: string;
+    icon: React.ElementType;
+    collapsed: boolean;
+    isOpen: boolean;
+    onToggle: () => void;
+    hasActiveChild: boolean;
+    children: React.ReactNode;
+}) => {
+    if (collapsed) {
+        return (
+            <div className="mt-2">
+                <div className="mx-3 border-t border-slate-200" />
+                <div className="mt-1 space-y-0.5">
+                    {children}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-4 mb-1">
+            <button
+                type="button"
+                onClick={onToggle}
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl transition-all duration-200
+                    ${hasActiveChild
+                        ? 'bg-brand-primary/10 text-brand-primary'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+            >
+                <div className="flex items-center gap-3">
+                    <Icon className="w-5 h-5" />
+                    <span className="font-semibold text-sm">{title}</span>
+                </div>
+                {isOpen ? (
+                    <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                )}
+            </button>
+            {isOpen && (
+                <div className="mt-1 mr-2 space-y-0.5 border-r-2 border-slate-100 pr-2 animate-in slide-in-from-top-1 duration-200">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+};
 
 // Notification Item
 const NotificationItem = ({
@@ -120,6 +193,7 @@ const DashboardLayout: React.FC = () => {
     const mainContentRef = React.useRef<HTMLDivElement>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -168,17 +242,31 @@ const DashboardLayout: React.FC = () => {
         { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
         { to: '/dashboard/users', icon: User, label: 'المستخدمين', roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
         { to: '/dashboard/employees', icon: Users, label: 'الموظفين', roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'], section: 'main' },
-        { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'operations' },
-        { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'operations' },
-        { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'operations' },
-        { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'operations' },
         { to: '/dashboard/inventory/quality-parameters', icon: Microscope, label: 'معاملات الجودة', section: 'operations' },
         { to: '/dashboard/inventory/price-lists', icon: DollarSign, label: 'قوائم الأسعار', section: 'operations' },
         { to: '/dashboard/inventory/units', icon: Shield, label: 'وحدات القياس', section: 'operations' },
-        { to: '/dashboard/inventory/warehouse/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse' },
-        { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse' },
-        { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse' },
+        { to: '/dashboard/inventory/sections', icon: Warehouse, label: 'أقسام المخزن', section: 'warehouse', warehouseGroup: 'management' },
+        { to: '/dashboard/inventory/categories', icon: Package, label: 'تصنيفات الأصناف', section: 'warehouse', warehouseGroup: 'management' },
+        { to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف ', section: 'warehouse', warehouseGroup: 'management' },
+        { to: '/dashboard/inventory/warehouses', icon: Building2, label: 'المستودعات', section: 'warehouse', warehouseGroup: 'management' },
+        { to: '/dashboard/inventory/warehouse/grn', icon: ArrowDownToLine, label: 'إذن إضافة (GRN)', section: 'warehouse', warehouseGroup: 'cycle' },
+        { to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine, label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle' },
+        { to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft, label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle' },
+        { to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle, label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', warehouseGroup: 'reports' },
+        { to: '/dashboard/inventory/reports/stagnant', icon: Clock, label: 'الأصناف الراكدة', section: 'warehouse', warehouseGroup: 'reports' },
+        { to: '/dashboard/inventory/reports/movement', icon: Activity, label: 'حركة الصنف التفصيلية', section: 'warehouse', warehouseGroup: 'reports' },
+        { to: '/dashboard/inventory/count', icon: ClipboardCheck, label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports' },
+        { to: '/dashboard/inventory/count', icon: AlertTriangle, label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports', search: '?mode=surprise' },
+        { to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2, label: 'تقرير المخزون الدوري', section: 'warehouse', warehouseGroup: 'reports' },
+        { to: '/dashboard/inventory/reports/variance', icon: GitCompare, label: 'تقرير الفروقات', section: 'warehouse', warehouseGroup: 'reports' },
         { to: '/dashboard/sales/sections', icon: ShoppingCart, label: 'دورة المبيعات', section: 'sales' },
+        { to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار', section: 'sales' },
+        { to: '/dashboard/sales/orders', icon: ClipboardList, label: 'أوامر البيع', section: 'sales' },
+        { to: '/dashboard/sales/issue-notes', icon: Package, label: 'إذونات الصرف', section: 'sales' },
+        { to: '/dashboard/sales/delivery-orders', icon: Truck, label: 'أوامر التوصيل', section: 'sales' },
+        { to: '/dashboard/sales/invoices', icon: FileText, label: 'فواتير المبيعات', section: 'sales' },
+        { to: '/dashboard/sales/receipts', icon: Receipt, label: 'إيصالات الدفع', section: 'sales' },
+        { to: '/dashboard/sales/reports', icon: BarChart2, label: 'تقارير المبيعات', section: 'sales' },
         { to: '/dashboard/crm/customers', icon: Users, label: 'العملاء', section: 'crm' },
         { to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء', section: 'procurement' },
         { to: '/dashboard/procurement/rfq', icon: FileText, label: 'عروض الأسعار (RFQ)', section: 'procurement' },
@@ -193,6 +281,43 @@ const DashboardLayout: React.FC = () => {
     const filteredNavItems = navItems.filter(item =>
         !item.roles || item.roles.includes(userRole.toUpperCase())
     );
+
+    // قوائم منسدلة: أي الأقسام مفتوحة (مفتوح افتراضياً إذا كان المسار الحالي داخل القسم)
+    const sectionIds = ['main', 'operations', 'sales', 'crm', 'warehouse', 'procurement', 'system'] as const;
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+        const path = location.pathname;
+        const initial: Record<string, boolean> = {};
+        sectionIds.forEach(id => {
+            const itemsInSection = navItems.filter(i => i.section === id);
+            initial[id] = itemsInSection.some(item =>
+                path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
+            );
+        });
+        return initial;
+    });
+
+    useEffect(() => {
+        const path = location.pathname;
+        setOpenSections(prev => {
+            let changed = false;
+            const next = { ...prev };
+            sectionIds.forEach(id => {
+                const itemsInSection = navItems.filter(i => i.section === id);
+                const hasActive = itemsInSection.some(item =>
+                    path === item.to || (item.to !== '/dashboard' && path.startsWith(item.to))
+                );
+                if (hasActive && !prev[id]) {
+                    next[id] = true;
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [location.pathname]);
+
+    const toggleSection = (id: string) => {
+        setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
+    };
 
     const notifications = [
         { title: 'موظف جديد', message: 'تمت إضافة أحمد محمد للنظام', time: 'منذ 5 دقائق', read: false, type: 'success' as const },
@@ -248,27 +373,47 @@ const DashboardLayout: React.FC = () => {
                     </button>
                 </div>
 
-                {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-                    {/* Main Section */}
-                    <SidebarSection title="الرئيسية" collapsed={sidebarCollapsed} />
-                    {filteredNavItems.filter(i => i.section === 'main').map((item) => (
-                        <SidebarLink
-                            key={item.to}
-                            to={item.to}
-                            icon={item.icon}
-                            label={item.label}
-                            active={location.pathname === item.to ||
-                                (item.to !== '/dashboard' && location.pathname.startsWith(item.to))}
-                            collapsed={sidebarCollapsed}
-                            badge={item.badge}
-                        />
-                    ))}
+                {/* Navigation - قوائم منسدلة */}
+                <nav className="flex-1 overflow-y-auto p-4 space-y-0">
+                    {/* الرئيسية */}
+                    <SidebarDropdownSection
+                        id="main"
+                        title="الرئيسية"
+                        icon={LayoutDashboard}
+                        collapsed={sidebarCollapsed}
+                        isOpen={openSections.main ?? true}
+                        onToggle={() => toggleSection('main')}
+                        hasActiveChild={filteredNavItems.filter(i => i.section === 'main').some(item =>
+                            location.pathname === item.to || (item.to !== '/dashboard' && location.pathname.startsWith(item.to))
+                        )}
+                    >
+                        {filteredNavItems.filter(i => i.section === 'main').map((item) => (
+                            <SidebarLink
+                                key={item.to}
+                                to={item.to}
+                                icon={item.icon}
+                                label={item.label}
+                                active={location.pathname === item.to ||
+                                    (item.to !== '/dashboard' && location.pathname.startsWith(item.to))}
+                                collapsed={sidebarCollapsed}
+                                badge={(item as { badge?: number }).badge}
+                            />
+                        ))}
+                    </SidebarDropdownSection>
 
-                    {/* Operations Section */}
+                    {/* العمليات */}
                     {filteredNavItems.some(i => i.section === 'operations') && (
-                        <>
-                            <SidebarSection title="العمليات" collapsed={sidebarCollapsed} />
+                        <SidebarDropdownSection
+                            id="operations"
+                            title="العمليات"
+                            icon={Package}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.operations ?? false}
+                            onToggle={() => toggleSection('operations')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'operations').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                        >
                             {filteredNavItems.filter(i => i.section === 'operations').map((item) => (
                                 <SidebarLink
                                     key={item.to}
@@ -277,16 +422,84 @@ const DashboardLayout: React.FC = () => {
                                     label={item.label}
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
-                                    badge={item.badge}
+                                    badge={(item as { badge?: number }).badge}
                                 />
                             ))}
-                        </>
+                        </SidebarDropdownSection>
                     )}
 
-                    {/* Sales Section */}
+                    {/* قسم المخازن - عناوين رئيسة: وحدة إدارة الأصناف والمخزون، دورة المخزن، التقارير والجرد */}
+                    {filteredNavItems.some(i => i.section === 'warehouse') && (
+                        <SidebarDropdownSection
+                            id="warehouse"
+                            title="قسم المخازن"
+                            icon={ArrowRightLeft}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.warehouse ?? false}
+                            onToggle={() => toggleSection('warehouse')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'warehouse').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                        >
+                            {/* وحدة إدارة الأصناف والمخزون */}
+                            <SidebarSubGroupTitle title="وحدة إدارة الأصناف والمخزون" collapsed={sidebarCollapsed} />
+                            {filteredNavItems
+                                .filter(i => i.section === 'warehouse' && (i as { warehouseGroup?: string }).warehouseGroup === 'management')
+                                .map((item) => (
+                                    <SidebarLink
+                                        key={item.to}
+                                        to={item.to}
+                                        icon={item.icon}
+                                        label={item.label}
+                                        active={location.pathname.startsWith(item.to)}
+                                        collapsed={sidebarCollapsed}
+                                    />
+                                ))}
+                            {/* دورة المخزن */}
+                            <SidebarSubGroupTitle title="دورة المخزن" collapsed={sidebarCollapsed} />
+                            {filteredNavItems
+                                .filter(i => i.section === 'warehouse' && (i as { warehouseGroup?: string }).warehouseGroup === 'cycle')
+                                .map((item) => (
+                                    <SidebarLink
+                                        key={item.to}
+                                        to={item.to}
+                                        icon={item.icon}
+                                        label={item.label}
+                                        active={location.pathname.startsWith(item.to)}
+                                        collapsed={sidebarCollapsed}
+                                    />
+                                ))}
+                            {/* التقارير والجرد */}
+                            <SidebarSubGroupTitle title="التقارير والجرد" collapsed={sidebarCollapsed} />
+                            {filteredNavItems
+                                .filter(i => i.section === 'warehouse' && (i as { warehouseGroup?: string }).warehouseGroup === 'reports')
+                                .map((item) => (
+                                    <SidebarLink
+                                        key={(item as { search?: string }).search ? `${item.to}${(item as { search?: string }).search}` : item.to}
+                                        to={item.to}
+                                        icon={item.icon}
+                                        label={item.label}
+                                        active={location.pathname.startsWith(item.to)}
+                                        collapsed={sidebarCollapsed}
+                                        search={(item as { search?: string }).search}
+                                    />
+                                ))}
+                        </SidebarDropdownSection>
+                    )}
+
+                    {/* قسم المبيعات */}
                     {filteredNavItems.some(i => i.section === 'sales') && (
-                        <>
-                            <SidebarSection title="المبيعات" collapsed={sidebarCollapsed} />
+                        <SidebarDropdownSection
+                            id="sales"
+                            title="قسم المبيعات"
+                            icon={ShoppingCart}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.sales ?? false}
+                            onToggle={() => toggleSection('sales')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'sales').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                        >
                             {filteredNavItems.filter(i => i.section === 'sales').map((item) => (
                                 <SidebarLink
                                     key={item.to}
@@ -297,13 +510,22 @@ const DashboardLayout: React.FC = () => {
                                     collapsed={sidebarCollapsed}
                                 />
                             ))}
-                        </>
+                        </SidebarDropdownSection>
                     )}
 
-                    {/* CRM Section */}
+                    {/* إدارة العملاء */}
                     {filteredNavItems.some(i => i.section === 'crm') && (
-                        <>
-                            <SidebarSection title="إدارة العملاء" collapsed={sidebarCollapsed} />
+                        <SidebarDropdownSection
+                            id="crm"
+                            title="إدارة العملاء"
+                            icon={Users}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.crm ?? false}
+                            onToggle={() => toggleSection('crm')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'crm').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                        >
                             {filteredNavItems.filter(i => i.section === 'crm').map((item) => (
                                 <SidebarLink
                                     key={item.to}
@@ -312,33 +534,25 @@ const DashboardLayout: React.FC = () => {
                                     label={item.label}
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
-                                    badge={item.badge}
+                                    badge={(item as { badge?: number }).badge}
                                 />
                             ))}
-                        </>
+                        </SidebarDropdownSection>
                     )}
 
-                    {/* Warehouse Section */}
-                    {filteredNavItems.some(i => i.section === 'warehouse') && (
-                        <>
-                            <SidebarSection title="دورة المخازن" collapsed={sidebarCollapsed} />
-                            {filteredNavItems.filter(i => i.section === 'warehouse').map((item) => (
-                                <SidebarLink
-                                    key={item.to}
-                                    to={item.to}
-                                    icon={item.icon}
-                                    label={item.label}
-                                    active={location.pathname.startsWith(item.to)}
-                                    collapsed={sidebarCollapsed}
-                                />
-                            ))}
-                        </>
-                    )}
-
-                    {/* Procurement Section */}
+                    {/* قسم المشتريات */}
                     {filteredNavItems.some(i => i.section === 'procurement') && (
-                        <>
-                            <SidebarSection title="المشتريات" collapsed={sidebarCollapsed} />
+                        <SidebarDropdownSection
+                            id="procurement"
+                            title="قسم المشتريات"
+                            icon={Truck}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.procurement ?? false}
+                            onToggle={() => toggleSection('procurement')}
+                            hasActiveChild={filteredNavItems.filter(i => i.section === 'procurement').some(item =>
+                                location.pathname.startsWith(item.to)
+                            )}
+                        >
                             {filteredNavItems.filter(i => i.section === 'procurement').map((item) => (
                                 <SidebarLink
                                     key={item.to}
@@ -347,25 +561,36 @@ const DashboardLayout: React.FC = () => {
                                     label={item.label}
                                     active={location.pathname.startsWith(item.to)}
                                     collapsed={sidebarCollapsed}
-                                    badge={item.badge}
+                                    badge={(item as { badge?: number }).badge}
                                 />
                             ))}
-                        </>
+                        </SidebarDropdownSection>
                     )}
 
-                    {/* System Section */}
-                    <SidebarSection title="النظام" collapsed={sidebarCollapsed} />
-                    {filteredNavItems.filter(i => i.section === 'system').map((item) => (
-                        <SidebarLink
-                            key={item.to}
-                            to={item.to}
-                            icon={item.icon}
-                            label={item.label}
-                            active={location.pathname.startsWith(item.to)}
-                            collapsed={sidebarCollapsed}
-                            badge={item.badge}
-                        />
-                    ))}
+                    {/* النظام */}
+                    <SidebarDropdownSection
+                        id="system"
+                        title="النظام"
+                        icon={Settings}
+                        collapsed={sidebarCollapsed}
+                        isOpen={openSections.system ?? false}
+                        onToggle={() => toggleSection('system')}
+                        hasActiveChild={filteredNavItems.filter(i => i.section === 'system').some(item =>
+                            location.pathname.startsWith(item.to)
+                        )}
+                    >
+                        {filteredNavItems.filter(i => i.section === 'system').map((item) => (
+                            <SidebarLink
+                                key={item.to}
+                                to={item.to}
+                                icon={item.icon}
+                                label={item.label}
+                                active={location.pathname.startsWith(item.to)}
+                                collapsed={sidebarCollapsed}
+                                badge={(item as { badge?: number }).badge}
+                            />
+                        ))}
+                    </SidebarDropdownSection>
                 </nav>
 
                 {/* User Profile Section */}

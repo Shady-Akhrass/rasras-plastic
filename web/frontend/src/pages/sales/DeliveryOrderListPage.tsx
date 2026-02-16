@@ -26,7 +26,7 @@ const DeliveryOrderListPage: React.FC = () => {
     const filtered = list.filter((d) =>
         !search ||
         (d.deliveryOrderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-        (d.saleOrderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
+        (d.issueNoteNumber || d.saleOrderNumber || '').toLowerCase().includes(search.toLowerCase()) ||
         (d.customerNameAr || '').toLowerCase().includes(search.toLowerCase())
     );
 
@@ -38,7 +38,7 @@ const DeliveryOrderListPage: React.FC = () => {
                         <div className="p-4 bg-white/10 rounded-2xl"><Truck className="w-10 h-10" /></div>
                         <div>
                             <h1 className="text-2xl font-bold mb-1">أوامر التوصيل</h1>
-                            <p className="text-white/80">أمر توصيل مرتبط بأمر البيع، مكان وتاريخ التسليم</p>
+                            <p className="text-white/80">أمر توصيل مرتبط بإذن الصرف، السائق والمركبة والتاريخ</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -67,9 +67,9 @@ const DeliveryOrderListPage: React.FC = () => {
                             <tr className="bg-slate-50 border-b border-slate-100">
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">رقم أمر التوصيل</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">التاريخ</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">أمر البيع</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">إذن الصرف</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">العميل</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">مكان التسليم</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الحالة</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الإجراء</th>
                             </tr>
                         </thead>
@@ -97,10 +97,10 @@ const DeliveryOrderListPage: React.FC = () => {
                                 filtered.map((d) => (
                                     <tr key={d.id} className="border-b border-slate-100 hover:bg-amber-50/50">
                                         <td className="px-6 py-4 font-mono font-bold text-amber-700">{d.deliveryOrderNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{d.deliveryDate ? new Date(d.deliveryDate).toLocaleDateString('ar-EG') : '—'}</td>
-                                        <td className="px-6 py-4 text-slate-700">{d.saleOrderNumber || '—'}</td>
+                                        <td className="px-6 py-4 text-slate-600">{d.orderDate ? new Date(d.orderDate).toLocaleDateString('ar-EG') : (d.deliveryDate ? new Date(d.deliveryDate).toLocaleDateString('ar-EG') : '—')}</td>
+                                        <td className="px-6 py-4 text-slate-700">{d.issueNoteNumber || d.saleOrderNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{d.customerNameAr || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{d.deliveryPlace || d.deliveryAddress || '—'}</td>
+                                        <td className="px-6 py-4"><span className="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">{d.status || '—'}</span></td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/dashboard/sales/delivery-orders/${d.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
                                         </td>

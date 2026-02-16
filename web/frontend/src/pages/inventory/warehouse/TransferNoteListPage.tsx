@@ -84,10 +84,10 @@ const TransferNoteListPage: React.FC = () => {
                                         <td className="px-6 py-4 font-mono font-bold text-violet-700">{t.transferNumber || '—'}</td>
                                         <td className="px-6 py-4">{t.fromWarehouseNameAr || '—'}</td>
                                         <td className="px-6 py-4">{t.toWarehouseNameAr || '—'}</td>
-                                        <td className="px-6 py-4">{reasonLabel[t.reason] || t.reason}</td>
+                                        <td className="px-6 py-4">{reasonLabel[t.reason as string] || t.reason || t.status || (t.notes ? String(t.notes).slice(0, 25) + (String(t.notes).length > 25 ? '…' : '') : '—')}</td>
                                         <td className="px-6 py-4">
-                                            <button 
-                                                onClick={() => navigate(`/dashboard/inventory/warehouse/transfer/${t.id}`)} 
+                                            <button
+                                                onClick={() => navigate(`/dashboard/inventory/warehouse/transfer/${t.id}`)}
                                                 className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
                                             >
                                                 <Eye className="w-5 h-5" />
