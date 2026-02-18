@@ -31,21 +31,21 @@ public class Item {
     @Column(name = "ItemNameEn")
     private String itemNameEn;
 
-    /** العلامة التجارية / Grade - يمكن أن يتكرر بين أصناف مختلفة (مثال: Sabic 5000S) */
-    @Column(name = "grade")
+    /** العلامة التجارية / Grade. Use @Transient if DB lacks column; remove @Transient once column exists. */
+    @Transient
     private String grade;
 
-    /** MFR (Melt Flow Rate) - معدل تدفق الذوبان - مقياس لسيولة البلاستيك المصهور، الوحدة: g/10 min */
-    @Column(name = "GradeName", precision = 10, scale = 4)
+    /** MFR (Melt Flow Rate) - معدل تدفق الذوبان. Use @Transient if DB lacks column. */
+    @Transient
     private BigDecimal gradeName;
 
-    @Column(name = "mi2")
+    @Transient
     private String mi2;
 
-    @Column(name = "mi21")
+    @Transient
     private String mi21;
 
-    @Column(name = "density")
+    @Transient
     private String density;
 
     @Column(name = "CategoryID", nullable = false)

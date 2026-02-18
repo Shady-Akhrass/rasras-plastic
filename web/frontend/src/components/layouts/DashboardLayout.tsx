@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
@@ -7,13 +8,11 @@ import {
     DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart,
     ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine,
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity,
-    ClipboardCheck, GitCompare, Undo2, Database
+    ClipboardCheck, GitCompare, Undo2, Database, History
 } from 'lucide-react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
-import { refreshUserPermissions } from '../../services/authService';
 import { canAccessPath } from '../../utils/permissionUtils';
-import { ROLE_CODES } from '../../constants/roleCodes';
 import { formatDate, formatTime } from '../../utils/format';
 import { useNotificationPolling } from '../../hooks/useNotificationPolling';
 
@@ -194,7 +193,6 @@ const DashboardLayout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [, setRefreshKey] = useState(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -235,7 +233,7 @@ const DashboardLayout: React.FC = () => {
                 payload: {
                     accessToken: token,
                     userId: user?.userId,
-                    apiUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api`
+                    apiUrl: `${import.meta.env.VITE_API_URL}/api`
                 }
             });
         }
@@ -244,11 +242,6 @@ const DashboardLayout: React.FC = () => {
         if (remaining <= 0) { clearSession(); return; }
         const id = setTimeout(() => clearSession(), remaining);
         return () => clearTimeout(id);
-    }, []);
-
-    // تحديث الصلاحيات من الخادم عند تحميل الـ Dashboard — لا تعتمد على localStorage فقط
-    useEffect(() => {
-        refreshUserPermissions().then((ok) => { if (ok) setRefreshKey((k) => k + 1); });
     }, []);
 
     // Route guard
@@ -276,11 +269,10 @@ const DashboardLayout: React.FC = () => {
     // ─── Role groups (fallback) ───
     const ROLES_PROCUREMENT = ['PM', 'BUYER', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
     const ROLES_SALES = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
-    const ROLES_WAREHOUSE = [ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN, ROLE_CODES.SYSTEM_ADMIN, ROLE_CODES.GM, ROLE_CODES.WAREHOUSE_KEEPER];
-    const ROLES_OPERATIONS = [ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN, ROLE_CODES.SYSTEM_ADMIN, ROLE_CODES.GM, ROLE_CODES.SALES_MANAGER];
-    const ROLES_SYSTEM = [ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN, ROLE_CODES.SYSTEM_ADMIN];
-    /** GM و ADMIN لهم override access دائمًا — راجع توثيق_الصلاحيات.md */
-    const ROLES_FINANCE = [ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN, ROLE_CODES.SYSTEM_ADMIN, ROLE_CODES.GM, ROLE_CODES.FINANCE_MANAGER, ROLE_CODES.ACCOUNTANT];
+    const ROLES_WAREHOUSE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM',
+        'WAREHOUSE_MANAGER', 'WH_MANAGER'];
+    const ROLES_OPERATIONS = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'SM']; const ROLES_SYSTEM = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN'];
+    const ROLES_FINANCE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'ACCOUNTANT'];
     const ROLES_CRM = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
 
     // ─── Nav items (use hook counts) ───
@@ -288,15 +280,17 @@ const DashboardLayout: React.FC = () => {
         to: string; icon: React.ElementType; label: string; section: string;
         roles?: readonly string[]; requiredPermission?: string;
         warehouseGroup?: string; search?: string; badge?: number; order?: number;
+        exact?: boolean;
     }> = [
             { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
             {
                 to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات',
-                section: 'main', badge: (pendingApprovals + pendingCustomerRequests) || undefined
+                section: 'main', badge: (pendingApprovals + pendingCustomerRequests) || undefined,
+                exact: true
             },
             {
-                to: '/dashboard/audit', icon: FileText, label: 'سجل الاعتمادات',
-                section: 'main', requiredPermission: 'SECTION_MAIN'
+                to: '/dashboard/approvals/audit', icon: History, label: 'سجل الاعتماد',
+                section: 'main'
             },
             {
                 to: '/dashboard/users', icon: User, label: 'المستخدمين',
@@ -363,6 +357,17 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/procurement/po', icon: ShoppingCart,
                 label: 'أوامر الشراء (PO)', section: 'procurement', order: 5,
+                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+            },
+            {
+                to: '/dashboard/procurement/waiting-imports', icon: Truck,
+                label: 'الشحنات القادمة', section: 'procurement', order: 5.5,
+                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT',
+                badge: waitingImports || undefined
+            },
+            {
+                to: '/dashboard/procurement/grn', icon: ArrowDownToLine,
+                label: 'إذن استلام / إذن إضافة (GRN)', section: 'procurement', order: 6,
                 roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
@@ -440,16 +445,14 @@ const DashboardLayout: React.FC = () => {
                 section: 'crm', roles: ROLES_CRM, requiredPermission: 'SECTION_CRM'
             },
 
-            // Finance (SECTION_FINANCE)
+            // Finance
             {
                 to: '/dashboard/finance/payment-vouchers', icon: Receipt,
-                label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE,
-                requiredPermission: 'SECTION_FINANCE'
+                label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE
             },
             {
                 to: '/dashboard/finance/payment-vouchers/new', icon: FileText,
-                label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE,
-                requiredPermission: 'SECTION_FINANCE'
+                label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE
             },
 
             // Warehouse
@@ -524,17 +527,6 @@ const DashboardLayout: React.FC = () => {
             },
 
             // Operations
-            {
-                to: '/dashboard/procurement/waiting-imports', icon: Truck,
-                label: 'الشحنات القادمة', section: 'operations', order: 0.5,
-                roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS',
-                badge: waitingImports || undefined
-            },
-            {
-                to: '/dashboard/procurement/grn', icon: ArrowDownToLine,
-                label: 'إذن استلام / إذن إضافة (GRN)', section: 'operations', order: 0.6,
-                roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS'
-            },
             {
                 to: '/dashboard/inventory/quality-inspection', icon: Microscope,
                 label: 'فحص الجودة', section: 'operations',
@@ -777,9 +769,10 @@ const DashboardLayout: React.FC = () => {
                         hasActiveChild={filteredNavItems
                             .filter(i => i.section === 'main')
                             .some(item =>
-                                location.pathname === item.to ||
-                                (item.to !== '/dashboard' &&
-                                    location.pathname.startsWith(item.to))
+                                item.exact ? location.pathname === item.to :
+                                (location.pathname === item.to ||
+                                    (item.to !== '/dashboard' &&
+                                        location.pathname.startsWith(item.to)))
                             )}
                         badge={(pendingApprovals + pendingCustomerRequests) || undefined}
                         blink={(pendingApprovals + pendingCustomerRequests) > 0}
@@ -788,9 +781,11 @@ const DashboardLayout: React.FC = () => {
                             .map(item => (
                                 <SidebarLink key={item.to} to={item.to}
                                     icon={item.icon} label={item.label}
-                                    active={location.pathname === item.to ||
-                                        (item.to !== '/dashboard' &&
-                                            location.pathname.startsWith(item.to))}
+                                    active={item.exact
+                                        ? location.pathname === item.to
+                                        : (location.pathname === item.to ||
+                                            (item.to !== '/dashboard' &&
+                                                location.pathname.startsWith(item.to)))}
                                     collapsed={sidebarCollapsed}
                                     badge={item.badge}
                                     blink={!!item.badge &&
