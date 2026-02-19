@@ -31,4 +31,16 @@ export const priceListService = {
     createPriceList: (data: PriceListDto) => apiClient.post<PriceListDto>(API_URL, data),
     updatePriceList: (id: number, data: PriceListDto) => apiClient.put<PriceListDto>(`${API_URL}/${id}`, data),
     deletePriceList: (id: number) => apiClient.delete(`${API_URL}/${id}`),
+
+    /**
+     * Helper to extract price from a PriceListItemDto, supporting both unitPrice and legacy price fields.
+     */
+    getPriceForItem: (itemId: number, items: PriceListItemDto[] = []): number => {
+        const pli = items.find(p => p.itemId === itemId);
+        if (!pli) return 0;
+
+        // Support both modern 'unitPrice' and legacy 'price' fields from DB
+        const price = pli.unitPrice ?? (pli as any).price ?? 0;
+        return typeof price === 'string' ? parseFloat(price) : price;
+    }
 };

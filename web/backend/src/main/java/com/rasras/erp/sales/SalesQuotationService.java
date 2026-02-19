@@ -24,10 +24,12 @@ import java.util.stream.Collectors;
 public class SalesQuotationService {
 
     private final SalesQuotationRepository quotationRepository;
+    // Trivial comment to force recompilation after DTO updates
     private final CustomerRepository customerRepository;
     private final ItemRepository itemRepository;
     private final UnitRepository unitRepository;
     private final PriceListRepository priceListRepository;
+    private final CustomerRequestRepository requestRepository;
     private final ApprovalService approvalService;
 
     @Transactional(readOnly = true)
@@ -72,9 +74,18 @@ public class SalesQuotationService {
                 dto.getDiscountPercentage() != null ? dto.getDiscountPercentage() : BigDecimal.ZERO);
         quotation.setDiscountAmount(dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO);
         quotation.setTaxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO);
+        quotation.setDeliveryCost(dto.getDeliveryCost() != null ? dto.getDeliveryCost() : BigDecimal.ZERO);
+        quotation.setOtherCosts(dto.getOtherCosts() != null ? dto.getOtherCosts() : BigDecimal.ZERO);
         quotation.setTotalAmount(dto.getTotalAmount() != null ? dto.getTotalAmount() : BigDecimal.ZERO);
         quotation.setPaymentTerms(dto.getPaymentTerms());
         quotation.setDeliveryTerms(dto.getDeliveryTerms());
+
+        if (dto.getRequestId() != null) {
+            CustomerRequest request = requestRepository.findById(dto.getRequestId())
+                    .orElse(null);
+            quotation.setCustomerRequest(request);
+        }
+
         quotation.setStatus(dto.getStatus() != null ? dto.getStatus() : "Draft");
         quotation.setApprovalStatus(dto.getApprovalStatus() != null ? dto.getApprovalStatus() : "Pending");
         quotation.setNotes(dto.getNotes());
@@ -132,9 +143,18 @@ public class SalesQuotationService {
         quotation.setDiscountPercentage(dto.getDiscountPercentage());
         quotation.setDiscountAmount(dto.getDiscountAmount());
         quotation.setTaxAmount(dto.getTaxAmount());
+        quotation.setDeliveryCost(dto.getDeliveryCost());
+        quotation.setOtherCosts(dto.getOtherCosts());
         quotation.setTotalAmount(dto.getTotalAmount());
         quotation.setPaymentTerms(dto.getPaymentTerms());
         quotation.setDeliveryTerms(dto.getDeliveryTerms());
+
+        if (dto.getRequestId() != null) {
+            CustomerRequest request = requestRepository.findById(dto.getRequestId())
+                    .orElse(null);
+            quotation.setCustomerRequest(request);
+        }
+
         quotation.setNotes(dto.getNotes());
         quotation.setTermsAndConditions(dto.getTermsAndConditions());
         quotation.setUpdatedBy(dto.getUpdatedBy() != null ? dto.getUpdatedBy() : 1);
@@ -181,7 +201,8 @@ public class SalesQuotationService {
         SalesQuotation quotation = quotationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Quotation not found"));
 
-        if (!"Draft".equals(quotation.getStatus()) && !"Pending".equals(quotation.getStatus()) && !"Rejected".equals(quotation.getStatus())) {
+        if (!"Draft".equals(quotation.getStatus()) && !"Pending".equals(quotation.getStatus())
+                && !"Rejected".equals(quotation.getStatus())) {
             throw new RuntimeException("Cannot delete quotation that is not in Draft, Pending, or Rejected status");
         }
 
@@ -193,8 +214,8 @@ public class SalesQuotationService {
         SalesQuotation quotation = quotationRepository.findById(quotationId)
                 .orElseThrow(() -> new RuntimeException("Sales Quotation not found"));
 
-        if (!"Accepted".equals(quotation.getStatus())) {
-            throw new RuntimeException("Quotation must be accepted before converting to Sales Order");
+        if (!"Approved".equals(quotation.getStatus())) {
+            throw new RuntimeException("Quotation must be approved before converting to Sales Order");
         }
 
         // This will be handled by SalesOrderService
@@ -233,6 +254,10 @@ public class SalesQuotationService {
                 .rejectedReason(quotation.getRejectedReason())
                 .notes(quotation.getNotes())
                 .termsAndConditions(quotation.getTermsAndConditions())
+                .requestId(
+                        quotation.getCustomerRequest() != null ? quotation.getCustomerRequest().getRequestId() : null)
+                .deliveryCost(quotation.getDeliveryCost())
+                .otherCosts(quotation.getOtherCosts())
                 .createdAt(quotation.getCreatedAt())
                 .createdBy(quotation.getCreatedBy())
                 .updatedAt(quotation.getUpdatedAt())

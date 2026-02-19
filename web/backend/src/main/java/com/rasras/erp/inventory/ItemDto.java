@@ -21,10 +21,10 @@ public class ItemDto {
     /** العلامة التجارية / Grade - يمكن أن يتكرر */
     private String grade;
     /** MFR (Melt Flow Rate) - معدل تدفق الذوبان - g/10 min */
-    private BigDecimal gradeName;
-    private String mi2;
-    private String mi21;
-    private String density;
+    private String gradeName;
+    private BigDecimal mi2;
+    private BigDecimal mi21;
+    private BigDecimal density;
     private Integer categoryId;
     private String categoryName; // Useful for UI
     private Integer unitId;

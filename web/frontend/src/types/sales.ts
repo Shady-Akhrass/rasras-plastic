@@ -8,6 +8,16 @@ export interface CustomerRequest {
     status: string;
     notes: string;
     items: CustomerRequestItem[];
+    schedules: CustomerRequestDeliverySchedule[];
+}
+
+export interface CustomerRequestDeliverySchedule {
+    scheduleId?: number;
+    requestId?: number;
+    deliveryDate: string;
+    productId?: number;
+    quantity: number;
+    notes?: string;
 }
 
 export interface CustomerRequestItem {

@@ -54,4 +54,7 @@ public class CustomerRequest {
 
     @OneToMany(mappedBy = "customerRequest", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CustomerRequestItem> items;
+
+    @OneToMany(mappedBy = "customerRequest", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CustomerRequestDeliverySchedule> schedules;
 }

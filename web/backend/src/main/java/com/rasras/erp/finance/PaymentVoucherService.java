@@ -7,6 +7,9 @@ import com.rasras.erp.finance.dto.InvoiceItemComparison;
 import com.rasras.erp.finance.dto.SupplierWithInvoices;
 import com.rasras.erp.inventory.GoodsReceiptNote;
 import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
+import com.rasras.erp.procurement.PurchaseReturn;
+import com.rasras.erp.procurement.PurchaseReturnItem;
+import com.rasras.erp.procurement.PurchaseReturnRepository;
 import com.rasras.erp.procurement.PurchaseOrder;
 import com.rasras.erp.procurement.PurchaseOrderRepository;
 import com.rasras.erp.supplier.Supplier;
@@ -41,6 +44,7 @@ public class PaymentVoucherService {
     private final SupplierRepository supplierRepo;
     private final PurchaseOrderRepository poRepo;
     private final GoodsReceiptNoteRepository grnRepo;
+    private final PurchaseReturnRepository purchaseReturnRepo;
     private final ApprovalService approvalService;
     private final UserRepository userRepo;
     private final SupplierInvoiceService supplierInvoiceService;
@@ -319,6 +323,8 @@ public class PaymentVoucherService {
                             .ifPresent(pi -> {
                                 itemComp.setPoQuantity(pi.getOrderedQty());
                                 itemComp.setPoUnitPrice(pi.getUnitPrice());
+                                itemComp.setPoDiscountPercentage(pi.getDiscountPercentage());
+                                itemComp.setPoTaxPercentage(pi.getTaxPercentage());
                                 itemComp.setPoLineTotal(pi.getTotalPrice());
                             });
                 }
@@ -329,7 +335,8 @@ public class PaymentVoucherService {
                             .filter(gi -> gi.getItem().getId().equals(invItem.getItem().getId()))
                             .findFirst()
                             .ifPresent(gi -> {
-                                itemComp.setGrnQuantity(gi.getReceivedQty());
+                                itemComp.setGrnQuantity(
+                                        gi.getAcceptedQty() != null ? gi.getAcceptedQty() : gi.getReceivedQty());
                                 itemComp.setGrnUnitPrice(gi.getUnitCost() != null ? gi.getUnitCost()
                                         : (itemComp.getPoUnitPrice() != null ? itemComp.getPoUnitPrice()
                                                 : BigDecimal.ZERO));
@@ -338,12 +345,53 @@ public class PaymentVoucherService {
                             });
                 }
 
-                boolean qtyMatch = itemComp.getInvoiceQuantity().equals(itemComp.getGrnQuantity());
-                boolean priceMatch = itemComp.getInvoiceUnitPrice().equals(itemComp.getPoUnitPrice());
-                itemComp.setIsMatch(qtyMatch && priceMatch);
-
                 itemComparisons.add(itemComp);
             }
+        }
+
+        // Look up purchase returns linked to the GRN and populate return data per item
+        BigDecimal returnSubTotal = BigDecimal.ZERO;
+        BigDecimal returnTotal = BigDecimal.ZERO;
+
+        if (grn != null && grn.getId() != null) {
+            List<PurchaseReturn> returns = purchaseReturnRepo.findByGrnId(grn.getId());
+            for (PurchaseReturn ret : returns) {
+                returnSubTotal = returnSubTotal.add(ret.getSubTotal() != null ? ret.getSubTotal() : BigDecimal.ZERO);
+                returnTotal = returnTotal.add(ret.getTotalAmount() != null ? ret.getTotalAmount() : BigDecimal.ZERO);
+
+                if (ret.getItems() != null) {
+                    for (PurchaseReturnItem retItem : ret.getItems()) {
+                        // Find matching item comparison by itemId
+                        itemComparisons.stream()
+                                .filter(ic -> ic.getItemName() != null
+                                        && retItem.getItem() != null
+                                        && ic.getItemName().equals(retItem.getItem().getItemNameAr()))
+                                .findFirst()
+                                .ifPresent(ic -> {
+                                    BigDecimal existingRetQty = ic.getReturnedQuantity() != null
+                                            ? ic.getReturnedQuantity()
+                                            : BigDecimal.ZERO;
+                                    ic.setReturnedQuantity(existingRetQty.add(retItem.getReturnedQty()));
+                                    ic.setReturnUnitPrice(retItem.getUnitPrice());
+                                    BigDecimal existingRetTotal = ic.getReturnLineTotal() != null
+                                            ? ic.getReturnLineTotal()
+                                            : BigDecimal.ZERO;
+                                    ic.setReturnLineTotal(existingRetTotal.add(retItem.getTotalPrice()));
+                                });
+                    }
+                }
+            }
+        }
+
+        // Set match status after return data is populated
+        for (InvoiceItemComparison ic : itemComparisons) {
+            BigDecimal retQty = ic.getReturnedQuantity() != null ? ic.getReturnedQuantity() : BigDecimal.ZERO;
+            BigDecimal netGrnQty = (ic.getGrnQuantity() != null ? ic.getGrnQuantity() : BigDecimal.ZERO)
+                    .subtract(retQty);
+            boolean qtyMatch = ic.getInvoiceQuantity() != null && ic.getInvoiceQuantity().compareTo(netGrnQty) == 0;
+            boolean priceMatch = ic.getInvoiceUnitPrice() != null && ic.getPoUnitPrice() != null
+                    && ic.getInvoiceUnitPrice().compareTo(ic.getPoUnitPrice()) == 0;
+            ic.setIsMatch(qtyMatch && priceMatch);
         }
 
         BigDecimal poSubTotal = po != null ? po.getSubTotal() : BigDecimal.ZERO;
@@ -371,14 +419,39 @@ public class PaymentVoucherService {
             grnDiscountAmount = inv.getDiscountAmount();
         }
 
+        // Calculate percentages for PO and Invoice
+        BigDecimal poDiscountPercentage = po != null && po.getSubTotal() != null
+                && po.getSubTotal().compareTo(BigDecimal.ZERO) > 0
+                        ? po.getDiscountAmount().multiply(new BigDecimal(100)).divide(po.getSubTotal(), 2,
+                                RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
+
+        BigDecimal poAfterDiscount = poSubTotal.subtract(poDiscountAmount);
+        BigDecimal poTaxPercentage = poAfterDiscount.compareTo(BigDecimal.ZERO) > 0
+                ? poTaxAmount.multiply(new BigDecimal(100)).divide(poAfterDiscount, 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        BigDecimal invDiscountPercentage = inv.getSubTotal() != null && inv.getSubTotal().compareTo(BigDecimal.ZERO) > 0
+                ? inv.getDiscountAmount().multiply(new BigDecimal(100)).divide(inv.getSubTotal(), 2,
+                        RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        BigDecimal invAfterDiscount = inv.getSubTotal().subtract(inv.getDiscountAmount());
+        BigDecimal invTaxPercentage = invAfterDiscount.compareTo(BigDecimal.ZERO) > 0
+                ? inv.getTaxAmount().multiply(new BigDecimal(100)).divide(invAfterDiscount, 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
         return InvoiceComparisonData.builder()
                 .supplierInvoiceId(inv.getId())
                 .invoiceNumber(inv.getInvoiceNumber())
                 .invoiceDate(inv.getInvoiceDate())
+                .currency(inv.getCurrency() != null ? inv.getCurrency() : "EGP")
                 .invoiceTotal(invoiceTotal)
                 .invoiceSubTotal(inv.getSubTotal())
                 .invoiceTaxAmount(inv.getTaxAmount())
                 .invoiceDiscountAmount(inv.getDiscountAmount())
+                .invoiceDiscountPercentage(invDiscountPercentage)
+                .invoiceTaxPercentage(invTaxPercentage)
                 .invoiceDeliveryCost(inv.getDeliveryCost())
                 .invoiceOtherCosts(inv.getOtherCosts())
 
@@ -387,6 +460,8 @@ public class PaymentVoucherService {
                 .poSubTotal(poSubTotal)
                 .poTaxAmount(poTaxAmount)
                 .poDiscountAmount(poDiscountAmount)
+                .poDiscountPercentage(poDiscountPercentage)
+                .poTaxPercentage(poTaxPercentage)
                 .poShippingCost(po != null ? po.getShippingCost() : BigDecimal.ZERO)
                 .poOtherCosts(po != null ? po.getOtherCosts() : BigDecimal.ZERO)
 
@@ -395,8 +470,16 @@ public class PaymentVoucherService {
                 .grnSubTotal(grnSubTotal)
                 .grnTaxAmount(grnTaxAmount)
                 .grnDiscountAmount(grnDiscountAmount)
+                .grnTaxPercentage(grnSubTotal.compareTo(BigDecimal.ZERO) > 0
+                        ? grnTaxAmount.multiply(new BigDecimal(100)).divide(grnSubTotal, 2, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO)
+                .grnDiscountPercentage(grnSubTotal.compareTo(BigDecimal.ZERO) > 0
+                        ? grnDiscountAmount.multiply(new BigDecimal(100)).divide(grnSubTotal, 2, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO)
                 .grnShippingCost(grn != null ? grn.getShippingCost() : BigDecimal.ZERO)
                 .grnOtherCosts(grn != null ? grn.getOtherCosts() : BigDecimal.ZERO)
+                .returnSubTotal(returnSubTotal)
+                .returnTotal(returnTotal)
 
                 .variancePercentage(variance)
                 .isValid(variance.abs().compareTo(new BigDecimal(10)) <= 0)
@@ -484,6 +567,8 @@ public class PaymentVoucherService {
                     .invoiceSubTotal(comparison.getInvoiceSubTotal())
                     .invoiceTaxAmount(comparison.getInvoiceTaxAmount())
                     .invoiceDiscountAmount(comparison.getInvoiceDiscountAmount())
+                    .invoiceTaxPercentage(comparison.getInvoiceTaxPercentage())
+                    .invoiceDiscountPercentage(comparison.getInvoiceDiscountPercentage())
                     .invoiceDeliveryCost(comparison.getInvoiceDeliveryCost())
                     .invoiceOtherCosts(comparison.getInvoiceOtherCosts())
                     .poNumber(comparison.getPoNumber())
@@ -491,6 +576,8 @@ public class PaymentVoucherService {
                     .poSubTotal(comparison.getPoSubTotal())
                     .poTaxAmount(comparison.getPoTaxAmount())
                     .poDiscountAmount(comparison.getPoDiscountAmount())
+                    .poTaxPercentage(comparison.getPoTaxPercentage())
+                    .poDiscountPercentage(comparison.getPoDiscountPercentage())
                     .poShippingCost(comparison.getPoShippingCost())
                     .poOtherCosts(comparison.getPoOtherCosts())
                     .grnNumber(comparison.getGrnNumber())
@@ -498,6 +585,8 @@ public class PaymentVoucherService {
                     .grnSubTotal(comparison.getGrnSubTotal())
                     .grnTaxAmount(comparison.getGrnTaxAmount())
                     .grnDiscountAmount(comparison.getGrnDiscountAmount())
+                    .grnTaxPercentage(comparison.getGrnTaxPercentage())
+                    .grnDiscountPercentage(comparison.getGrnDiscountPercentage())
                     .grnShippingCost(comparison.getGrnShippingCost())
                     .grnOtherCosts(comparison.getGrnOtherCosts())
                     .variancePercentage(comparison.getVariancePercentage())

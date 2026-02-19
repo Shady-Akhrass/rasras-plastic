@@ -41,7 +41,7 @@ const SaleOrderFormPage: React.FC = () => {
     const [processing, setProcessing] = useState(false);
     const [customers, setCustomers] = useState<any[]>([]);
     const [items, setItems] = useState<any[]>([]);
-    const [quotations, setQuotations] = useState<any[]>([]);
+    const [availableQuotations, setAvailableQuotations] = useState<any[]>([]);
     const approvalId = searchParams.get('approvalId');
 
     const [form, setForm] = useState<SaleOrderDto>({
@@ -64,14 +64,22 @@ const SaleOrderFormPage: React.FC = () => {
     useEffect(() => {
         (async () => {
             try {
-                const [c, i, q] = await Promise.all([
+                const [c, i, q, so] = await Promise.all([
                     customerService.getActiveCustomers().catch(() => []),
                     (itemService.getActiveItems() as Promise<{ data?: any[] }>).then((r) => Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : []).catch(() => []),
-                    salesQuotationService.getAll().catch(() => [])
+                    salesQuotationService.getAll().catch(() => []),
+                    saleOrderService.getAll().catch(() => [])
                 ]);
                 setCustomers(Array.isArray(c) ? c : []);
                 setItems(Array.isArray(i) ? i : []);
-                setQuotations(Array.isArray(q) ? q : []);
+                
+                // Filter quotations that don't have a sales order
+                const usedQuotationIds = (Array.isArray(so) ? so : [])
+                    .map((order: any) => order.salesQuotationId)
+                    .filter((id: number) => id);
+                const available = (Array.isArray(q) ? q : [])
+                    .filter((quotation: any) => !usedQuotationIds.includes(quotation.id));
+                setAvailableQuotations(available);
             } catch { toast.error('فشل تحميل البيانات'); }
         })();
     }, []);
@@ -151,9 +159,17 @@ const SaleOrderFormPage: React.FC = () => {
         setSaving(true);
         try {
             const payload: SaleOrderDto = { ...form, subTotal: subtotal, discountAmount: disc, taxAmount: tax, totalAmount: total, items: form.items };
+            let createdOrder: SaleOrderDto | null = null;
             if (isNew) {
-                await saleOrderService.create(payload);
-                toast.success('تم إنشاء أمر البيع');
+                createdOrder = await saleOrderService.create(payload);
+                if (createdOrder) {
+                    toast.success('تم إنشاء أمر البيع');
+                    // Automatically submit for approval
+                    await saleOrderService.submitForApproval(createdOrder.id!);
+                    toast.success('تم إرسال الأمر للاعتماد');
+                } else {
+                    toast.error('فشل إنشاء أمر البيع');
+                }
             } else {
                 await saleOrderService.update(parseInt(id!), payload);
                 toast.success('تم التحديث');
@@ -341,7 +357,7 @@ const SaleOrderFormPage: React.FC = () => {
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">عرض السعر (اختياري)</label>
                                 <select disabled={isReadOnly} value={form.salesQuotationId || ''} onChange={(e) => loadFromQuotation(parseInt(e.target.value) || 0)} className={inputClass()}>
                                     <option value="">—</option>
-                                    {quotations.map((q) => <option key={q.id} value={q.id}>{q.quotationNumber} — {q.customerNameAr}</option>)}
+                                    {availableQuotations.map((q) => <option key={q.id} value={q.id}>{q.quotationNumber} — {q.customerNameAr}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-2">

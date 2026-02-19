@@ -21,6 +21,7 @@ import { deliveryOrderService, type DeliveryOrderDto } from '../../services/deli
 import { stockIssueNoteService } from '../../services/stockIssueNoteService';
 import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
+import { vehicleService, type VehicleDto } from '../../services/vehicleService';
 
 const DeliveryOrderFormPage: React.FC = () => {
     const navigate = useNavigate();
@@ -33,6 +34,7 @@ const DeliveryOrderFormPage: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [issueNotes, setIssueNotes] = useState<{ id?: number; issueNoteNumber?: string; soNumber?: string; customerNameAr?: string; status?: string }[]>([]);
+    const [vehicles, setVehicles] = useState<VehicleDto[]>([]);
     const approvalId = searchParams.get('approvalId');
     const isView = searchParams.get('mode') === 'view';
     const isEdit = !!id && !isNew;
@@ -53,7 +55,9 @@ const DeliveryOrderFormPage: React.FC = () => {
                 const list = await stockIssueNoteService.getAll();
                 const approved = (Array.isArray(list) ? list : []).filter((n) => n.status === 'Approved');
                 setIssueNotes(approved);
-            } catch { toast.error('فشل تحميل إذونات الصرف'); }
+                const vehicleList = await vehicleService.getActive();
+                setVehicles(vehicleList);
+            } catch { toast.error('فشل تحميل البيانات'); }
         })();
     }, []);
 
@@ -348,6 +352,44 @@ const DeliveryOrderFormPage: React.FC = () => {
                                 عنوان التوصيل
                             </label>
                             <input type="text" value={form.deliveryAddress || ''} onChange={(e) => setForm((f) => ({ ...f, deliveryAddress: e.target.value }))} className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-brand-primary outline-none transition-all font-semibold" placeholder="عنوان الاستلام" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                <Truck className="w-4 h-4 text-brand-primary" />
+                                المركبة
+                            </label>
+                            <select
+                                value={form.vehicleId || ''}
+                                onChange={(e) => {
+                                    const vehicleId = e.target.value ? parseInt(e.target.value) : undefined;
+                                    // Auto-populate driver info from selected vehicle
+                                    if (vehicleId) {
+                                        const selectedVehicle = vehicles.find(v => v.id === vehicleId);
+                                        if (selectedVehicle) {
+                                            setForm((f) => ({
+                                                ...f,
+                                                vehicleId,
+                                                driverName: selectedVehicle.driverName || '',
+                                                driverPhone: selectedVehicle.driverPhone || ''
+                                            }));
+                                        }
+                                    } else {
+                                        setForm((f) => ({
+                                            ...f,
+                                            vehicleId: undefined,
+                                            driverName: '',
+                                            driverPhone: ''
+                                        }));
+                                    }
+                                }}
+                                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-brand-primary outline-none transition-all font-semibold"
+                            >
+                                <option value="">اختر المركبة...</option>
+                                {vehicles.map((v) => (
+                                    <option key={v.id} value={v.id}>{v.vehicleCode} - {v.plateNumber} - {v.brand} {v.model}</option>
+                                ))}
+                                {vehicles.length === 0 && <option value="" disabled>لا توجد مركبات نشطة</option>}
+                            </select>
                         </div>
                         <div className="space-y-2">
                             <label className="flex items-center gap-2 text-sm font-bold text-slate-600">

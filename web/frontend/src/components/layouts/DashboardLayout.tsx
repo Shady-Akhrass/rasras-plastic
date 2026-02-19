@@ -422,6 +422,11 @@ const DashboardLayout: React.FC = () => {
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
             },
             {
+                to: '/dashboard/sales/vehicles', icon: Truck,
+                label: 'المركبات', section: 'sales', order: 6.5,
+                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+            },
+            {
                 to: '/dashboard/sales/invoices', icon: FileText,
                 label: 'فواتير المبيعات', section: 'sales', order: 7,
                 roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'

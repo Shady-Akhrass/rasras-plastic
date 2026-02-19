@@ -188,7 +188,10 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    /** تعيين صلاحيات الأقسام للأدوار الافتراضية حتى يعمل السايد بار تلقائياً دون تعيين يدوي */
+    /**
+     * تعيين صلاحيات الأقسام للأدوار الافتراضية حتى يعمل السايد بار تلقائياً دون
+     * تعيين يدوي
+     */
     private void seedDefaultRoleSectionPermissions() {
         log.info("Seeding default role section permissions...");
         List<String> allSectionCodes = java.util.Arrays.asList(
@@ -206,10 +209,12 @@ public class DataSeeder implements CommandLineRunner {
 
         for (java.util.Map.Entry<String, java.util.List<String>> e : roleSectionMap.entrySet()) {
             Role role = roleRepository.findByRoleCode(e.getKey()).orElse(null);
-            if (role == null) continue;
+            if (role == null)
+                continue;
             for (String permCode : e.getValue()) {
                 Permission perm = permissionRepository.findByPermissionCode(permCode).orElse(null);
-                if (perm == null) continue;
+                if (perm == null)
+                    continue;
                 boolean exists = rolePermissionRepository.findByRoleRoleId(role.getRoleId()).stream()
                         .anyMatch(rp -> rp.getPermission().getPermissionId().equals(perm.getPermissionId()));
                 if (!exists) {
@@ -493,6 +498,30 @@ public class DataSeeder implements CommandLineRunner {
                 stepRepo.save(step3);
             }
         }
+
+        // 8. Sales Quotation Approval Workflow
+        if (!workflowRepo.findByWorkflowCode("QUOTATION_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow sqWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("QUOTATION_APPROVAL")
+                    .workflowName("Sales Quotation Approval")
+                    .documentType("SalesQuotation")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(sqWorkflow);
+
+            Role smRole = roleRepository.findByRoleCode("SM").orElse(null);
+            if (smRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(sqWorkflow)
+                        .stepNumber(1)
+                        .stepName("Sales Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(smRole)
+                        .build();
+                stepRepo.save(step1);
+            }
+        }
     }
 
     /**
@@ -505,48 +534,44 @@ public class DataSeeder implements CommandLineRunner {
         log.info("Seeding approval limits...");
 
         // Helper to get role by code safely
-        java.util.function.Function<String, Role> getRole = code ->
-                roleRepository.findByRoleCode(code).orElse(null);
+        java.util.function.Function<String, Role> getRole = code -> roleRepository.findByRoleCode(code).orElse(null);
 
         // 1) حدود أوامر الشراء (PO_APPROVAL)
         if (limitRepo.findByActivityTypeAndIsActiveTrue("PO_APPROVAL").isEmpty()) {
-            Role pm = getRole.apply("PM");   // Procurement Manager
-            Role fm = getRole.apply("FM");   // Finance Manager
-            Role gm = getRole.apply("GM");   // General Manager
+            Role pm = getRole.apply("PM"); // Procurement Manager
+            Role fm = getRole.apply("FM"); // Finance Manager
+            Role gm = getRole.apply("GM"); // General Manager
 
             if (pm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitPm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("PO_APPROVAL")
-                                .role(pm)
-                                .minAmount(java.math.BigDecimal.ZERO)
-                                .maxAmount(new java.math.BigDecimal("20000"))
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitPm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("PO_APPROVAL")
+                        .role(pm)
+                        .minAmount(java.math.BigDecimal.ZERO)
+                        .maxAmount(new java.math.BigDecimal("20000"))
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitPm);
             }
 
             if (fm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitFm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("PO_APPROVAL")
-                                .role(fm)
-                                .minAmount(new java.math.BigDecimal("20000"))
-                                .maxAmount(new java.math.BigDecimal("50000"))
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitFm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("PO_APPROVAL")
+                        .role(fm)
+                        .minAmount(new java.math.BigDecimal("20000"))
+                        .maxAmount(new java.math.BigDecimal("50000"))
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitFm);
             }
 
             if (gm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitGm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("PO_APPROVAL")
-                                .role(gm)
-                                .minAmount(new java.math.BigDecimal("50000"))
-                                .maxAmount(null) // بلا حد أعلى
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitGm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("PO_APPROVAL")
+                        .role(gm)
+                        .minAmount(new java.math.BigDecimal("50000"))
+                        .maxAmount(null) // بلا حد أعلى
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitGm);
             }
         }
@@ -554,85 +579,79 @@ public class DataSeeder implements CommandLineRunner {
         // 2) حدود اعتماد صرف فواتير الموردين / الشيكات (PAYMENT_APPROVAL)
         if (limitRepo.findByActivityTypeAndIsActiveTrue("PAYMENT_APPROVAL").isEmpty()) {
             Role acc = getRole.apply("ACC"); // Accountant
-            Role fm = getRole.apply("FM");   // Finance Manager
-            Role gm = getRole.apply("GM");   // General Manager
+            Role fm = getRole.apply("FM"); // Finance Manager
+            Role gm = getRole.apply("GM"); // General Manager
 
             if (acc != null) {
-                com.rasras.erp.approval.ApprovalLimit limitAcc =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("PAYMENT_APPROVAL")
-                                .role(acc)
-                                .minAmount(java.math.BigDecimal.ZERO)
-                                .maxAmount(new java.math.BigDecimal("30000"))
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitAcc = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("PAYMENT_APPROVAL")
+                        .role(acc)
+                        .minAmount(java.math.BigDecimal.ZERO)
+                        .maxAmount(new java.math.BigDecimal("30000"))
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitAcc);
             }
 
             if (fm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitFm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("PAYMENT_APPROVAL")
-                                .role(fm)
-                                .minAmount(new java.math.BigDecimal("30000"))
-                                .maxAmount(new java.math.BigDecimal("100000"))
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitFm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("PAYMENT_APPROVAL")
+                        .role(fm)
+                        .minAmount(new java.math.BigDecimal("30000"))
+                        .maxAmount(new java.math.BigDecimal("100000"))
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitFm);
             }
 
             if (gm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitGm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("PAYMENT_APPROVAL")
-                                .role(gm)
-                                .minAmount(new java.math.BigDecimal("100000"))
-                                .maxAmount(null)
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitGm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("PAYMENT_APPROVAL")
+                        .role(gm)
+                        .minAmount(new java.math.BigDecimal("100000"))
+                        .maxAmount(null)
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitGm);
             }
         }
 
         // 3) حدود خصم المبيعات (SALES_DISCOUNT) - للاستخدام المستقبلي
         if (limitRepo.findByActivityTypeAndIsActiveTrue("SALES_DISCOUNT").isEmpty()) {
-            Role sm = getRole.apply("SM");   // Sales Manager
-            Role fm = getRole.apply("FM");   // Finance Manager
-            Role gm = getRole.apply("GM");   // General Manager
+            Role sm = getRole.apply("SM"); // Sales Manager
+            Role fm = getRole.apply("FM"); // Finance Manager
+            Role gm = getRole.apply("GM"); // General Manager
 
             if (sm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitSm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("SALES_DISCOUNT")
-                                .role(sm)
-                                .minPercentage(java.math.BigDecimal.ZERO)
-                                .maxPercentage(new java.math.BigDecimal("5"))
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitSm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("SALES_DISCOUNT")
+                        .role(sm)
+                        .minPercentage(java.math.BigDecimal.ZERO)
+                        .maxPercentage(new java.math.BigDecimal("5"))
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitSm);
             }
 
             if (fm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitFm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("SALES_DISCOUNT")
-                                .role(fm)
-                                .minPercentage(new java.math.BigDecimal("5"))
-                                .maxPercentage(new java.math.BigDecimal("10"))
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitFm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("SALES_DISCOUNT")
+                        .role(fm)
+                        .minPercentage(new java.math.BigDecimal("5"))
+                        .maxPercentage(new java.math.BigDecimal("10"))
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitFm);
             }
 
             if (gm != null) {
-                com.rasras.erp.approval.ApprovalLimit limitGm =
-                        com.rasras.erp.approval.ApprovalLimit.builder()
-                                .activityType("SALES_DISCOUNT")
-                                .role(gm)
-                                .minPercentage(new java.math.BigDecimal("10"))
-                                .maxPercentage(null)
-                                .isActive(true)
-                                .build();
+                com.rasras.erp.approval.ApprovalLimit limitGm = com.rasras.erp.approval.ApprovalLimit.builder()
+                        .activityType("SALES_DISCOUNT")
+                        .role(gm)
+                        .minPercentage(new java.math.BigDecimal("10"))
+                        .maxPercentage(null)
+                        .isActive(true)
+                        .build();
                 limitRepo.save(limitGm);
             }
         }

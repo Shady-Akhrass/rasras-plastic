@@ -8,6 +8,7 @@ import {
     Calendar,
     User,
     Edit3,
+    Eye,
     CheckCircle2,
     XCircle,
     Clock,
@@ -130,15 +131,34 @@ const RequestTableRow: React.FC<{
         <td className="px-6 py-4">
             <StatusBadge status={request.status || 'Draft'} />
         </td>
+        <td className="px-6 py-4 text-sm text-slate-600">
+            {request.schedules && request.schedules.length > 0 ? (
+                <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <span className="font-semibold text-amber-600">
+                        {formatDate(request.schedules.sort((a, b) =>
+                            new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime()
+                        )[0].deliveryDate)}
+                    </span>
+                    {request.schedules.length > 1 && (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">
+                            +{request.schedules.length - 1}
+                        </span>
+                    )}
+                </div>
+            ) : (
+                <span className="text-slate-400">-</span>
+            )}
+        </td>
         <td className="px-6 py-4">
             <div className="flex items-center gap-2">
                 <button
                     onClick={() => onView(request.requestId)}
                     className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
                         rounded-lg transition-all duration-200"
-                    title={request.status === 'Draft' ? 'تعديل' : 'عرض'}
+                    title={request.status === 'Approved' ? 'عرض' : 'تعديل'}
                 >
-                    <Edit3 className="w-4 h-4" />
+                    {request.status === 'Approved' ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
                 </button>
 
                 {(request.status === 'Draft' || request.status === 'Rejected') && (
@@ -190,7 +210,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
-        <td colSpan={5} className="px-6 py-16">
+        <td colSpan={6} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm || statusFilter !== 'All' ? (
@@ -462,6 +482,7 @@ const CustomerRequestListPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">تاريخ الطلب</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">العميل</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
+                                <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">أقرب تسليم</th>
                                 <th className="px-6 py-4 text-left text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>
                         </thead>

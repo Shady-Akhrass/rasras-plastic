@@ -33,6 +33,8 @@ public class PaymentVoucherAllocationDto {
     private BigDecimal poSubTotal;
     private BigDecimal poTaxAmount;
     private BigDecimal poDiscountAmount;
+    private BigDecimal poTaxPercentage;
+    private BigDecimal poDiscountPercentage;
     private BigDecimal poShippingCost;
     private BigDecimal poOtherCosts;
 
@@ -41,8 +43,13 @@ public class PaymentVoucherAllocationDto {
     private BigDecimal grnSubTotal;
     private BigDecimal grnTaxAmount;
     private BigDecimal grnDiscountAmount;
+    private BigDecimal grnTaxPercentage;
+    private BigDecimal grnDiscountPercentage;
     private BigDecimal grnShippingCost;
     private BigDecimal grnOtherCosts;
+
+    private BigDecimal invoiceTaxPercentage;
+    private BigDecimal invoiceDiscountPercentage;
 
     private BigDecimal variancePercentage;
     private Boolean isValid;

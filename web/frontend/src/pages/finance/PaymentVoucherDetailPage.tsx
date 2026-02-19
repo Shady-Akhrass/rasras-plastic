@@ -519,6 +519,7 @@ const PaymentVoucherDetailPage: React.FC = () => {
                                     invoiceDeliveryCost={currentAllocation.invoiceDeliveryCost}
                                     invoiceOtherCosts={currentAllocation.invoiceOtherCosts}
                                     isValid={currentAllocation.isValid}
+                                    returnSubTotal={comparisonData?.returnSubTotal}
                                     items={comparisonData?.items || []}
                                     message={currentAllocation.isValid ? "المطابقة صحيحة ومكتملة البيانات" : "يوجد تفاوت في البيانات يتطلب المراجعة"}
                                 />

@@ -81,6 +81,18 @@ public class SalesQuotation extends AuditableEntity {
     @Column(name = "DeliveryTerms", length = 200)
     private String deliveryTerms;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "RequestID")
+    private CustomerRequest customerRequest;
+
+    @Column(name = "DeliveryCost", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal deliveryCost = BigDecimal.ZERO;
+
+    @Column(name = "OtherCosts", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal otherCosts = BigDecimal.ZERO;
+
     @Column(name = "Status", length = 20)
     @Builder.Default
     private String status = "Draft";
