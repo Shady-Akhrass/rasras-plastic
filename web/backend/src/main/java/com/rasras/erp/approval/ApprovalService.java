@@ -610,6 +610,14 @@ public class ApprovalService {
                     sq.setStatus("Approved");
                 } else if ("Rejected".equals(status)) {
                     sq.setStatus("Rejected");
+                    // NEW: Capture rejection comment
+                    if (request.getActions() != null && !request.getActions().isEmpty()) {
+                        // Get the latest rejection comment
+                        request.getActions().stream()
+                                .filter(a -> "Rejected".equals(a.getActionType()))
+                                .reduce((first, second) -> second) // Get the last rejection action
+                                .ifPresent(action -> sq.setRejectedReason(action.getComments()));
+                    }
                 }
                 salesQuotationRepo.save(sq);
             });
@@ -739,11 +747,12 @@ public class ApprovalService {
 
         // 3. تم تعطيل approval workflow للـ PO لأنه معتمد تلقائياً بعد اعتماد المقارنة
         // PO يُنشأ فقط من مقارنة معتمدة، لذلك يُعتبر معتمداً مباشرة
-        savedPo.setStatus("Confirmed");  // معتمد مباشرة
-        savedPo.setApprovalStatus("Approved");  // معتمد تلقائياً
+        savedPo.setStatus("Confirmed"); // معتمد مباشرة
+        savedPo.setApprovalStatus("Approved"); // معتمد تلقائياً
         poRepo.save(savedPo);
-        
-        System.out.println("✅ PO " + savedPo.getPoNumber() + " created and auto-approved from comparison " + qc.getComparisonNumber());
+
+        System.out.println("✅ PO " + savedPo.getPoNumber() + " created and auto-approved from comparison "
+                + qc.getComparisonNumber());
     }
 
     private String generatePONumber() {

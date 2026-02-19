@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -21,7 +22,6 @@ public class Item {
     @Column(name = "ItemID")
     private Integer id;
 
-    /** كود الصنف الفريد - يُولَّد تلقائياً (مثال: ITEM-00001) */
     @Column(name = "ItemCode", nullable = false, unique = true)
     private String itemCode;
 
@@ -31,22 +31,20 @@ public class Item {
     @Column(name = "ItemNameEn")
     private String itemNameEn;
 
-    /** العلامة التجارية / Grade. Use @Transient if DB lacks column; remove @Transient once column exists. */
-    @Transient
+    @Column(name = "Grade")
     private String grade;
 
-    /** MFR (Melt Flow Rate) - معدل تدفق الذوبان. Use @Transient if DB lacks column. */
-    @Transient
-    private BigDecimal gradeName;
+    @Column(name = "GradeName")
+    private String gradeName;
 
-    @Transient
-    private String mi2;
+    @Column(name = "MI2")
+    private BigDecimal mi2;
 
-    @Transient
-    private String mi21;
+    @Column(name = "MI21")
+    private BigDecimal mi21;
 
-    @Transient
-    private String density;
+    @Column(name = "Density")
+    private BigDecimal density;
 
     @Column(name = "CategoryID", nullable = false)
     private Integer categoryId;

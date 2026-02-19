@@ -70,15 +70,15 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             border: 'border-slate-200',
             icon: FileText
         },
-        'Sent': {
-            label: 'تم الإرسال',
-            bg: 'bg-blue-50',
-            text: 'text-blue-700',
-            border: 'border-blue-200',
+        'Pending': {
+            label: 'قيد الاعتماد',
+            bg: 'bg-amber-50',
+            text: 'text-amber-700',
+            border: 'border-amber-200',
             icon: Clock
         },
-        'Accepted': {
-            label: 'مقبول',
+        'Approved': {
+            label: 'معتمد',
             bg: 'bg-emerald-50',
             text: 'text-emerald-700',
             border: 'border-emerald-200',
@@ -150,8 +150,8 @@ const QuotationListPage: React.FC = () => {
     const stats = useMemo(() => {
         const total = list.length;
         const totalAmount = list.reduce((sum, q) => sum + (Number(q.totalAmount) || 0), 0);
-        const accepted = list.filter(q => q.status === 'Accepted').length;
-        const pending = list.filter(q => q.status === 'Sent' || !q.status).length;
+        const accepted = list.filter(q => q.status === 'Approved').length;
+        const pending = list.filter(q => q.status === 'Pending').length;
 
         return {
             total,
@@ -265,8 +265,8 @@ const QuotationListPage: React.FC = () => {
                             >
                                 <option value="All">جميع الحالات</option>
                                 <option value="Draft">مسودة</option>
-                                <option value="Sent">تم الإرسال</option>
-                                <option value="Accepted">مقبول</option>
+                                <option value="Pending">قيد الاعتماد</option>
+                                <option value="Approved">معتمد</option>
                                 <option value="Rejected">مرفوض</option>
                             </select>
                         </div>
@@ -363,22 +363,21 @@ const QuotationListPage: React.FC = () => {
                                             <div className="flex flex-col gap-1">
                                                 <StatusBadge status={q.status || 'Draft'} />
                                                 {q.approvalStatus && (
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${
-                                                        q.approvalStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${q.approvalStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
                                                         q.approvalStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                        q.approvalStatus === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                                        'bg-slate-50 text-slate-500 border-slate-200'
-                                                    }`}>
+                                                            q.approvalStatus === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                                'bg-slate-50 text-slate-500 border-slate-200'
+                                                        }`}>
                                                         {q.approvalStatus === 'Approved' ? 'معتمد' :
                                                             q.approvalStatus === 'Rejected' ? 'مرفوض' :
-                                                            q.approvalStatus === 'Pending' ? 'قيد الاعتماد' : q.approvalStatus}
+                                                                q.approvalStatus === 'Pending' ? 'قيد الاعتماد' : q.approvalStatus}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-left">
                                             <div className="flex items-center justify-end gap-2">
-                                                {q.status !== 'Draft' && q.status !== 'Rejected' && (
+                                                {q.status === 'Approved' && (
                                                     <button
                                                         onClick={async (e) => {
                                                             e.stopPropagation();

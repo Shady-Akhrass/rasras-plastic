@@ -11,13 +11,14 @@ import {
     User,
     ClipboardList,
     Eye,
-    Tag,
+    Calendar,
+    Clock,
 } from 'lucide-react';
 import { customerRequestService } from '../../services/customerRequestService';
 import customerService, { type Customer } from '../../services/customerService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService } from '../../services/unitService';
-import { priceListService, type PriceListDto } from '../../services/priceListService';
+import { priceListService, type PriceListItemDto } from '../../services/priceListService';
 import type { CustomerRequest, CustomerRequestItem } from '../../types/sales';
 import toast from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
@@ -33,15 +34,13 @@ const CustomerRequestFormPage = () => {
     const location = useLocation();
     const isEditMode = !!id;
     const queryParams = new URLSearchParams(location.search);
-    const isViewMode = queryParams.get('mode') === 'view';
-
     const [loading, setLoading] = useState(false);
 
     // Master Data State
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [items, setItems] = useState<ItemDto[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
-    const [priceLists, setPriceLists] = useState<PriceListDto[]>([]);
+    const [sellablePrices, setSellablePrices] = useState<PriceListItemDto[]>([]);
 
     // Form State
     const [formData, setFormData] = useState<Partial<CustomerRequest>>({
@@ -50,8 +49,90 @@ const CustomerRequestFormPage = () => {
         customerId: 0,
         priceListId: 0,
         notes: '',
-        items: []
+        items: [],
+        schedules: []
     });
+
+    const isViewMode = queryParams.get('mode') === 'view' || formData.status === 'Approved';
+
+    // ──────────────────────────────────────────
+    // Synchronization Logic
+    // ──────────────────────────────────────────
+
+    const getSyncedItems = (items: CustomerRequestItem[] | undefined, schedules: any[] | undefined) => {
+        if (!items || items.length === 0) return items;
+        const currentItems = [...items];
+        const currentSchedules = schedules || [];
+
+        // Calculate total quantity per productId from schedules
+        const qtyMap = currentSchedules.reduce((acc: Record<number, number>, s) => {
+            if (s.productId) {
+                acc[s.productId] = (acc[s.productId] || 0) + (parseFloat(s.quantity) || 0);
+            }
+            return acc;
+        }, {});
+
+        // Update items with their synced quantities
+        const newItems = currentItems.map(item => {
+            if (item.productId && qtyMap[item.productId] !== undefined) {
+                const newQty = qtyMap[item.productId];
+
+                // Recalculate totalPrice if it exists (it's added dynamically for UI)
+                const unitPrice = (item as any).unitPrice || 0;
+                return {
+                    ...item,
+                    quantity: newQty,
+                    totalPrice: newQty * unitPrice
+                };
+            }
+            return item;
+        });
+
+        return newItems;
+    };
+
+    const addSchedule = () => {
+        setFormData(prev => {
+            const newSchedules = [
+                ...(prev.schedules || []),
+                {
+                    deliveryDate: new Date().toISOString().split('T')[0],
+                    productId: 0,
+                    quantity: 0,
+                    notes: ''
+                }
+            ];
+            return {
+                ...prev,
+                schedules: newSchedules,
+                items: getSyncedItems(prev.items, newSchedules)
+            };
+        });
+    };
+
+    const updateSchedule = (index: number, field: keyof any, value: any) => {
+        setFormData(prev => {
+            const newSchedules = [...(prev.schedules || [])];
+            newSchedules[index] = { ...newSchedules[index], [field]: value };
+            return {
+                ...prev,
+                schedules: newSchedules,
+                items: getSyncedItems(prev.items, newSchedules)
+            };
+        });
+    };
+
+    const removeSchedule = (index: number) => {
+        setFormData(prev => {
+            const newSchedules = [...(prev.schedules || [])];
+            newSchedules.splice(index, 1);
+            return {
+                ...prev,
+                schedules: newSchedules,
+                items: getSyncedItems(prev.items, newSchedules)
+            };
+        });
+    };
 
     useEffect(() => {
         loadMasterData();
@@ -79,7 +160,14 @@ const CustomerRequestFormPage = () => {
             setUnits(Array.isArray(unitsData) ? unitsData : []);
 
             const plData = 'data' in priceListsRes ? (priceListsRes as any).data : priceListsRes;
-            setPriceLists(Array.isArray(plData) ? plData.filter((pl: any) => pl.listType === 'SELLING') : []);
+            const sellingLists = Array.isArray(plData) ? plData.filter((pl: any) => pl.listType === 'SELLING') : [];
+            const allSellablePrices: PriceListItemDto[] = [];
+            sellingLists.forEach(list => {
+                if (list.items) {
+                    allSellablePrices.push(...list.items);
+                }
+            });
+            setSellablePrices(allSellablePrices);
 
         } catch (error) {
             console.error('Failed to load master data', error);
@@ -125,23 +213,36 @@ const CustomerRequestFormPage = () => {
     };
 
     const updateItem = (index: number, field: keyof CustomerRequestItem, value: any) => {
-        const newItems = [...(formData.items || [])];
-        const item = { ...newItems[index], [field]: value };
+        setFormData(prev => {
+            const newItems = [...(prev.items || [])];
+            const item = { ...newItems[index], [field]: value };
 
-        // If product changed, update related fields
-        if (field === 'productId') {
-            const selectedItem = items.find(i => i.id === value);
-            if (selectedItem) {
-                item.productName = selectedItem.itemNameAr;
-                // If item has a default unit, use it
-                if (selectedItem.unitId) {
+            if (field === 'productId') {
+                const selectedItem = items.find(i => i.id === value);
+                if (selectedItem) {
+                    item.productName = selectedItem.itemNameAr;
                     item.unitId = selectedItem.unitId;
                 }
-            }
-        }
 
-        newItems[index] = item;
-        setFormData(prev => ({ ...prev, items: newItems }));
+                // Automatic Price Lookup
+                const pli = sellablePrices.find(p => p.itemId === value);
+                if (pli) {
+                    (item as any).unitPrice = priceListService.getPriceForItem(value as number, [pli]);
+                    // Update form's priceListId if found
+                    prev.priceListId = pli.priceListId;
+                } else {
+                    (item as any).unitPrice = 0;
+                }
+            }
+
+            // Calculate line total for UI
+            const qty = item.quantity || 0;
+            const price = (item as any).unitPrice || 0;
+            (item as any).totalPrice = qty * price;
+
+            newItems[index] = item;
+            return { ...prev, items: newItems };
+        });
     };
 
     const removeItem = (index: number) => {
@@ -177,7 +278,9 @@ const CustomerRequestFormPage = () => {
 
         try {
             setLoading(true);
-            const submissionData = { ...formData };
+            // Final safety sync
+            const finalItems = getSyncedItems(formData.items, formData.schedules);
+            const submissionData = { ...formData, items: finalItems };
 
             if (isEditMode) {
                 await customerRequestService.updateRequest(Number(id), submissionData);
@@ -197,6 +300,7 @@ const CustomerRequestFormPage = () => {
 
     const totalItems = formData.items?.length || 0;
     const totalQuantity = formData.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+    const totalEstimatedAmount = formData.items?.reduce((sum, item) => sum + ((item as any).totalPrice || 0), 0) || 0;
 
     if (loading && isEditMode) {
         return (
@@ -333,27 +437,127 @@ const CustomerRequestFormPage = () => {
                                 </select>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                                    <Tag className="w-4 h-4 text-brand-primary" />
-                                    قائمة الأسعار
-                                </label>
-                                <select
-                                    name="priceListId"
-                                    value={formData.priceListId || ''}
-                                    disabled={isViewMode}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, priceListId: parseInt(e.target.value) }))}
-                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
-                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                >
-                                    <option value="">اختر قائمة الأسعار...</option>
-                                    {priceLists.map(pl => (
-                                        <option key={pl.id} value={pl.id}>
-                                            {pl.priceListName}
-                                        </option>
-                                    ))}
-                                </select>
+                        </div>
+                    </div>
+
+                    {/* Delivery Scheduling */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '50ms' }}>
+                        <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-amber-100 rounded-xl">
+                                        <Calendar className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 text-lg">جدولة التوصيل</h3>
+                                        <p className="text-slate-500 text-sm">تحديد مواعيد التوصيل والكميات لكل موعد</p>
+                                    </div>
+                                </div>
+                                {!isViewMode && (
+                                    <button
+                                        type="button"
+                                        onClick={addSchedule}
+                                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-all font-bold shadow-md shadow-amber-200"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        إضافة موعد
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 text-right">
+                                            <th className="pb-4 pr-2 text-sm font-bold text-slate-500">م</th>
+                                            <th className="pb-4 px-4 text-sm font-bold text-slate-500">الصنف</th>
+                                            <th className="pb-4 px-4 text-sm font-bold text-slate-500">تاريخ التوصيل</th>
+                                            <th className="pb-4 px-4 text-sm font-bold text-slate-500 text-center">الكمية</th>
+                                            <th className="pb-4 px-4 text-sm font-bold text-slate-500">ملاحظات التوصيل</th>
+                                            {!isViewMode && <th className="pb-4 px-4 text-sm font-bold text-slate-500">التحكم</th>}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {(formData.schedules || []).map((schedule, index) => (
+                                            <tr key={index} className="group hover:bg-slate-50/50 transition-colors">
+                                                <td className="py-4 pr-2 text-sm font-bold text-slate-400">
+                                                    {index + 1}
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <select
+                                                        disabled={isViewMode}
+                                                        value={schedule.productId || ''}
+                                                        onChange={(e) => updateSchedule(index, 'productId', parseInt(e.target.value))}
+                                                        className="w-full min-w-[150px] px-3 py-2 bg-white border border-slate-200 rounded-lg focus:border-brand-primary outline-none text-sm font-semibold transition-all"
+                                                    >
+                                                        <option value={0}>اختر الصنف...</option>
+                                                        {formData.items?.map(it => (
+                                                            <option key={it.productId} value={it.productId}>
+                                                                {it.productName}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <div className="relative">
+                                                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                                        <input
+                                                            type="date"
+                                                            disabled={isViewMode}
+                                                            min={new Date().toISOString().split('T')[0]}
+                                                            value={schedule.deliveryDate}
+                                                            onChange={(e) => updateSchedule(index, 'deliveryDate', e.target.value)}
+                                                            className="w-full pr-10 pl-3 py-2 bg-white border border-slate-200 rounded-lg focus:border-brand-primary outline-none text-sm font-semibold transition-all disabled:opacity-70"
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4 flex justify-center">
+                                                    <input
+                                                        type="number"
+                                                        disabled={isViewMode}
+                                                        value={schedule.quantity || 0}
+                                                        onChange={(e) => updateSchedule(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                                        className="w-32 px-3 py-2 bg-white border border-slate-200 rounded-lg focus:border-brand-primary outline-none text-sm font-bold text-center transition-all disabled:opacity-70"
+                                                    />
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="أضف ملاحظات التوصيل (عنوان أو تفاصيل)..."
+                                                        disabled={isViewMode}
+                                                        value={schedule.notes || ''}
+                                                        onChange={(e) => updateSchedule(index, 'notes', e.target.value)}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:border-brand-primary outline-none text-sm font-medium transition-all disabled:opacity-70"
+                                                    />
+                                                </td>
+                                                {!isViewMode && (
+                                                    <td className="py-4 px-4 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeSchedule(index)}
+                                                            className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                            title="حذف الموعد"
+                                                        >
+                                                            <Trash2 className="w-5 h-5" />
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                        {(formData.schedules || []).length === 0 && (
+                                            <tr>
+                                                <td colSpan={isViewMode ? 4 : 5} className="py-12 text-center">
+                                                    <div className="flex flex-col items-center gap-2 opacity-40">
+                                                        <Clock className="w-8 h-8 text-slate-400" />
+                                                        <p className="text-slate-500 font-medium">لا توجد مواعيد توصيل مجدولة</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -407,6 +611,8 @@ const CustomerRequestFormPage = () => {
                                             الكمية <span className="text-rose-500">*</span>
                                         </th>
                                         <th className="py-4 px-4 text-center">الوحدة</th>
+                                        <th className="py-4 px-4 text-center">سعر الوحدة</th>
+                                        <th className="py-4 px-4 text-center">الإجمالي</th>
                                         <th className="py-4 px-4 text-right">ملاحظات</th>
                                         <th className="py-4 pl-6 text-center w-16">حذف</th>
                                     </tr>
@@ -428,11 +634,13 @@ const CustomerRequestFormPage = () => {
                                                         ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 >
                                                     <option value={0}>اختر الصنف...</option>
-                                                    {items.filter(i => i.isSellable).map(i => (
-                                                        <option key={i.id} value={i.id}>
-                                                            {i.itemNameAr} ({i.grade || i.itemCode})
-                                                        </option>
-                                                    ))}
+                                                    {items
+                                                        .filter(i => i.isSellable)
+                                                        .map(i => (
+                                                            <option key={i.id} value={i.id}>
+                                                                {i.itemNameAr} ({i.grade || i.itemCode})
+                                                            </option>
+                                                        ))}
                                                 </select>
                                             </td>
                                             <td className="py-4 px-4">
@@ -440,20 +648,31 @@ const CustomerRequestFormPage = () => {
                                                     type="number"
                                                     min="0.001"
                                                     step="0.001"
-                                                    disabled={isViewMode}
+                                                    disabled={isViewMode || formData.schedules?.some(s => s.productId === item.productId)}
                                                     value={item.quantity}
                                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                                     required
                                                     className={`w-28 px-3 py-2 bg-white border-2 border-slate-200 rounded-xl 
                                                         text-sm text-center font-bold text-brand-primary outline-none 
                                                         focus:border-brand-primary transition-all
-                                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                        ${isViewMode || formData.schedules?.some(s => s.productId === item.productId) ? 'opacity-70 cursor-not-allowed bg-slate-50' : ''}`}
+                                                    title={formData.schedules?.some(s => s.productId === item.productId) ? 'يتم حساب الكمية تلقائياً من جدول التوصيل' : ''}
                                                 />
                                             </td>
                                             <td className="py-4 px-4 text-center">
                                                 <span className="text-sm font-semibold text-slate-600">
                                                     {units.find(u => u.id === item.unitId)?.unitNameAr ||
                                                         items.find(i => i.id === item.productId)?.unitName || '-'}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-4 text-center">
+                                                <span className="text-sm font-bold text-slate-700">
+                                                    {formatNumber((item as any).unitPrice || 0)}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-4 text-center">
+                                                <span className="text-sm font-bold text-emerald-600">
+                                                    {formatNumber((item as any).totalPrice || 0)}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-4">
@@ -515,8 +734,14 @@ const CustomerRequestFormPage = () => {
                                 <span className="font-bold text-lg" dir="ltr">{totalItems}</span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                <span className="text-white/60 text-sm">إجمالي الكميات</span>
+                                <span className="text-white/60 text-sm">إجمالي القيمة التقديرية</span>
                                 <span className="font-bold text-lg text-emerald-400" dir="ltr">
+                                    {formatNumber(totalEstimatedAmount, { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                                <span className="text-white/60 text-sm">إجمالي الكميات</span>
+                                <span className="font-bold text-lg text-white/80" dir="ltr">
                                     {formatNumber(totalQuantity, { minimumFractionDigits: 2 })}
                                 </span>
                             </div>

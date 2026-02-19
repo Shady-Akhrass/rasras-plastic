@@ -71,6 +71,7 @@ const DatabaseSettingsPage: React.FC = () => {
     // Error Logs State
     const [errorLogs, setErrorLogs] = useState<string[]>([]);
     const [loadingErrorLogs, setLoadingErrorLogs] = useState(false);
+    const [clearingErrorLogs, setClearingErrorLogs] = useState(false);
 
     const [showPassword, setShowPassword] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -265,6 +266,28 @@ const DatabaseSettingsPage: React.FC = () => {
             console.error(error);
         } finally {
             setLoadingErrorLogs(false);
+        }
+    };
+
+    const handleClearErrorLogs = async () => {
+        setClearingErrorLogs(true);
+        try {
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch(`${API_BASE_URL}/api/settings/database/error-logs/clear`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                showNotification('success', 'تم مسح سجل الأخطاء بنجاح');
+                setErrorLogs([]);
+            } else {
+                showNotification('error', data.message);
+            }
+        } catch (error: any) {
+            showNotification('error', error.message);
+        } finally {
+            setClearingErrorLogs(false);
         }
     };
 
@@ -548,9 +571,19 @@ const DatabaseSettingsPage: React.FC = () => {
                             <AlertOctagon className="w-5 h-5" />
                             سجلات أخطاء النظام
                         </h3>
-                        <button onClick={fetchErrorLogs} className="p-2 hover:bg-slate-100 rounded-lg">
-                            <RefreshCw className={`w-4 h-4 text-slate-500 ${loadingErrorLogs ? 'animate-spin' : ''}`} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleClearErrorLogs}
+                                disabled={clearingErrorLogs || errorLogs.length === 0}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors disabled:opacity-50"
+                            >
+                                <Trash2 className={`w-3.5 h-3.5 ${clearingErrorLogs ? 'animate-pulse' : ''}`} />
+                                مسح السجل
+                            </button>
+                            <button onClick={fetchErrorLogs} className="p-2 hover:bg-slate-100 rounded-lg">
+                                <RefreshCw className={`w-4 h-4 text-slate-500 ${loadingErrorLogs ? 'animate-spin' : ''}`} />
+                            </button>
+                        </div>
                     </div>
                     <div className="flex-1 overflow-auto bg-slate-50 p-4">
                         {errorLogs.length > 0 ? (

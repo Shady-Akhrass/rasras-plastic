@@ -7,6 +7,8 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "approvalrequests")
@@ -66,4 +68,7 @@ public class ApprovalRequest {
 
     @Column(name = "CompletedDate")
     private LocalDateTime completedDate;
+
+    @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ApprovalAction> actions = new java.util.ArrayList<>();
 }

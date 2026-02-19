@@ -130,9 +130,17 @@ public class DatabaseController {
     }
 
     @GetMapping("/error-logs")
-    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
-    @Operation(summary = "Get Database Error Logs", description = "Returns the persistent database operation error logs.")
-    public ResponseEntity<ApiResponse<List<String>>> getErrorLogs() {
-        return ResponseEntity.ok(ApiResponse.success(databaseService.getErrorLogs()));
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @Operation(summary = "Get System Error Logs", description = "Returns filtered system error logs.")
+    public ResponseEntity<ApiResponse<List<String>>> getErrorLogs(@RequestParam(defaultValue = "100") int limit) {
+        return ResponseEntity.ok(ApiResponse.success(logService.getSystemErrorLogs(limit)));
+    }
+
+    @PostMapping("/error-logs/clear")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @Operation(summary = "Clear System Error Logs", description = "Virtually clears the system error logs.")
+    public ResponseEntity<ApiResponse<String>> clearErrorLogs() {
+        logService.clearSystemErrorLogs();
+        return ResponseEntity.ok(ApiResponse.success("System error logs cleared successfully."));
     }
 }

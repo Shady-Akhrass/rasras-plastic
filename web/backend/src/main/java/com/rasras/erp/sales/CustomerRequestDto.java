@@ -25,4 +25,5 @@ public class CustomerRequestDto {
     private LocalDateTime createdAt;
     private Integer createdBy;
     private List<CustomerRequestItemDto> items;
+    private List<CustomerRequestDeliveryScheduleDto> schedules;
 }

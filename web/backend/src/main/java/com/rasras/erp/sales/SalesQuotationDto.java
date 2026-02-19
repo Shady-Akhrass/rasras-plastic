@@ -35,6 +35,10 @@ public class SalesQuotationDto {
     private BigDecimal totalAmount;
     private String paymentTerms;
     private String deliveryTerms;
+    private Integer requestId;
+    private BigDecimal deliveryCost;
+    private BigDecimal otherCosts;
+
     private String status;
     private String approvalStatus;
     private LocalDateTime sentDate;

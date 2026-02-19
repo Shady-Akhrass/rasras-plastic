@@ -54,6 +54,8 @@ export interface PaymentVoucherAllocationDto {
     invoiceSubTotal?: number;
     invoiceTaxAmount?: number;
     invoiceDiscountAmount?: number;
+    invoiceTaxPercentage?: number;
+    invoiceDiscountPercentage?: number;
     invoiceDeliveryCost?: number;
     invoiceOtherCosts?: number;
     poNumber?: string;
@@ -61,6 +63,8 @@ export interface PaymentVoucherAllocationDto {
     poSubTotal?: number;
     poTaxAmount?: number;
     poDiscountAmount?: number;
+    poTaxPercentage?: number;
+    poDiscountPercentage?: number;
     poShippingCost?: number;
     poOtherCosts?: number;
     grnNumber?: string;
@@ -68,6 +72,8 @@ export interface PaymentVoucherAllocationDto {
     grnSubTotal?: number;
     grnTaxAmount?: number;
     grnDiscountAmount?: number;
+    grnTaxPercentage?: number;
+    grnDiscountPercentage?: number;
     grnShippingCost?: number;
     grnOtherCosts?: number;
     variancePercentage?: number;
@@ -82,6 +88,8 @@ export interface InvoiceComparisonData {
     invoiceSubTotal?: number;
     invoiceTaxAmount?: number;
     invoiceDiscountAmount?: number;
+    invoiceTaxPercentage?: number;
+    invoiceDiscountPercentage?: number;
     invoiceDeliveryCost?: number;
     invoiceOtherCosts?: number;
     poNumber?: string;
@@ -89,6 +97,8 @@ export interface InvoiceComparisonData {
     poSubTotal?: number;
     poTaxAmount?: number;
     poDiscountAmount?: number;
+    poTaxPercentage?: number;
+    poDiscountPercentage?: number;
     poShippingCost?: number;
     poOtherCosts?: number;
     grnNumber?: string;
@@ -96,8 +106,12 @@ export interface InvoiceComparisonData {
     grnSubTotal?: number;
     grnTaxAmount?: number;
     grnDiscountAmount?: number;
+    grnTaxPercentage?: number;
+    grnDiscountPercentage?: number;
     grnShippingCost?: number;
     grnOtherCosts?: number;
+    returnTotal?: number;
+    returnSubTotal?: number;
     variancePercentage?: number;
     isValid?: boolean;
     paidAmount?: number;
@@ -112,12 +126,17 @@ export interface InvoiceItemComparison {
     itemName: string;
     poQuantity?: number;
     grnQuantity?: number;
+    returnedQuantity?: number;
     invoiceQuantity?: number;
     poUnitPrice?: number;
+    poDiscountPercentage?: number;
+    poTaxPercentage?: number;
     grnUnitPrice?: number;
+    returnUnitPrice?: number;
     invoiceUnitPrice?: number;
     poLineTotal?: number;
     grnLineTotal?: number;
+    returnLineTotal?: number;
     invoiceLineTotal?: number;
     isMatch?: boolean;
 }

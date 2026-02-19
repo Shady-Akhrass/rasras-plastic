@@ -23,6 +23,8 @@ import Pagination from '../../components/common/Pagination';
 import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import InvoiceMatchingValidation from '../../components/finance/InvoiceMatchingValidation';
+import type { InvoiceComparisonData } from '../../services/paymentVoucherService';
 
 
 // Stat Card Component
@@ -287,6 +289,11 @@ const PaymentVouchersPage: React.FC = () => {
     const [unpaidInvoicesLoading, setUnpaidInvoicesLoading] = useState(false);
     const [selectedInvoices, setSelectedInvoices] = useState<Set<number>>(new Set());
 
+    // Validation Modal State
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [validationData, setValidationData] = useState<InvoiceComparisonData | null>(null);
+    const [validationLoading, setValidationLoading] = useState(false);
+
     useEffect(() => {
         fetchVouchers();
     }, []);
@@ -396,6 +403,27 @@ const PaymentVouchersPage: React.FC = () => {
         } catch (error) {
             console.error('Print failed:', error);
             // Optional: add a toast notice here if one is available in the scope
+        }
+    };
+
+    const handleVerifyInvoice = async (invoice: SupplierInvoiceDto) => {
+        try {
+            setValidationLoading(true);
+            // Fetch comparison data for this supplier
+            const comparisons = await paymentVoucherService.getInvoiceComparison(invoice.supplierId);
+            const specificComparison = comparisons.find(c => c.supplierInvoiceId === invoice.id);
+
+            if (specificComparison) {
+                setValidationData(specificComparison);
+                setShowValidationModal(true);
+            } else {
+                toast.error('لم يتم العثور على بيانات مطابقة لهذه الفاتورة');
+            }
+        } catch (error) {
+            console.error('Failed to fetch validation data:', error);
+            toast.error('فشل تحميل بيانات المطابقة');
+        } finally {
+            setValidationLoading(false);
         }
     };
 
@@ -717,7 +745,16 @@ const PaymentVouchersPage: React.FC = () => {
                                                         <span className="text-sm text-slate-600">—</span>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className="text-sm text-slate-600">—</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => handleVerifyInvoice(invoice)}
+                                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                                                                title="التحقق من المطابقة"
+                                                            >
+                                                                <ShieldCheck className="w-4 h-4" />
+                                                            </button>
+                                                            <span className="text-sm text-slate-600">—</span>
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -787,6 +824,66 @@ const PaymentVouchersPage: React.FC = () => {
                             }}
                         />
                     )}
+                </div>
+            )}
+
+            {/* Validation Modal */}
+            {showValidationModal && validationData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 z-10 flex items-center justify-between p-6 bg-white border-b border-slate-100">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <ShieldCheck className="w-6 h-6 text-brand-primary" />
+                                مطابقة الفاتورة رقم {validationData.invoiceNumber}
+                            </h3>
+                            <button
+                                onClick={() => setShowValidationModal(false)}
+                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <InvoiceMatchingValidation
+                                poNumber={validationData.poNumber}
+                                grnNumber={validationData.grnNumber}
+                                invoiceNumber={validationData.invoiceNumber}
+                                poTotal={validationData.poTotal}
+                                poSubTotal={validationData.poSubTotal}
+                                poTaxAmount={validationData.poTaxAmount}
+                                poDiscountAmount={validationData.poDiscountAmount}
+                                poShippingCost={validationData.poShippingCost}
+                                poOtherCosts={validationData.poOtherCosts}
+                                grnTotal={validationData.grnTotal}
+                                grnSubTotal={validationData.grnSubTotal}
+                                grnTaxAmount={validationData.grnTaxAmount}
+                                grnDiscountAmount={validationData.grnDiscountAmount}
+                                grnTaxPercentage={validationData.grnTaxPercentage}
+                                grnDiscountPercentage={validationData.grnDiscountPercentage}
+                                grnShippingCost={validationData.grnShippingCost}
+                                grnOtherCosts={validationData.grnOtherCosts}
+                                invoiceTotal={validationData.invoiceTotal}
+                                invoiceSubTotal={validationData.invoiceSubTotal}
+                                invoiceTaxAmount={validationData.invoiceTaxAmount}
+                                invoiceDiscountAmount={validationData.invoiceDiscountAmount}
+                                invoiceTaxPercentage={validationData.invoiceTaxPercentage}
+                                invoiceDiscountPercentage={validationData.invoiceDiscountPercentage}
+                                invoiceDeliveryCost={validationData.invoiceDeliveryCost}
+                                invoiceOtherCosts={validationData.invoiceOtherCosts}
+                                isValid={validationData.isValid}
+                                returnSubTotal={validationData.returnSubTotal}
+                                items={validationData.items || []}
+                            />
+                        </div>
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+                            <button
+                                onClick={() => setShowValidationModal(false)}
+                                className="px-6 py-2.5 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors"
+                            >
+                                إغلاق
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

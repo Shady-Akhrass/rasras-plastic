@@ -113,7 +113,7 @@ const PurchaseRequisitionFormPage = () => {
             setItems('data' in itemsResponse ? (itemsResponse as any).data : itemsResponse);
             setUnits('data' in unitsResponse ? (unitsResponse as any).data : unitsResponse);
             setDepartments(deptsData);
-            
+
             // FIX 2: Removed logic that overwrote department with the first one from API
         } catch (error) {
             console.error('Failed to load master data', error);
@@ -219,7 +219,7 @@ const PurchaseRequisitionFormPage = () => {
             if (isEditMode && id) {
                 await purchaseService.updatePR(parseInt(id), submissionData as PurchaseRequisition);
                 // Only submit if it's a draft, otherwise just update
-                if(submissionData.status === 'Draft') {
+                if (submissionData.status === 'Draft') {
                     await purchaseService.submitPR(parseInt(id));
                 }
                 toast.success('تم تحديث طلب الشراء بنجاح');

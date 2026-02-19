@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { vehicleService, type VehicleDto } from './vehicleService';
 
 /**
  * أمر التوصيل (Delivery Order)
@@ -55,6 +56,7 @@ export interface DeliveryOrderDto {
     deliveryPlace?: string;
     vehicleNo?: string;
     items?: DeliveryOrderItemDto[];
+    vehicles?: VehicleDto[];
 }
 
 const _api = '/sales/delivery-orders';
@@ -129,6 +131,14 @@ export const deliveryOrderService = {
             return (res.data as any)?.data ?? null;
         } catch {
             return null;
+        }
+    },
+
+    getActiveVehicles: async (): Promise<VehicleDto[]> => {
+        try {
+            return await vehicleService.getActive();
+        } catch {
+            return [];
         }
     },
 };

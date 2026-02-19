@@ -53,12 +53,14 @@ const WORKFLOW_NAME_AR: Record<string, string> = {
     'Purchase Return Approval': 'اعتماد مرتجع المشتريات',
     'Quotation Comparison Approval': 'اعتماد مقارنة العروض',
     'Payment Voucher Approval': 'اعتماد سند صرف',
+    'Sales Quotation Approval': 'اعتماد عرض سعر مبيعات',
 };
 const STEP_NAME_AR: Record<string, string> = {
     'Procurement Manager Approval': 'اعتماد مدير المشتريات',
     'Finance Manager Approval': 'اعتماد المدير المالي',
     'General Manager Approval': 'اعتماد المدير العام',
     'Quality Controller Approval': 'اعتماد مراقب الجودة',
+    'Sales Manager Approval': 'اعتماد مدير المبيعات',
 };
 const tr = (en: string | undefined, map: Record<string, string>) =>
     en && map[en] ? map[en] : en || '';
@@ -92,6 +94,7 @@ const DOC_TYPE_CONFIGS: Record<string, {
     Supplier: { label: 'مورد', bg: 'bg-slate-50', text: 'text-slate-600', icon: Package, gradient: 'from-slate-500 to-gray-600' },
     CustomerRequest: { label: 'طلب عميل', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', icon: MessageSquare, gradient: 'from-fuchsia-500 to-pink-600' },
     CR: { label: 'طلب عميل', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', icon: MessageSquare, gradient: 'from-fuchsia-500 to-pink-600' },
+    SalesQuotation: { label: 'عرض سعر مبيعات', bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Tag, gradient: 'from-indigo-500 to-blue-600' },
 };
 
 const getDocTypeConfig = (type: string) =>
@@ -111,6 +114,7 @@ const TYPE_ROUTES: Record<string, string> = {
     Supplier: '/dashboard/procurement/suppliers',
     CustomerRequest: '/dashboard/sales/customer-requests',
     CR: '/dashboard/sales/customer-requests',
+    SalesQuotation: '/dashboard/sales/quotations',
 };
 
 const isGRNType = (t: string) => t === 'GoodsReceiptNote' || t === 'GRN';
@@ -127,6 +131,7 @@ const FILTER_OPTIONS = [
     { value: 'Supplier', label: 'موردين', icon: Tag },
     { value: 'PaymentVoucher', label: 'سندات صرف', icon: DollarSign },
     { value: 'CustomerRequest', label: 'طلبات عملاء', icon: MessageSquare },
+    { value: 'SalesQuotation', label: 'عروض أسعار مبيعات', icon: Tag },
 ] as const;
 
 // ════════════════════════════════════════════

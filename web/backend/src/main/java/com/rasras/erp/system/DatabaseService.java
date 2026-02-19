@@ -242,30 +242,8 @@ public class DatabaseService {
         });
     }
 
-    private static final String ERROR_LOG_FILE = "db_ops_errors.log";
-
     public void logError(String context, Exception e) {
-        String timestamp = java.time.LocalDateTime.now().toString();
-        String errorMessage = String.format("[%s] ERROR in %s: %s\n", timestamp, context, e.getMessage());
-        try {
-            Files.writeString(Paths.get(ERROR_LOG_FILE), errorMessage, java.nio.file.StandardOpenOption.CREATE,
-                    java.nio.file.StandardOpenOption.APPEND);
-        } catch (IOException ioException) {
-            log.error("Failed to write to error log file", ioException);
-        }
-    }
-
-    public List<String> getErrorLogs() {
-        try {
-            Path path = Paths.get(ERROR_LOG_FILE);
-            if (!Files.exists(path)) {
-                return new ArrayList<>();
-            }
-            return Files.readAllLines(path);
-        } catch (IOException e) {
-            log.error("Failed to read error log file", e);
-            return List.of("Failed to read logs: " + e.getMessage());
-        }
+        log.error("ERROR in {}: {}", context, e.getMessage(), e);
     }
 
     // Execute raw SQL script

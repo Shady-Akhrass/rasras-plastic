@@ -6,10 +6,10 @@ export interface ItemDto {
     itemNameAr: string;
     itemNameEn?: string;
     grade?: string;
-    gradeName?: number;
-    mi2?: string;
-    mi21?: string;
-    density?: string;
+    gradeName?: string;
+    mi2?: number;
+    mi21?: number;
+    density?: number;
     categoryId: number;
     categoryName?: string;
     unitId: number;

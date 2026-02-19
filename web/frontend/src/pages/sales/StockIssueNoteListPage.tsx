@@ -205,7 +205,7 @@ const StockIssueNoteListPage: React.FC = () => {
                                         <td className="px-6 py-4 flex gap-2">
                                             <button onClick={() => navigate(`/dashboard/sales/issue-notes/${n.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg" title="عرض"><Eye className="w-5 h-5" /></button>
                                             {n.status === 'Draft' && (
-                                                <button onClick={() => handleApprove(n.id!)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="اعتماد"><CheckCircle className="w-5 h-5" /></button>
+                                                <button onClick={() => handleApprove(n.id!)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="اعتماد"><CheckCircle2 className="w-5 h-5" /></button>
                                             )}
                                         </td>
                                     </tr>

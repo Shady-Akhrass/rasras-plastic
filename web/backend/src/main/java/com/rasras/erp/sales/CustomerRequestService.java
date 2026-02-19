@@ -25,6 +25,7 @@ public class CustomerRequestService {
         request.setRequestNumber(generateRequestNumber());
         request.setRequestDate(dto.getRequestDate() != null ? dto.getRequestDate() : LocalDate.now());
         request.setCustomerId(dto.getCustomerId());
+        request.setPriceListId(dto.getPriceListId());
         request.setStatus("Pending");
         request.setNotes(dto.getNotes());
         request.setCreatedBy(dto.getCreatedBy());
@@ -40,6 +41,19 @@ public class CustomerRequestService {
                 return item;
             }).collect(Collectors.toList());
             request.setItems(items);
+        }
+
+        if (dto.getSchedules() != null) {
+            List<CustomerRequestDeliverySchedule> schedules = dto.getSchedules().stream().map(sDto -> {
+                CustomerRequestDeliverySchedule schedule = new CustomerRequestDeliverySchedule();
+                schedule.setCustomerRequest(request);
+                schedule.setDeliveryDate(sDto.getDeliveryDate());
+                schedule.setProductId(sDto.getProductId());
+                schedule.setQuantity(sDto.getQuantity());
+                schedule.setNotes(sDto.getNotes());
+                return schedule;
+            }).collect(Collectors.toList());
+            request.setSchedules(schedules);
         }
 
         CustomerRequest saved = requestRepository.save(request);
@@ -65,7 +79,12 @@ public class CustomerRequestService {
         CustomerRequest request = requestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer Request not found with id " + id));
 
+        if ("Approved".equalsIgnoreCase(request.getStatus())) {
+            throw new RuntimeException("Cannot update an approved request");
+        }
+
         request.setCustomerId(dto.getCustomerId());
+        request.setPriceListId(dto.getPriceListId());
         request.setNotes(dto.getNotes());
         request.setStatus(dto.getStatus());
 
@@ -84,6 +103,24 @@ public class CustomerRequestService {
                 return item;
             }).collect(Collectors.toList());
             request.getItems().addAll(items);
+        }
+
+        if (request.getSchedules() != null) {
+            request.getSchedules().clear();
+        } else {
+            request.setSchedules(new java.util.ArrayList<>());
+        }
+        if (dto.getSchedules() != null) {
+            List<CustomerRequestDeliverySchedule> schedules = dto.getSchedules().stream().map(sDto -> {
+                CustomerRequestDeliverySchedule schedule = new CustomerRequestDeliverySchedule();
+                schedule.setCustomerRequest(request);
+                schedule.setDeliveryDate(sDto.getDeliveryDate());
+                schedule.setProductId(sDto.getProductId());
+                schedule.setQuantity(sDto.getQuantity());
+                schedule.setNotes(sDto.getNotes());
+                return schedule;
+            }).collect(Collectors.toList());
+            request.getSchedules().addAll(schedules);
         }
 
         return mapToDto(requestRepository.save(request));
@@ -124,12 +161,27 @@ public class CustomerRequestService {
                 .requestNumber(entity.getRequestNumber())
                 .requestDate(entity.getRequestDate())
                 .customerId(entity.getCustomerId())
+                .priceListId(entity.getPriceListId())
                 .status(entity.getStatus())
                 .notes(entity.getNotes())
                 .createdAt(entity.getCreatedAt())
                 .items(entity.getItems() != null
                         ? entity.getItems().stream().map(this::mapItemToDto).collect(Collectors.toList())
                         : null)
+                .schedules(entity.getSchedules() != null
+                        ? entity.getSchedules().stream().map(this::mapScheduleToDto).collect(Collectors.toList())
+                        : null)
+                .build();
+    }
+
+    private CustomerRequestDeliveryScheduleDto mapScheduleToDto(CustomerRequestDeliverySchedule entity) {
+        return CustomerRequestDeliveryScheduleDto.builder()
+                .scheduleId(entity.getScheduleId())
+                .requestId(entity.getCustomerRequest().getRequestId())
+                .deliveryDate(entity.getDeliveryDate())
+                .productId(entity.getProductId())
+                .quantity(entity.getQuantity())
+                .notes(entity.getNotes())
                 .build();
     }
 

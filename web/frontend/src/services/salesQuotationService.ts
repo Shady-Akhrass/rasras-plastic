@@ -57,6 +57,9 @@ export interface SalesQuotationDto {
     createdBy?: number;
     updatedAt?: string;
     updatedBy?: number;
+    requestId?: number;
+    deliveryCost?: number;
+    otherCosts?: number;
     items: SalesQuotationItemDto[];
 }
 
@@ -97,6 +100,10 @@ export interface LegacySalesQuotationDto {
     totalAmount?: number;
     status?: string;
     notes?: string;
+    requestId?: number;
+    deliveryCost?: number;
+    otherCosts?: number;
+    approvalStatus?: string;
     items: LegacySalesQuotationItemDto[];
 }
 
@@ -150,6 +157,10 @@ const mapToLegacy = (dto: SalesQuotationDto): LegacySalesQuotationDto => ({
     totalAmount: dto.totalAmount,
     status: dto.status,
     notes: dto.notes,
+    requestId: dto.requestId,
+    deliveryCost: dto.deliveryCost,
+    otherCosts: dto.otherCosts,
+    approvalStatus: dto.approvalStatus,
     items: dto.items.map(mapToLegacyItem),
 });
 
@@ -176,6 +187,10 @@ const mapFromLegacy = (dto: LegacySalesQuotationDto): SalesQuotationDto => ({
     deliveryTerms: undefined,
     status: dto.status,
     notes: dto.notes,
+    requestId: (dto as any).requestId,
+    deliveryCost: (dto as any).deliveryCost,
+    otherCosts: (dto as any).otherCosts,
+    approvalStatus: (dto as any).approvalStatus,
     items: dto.items.map(mapFromLegacyItem),
 });
 

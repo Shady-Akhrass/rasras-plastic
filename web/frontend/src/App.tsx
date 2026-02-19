@@ -70,6 +70,8 @@ import StockIssueNoteListPage from './pages/sales/StockIssueNoteListPage';
 import StockIssueNoteFormPage from './pages/sales/StockIssueNoteFormPage';
 import DeliveryOrderListPage from './pages/sales/DeliveryOrderListPage';
 import DeliveryOrderFormPage from './pages/sales/DeliveryOrderFormPage';
+import VehicleListPage from './pages/sales/VehicleListPage';
+import VehicleFormPage from './pages/sales/VehicleFormPage';
 import SalesInvoiceListPage from './pages/sales/SalesInvoiceListPage';
 import SalesInvoiceFormPage from './pages/sales/SalesInvoiceFormPage';
 import ReceiptListPage from './pages/sales/ReceiptListPage';
@@ -223,6 +225,11 @@ function App() {
               <Route index element={<DeliveryOrderListPage />} />
               <Route path="new" element={<DeliveryOrderFormPage />} />
               <Route path=":id" element={<DeliveryOrderFormPage />} />
+            </Route>
+            <Route path="vehicles">
+              <Route index element={<VehicleListPage />} />
+              <Route path="new" element={<VehicleFormPage />} />
+              <Route path=":id" element={<VehicleFormPage />} />
             </Route>
             <Route path="invoices">
               <Route index element={<SalesInvoiceListPage />} />
