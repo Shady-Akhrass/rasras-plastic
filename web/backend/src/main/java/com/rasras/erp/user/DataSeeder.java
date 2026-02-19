@@ -41,10 +41,6 @@ public class DataSeeder implements CommandLineRunner {
 
         // 0.1 Seed Approval Workflows
         seedApprovalWorkflows();
-        // إصلاح خطوات اعتماد سند الصرف إن كانت خاطئة (أول خطوة يجب أن تكون FM)
-        ensurePVApprovalSteps();
-        // إصلاح خطوات اعتماد المقارنة إن كانت خاطئة (أول خطوة PM ثم FM ثم GM)
-        ensureQCApprovalSteps();
 
         // 0.2 Seed Approval Limits (حدود الاعتماد المالية)
         seedApprovalLimits();
@@ -149,12 +145,12 @@ public class DataSeeder implements CommandLineRunner {
                 { "SECTION_MAIN", "الرئيسية والاعتمادات", "Main & Approvals", "MENU" },
                 { "SECTION_USERS", "المستخدمين", "Users", "MENU" },
                 { "SECTION_EMPLOYEES", "الموظفين", "Employees", "MENU" },
-                { "SECTION_FINANCE", "المالية والمحاسبة", "Finance & Accounting", "MENU" },
                 { "SECTION_WAREHOUSE", "المخازن", "Warehouse", "MENU" },
                 { "SECTION_OPERATIONS", "العمليات", "Operations", "MENU" },
                 { "SECTION_SALES", "المبيعات", "Sales", "MENU" },
                 { "SECTION_CRM", "العملاء (CRM)", "CRM", "MENU" },
                 { "SECTION_PROCUREMENT", "المشتريات", "Procurement", "MENU" },
+                { "SECTION_FINANCE", "المالية", "Finance", "MENU" },
                 { "SECTION_SYSTEM", "إعدادات النظام", "System Settings", "MENU" },
         };
         for (String[] p : sectionPerms) {
@@ -200,8 +196,9 @@ public class DataSeeder implements CommandLineRunner {
     private void seedDefaultRoleSectionPermissions() {
         log.info("Seeding default role section permissions...");
         List<String> allSectionCodes = java.util.Arrays.asList(
-                "SECTION_MAIN", "SECTION_USERS", "SECTION_EMPLOYEES", "SECTION_FINANCE", "SECTION_WAREHOUSE",
-                "SECTION_OPERATIONS", "SECTION_SALES", "SECTION_CRM", "SECTION_PROCUREMENT", "SECTION_SYSTEM");
+                "SECTION_MAIN", "SECTION_USERS", "SECTION_EMPLOYEES", "SECTION_WAREHOUSE",
+                "SECTION_OPERATIONS", "SECTION_SALES", "SECTION_CRM", "SECTION_PROCUREMENT",
+                "SECTION_FINANCE", "SECTION_SYSTEM");
         java.util.Map<String, java.util.List<String>> roleSectionMap = new java.util.HashMap<>();
         roleSectionMap.put("PM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_PROCUREMENT"));
         roleSectionMap.put("BUYER", java.util.Arrays.asList("SECTION_MAIN", "SECTION_PROCUREMENT"));
@@ -501,30 +498,6 @@ public class DataSeeder implements CommandLineRunner {
                         .approverRole(accRole)
                         .build();
                 stepRepo.save(step3);
-            }
-        }
-
-        // 8. Sales Quotation Approval Workflow
-        if (!workflowRepo.findByWorkflowCode("QUOTATION_APPROVAL").isPresent()) {
-            com.rasras.erp.approval.ApprovalWorkflow sqWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
-                    .workflowCode("QUOTATION_APPROVAL")
-                    .workflowName("Sales Quotation Approval")
-                    .documentType("SalesQuotation")
-                    .isActive(true)
-                    .build();
-            workflowRepo.save(sqWorkflow);
-
-            Role smRole = roleRepository.findByRoleCode("SM").orElse(null);
-            if (smRole != null) {
-                com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
-                        .builder()
-                        .workflow(sqWorkflow)
-                        .stepNumber(1)
-                        .stepName("Sales Manager Approval")
-                        .approverType("ROLE")
-                        .approverRole(smRole)
-                        .build();
-                stepRepo.save(step1);
             }
         }
     }

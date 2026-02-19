@@ -267,12 +267,12 @@ const DashboardLayout: React.FC = () => {
         name.split(' ').map(n => n[0]).join('').slice(0, 2);
 
     // ─── Role groups (fallback) ───
-    const ROLES_PROCUREMENT = ['PM', 'BUYER', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
+    const ROLES_PROCUREMENT = ['PM', 'BUYER', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'FM'];
     const ROLES_SALES = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
-    const ROLES_WAREHOUSE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM',
-        'WAREHOUSE_MANAGER', 'WH_MANAGER'];
-    const ROLES_OPERATIONS = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'SM']; const ROLES_SYSTEM = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN'];
-    const ROLES_FINANCE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'ACCOUNTANT'];
+    const ROLES_WAREHOUSE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'WHM'];
+    const ROLES_OPERATIONS = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'SM', 'QC'];
+    const ROLES_SYSTEM = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN'];
+    const ROLES_FINANCE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'ACC', 'FM'];
     const ROLES_CRM = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
 
     // ─── Nav items (use hook counts) ───
@@ -454,12 +454,12 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/finance/payment-vouchers', icon: Receipt,
                 label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE,
-                requiredPermission: 'SECTION_FINANCE'
+                requiredPermission: 'SECTION_FINANCE', order: 1
             },
             {
                 to: '/dashboard/finance/payment-vouchers/new', icon: FileText,
                 label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE,
-                requiredPermission: 'SECTION_FINANCE'
+                requiredPermission: 'SECTION_FINANCE', order: 2
             },
 
             // Warehouse
@@ -621,13 +621,20 @@ const DashboardLayout: React.FC = () => {
 
     // Filter by permissions/roles
     const filteredNavItems = navItems.filter(item => {
-        const usePerms = userPermissions.length > 0;
-        if (usePerms) {
-            if (!item.requiredPermission) return true;
-            return userPermissions.includes(item.requiredPermission);
+        const upperRole = userRole.toUpperCase();
+
+        // 1. Admin/Superadmin/GM bypass
+        if (['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'].includes(upperRole)) return true;
+
+        // 2. Check permissions if they exist
+        const hasPerms = userPermissions.length > 0;
+        if (hasPerms && item.requiredPermission) {
+            if (userPermissions.includes(item.requiredPermission)) return true;
         }
+
+        // 3. Fallback to roles
         return !item.roles || item.roles.length === 0 ||
-            item.roles.includes(userRole.toUpperCase());
+            item.roles.includes(upperRole);
     });
 
     const MANAGER_ROLES = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM',
@@ -777,9 +784,9 @@ const DashboardLayout: React.FC = () => {
                             .filter(i => i.section === 'main')
                             .some(item =>
                                 item.exact ? location.pathname === item.to :
-                                (location.pathname === item.to ||
-                                    (item.to !== '/dashboard' &&
-                                        location.pathname.startsWith(item.to)))
+                                    (location.pathname === item.to ||
+                                        (item.to !== '/dashboard' &&
+                                            location.pathname.startsWith(item.to)))
                             )}
                         badge={(pendingApprovals + pendingCustomerRequests) || undefined}
                         blink={(pendingApprovals + pendingCustomerRequests) > 0}

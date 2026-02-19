@@ -49,9 +49,12 @@ const PaymentVoucherDetailPage: React.FC = () => {
         if (!approvalId) return;
         try {
             setActionLoading(true);
+            const userString = localStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            const currentUserId = user?.userId || 1;
+
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
-            // User ID hardcoded to 1 for now, should come from auth
-            await approvalService.takeAction(parseInt(approvalId), 1, action);
+            await approvalService.takeAction(parseInt(approvalId), currentUserId, action);
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح ✅' : 'تم رفض الطلب ❌', { id: toastId });
             navigate('/dashboard/procurement/approvals');
         } catch (error) {

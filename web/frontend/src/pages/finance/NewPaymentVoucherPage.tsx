@@ -309,6 +309,10 @@ const NewPaymentVoucherPage: React.FC = () => {
         if (validationError) { toast.error(validationError); return; }
         try {
             setLoading(true);
+            const userString = localStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            const currentUserId = user?.userId || 1;
+
             const totalSplit = (formData.cashAmount || 0) + (formData.bankAmount || 0) + (formData.chequeAmount || 0) + (formData.bankTransferAmount || 0);
             const voucherAmount = formData.isSplitPayment ? totalSplit : totalAmount;
             const voucher: PaymentVoucherDto = {
@@ -328,7 +332,7 @@ const NewPaymentVoucherPage: React.FC = () => {
                     ? `دفعة مجمعة لعدد ${selectedInvoices.length} فواتير`
                     : `دفعة للفاتورة رقم ${selectedInvoices[0].invoiceNumber}`,
                 notes: formData.notes,
-                preparedByUserId: 1,
+                preparedByUserId: currentUserId,
                 status: 'Closed',
                 approvalStatus: 'Pending',
                 allocations: selectedInvoices.map(inv => ({

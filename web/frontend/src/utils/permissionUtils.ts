@@ -21,7 +21,7 @@ export const SECTION_ROLES = {
 } as const;
 
 /** مسارات متاحة لجميع من سجّل دخوله */
-const PUBLIC_PATHS = ['/dashboard', '/dashboard/approvals', '/dashboard/profile'];
+
 
 /**
  * أنماط المسارات وربطها بالصلاحيات — يغطي المسارات الديناميكية مثل /dashboard/finance/payments/123
@@ -76,10 +76,24 @@ export function getRequiredRolesForPath(path: string): string[] | null {
  */
 export function canAccessPath(
   path: string,
-  _userRole: string,
+  userRole: string,
   userPermissions?: string[] | null
 ): boolean {
   const required = getRequiredPermissionForPath(path);
   if (!required) return true;
-  return !!(userPermissions && userPermissions.length > 0 && userPermissions.includes(required));
+
+  // 1. Try permissions first if available
+  if (userPermissions && userPermissions.length > 0) {
+    if (userPermissions.includes(required)) return true;
+  }
+
+  // 2. Fallback to roles
+  const upperRole = userRole.toUpperCase();
+  // Admin/Superadmin bypass
+  if (['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'].includes(upperRole)) return true;
+
+  const requiredRoles = getRequiredRolesForPath(path);
+  if (!requiredRoles || requiredRoles.length === 0) return true;
+
+  return requiredRoles.includes(upperRole);
 }

@@ -34,6 +34,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
 import { customerRequestService } from '../../services/customerRequestService';
+import type { CustomerRequest } from '../../types/sales';
 import { REFRESH_DATA_EVENT } from '../../hooks/useNotificationPolling';
 import { formatNumber, formatDate } from '../../utils/format';
 import { grnService } from '../../services/grnService';
@@ -61,6 +62,7 @@ const STEP_NAME_AR: Record<string, string> = {
     'General Manager Approval': 'اعتماد المدير العام',
     'Quality Controller Approval': 'اعتماد مراقب الجودة',
     'Sales Manager Approval': 'اعتماد مدير المبيعات',
+    'Payment Disbursement': 'صرف الدفعة',
 };
 const tr = (en: string | undefined, map: Record<string, string>) =>
     en && map[en] ? map[en] : en || '';
@@ -673,8 +675,8 @@ const ApprovalsInbox: React.FC = () => {
 
             // Map pending CRs to ApprovalRequestDto format (only if we fetched them)
             const crs: ApprovalRequestDto[] = (crsData?.data || [])
-                .filter(cr => cr.status === 'Pending')
-                .map(cr => ({
+                .filter((cr: CustomerRequest) => cr.status === 'Pending')
+                .map((cr: CustomerRequest) => ({
                     id: cr.requestId || 0,
                     documentType: 'CustomerRequest',
                     documentId: cr.requestId || 0,
