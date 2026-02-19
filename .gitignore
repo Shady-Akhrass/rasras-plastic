@@ -68,3 +68,10 @@ personal/
 
 # Scripts helpers (local automation)
 scripts/
+# Backend logs
+web/backend/logs/
+*.tmp
+*.gz
+
+# SQL dumps
+*.sql

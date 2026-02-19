@@ -125,13 +125,12 @@ const PurchaseRequisitionFormPage = () => {
         try {
             setLoading(true);
             const data = await purchaseService.getPRById(prId);
-            // Ensure department stays as 1 even if data says otherwise (optional, depends on requirement)
-            // or just load what is saved. For now, we load what is saved.
-            setFormData(data);
+            // Sales form: always keep requesting department as Sales (ID: 4)
+            setFormData({ ...data, requestedByDeptId: 4 });
         } catch (error) {
             console.error('Failed to load PR', error);
             toast.error('فشل تحميل بيانات الطلب');
-            navigate('/dashboard/procurement/pr');
+            navigate('/dashboard/sales/purchase-requisitions');
         } finally {
             setLoading(false);
         }

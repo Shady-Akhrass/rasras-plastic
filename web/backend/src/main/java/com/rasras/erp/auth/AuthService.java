@@ -1,6 +1,7 @@
 package com.rasras.erp.auth;
 
 import com.rasras.erp.auth.dto.ChangePasswordRequest;
+import com.rasras.erp.auth.dto.CurrentUserDto;
 import com.rasras.erp.auth.dto.LoginRequest;
 import com.rasras.erp.auth.dto.LoginResponse;
 import com.rasras.erp.auth.dto.RefreshTokenRequest;
@@ -128,6 +129,35 @@ public class AuthService {
                 .username(userPrincipal.getUsername())
                 .roleName(user.getRole().getRoleNameEn())
                 .roleCode(user.getRole().getRoleCode())
+                .fullNameAr(fullNameAr)
+                .permissions(permissions)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public CurrentUserDto getCurrentUser(String username) {
+        User user = userRepository.findByUsernameWithPermissions(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
+
+        UserPrincipal userPrincipal = UserPrincipal.create(user);
+        String fullNameAr = (user.getEmployeeId() != null)
+                ? employeeRepository.findById(user.getEmployeeId())
+                        .map(e -> e.getFirstNameAr() + " " + e.getLastNameAr())
+                        .orElse("مستخدم")
+                : "مستخدم";
+
+        List<String> permissions = userPrincipal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -> !a.startsWith("ROLE_"))
+                .collect(Collectors.toList());
+
+        var role = user.getRole();
+        return CurrentUserDto.builder()
+                .userId(user.getUserId())
+                .employeeId(user.getEmployeeId())
+                .username(user.getUsername())
+                .roleCode(role != null ? role.getRoleCode() : null)
+                .roleName(role != null ? role.getRoleNameEn() : null)
                 .fullNameAr(fullNameAr)
                 .permissions(permissions)
                 .build();

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
     Users, Package, Bell, Search, Menu, LogOut, LayoutDashboard,
@@ -7,7 +8,7 @@ import {
     DollarSign, FileText, Tag, Scale, Truck, Warehouse, ShoppingCart,
     ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine,
     Receipt, ClipboardList, BarChart2, AlertTriangle, Activity,
-    ClipboardCheck, GitCompare, Undo2, Database
+    ClipboardCheck, GitCompare, Undo2, Database, History
 } from 'lucide-react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
@@ -279,11 +280,17 @@ const DashboardLayout: React.FC = () => {
         to: string; icon: React.ElementType; label: string; section: string;
         roles?: readonly string[]; requiredPermission?: string;
         warehouseGroup?: string; search?: string; badge?: number; order?: number;
+        exact?: boolean;
     }> = [
             { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
             {
                 to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات',
-                section: 'main', badge: (pendingApprovals + pendingCustomerRequests) || undefined
+                section: 'main', badge: (pendingApprovals + pendingCustomerRequests) || undefined,
+                exact: true
+            },
+            {
+                to: '/dashboard/approvals/audit', icon: History, label: 'سجل الاعتماد',
+                section: 'main'
             },
             {
                 to: '/dashboard/users', icon: User, label: 'المستخدمين',
@@ -446,11 +453,13 @@ const DashboardLayout: React.FC = () => {
             // Finance
             {
                 to: '/dashboard/finance/payment-vouchers', icon: Receipt,
-                label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE
+                label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE,
+                requiredPermission: 'SECTION_FINANCE'
             },
             {
                 to: '/dashboard/finance/payment-vouchers/new', icon: FileText,
-                label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE
+                label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE,
+                requiredPermission: 'SECTION_FINANCE'
             },
 
             // Warehouse
@@ -767,9 +776,10 @@ const DashboardLayout: React.FC = () => {
                         hasActiveChild={filteredNavItems
                             .filter(i => i.section === 'main')
                             .some(item =>
-                                location.pathname === item.to ||
-                                (item.to !== '/dashboard' &&
-                                    location.pathname.startsWith(item.to))
+                                item.exact ? location.pathname === item.to :
+                                (location.pathname === item.to ||
+                                    (item.to !== '/dashboard' &&
+                                        location.pathname.startsWith(item.to)))
                             )}
                         badge={(pendingApprovals + pendingCustomerRequests) || undefined}
                         blink={(pendingApprovals + pendingCustomerRequests) > 0}
@@ -778,9 +788,11 @@ const DashboardLayout: React.FC = () => {
                             .map(item => (
                                 <SidebarLink key={item.to} to={item.to}
                                     icon={item.icon} label={item.label}
-                                    active={location.pathname === item.to ||
-                                        (item.to !== '/dashboard' &&
-                                            location.pathname.startsWith(item.to))}
+                                    active={item.exact
+                                        ? location.pathname === item.to
+                                        : (location.pathname === item.to ||
+                                            (item.to !== '/dashboard' &&
+                                                location.pathname.startsWith(item.to)))}
                                     collapsed={sidebarCollapsed}
                                     badge={item.badge}
                                     blink={!!item.badge &&

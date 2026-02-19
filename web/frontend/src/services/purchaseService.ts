@@ -174,6 +174,10 @@ const purchaseService = {
         const response = await apiClient.get<{ data: PurchaseRequisition[] }>('/procurement/pr');
         return response.data.data;
     },
+     getSalesPRs: async () => {
+        const response = await apiClient.get<{ data: PurchaseRequisition[] }>('/procurement/pr/sales');
+        return response.data.data;
+    },
     getPRById: async (id: number) => {
         const response = await apiClient.get<{ data: PurchaseRequisition }>(`/procurement/pr/${id}`);
         return response.data.data;

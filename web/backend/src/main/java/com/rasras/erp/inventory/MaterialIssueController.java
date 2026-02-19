@@ -4,8 +4,10 @@ import com.rasras.erp.sales.StockAvailabilityWarningDto;
 import com.rasras.erp.sales.StockIssueNoteDto;
 import com.rasras.erp.sales.StockIssueNoteService;
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.List;
 @RequestMapping("/inventory/material-issues")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
 public class MaterialIssueController {
 
     private final StockIssueNoteService stockIssueNoteService;

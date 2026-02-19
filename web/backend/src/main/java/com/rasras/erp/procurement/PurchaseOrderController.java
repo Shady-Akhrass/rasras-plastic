@@ -1,7 +1,9 @@
 package com.rasras.erp.procurement;
 
+import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,6 +13,7 @@ import java.util.Map;
 @RequestMapping("/procurement/po")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION)
 public class PurchaseOrderController {
 
     private final PurchaseOrderService poService;

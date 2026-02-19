@@ -41,6 +41,10 @@ public class DataSeeder implements CommandLineRunner {
 
         // 0.1 Seed Approval Workflows
         seedApprovalWorkflows();
+        // إصلاح خطوات اعتماد سند الصرف إن كانت خاطئة (أول خطوة يجب أن تكون FM)
+        ensurePVApprovalSteps();
+        // إصلاح خطوات اعتماد المقارنة إن كانت خاطئة (أول خطوة PM ثم FM ثم GM)
+        ensureQCApprovalSteps();
 
         // 0.2 Seed Approval Limits (حدود الاعتماد المالية)
         seedApprovalLimits();
@@ -145,6 +149,7 @@ public class DataSeeder implements CommandLineRunner {
                 { "SECTION_MAIN", "الرئيسية والاعتمادات", "Main & Approvals", "MENU" },
                 { "SECTION_USERS", "المستخدمين", "Users", "MENU" },
                 { "SECTION_EMPLOYEES", "الموظفين", "Employees", "MENU" },
+                { "SECTION_FINANCE", "المالية والمحاسبة", "Finance & Accounting", "MENU" },
                 { "SECTION_WAREHOUSE", "المخازن", "Warehouse", "MENU" },
                 { "SECTION_OPERATIONS", "العمليات", "Operations", "MENU" },
                 { "SECTION_SALES", "المبيعات", "Sales", "MENU" },
@@ -195,7 +200,7 @@ public class DataSeeder implements CommandLineRunner {
     private void seedDefaultRoleSectionPermissions() {
         log.info("Seeding default role section permissions...");
         List<String> allSectionCodes = java.util.Arrays.asList(
-                "SECTION_MAIN", "SECTION_USERS", "SECTION_EMPLOYEES", "SECTION_WAREHOUSE",
+                "SECTION_MAIN", "SECTION_USERS", "SECTION_EMPLOYEES", "SECTION_FINANCE", "SECTION_WAREHOUSE",
                 "SECTION_OPERATIONS", "SECTION_SALES", "SECTION_CRM", "SECTION_PROCUREMENT", "SECTION_SYSTEM");
         java.util.Map<String, java.util.List<String>> roleSectionMap = new java.util.HashMap<>();
         roleSectionMap.put("PM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_PROCUREMENT"));
@@ -204,8 +209,8 @@ public class DataSeeder implements CommandLineRunner {
         roleSectionMap.put("WHM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_WAREHOUSE"));
         roleSectionMap.put("QC", java.util.Arrays.asList("SECTION_MAIN", "SECTION_OPERATIONS"));
         roleSectionMap.put("GM", allSectionCodes);
-        roleSectionMap.put("FM", java.util.Arrays.asList("SECTION_MAIN"));
-        roleSectionMap.put("ACC", java.util.Arrays.asList("SECTION_MAIN"));
+        roleSectionMap.put("FM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_FINANCE"));
+        roleSectionMap.put("ACC", java.util.Arrays.asList("SECTION_MAIN", "SECTION_FINANCE"));
 
         for (java.util.Map.Entry<String, java.util.List<String>> e : roleSectionMap.entrySet()) {
             Role role = roleRepository.findByRoleCode(e.getKey()).orElse(null);

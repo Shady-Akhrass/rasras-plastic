@@ -15,6 +15,12 @@ export const systemService = {
         return response.data;
     },
 
+    /** Settings any authenticated user can read (e.g. buyers for comparison page). */
+    getPublicSettings: async () => {
+        const response = await apiClient.get<{ data: SystemSettingDto[] }>('/settings/public');
+        return response.data;
+    },
+
     updateSetting: async (key: string, value: string) => {
         const response = await apiClient.put<{ success: boolean; data: SystemSettingDto }>(`/settings/${key}`, { value });
         return response.data;

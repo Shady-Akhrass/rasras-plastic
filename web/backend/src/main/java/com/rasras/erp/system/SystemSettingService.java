@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +41,33 @@ public class SystemSettingService {
         return mapToDto(systemSettingRepository.save(setting));
     }
 
+    /** Keys that any authenticated user can read (e.g. for comparison page, currency display). DB uses DEFAULT_CURRENCY. */
+    private static final Set<String> PUBLIC_SETTING_KEYS = Set.of("RequireThreeQuotations", "DefaultCurrency", "DEFAULT_CURRENCY");
+
+    /**
+     * Returns only settings that are safe to expose to any authenticated user (e.g. buyers for comparison page).
+     */
+    public List<SystemSettingDto> getPublicSettings() {
+        ensureRequireThreeQuotationsExists();
+        return systemSettingRepository.findAll().stream()
+                .filter(s -> PUBLIC_SETTING_KEYS.contains(s.getSettingKey()))
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void ensureRequireThreeQuotationsExists() {
+        if (systemSettingRepository.findBySettingKey("RequireThreeQuotations").isEmpty()) {
+            systemSettingRepository.save(SystemSetting.builder()
+                    .settingKey("RequireThreeQuotations")
+                    .settingValue("true")
+                    .description("Require at least 3 supplier quotations for comparison")
+                    .category("Procurement")
+                    .dataType("Boolean")
+                    .build());
+        }
+    }
+
     @Transactional
     public void initDefaultSettings() {
         if (systemSettingRepository.count() == 0) {
@@ -48,7 +76,9 @@ public class SystemSettingService {
             createSettingIfNotExists("ALLOW_NEGATIVE_STOCK", "false", "Allow negative stock", "Inventory", "Boolean");
             createSettingIfNotExists("COMPANY_EMAIL_NOTIFICATIONS", "true", "Enable email notifications", "General",
                     "Boolean");
+            createSettingIfNotExists("RequireThreeQuotations", "true", "Require at least 3 supplier quotations for comparison", "Procurement", "Boolean");
         }
+        ensureRequireThreeQuotationsExists();
     }
 
     private void createSettingIfNotExists(String key, String value, String desc, String category, String type) {

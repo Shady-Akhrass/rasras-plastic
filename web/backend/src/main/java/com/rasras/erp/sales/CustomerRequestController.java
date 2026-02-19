@@ -1,8 +1,10 @@
 package com.rasras.erp.sales;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/sales/customer-requests")
 @RequiredArgsConstructor
+@PreAuthorize(SecurityConstants.SALES_SECTION)
 public class CustomerRequestController {
 
     private final CustomerRequestService service;

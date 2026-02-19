@@ -5,6 +5,20 @@ import { itemService } from '../../../services/itemService';
 import warehouseService, { type WarehouseDto } from '../../../services/warehouseService';
 import { stockMovementService, type StockMovementItemDto } from '../../../services/stockMovementService';
 
+// تحويل نوع الحركة (type) إلى تسمية عربية واضحة
+const getMovementTypeLabel = (type: string | undefined): string => {
+    if (!type) return '-';
+    const typeMap: Record<string, string> = {
+        'GRN': 'دخول مخزن',
+        'RETURN': 'مرتجع شراء',
+        'ADJUSTMENT': 'تعديل جرد',
+        'TRANSFER_IN': 'نقل (دخول)',
+        'TRANSFER_OUT': 'نقل (خروج)',
+        'ISSUE': 'صرف',
+    };
+    return typeMap[type] || type;
+};
+
 const ItemMovementReportPage: React.FC = () => {
     const navigate = useNavigate();
     const [items, setItems] = useState<{ id?: number; itemCode: string; itemNameAr: string }[]>([]);
@@ -257,7 +271,7 @@ const ItemMovementReportPage: React.FC = () => {
                                     {movements.map((m, i) => (
                                         <tr key={i} className="border-b border-slate-100">
                                             <td className="py-3 text-sm">{formatDate(m.date)}</td>
-                                            <td className="py-3 text-sm">{m.type ?? '-'}</td>
+                                            <td className="py-3 text-sm font-medium text-slate-700">{getMovementTypeLabel(m.type)}</td>
                                             <td className="py-3 text-sm font-medium">{m.qty ?? '-'}</td>
                                             <td className="py-3 text-sm">{m.balance ?? '-'}</td>
                                             <td className="py-3 text-sm text-slate-400">{m.ref || '-'}</td>

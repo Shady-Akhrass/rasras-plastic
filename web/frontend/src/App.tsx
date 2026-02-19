@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ScrollToTop from './components/common/ScrollToTop';
 import LoginPage from './pages/auth/LoginPage';
@@ -82,6 +83,7 @@ import { Toaster } from 'react-hot-toast';
 import StockLevelsPage from './pages/inventory/StockLevelsPage';
 import QualityInspectionPage from './pages/inventory/QualityInspectionPage';
 import ApprovalsInbox from './pages/procurement/ApprovalsInbox';
+import ApprovalAuditPage from './pages/procurement/ApprovalAuditPage';
 import PurchaseOrdersPage from './pages/procurement/PurchaseOrdersPage';
 import PurchaseOrderFormPage from './pages/procurement/PurchaseOrderFormPage';
 import WaitingImportsPage from './pages/procurement/WaitingImportsPage';
@@ -118,7 +120,10 @@ function App() {
           </ProtectedRoute>
         }>
           <Route index element={<DashboardHome />} />
-          <Route path="approvals" element={<ApprovalsInbox />} />
+          <Route path="approvals">
+            <Route index element={<ApprovalsInbox />} />
+            <Route path="audit" element={<ApprovalAuditPage />} />
+          </Route>
           <Route path="employees" element={<EmployeeList />} />
           <Route path="hr">
             <Route path="leave-types" element={<LeaveTypesPage />} />
