@@ -86,8 +86,8 @@ const QuotationComparisonFormPage: React.FC = () => {
 
     const loadSettings = async () => {
         try {
-            const data = await systemService.getAllSettings();
-            const setting = data.data.find(s => s.settingKey === 'RequireThreeQuotations');
+            const data = await systemService.getPublicSettings();
+            const setting = data.data?.find(s => s.settingKey === 'RequireThreeQuotations');
             if (setting) {
                 setRequireThreeQuotations(setting.settingValue === 'true');
             }

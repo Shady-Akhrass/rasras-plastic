@@ -105,7 +105,7 @@ export function useNotificationPolling(pathname: string) {
         return INTERVALS.BACKGROUND;
     }, []);
 
-    // ─── Single consolidated fetch ───
+    // ─── Single consolidated fetch (only calls APIs the user has permission for) ───
     const fetchAll = useCallback(async () => {
         // Cancel any in-flight request
         abortRef.current?.abort();
@@ -115,105 +115,98 @@ export function useNotificationPolling(pathname: string) {
         const user = userString ? JSON.parse(userString) : null;
         if (!user?.userId) return;
 
+        const permissions: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
+        const has = (p: string) => permissions.includes(p);
+
         const soundEnabled = localStorage.getItem('approvals_sound') !== 'off';
         const currentPath = pathnameRef.current;
 
-        // Run all 4 fetches concurrently with Promise.allSettled
-        const [approvalsResult, inspectionsResult, importsResult, crResult] =
-            await Promise.allSettled([
-                approvalService.getPendingRequests(user.userId),
-                grnService.getAllGRNs(),
-                purchaseOrderService.getWaitingForArrivalPOs(),
-                customerRequestService.getAllRequests(),
-            ]);
+        // Build only the fetches the user is allowed to call (avoid 403)
+        type TaggedPromise = Promise<{ type: 'approvals' | 'inspections' | 'imports' | 'cr'; value: any }>;
+        const tasks: TaggedPromise[] = [];
 
-        // ── 1) Approvals ──
-        if (approvalsResult.status === 'fulfilled') {
-            const requests = approvalsResult.value.data || [];
-            const currentIds = new Set(requests.map((r: any) => r.id));
+        tasks.push(
+            approvalService.getPendingRequests(user.userId).then(value => ({ type: 'approvals' as const, value }))
+        );
+        if (has('SECTION_PROCUREMENT') || has('SECTION_WAREHOUSE') || has('SECTION_OPERATIONS')) {
+            tasks.push(grnService.getAllGRNs().then(value => ({ type: 'inspections' as const, value })));
+            tasks.push(purchaseOrderService.getWaitingForArrivalPOs().then(value => ({ type: 'imports' as const, value })));
+        }
+        if (has('SECTION_SALES') || has('SECTION_OPERATIONS')) {
+            tasks.push(customerRequestService.getAllRequests().then(value => ({ type: 'cr' as const, value })));
+        }
 
-            // Detect NEW approvals (skip initial load)
-            if (!isInitialLoad.current) {
-                const newRequests = requests.filter(
-                    (r: any) => !prevApprovalIds.current.has(r.id)
-                );
-                if (newRequests.length > 0) {
-                    if (soundEnabled) playNotificationSound();
+        const results = await Promise.allSettled(tasks);
 
-                    // Dispatch event for other components (like ApprovalsInbox) to react immediately
-                    window.dispatchEvent(new CustomEvent(REFRESH_DATA_EVENT, {
-                        detail: { type: 'approvals', count: newRequests.length }
-                    }));
+        for (const settled of results) {
+            if (settled.status !== 'fulfilled') continue;
+            const { type, value } = settled.value;
 
-                    const count = newRequests.length;
-                    if (!currentPath.startsWith('/dashboard/approvals')) {
-                        sendBrowserNotification(
-                            'طلبات اعتماد جديدة',
-                            count === 1
-                                ? 'لديك طلب اعتماد جديد ينتظر مراجعتك'
-                                : `لديك ${count} طلبات اعتماد جديدة`
-                        );
-                        toast(
-                            count === 1
-                                ? 'طلب اعتماد جديد'
-                                : `${count} طلبات اعتماد جديدة`,
-                            { icon: '🔔', duration: 5000, style: { fontWeight: 'bold' } }
-                        );
+            if (type === 'approvals') {
+                const requests = value?.data || [];
+                const currentIds = new Set(requests.map((r: any) => r.id));
+
+                if (!isInitialLoad.current) {
+                    const newRequests = requests.filter(
+                        (r: any) => !prevApprovalIds.current.has(r.id)
+                    );
+                    if (newRequests.length > 0) {
+                        if (soundEnabled) playNotificationSound();
+                        window.dispatchEvent(new CustomEvent(REFRESH_DATA_EVENT, {
+                            detail: { type: 'approvals', count: newRequests.length }
+                        }));
+                        const count = newRequests.length;
+                        if (!currentPath.startsWith('/dashboard/approvals')) {
+                            sendBrowserNotification(
+                                'طلبات اعتماد جديدة',
+                                count === 1
+                                    ? 'لديك طلب اعتماد جديد ينتظر مراجعتك'
+                                    : `لديك ${count} طلبات اعتماد جديدة`
+                            );
+                            toast(
+                                count === 1 ? 'طلب اعتماد جديد' : `${count} طلبات اعتماد جديدة`,
+                                { icon: '🔔', duration: 5000, style: { fontWeight: 'bold' } }
+                            );
+                        }
                     }
                 }
+                prevApprovalIds.current = currentIds;
+                setCounts(prev =>
+                    prev.pendingApprovals === requests.length ? prev : { ...prev, pendingApprovals: requests.length }
+                );
+            } else if (type === 'inspections') {
+                const grns = value || [];
+                const currentCount = grns.filter((g: any) => g.status === 'Pending Inspection').length;
+                if (
+                    !isInitialLoad.current &&
+                    prevInspectionCount.current !== null &&
+                    currentCount > prevInspectionCount.current
+                ) {
+                    if (soundEnabled) playNotificationSound();
+                    toast.success('شحنة جديدة وصلت وبانتظار الفحص', {
+                        icon: '🔍',
+                        duration: 5000,
+                        style: { fontWeight: 'bold' },
+                    });
+                }
+                prevInspectionCount.current = currentCount;
+                setCounts(prev =>
+                    prev.pendingInspections === currentCount ? prev : { ...prev, pendingInspections: currentCount }
+                );
+            } else if (type === 'imports') {
+                const waitingPOs = value || [];
+                setCounts(prev =>
+                    prev.waitingImports === waitingPOs.length ? prev : { ...prev, waitingImports: waitingPOs.length }
+                );
+            } else if (type === 'cr') {
+                const requests = value?.data || [];
+                const pendingCount = requests.filter((r: any) => r.status === 'Pending').length;
+                setCounts(prev =>
+                    prev.pendingCustomerRequests === pendingCount
+                        ? prev
+                        : { ...prev, pendingCustomerRequests: pendingCount }
+                );
             }
-            prevApprovalIds.current = currentIds;
-
-            setCounts(prev => {
-                if (prev.pendingApprovals === requests.length) return prev;
-                return { ...prev, pendingApprovals: requests.length };
-            });
-        }
-
-        // ── 2) Inspections ──
-        if (inspectionsResult.status === 'fulfilled') {
-            const grns = inspectionsResult.value;
-            const currentCount = grns.filter(
-                (g: any) => g.status === 'Pending Inspection'
-            ).length;
-
-            if (
-                !isInitialLoad.current &&
-                prevInspectionCount.current !== null &&
-                currentCount > prevInspectionCount.current
-            ) {
-                if (soundEnabled) playNotificationSound();
-                toast.success('شحنة جديدة وصلت وبانتظار الفحص', {
-                    icon: '🔍',
-                    duration: 5000,
-                    style: { fontWeight: 'bold' },
-                });
-            }
-            prevInspectionCount.current = currentCount;
-
-            setCounts(prev => {
-                if (prev.pendingInspections === currentCount) return prev;
-                return { ...prev, pendingInspections: currentCount };
-            });
-        }
-
-        // ── 3) Waiting Imports ──
-        if (importsResult.status === 'fulfilled') {
-            const waitingPOs = importsResult.value;
-            setCounts(prev => {
-                if (prev.waitingImports === waitingPOs.length) return prev;
-                return { ...prev, waitingImports: waitingPOs.length };
-            });
-        }
-
-        // ── 4) Customer Requests ──
-        if (crResult.status === 'fulfilled') {
-            const requests = crResult.value.data || [];
-            const pendingCount = requests.filter((r: any) => r.status === 'Pending').length;
-            setCounts(prev => {
-                if (prev.pendingCustomerRequests === pendingCount) return prev;
-                return { ...prev, pendingCustomerRequests: pendingCount };
-            });
         }
 
         isInitialLoad.current = false;

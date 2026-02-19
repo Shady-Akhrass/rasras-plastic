@@ -149,22 +149,27 @@ public class ApprovalService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<ApprovalRequest> requests = requestRepo.findByStatusIn(List.of("Pending", "InProgress"));
+        List<ApprovalRequest> requests = requestRepo.findByStatusInWithCurrentStepAndApproverRole(List.of("Pending", "InProgress"));
 
-        // Filter requests
+        // Filter requests: اعتماداً على كود الدور (roleCode) لتفادي اختلاف الـ ID بين الخطوة والمستخدم
         List<ApprovalRequest> filteredRequests;
         if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleCode())) {
             filteredRequests = requests;
         } else {
+            String userRoleCode = user.getRole().getRoleCode();
             filteredRequests = requests.stream()
                     .filter(req -> {
                         ApprovalWorkflowStep step = req.getCurrentStep();
                         if (step == null)
                             return false;
                         if ("ROLE".equals(step.getApproverType())) {
-                            return user.getRole().getRoleId().equals(step.getApproverRole().getRoleId());
+                            if (step.getApproverRole() == null) return false;
+                            // مقارنة بكود الدور حتى لو اختلف RoleID (مثلاً مدير المالي FM)
+                            return userRoleCode != null
+                                    && userRoleCode.equalsIgnoreCase(step.getApproverRole().getRoleCode());
                         } else {
-                            return user.getUserId().equals(step.getApproverUser().getUserId());
+                            return step.getApproverUser() != null
+                                    && user.getUserId().equals(step.getApproverUser().getUserId());
                         }
                     })
                     .collect(Collectors.toList());

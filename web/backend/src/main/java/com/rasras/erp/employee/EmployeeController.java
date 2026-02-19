@@ -3,6 +3,7 @@ package com.rasras.erp.employee;
 import com.rasras.erp.employee.dto.*;
 import com.rasras.erp.shared.dto.ApiResponse;
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
+import com.rasras.erp.shared.security.SecurityConstants;
 import com.rasras.erp.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -64,7 +65,7 @@ public class EmployeeController {
 
     @GetMapping
     @Operation(summary = "Get all employees", description = "Returns a paginated list of employees")
-    @PreAuthorize("hasAuthority('HR_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.EMPLOYEES_SECTION)
     public ResponseEntity<ApiResponse<Page<EmployeeDto>>> getAllEmployees(
             @PageableDefault(size = 20) Pageable pageable) {
         Page<EmployeeDto> employees = employeeService.getAllEmployees(pageable);
@@ -81,7 +82,7 @@ public class EmployeeController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get employee by ID", description = "Returns an employee by their ID")
-    @PreAuthorize("hasAuthority('HR_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.EMPLOYEES_SECTION)
     public ResponseEntity<ApiResponse<EmployeeDto>> getEmployeeById(@PathVariable Integer id) {
         EmployeeDto employee = employeeService.getEmployeeById(id);
         return ResponseEntity.ok(ApiResponse.success(employee));
@@ -89,7 +90,7 @@ public class EmployeeController {
 
     @PostMapping
     @Operation(summary = "Create a new employee", description = "Creates a new employee record")
-    @PreAuthorize("hasAuthority('HR_CREATE') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.EMPLOYEES_SECTION)
     public ResponseEntity<ApiResponse<EmployeeDto>> createEmployee(@Valid @RequestBody CreateEmployeeRequest request) {
         EmployeeDto employee = employeeService.createEmployee(request);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -98,7 +99,7 @@ public class EmployeeController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update employee", description = "Updates an existing employee record")
-    @PreAuthorize("hasAuthority('HR_UPDATE') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.EMPLOYEES_SECTION)
     public ResponseEntity<ApiResponse<EmployeeDto>> updateEmployee(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateEmployeeRequest request) {
@@ -108,7 +109,7 @@ public class EmployeeController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete employee", description = "Soft deletes an employee (sets inactive)")
-    @PreAuthorize("hasAuthority('HR_DELETE') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.EMPLOYEES_SECTION)
     public ResponseEntity<ApiResponse<Void>> deleteEmployee(@PathVariable Integer id) {
         employeeService.deleteEmployee(id);
         return ResponseEntity.ok(ApiResponse.success("Employee deleted successfully"));

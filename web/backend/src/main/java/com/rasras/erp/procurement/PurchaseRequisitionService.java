@@ -50,6 +50,17 @@ public class PurchaseRequisitionService {
                                 .collect(Collectors.toList());
         }
 
+        /** PRs created by the current user only (for Sales section). */
+        @Transactional(readOnly = true)
+        public List<PurchaseRequisitionDto> getPRsForSalesUser(Integer createdByUserId) {
+                if (createdByUserId == null) {
+                        return List.of();
+                }
+                return prRepository.findByCreatedBy(createdByUserId).stream()
+                                .map(this::mapToDto)
+                                .collect(Collectors.toList());
+        }
+
         @Transactional(readOnly = true)
         public PurchaseRequisitionDto getPurchaseRequisitionById(Integer id) {
                 return prRepository.findById(id)

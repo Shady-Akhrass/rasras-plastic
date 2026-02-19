@@ -1,6 +1,7 @@
 package com.rasras.erp.inventory;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -14,44 +15,39 @@ import java.util.List;
 @RequestMapping("/inventory/items")
 @RequiredArgsConstructor
 @Tag(name = "Items Master", description = "Items Management APIs")
+@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
 public class ItemController {
 
     private final ItemService itemService;
 
     @GetMapping
     @Operation(summary = "Get all items", description = "Returns all items in inventory")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<List<ItemDto>>> getAllItems() {
         return ResponseEntity.ok(ApiResponse.success(itemService.getAllItems()));
     }
 
     @GetMapping("/active")
     @Operation(summary = "Get active items", description = "Returns all active items")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<List<ItemDto>>> getActiveItems() {
         return ResponseEntity.ok(ApiResponse.success(itemService.getActiveItems()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
     public ResponseEntity<ApiResponse<ItemDto>> getItemById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(itemService.getItemById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_CREATE') or hasAuthority('SECTION_OPERATIONS')")
     public ResponseEntity<ApiResponse<ItemDto>> createItem(@RequestBody ItemDto dto) {
         return ResponseEntity.ok(ApiResponse.success(itemService.createItem(dto)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_UPDATE') or hasAuthority('SECTION_OPERATIONS')")
     public ResponseEntity<ApiResponse<ItemDto>> updateItem(@PathVariable Integer id, @RequestBody ItemDto dto) {
         return ResponseEntity.ok(ApiResponse.success(itemService.updateItem(id, dto)));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN') or hasAuthority('INVENTORY_DELETE') or hasAuthority('SECTION_OPERATIONS')")
     public ResponseEntity<ApiResponse<Void>> deleteItem(@PathVariable Integer id) {
         itemService.deleteItem(id);
         return ResponseEntity.ok(ApiResponse.success(null));

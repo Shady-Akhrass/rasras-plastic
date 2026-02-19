@@ -1,5 +1,6 @@
 package com.rasras.erp.inventory;
 
+import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,7 +13,7 @@ import java.util.Map;
 @RequestMapping("/inventory/grn")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_PROCUREMENT')")
+@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION)
 public class GRNController {
 
     private final GRNService grnService;

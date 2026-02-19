@@ -41,6 +41,10 @@ public class DataSeeder implements CommandLineRunner {
 
         // 0.1 Seed Approval Workflows
         seedApprovalWorkflows();
+        // إصلاح خطوات اعتماد سند الصرف إن كانت خاطئة (أول خطوة يجب أن تكون FM)
+        ensurePVApprovalSteps();
+        // إصلاح خطوات اعتماد المقارنة إن كانت خاطئة (أول خطوة PM ثم FM ثم GM)
+        ensureQCApprovalSteps();
 
         // 0.2 Seed Approval Limits (حدود الاعتماد المالية)
         seedApprovalLimits();
@@ -579,6 +583,158 @@ public class DataSeeder implements CommandLineRunner {
                         .approverRole(gmRole)
                         .build());
             }
+        }
+    }
+
+    /**
+     * يضمن أن سير اعتماد سند الصرف (PV_APPROVAL) يبدأ بخطوة مدير المالي (FM).
+     * إذا وُجد السير لكن الخطوة الأولى ليست FM (مثلاً ADMIN من إصدار قديم)، يُعاد إنشاء الخطوات.
+     */
+    private void ensurePVApprovalSteps() {
+        var pvOpt = workflowRepo.findByWorkflowCode("PV_APPROVAL");
+        if (pvOpt.isEmpty()) return;
+
+        com.rasras.erp.approval.ApprovalWorkflow pvWorkflow = pvOpt.get();
+        java.util.List<com.rasras.erp.approval.ApprovalWorkflowStep> steps =
+                stepRepo.findByWorkflowWorkflowIdOrderByStepNumberAsc(pvWorkflow.getWorkflowId());
+
+        boolean firstStepIsFM = !steps.isEmpty()
+                && steps.get(0).getApproverRole() != null
+                && "FM".equalsIgnoreCase(steps.get(0).getApproverRole().getRoleCode());
+
+        if (firstStepIsFM) return;
+
+        Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+        Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+        Role accRole = roleRepository.findByRoleCode("ACC").orElse(null);
+
+        // إنشاء الخطوات الجديدة أولاً (خطوة 1 = FM) ثم ربط الطلبات والسجل التاريخي بها قبل حذف القديمة
+        com.rasras.erp.approval.ApprovalWorkflowStep newStep1 = null, newStep2 = null, newStep3 = null;
+        if (fmRole != null) {
+            newStep1 = stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                    .workflow(pvWorkflow)
+                    .stepNumber(1)
+                    .stepName("Finance Manager Approval")
+                    .approverType("ROLE")
+                    .approverRole(fmRole)
+                    .build());
+        }
+        if (gmRole != null) {
+            newStep2 = stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                    .workflow(pvWorkflow)
+                    .stepNumber(2)
+                    .stepName("General Manager Approval")
+                    .approverType("ROLE")
+                    .approverRole(gmRole)
+                    .build());
+        }
+        if (accRole != null) {
+            newStep3 = stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                    .workflow(pvWorkflow)
+                    .stepNumber(3)
+                    .stepName("Payment Disbursement")
+                    .approverType("ROLE")
+                    .approverRole(accRole)
+                    .build());
+        }
+
+        if (!steps.isEmpty()) {
+            if (newStep1 != null) {
+                int updated = jdbcTemplate.update(
+                        "UPDATE approvalrequests SET CurrentStepID = ? WHERE WorkflowID = ? AND Status IN ('Pending', 'InProgress')",
+                        newStep1.getStepId(), pvWorkflow.getWorkflowId());
+                if (updated > 0) log.info("PV_APPROVAL: updated {} pending request(s) to new FM step", updated);
+            }
+            // إعادة توجيه approvalactions وapprovalrequests للخطوات الجديدة قبل حذف القديمة لتجنب خرق FK
+            java.util.List<Integer> newIds = java.util.Arrays.asList(
+                    newStep1 != null ? newStep1.getStepId() : null,
+                    newStep2 != null ? newStep2.getStepId() : null,
+                    newStep3 != null ? newStep3.getStepId() : null);
+            for (int i = 0; i < steps.size() && i < newIds.size(); i++) {
+                Integer newId = newIds.get(i);
+                int oldStepId = steps.get(i).getStepId();
+                if (newId != null) {
+                    jdbcTemplate.update("UPDATE approvalactions SET StepID = ? WHERE StepID = ?", newId, oldStepId);
+                    jdbcTemplate.update("UPDATE approvalrequests SET CurrentStepID = ? WHERE CurrentStepID = ?", newId, oldStepId);
+                }
+            }
+            stepRepo.deleteAll(steps);
+            log.info("PV_APPROVAL: removed {} incorrect steps, first step is now FM", steps.size());
+        }
+    }
+
+    /**
+     * يضمن أن سير اعتماد المقارنة (QC_APPROVAL) يبدأ بخطوة مدير المشتريات (PM) ثم FM ثم GM.
+     */
+    private void ensureQCApprovalSteps() {
+        var qcOpt = workflowRepo.findByWorkflowCode("QC_APPROVAL");
+        if (qcOpt.isEmpty()) return;
+
+        com.rasras.erp.approval.ApprovalWorkflow qcWorkflow = qcOpt.get();
+        java.util.List<com.rasras.erp.approval.ApprovalWorkflowStep> steps =
+                stepRepo.findByWorkflowWorkflowIdOrderByStepNumberAsc(qcWorkflow.getWorkflowId());
+
+        boolean firstStepIsPM = !steps.isEmpty()
+                && steps.get(0).getApproverRole() != null
+                && "PM".equalsIgnoreCase(steps.get(0).getApproverRole().getRoleCode());
+
+        if (firstStepIsPM) return;
+
+        Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
+        Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+        Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+
+        com.rasras.erp.approval.ApprovalWorkflowStep newStep1 = null, newStep2 = null, newStep3 = null;
+        if (pmRole != null) {
+            newStep1 = stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                    .workflow(qcWorkflow)
+                    .stepNumber(1)
+                    .stepName("Procurement Manager Approval")
+                    .approverType("ROLE")
+                    .approverRole(pmRole)
+                    .build());
+        }
+        if (fmRole != null) {
+            newStep2 = stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                    .workflow(qcWorkflow)
+                    .stepNumber(2)
+                    .stepName("Finance Manager Approval")
+                    .approverType("ROLE")
+                    .approverRole(fmRole)
+                    .build());
+        }
+        if (gmRole != null) {
+            newStep3 = stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                    .workflow(qcWorkflow)
+                    .stepNumber(3)
+                    .stepName("General Manager Approval")
+                    .approverType("ROLE")
+                    .approverRole(gmRole)
+                    .build());
+        }
+
+        if (!steps.isEmpty()) {
+            if (newStep1 != null) {
+                int updated = jdbcTemplate.update(
+                        "UPDATE approvalrequests SET CurrentStepID = ? WHERE WorkflowID = ? AND Status IN ('Pending', 'InProgress')",
+                        newStep1.getStepId(), qcWorkflow.getWorkflowId());
+                if (updated > 0) log.info("QC_APPROVAL: updated {} pending request(s) to new PM step", updated);
+            }
+            // إعادة توجيه approvalactions وapprovalrequests للخطوات الجديدة قبل حذف القديمة لتجنب خرق FK
+            java.util.List<Integer> newIds = java.util.Arrays.asList(
+                    newStep1 != null ? newStep1.getStepId() : null,
+                    newStep2 != null ? newStep2.getStepId() : null,
+                    newStep3 != null ? newStep3.getStepId() : null);
+            for (int i = 0; i < steps.size() && i < newIds.size(); i++) {
+                Integer newId = newIds.get(i);
+                int oldStepId = steps.get(i).getStepId();
+                if (newId != null) {
+                    jdbcTemplate.update("UPDATE approvalactions SET StepID = ? WHERE StepID = ?", newId, oldStepId);
+                    jdbcTemplate.update("UPDATE approvalrequests SET CurrentStepID = ? WHERE CurrentStepID = ?", newId, oldStepId);
+                }
+            }
+            stepRepo.deleteAll(steps);
+            log.info("QC_APPROVAL: removed {} incorrect steps, first step is now PM", steps.size());
         }
     }
 

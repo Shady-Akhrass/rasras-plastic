@@ -1,8 +1,10 @@
 package com.rasras.erp.approval;
 
 import com.rasras.erp.approval.dto.ApprovalLimitDto;
+import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,6 +13,7 @@ import java.util.List;
 @RequestMapping("/approval-limits")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
 public class ApprovalLimitController {
 
     private final ApprovalLimitService approvalLimitService;

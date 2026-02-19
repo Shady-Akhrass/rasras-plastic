@@ -329,7 +329,7 @@ const RoleCard: React.FC<{
                 </span>
             </div>
             <h3 className="text-xl font-bold text-slate-800 mb-1 group-hover:text-brand-primary transition-colors">
-                {role.roleNameAr}
+                {role.roleNameAr} ({role.roleCode})
             </h3>
             <div className="text-sm text-slate-500 mb-4" dir="ltr">
                 {role.roleNameEn || '---'}
@@ -384,7 +384,7 @@ const PermissionMatrix: React.FC<{
         return permissions.reduce((acc, perm) => {
             const module = perm.moduleName || 'Other';
             if (!acc[module]) acc[module] = [];
-            acc[module].push(perm);
+            if (!acc[module].some(p => p.permissionId === perm.permissionId)) acc[module].push(perm);
             return acc;
         }, {} as Record<string, PermissionDto[]>);
     }, [permissions]);
@@ -572,8 +572,10 @@ const RolesPage: React.FC = () => {
                 roleService.getAllRoles(),
                 roleService.getAllPermissions()
             ]);
-            setRoles(rolesRes.data || []);
-            setPermissions(permsRes.data || []);
+            const rawRoles = rolesRes.data || [];
+            const rawPerms = permsRes.data || [];
+            setRoles(rawRoles.filter((r, i, a) => a.findIndex(x => x.roleId === r.roleId) === i));
+            setPermissions(rawPerms.filter((p, i, a) => a.findIndex(x => x.permissionId === p.permissionId) === i));
         } catch (error) {
             console.error('Error fetching data:', error);
             toast.error('فشل في تحميل البيانات');
@@ -994,7 +996,7 @@ const RolesPage: React.FC = () => {
                 ) : filteredRoles.length > 0 ? (
                     filteredRoles.map((role, index) => (
                         <RoleCard
-                            key={role.roleId}
+                            key={role.roleId ?? `role-${index}`}
                             role={role}
                             onEdit={() => {
                                 setEditingRole(role);
@@ -1097,7 +1099,7 @@ const RolesPage: React.FC = () => {
                 isOpen={showPermModal}
                 onClose={() => setShowPermModal(false)}
                 title="إدارة الصلاحيات"
-                subtitle={currentRoleForPerms ? `تعديل صلاحيات الدور: ${currentRoleForPerms.roleNameAr}` : undefined}
+                subtitle={currentRoleForPerms ? `تعديل صلاحيات الدور: ${currentRoleForPerms.roleNameAr} (${currentRoleForPerms.roleCode})` : undefined}
                 size="large"
             >
                 <div className="p-6">

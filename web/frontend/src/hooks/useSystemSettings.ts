@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { systemService, type SystemSettingDto } from '../services/systemService';
 import { currencyService } from '../services/currencyService';
 
+/** Public settings keys (any authenticated user). Backend may use DefaultCurrency or DEFAULT_CURRENCY. */
+const DEFAULT_CURRENCY_KEYS = ['DefaultCurrency', 'DEFAULT_CURRENCY'];
+
 export const useSystemSettings = () => {
     const [settings, setSettings] = useState<SystemSettingDto[]>([]);
     const [rates, setRates] = useState<Record<string, number>>({});
@@ -11,7 +14,7 @@ export const useSystemSettings = () => {
         const init = async () => {
             try {
                 const [settingsRes, ratesRes] = await Promise.all([
-                    systemService.getAllSettings(),
+                    systemService.getPublicSettings(),
                     currencyService.getRates()
                 ]);
 
@@ -35,7 +38,8 @@ export const useSystemSettings = () => {
         return settings.find(s => s.settingKey === key)?.settingValue;
     };
 
-    const defaultCurrency = getSetting('DefaultCurrency') || 'EGP';
+    const defaultCurrency =
+        DEFAULT_CURRENCY_KEYS.map((k) => getSetting(k)).find(Boolean) || 'EGP';
 
     const getCurrencyLabel = (currency: string) => {
         const target = currency || defaultCurrency;

@@ -448,11 +448,13 @@ const DashboardLayout: React.FC = () => {
             // Finance
             {
                 to: '/dashboard/finance/payment-vouchers', icon: Receipt,
-                label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE
+                label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE,
+                requiredPermission: 'SECTION_FINANCE'
             },
             {
                 to: '/dashboard/finance/payment-vouchers/new', icon: FileText,
-                label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE
+                label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE,
+                requiredPermission: 'SECTION_FINANCE'
             },
 
             // Warehouse

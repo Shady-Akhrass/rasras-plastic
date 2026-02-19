@@ -2,9 +2,11 @@ package com.rasras.erp.user;
 
 import com.rasras.erp.user.dto.AssignPermissionsRequest;
 import com.rasras.erp.user.dto.RoleDto;
+import com.rasras.erp.shared.security.SecurityConstants;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/roles")
 @RequiredArgsConstructor
+@PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
 public class RoleController {
 
     private final RoleService roleService;
@@ -45,7 +48,8 @@ public class RoleController {
     @PostMapping("/{id}/permissions")
     public ResponseEntity<Void> assignPermissions(@PathVariable Integer id,
             @Valid @RequestBody AssignPermissionsRequest request) {
-        roleService.assignPermissions(id, request.getPermissionIds());
+        List<Integer> ids = request.getPermissionIds() != null ? request.getPermissionIds() : List.of();
+        roleService.assignPermissions(id, ids);
         return ResponseEntity.ok().build();
     }
 }
