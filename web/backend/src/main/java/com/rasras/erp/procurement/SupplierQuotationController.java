@@ -1,8 +1,10 @@
 package com.rasras.erp.procurement;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/procurement/quotation")
 @RequiredArgsConstructor
+@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION)
 public class SupplierQuotationController {
 
     private final SupplierQuotationService quotationService;

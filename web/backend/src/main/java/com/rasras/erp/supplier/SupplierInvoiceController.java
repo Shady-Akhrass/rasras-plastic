@@ -1,9 +1,11 @@
 package com.rasras.erp.supplier;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import com.rasras.erp.supplier.dto.SupplierInvoiceDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,6 +14,7 @@ import java.util.List;
 @RequestMapping("/suppliers/invoices")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize(SecurityConstants.SUPPLIER_INVOICES)
 public class SupplierInvoiceController {
 
     private final SupplierInvoiceService invoiceService;

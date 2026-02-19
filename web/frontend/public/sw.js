@@ -17,9 +17,12 @@ const broadcast = async (channel, payload) => {
 // Fetch logic moved to SW
 const fetchCounts = async () => {
     if (!config.accessToken || !config.userId) return;
+    const url = `${config.apiUrl}/approvals/pending?userId=${config.userId}`;
+    if (!url.startsWith('http')) return;
 
     try {
-        const response = await fetch(`${config.apiUrl}/approvals/pending?userId=${config.userId}`, {
+        const response = await fetch(url, {
+            mode: 'cors',
             headers: {
                 'Authorization': `Bearer ${config.accessToken}`,
                 'Content-Type': 'application/json'
@@ -31,6 +34,7 @@ const fetchCounts = async () => {
             stopPolling();
             return;
         }
+        if (!response.ok) return;
 
         const data = await response.json();
         const count = data.data?.length || 0;
@@ -39,8 +43,8 @@ const fetchCounts = async () => {
             pendingApprovals: count,
             timestamp: Date.now()
         });
-    } catch (error) {
-        console.error('SW fetch failed:', error);
+    } catch (_err) {
+        // Failed to fetch — غالباً CORS أو عدم وصول الشبكة. تجاهل بصمت لتجنّب إزعاج المستخدم.
     }
 };
 

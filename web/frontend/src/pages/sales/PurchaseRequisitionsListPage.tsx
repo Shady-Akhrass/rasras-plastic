@@ -361,25 +361,8 @@ const PurchaseRequisitionsListPage: React.FC = () => {
     const fetchPRs = async () => {
         try {
             setLoading(true);
-            const data = await purchaseService.getAllPRs();
-
-            // STRICT FILTERING - ONLY SALES DEPARTMENT (ID: 4)
-            const salesPRs = Array.isArray(data) ? data.filter(pr => {
-                const isSalesDept = pr.requestedByDeptId === 4;
-                const isSalesByName = pr.requestedByDeptName && (
-                    pr.requestedByDeptName.includes('المبيعات') ||
-                    pr.requestedByDeptName.includes('مبيعات') ||
-                    pr.requestedByDeptName.toLowerCase().includes('sales')
-                );
-
-                // Only include if explicitly from sales department
-                return isSalesDept || isSalesByName;
-            }) : [];
-
-            console.log('Total PRs from API:', Array.isArray(data) ? data.length : 0);
-            console.log('Sales PRs after filtering:', salesPRs.length);
-
-            setPrs(salesPRs);
+            const data = await purchaseService.getSalesPRs();
+            setPrs(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to fetch PRs:', error);
             toast.error('فشل تحميل قائمة الطلبات');

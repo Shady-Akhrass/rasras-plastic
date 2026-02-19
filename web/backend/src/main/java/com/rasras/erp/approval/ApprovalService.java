@@ -28,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -147,22 +149,27 @@ public class ApprovalService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<ApprovalRequest> requests = requestRepo.findByStatusIn(List.of("Pending", "InProgress"));
+        List<ApprovalRequest> requests = requestRepo.findByStatusInWithCurrentStepAndApproverRole(List.of("Pending", "InProgress"));
 
-        // Filter requests
+        // Filter requests: اعتماداً على كود الدور (roleCode) لتفادي اختلاف الـ ID بين الخطوة والمستخدم
         List<ApprovalRequest> filteredRequests;
         if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleCode())) {
             filteredRequests = requests;
         } else {
+            String userRoleCode = user.getRole().getRoleCode();
             filteredRequests = requests.stream()
                     .filter(req -> {
                         ApprovalWorkflowStep step = req.getCurrentStep();
                         if (step == null)
                             return false;
                         if ("ROLE".equals(step.getApproverType())) {
-                            return user.getRole().getRoleId().equals(step.getApproverRole().getRoleId());
+                            if (step.getApproverRole() == null) return false;
+                            // مقارنة بكود الدور حتى لو اختلف RoleID (مثلاً مدير المالي FM)
+                            return userRoleCode != null
+                                    && userRoleCode.equalsIgnoreCase(step.getApproverRole().getRoleCode());
                         } else {
-                            return user.getUserId().equals(step.getApproverUser().getUserId());
+                            return step.getApproverUser() != null
+                                    && user.getUserId().equals(step.getApproverUser().getUserId());
                         }
                     })
                     .collect(Collectors.toList());
@@ -172,10 +179,37 @@ public class ApprovalService {
         return filteredRequests.stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
+    /** سجل الاعتمادات — آخر الإجراءات (من اعتمد ومتى) للشفافية والتدقيق */
+    @Transactional(readOnly = true)
+    public List<ApprovalAuditDto> getRecentApprovalActions(int limit) {
+        return actionRepo.findAllByOrderByActionDateDesc(PageRequest.of(0, Math.min(limit, 200)))
+                .stream()
+                .map(this::mapActionToAuditDto)
+                .collect(Collectors.toList());
+    }
+
+    private ApprovalAuditDto mapActionToAuditDto(ApprovalAction action) {
+        ApprovalRequest req = action.getRequest();
+        return ApprovalAuditDto.builder()
+                .actionId(action.getId())
+                .requestId(req.getId())
+                .documentType(req.getDocumentType())
+                .documentId(req.getDocumentId())
+                .documentNumber(req.getDocumentNumber())
+                .workflowName(req.getWorkflow().getWorkflowName())
+                .stepName(action.getStep().getStepName())
+                .actionType(action.getActionType())
+                .actionByUser(action.getActionByUser().getUsername())
+                .actionDate(action.getActionDate())
+                .comments(action.getComments())
+                .totalAmount(req.getTotalAmount())
+                .requestStatus(req.getStatus())
+                .build();
+    }
+
     private ApprovalRequestDto mapToDto(ApprovalRequest req) {
         BigDecimal amountToUse = req.getTotalAmount();
-        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix
-        // display)
+        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix display)
         if ("QuotationComparison".equals(req.getDocumentType())
                 && (amountToUse == null || amountToUse.compareTo(BigDecimal.ZERO) == 0)) {
             amountToUse = comparisonRepo.findById(req.getDocumentId())
@@ -286,7 +320,7 @@ public class ApprovalService {
                         // ✅ Strategy B: إغلاق الطلب نهائياً
                         request.setStatus("Rejected");
                         request.setCompletedDate(LocalDateTime.now());
-                        request.setCurrentStep(null); // ✅ تصفير CurrentStep
+                        request.setCurrentStep(null);  // ✅ تصفير CurrentStep
                         updateLinkedDocumentStatus(request, "Rejected", userId);
                     }
                     requestRepo.save(request);
@@ -454,33 +488,31 @@ public class ApprovalService {
                 qc.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     qc.setStatus("Approved");
-
+                    
                     // ✅ Idempotent PO Creation: إنشاء PO مرة واحدة فقط
                     if (qc.getSelectedQuotation() != null) {
                         boolean poExists = poRepo.findByQuotationId(qc.getSelectedQuotation().getId()).isPresent();
-
+                        
                         if (!poExists) {
                             // NEW: Automatically create PO and initiate its approval
                             createPOFromComparison(qc, userId);
                         } else {
-                            System.out.println("PO already exists for quotation " +
-                                    qc.getSelectedQuotation().getId() + " - skipping creation");
+                            System.out.println("PO already exists for quotation " + 
+                                qc.getSelectedQuotation().getId() + " - skipping creation");
                         }
                     }
                 } else if ("Rejected".equals(status)) {
                     // ✅ إعادة المقارنة إلى Draft للسماح بالتعديل وإعادة الإرسال
                     qc.setStatus("Draft");
                     qc.setApprovalStatus("Rejected"); // تتبع آخر محاولة رفض
-
+                    
                     // ✅ تتبع عدد مرات الرفض
                     Integer rejectionCount = qc.getRejectionCount() != null ? qc.getRejectionCount() : 0;
                     qc.setRejectionCount(rejectionCount + 1);
                     qc.setLastRejectionDate(LocalDateTime.now());
-
-                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل
-                    // تاريخي
-                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات
-                    // المُغلقة
+                    
+                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل تاريخي
+                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات المُغلقة
                 }
                 comparisonRepo.save(qc);
             });

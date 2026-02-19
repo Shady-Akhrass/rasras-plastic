@@ -1,6 +1,7 @@
 package com.rasras.erp.system;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +30,7 @@ public class DatabaseController {
     private final LogService logService;
 
     @PostMapping("/restore")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Restore Database", description = "Restores the database from an uploaded SQL file. WARNING: Overwrites existing data.")
     public ResponseEntity<ApiResponse<String>> restoreDatabase(
             @RequestParam("file") MultipartFile file,
@@ -44,7 +45,7 @@ public class DatabaseController {
     }
 
     @GetMapping("/backup")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Download Database Backup", description = "Generates and downloads an SQL backup of the current database.")
     public ResponseEntity<Resource> downloadBackup(
             @RequestParam("dbUser") String dbUser,
@@ -67,14 +68,14 @@ public class DatabaseController {
     }
 
     @GetMapping("/overview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Get Database Overview", description = "Returns statistics about database tables (rows, size, etc.)")
     public ResponseEntity<ApiResponse<List<DatabaseService.TableStatus>>> getDatabaseOverview() {
         return ResponseEntity.ok(ApiResponse.success(databaseService.getDatabaseOverview()));
     }
 
     @GetMapping("/table/{tableName}/data")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Get Table Data", description = "Returns the first N rows of a specific table")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getTableData(
             @PathVariable String tableName,
@@ -87,14 +88,14 @@ public class DatabaseController {
     }
 
     @GetMapping("/logs")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Get System Logs", description = "Returns the last N lines of system logs")
     public ResponseEntity<ApiResponse<List<String>>> getSystemLogs(@RequestParam(defaultValue = "100") int lines) {
         return ResponseEntity.ok(ApiResponse.success(logService.getSystemLogs(lines)));
     }
 
     @PostMapping("/execute-sql")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Execute SQL Script", description = "Executes a raw SQL script.")
     public ResponseEntity<ApiResponse<String>> executeSql(@RequestBody Map<String, String> payload) {
         try {
@@ -110,7 +111,7 @@ public class DatabaseController {
     }
 
     @PostMapping("/clear-tables")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Clear Tables", description = "Clears data from selected tables with optional FK check disable.")
     public ResponseEntity<ApiResponse<String>> clearTables(@RequestBody Map<String, Object> payload) {
         try {
@@ -129,7 +130,7 @@ public class DatabaseController {
     }
 
     @GetMapping("/error-logs")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     @Operation(summary = "Get Database Error Logs", description = "Returns the persistent database operation error logs.")
     public ResponseEntity<ApiResponse<List<String>>> getErrorLogs() {
         return ResponseEntity.ok(ApiResponse.success(databaseService.getErrorLogs()));

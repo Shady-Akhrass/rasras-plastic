@@ -621,6 +621,8 @@ const ApprovalsInbox: React.FC = () => {
     }>({ show: false, request: null, warehouses: [], selectedWarehouseId: 0, loading: false });
 
     // ─── Get Current User ───
+    // طلبات الاعتماد تُفلتر حسب المستخدم الحالي؛ استخدام userId خاطئ يعرض طلبات مستخدم آخر.
+    // مصدر الحقيقة: تسجيل الدخول و /auth/me يخزنان userId في localStorage (محدّث عبر refreshUserPermissions).
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
     const currentUserId = user?.userId ?? user?.id ?? 1;
@@ -644,15 +646,28 @@ const ApprovalsInbox: React.FC = () => {
         if (!mountedRef.current) return;
         try {
             if (!silent) setLoading(true);
-            const [approvalsData, crsData] = await Promise.all([
-                approvalService.getPendingRequests(currentUserId),
-                customerRequestService.getAllRequests() // We will filter effectively on client side or create a specific endpoint later
-            ]);
+
+            const currentUserJson = localStorage.getItem('user');
+            const currentUser = currentUserJson ? JSON.parse(currentUserJson) : null;
+            const uid = currentUser?.userId ?? currentUser?.id ?? currentUserId;
+            const permissions: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+            const canFetchCustomerRequests = permissions.includes('SECTION_SALES') || permissions.includes('SECTION_OPERATIONS');
+
+            const promises: Promise<any>[] = [
+                approvalService.getPendingRequests(uid),
+            ];
+            if (canFetchCustomerRequests) {
+                promises.push(customerRequestService.getAllRequests());
+            }
+
+            const results = await Promise.all(promises);
+            const approvalsData = results[0];
+            const crsData = results.length > 1 ? results[1] : { data: [] };
 
             const approvals: ApprovalRequestDto[] = approvalsData.data || [];
 
-            // Map pending CRs to ApprovalRequestDto format
-            const crs: ApprovalRequestDto[] = (crsData.data || [])
+            // Map pending CRs to ApprovalRequestDto format (only if we fetched them)
+            const crs: ApprovalRequestDto[] = (crsData?.data || [])
                 .filter(cr => cr.status === 'Pending')
                 .map(cr => ({
                     id: cr.requestId || 0,

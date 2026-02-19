@@ -31,7 +31,9 @@ export const roleService = {
     updateRole: (id: number, data: RoleDto) => apiClient.put<RoleDto>(`${ROLES_API_URL}/${id}`, data),
     deleteRole: (id: number) => apiClient.delete(`${ROLES_API_URL}/${id}`),
     assignPermissions: (roleId: number, permissionIds: number[]) =>
-        apiClient.post(`${ROLES_API_URL}/${roleId}/permissions`, { permissionIds }),
+        apiClient.post(`${ROLES_API_URL}/${roleId}/permissions`, {
+            permissionIds: permissionIds.map(id => Number(id)).filter(n => !isNaN(n)),
+        }),
 
     // Permissions
     getAllPermissions: () => apiClient.get<PermissionDto[]>(PERMISSIONS_API_URL),

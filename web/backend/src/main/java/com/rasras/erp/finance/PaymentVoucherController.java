@@ -4,10 +4,12 @@ import com.rasras.erp.finance.dto.InvoiceComparisonData;
 import com.rasras.erp.finance.dto.PaymentVoucherDto;
 import com.rasras.erp.finance.dto.SupplierWithInvoices;
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +18,7 @@ import java.util.List;
 @RequestMapping("/finance/payment-vouchers")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize(SecurityConstants.FINANCE_SECTION)
 public class PaymentVoucherController {
 
     private final PaymentVoucherService voucherService;
@@ -104,6 +107,8 @@ public class PaymentVoucherController {
         String fileName = "PaymentVoucher_" + voucher.getVoucherNumber() + ".pdf";
 
         return ResponseEntity.ok()
+                .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdfContents);

@@ -6,6 +6,23 @@ import type { WarehouseDto } from '../../services/warehouseService';
 import stockAdjustmentService, { type StockAdjustmentDto } from '../../services/stockAdjustmentService';
 import { toast } from 'react-hot-toast';
 
+// إرسال إشعار متصفح بعد اعتماد الجرد
+const sendCountApprovalNotification = (adjustmentNumber: string, warehouseName: string, itemsCount: number) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification('تم اعتماد الجرد', {
+            body: `الجرد ${adjustmentNumber} في ${warehouseName} - تم تطبيق ${itemsCount} تسوية على المخزون`,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: 'stock-count-approval',
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+        };
+    }
+};
+
 type CountType = 'periodic' | 'surprise';
 
 const InventoryCountPage: React.FC = () => {
@@ -35,6 +52,11 @@ const InventoryCountPage: React.FC = () => {
                 setLoadingWarehouses(false);
             }
         })();
+        
+        // طلب إذن الإشعارات عند تحميل الصفحة
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
     }, []);
 
     const isPeriodic = type === 'periodic';
@@ -95,8 +117,45 @@ const InventoryCountPage: React.FC = () => {
         try {
             const updated = await stockAdjustmentService.approve(adjustment.id);
             if (updated) {
-                toast.success('تم اعتماد الجرد وتحديث المخزون');
-                navigate('/dashboard/inventory/reports/variance');
+                // حساب عدد الأصناف المعدلة (التي لها فرق ≠ 0)
+                const adjustedItems = (updated.items || []).filter(item => {
+                    const sys = Number(item.systemQty) || 0;
+                    const act = Number(item.actualQty) || 0;
+                    return Math.abs(act - sys) > 0.001; // تجنب أخطاء الفاصلة العائمة
+                });
+
+                const surplusCount = adjustedItems.filter(item => {
+                    const sys = Number(item.systemQty) || 0;
+                    const act = Number(item.actualQty) || 0;
+                    return act > sys;
+                }).length;
+
+                const shortageCount = adjustedItems.filter(item => {
+                    const sys = Number(item.systemQty) || 0;
+                    const act = Number(item.actualQty) || 0;
+                    return act < sys;
+                }).length;
+
+                // رسالة نجاح غنية بالتفاصيل
+                const message = adjustedItems.length > 0
+                    ? `تم اعتماد الجرد وتطبيق ${adjustedItems.length} تسوية على المخزون (${surplusCount > 0 ? `${surplusCount} زيادة` : ''}${surplusCount > 0 && shortageCount > 0 ? '، ' : ''}${shortageCount > 0 ? `${shortageCount} نقص` : ''})`
+                    : 'تم اعتماد الجرد (لا توجد فروقات)';
+
+                toast.success(message, { duration: 5000 });
+                
+                // إرسال إشعار متصفح
+                if (adjustedItems.length > 0) {
+                    sendCountApprovalNotification(
+                        updated.adjustmentNumber || 'الجرد',
+                        updated.warehouseNameAr || 'المستودع',
+                        adjustedItems.length
+                    );
+                }
+                
+                // الانتقال إلى تقرير الفروقات بعد ثانية للسماح بقراءة الرسالة
+                setTimeout(() => {
+                    navigate('/dashboard/inventory/reports/variance');
+                }, 1000);
             }
         } catch (err: any) {
             toast.error(err?.response?.data?.message || 'فشل الاعتماد');

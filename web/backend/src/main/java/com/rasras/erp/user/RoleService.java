@@ -102,9 +102,9 @@ public class RoleService {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new RuntimeException("Role not found"));
 
-        // Remove existing permissions
-        List<RolePermission> existing = rolePermissionRepository.findByRoleRoleId(roleId);
-        rolePermissionRepository.deleteAll(existing);
+        // حذف صلاحيات الدور مباشرة في DB (استعلام DELETE) ثم flush لضمان تنفيذ الحذف قبل أي إدراج
+        rolePermissionRepository.deleteByRoleRoleId(roleId);
+        rolePermissionRepository.flush();
 
         // إزالة التكرار لتجنب خرق قيد UNIQUE (RoleID, PermissionID)
         List<Integer> distinctIds = permissionIds != null

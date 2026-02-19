@@ -185,7 +185,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onClose, onSuccess }) => {
                             <option value="">اختر الدور</option>
                             {roles.map(role => (
                                 <option key={role.roleId} value={role.roleId}>
-                                    {role.roleNameAr}
+                                    {role.roleNameAr} ({role.roleCode})
                                 </option>
                             ))}
                         </select>
