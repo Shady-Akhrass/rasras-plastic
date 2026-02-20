@@ -109,7 +109,7 @@ const TYPE_ROUTES: Record<string, string> = {
     QC: '/dashboard/procurement/comparison', QuotationComparison: '/dashboard/procurement/comparison',
     PO: '/dashboard/procurement/po', PurchaseOrder: '/dashboard/procurement/po',
     GRN: '/dashboard/procurement/grn', GoodsReceiptNote: '/dashboard/procurement/grn',
-    SINV: '/dashboard/procurement/invoices', SupplierInvoice: '/dashboard/procurement/invoices',
+    SINV: '/dashboard/finance/invoices', SupplierInvoice: '/dashboard/finance/invoices',
     PurchaseReturn: '/dashboard/procurement/returns',
     PaymentVoucher: '/dashboard/finance/payment-vouchers',
     PV: '/dashboard/finance/payment-vouchers',

@@ -29,9 +29,20 @@ public final class SecurityConstants {
     /** المالية والمحاسبة: سندات صرف، اعتمادات */
     public static final String FINANCE_SECTION = "hasAuthority('SECTION_FINANCE')";
 
-    /** فواتير الموردين: للمشتريات وللمالية (عرض الفواتير غير المدفوعة في سندات الصرف) */
+    /** فواتير الموردين: للمشتريات وللمالية (عرض الفواتير غير المدفوعة في سندات الصرف) — للتوافق مع controllers أخرى */
     public static final String SUPPLIER_INVOICES =
             "hasAuthority('SECTION_PROCUREMENT') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_SALES') or hasAuthority('SECTION_FINANCE')";
+
+    /** فواتير الموردين — Action-level (فصل الصلاحيات SoD) */
+    public static final String SUPPLIER_INVOICE_CREATE  = "hasAuthority('SUPPLIER_INVOICE_CREATE')";
+    public static final String SUPPLIER_INVOICE_VIEW    = "hasAuthority('SUPPLIER_INVOICE_VIEW')";
+    public static final String SUPPLIER_INVOICE_REVIEW  = "hasAuthority('SUPPLIER_INVOICE_REVIEW')";
+    public static final String SUPPLIER_INVOICE_APPROVE = "hasAuthority('SUPPLIER_INVOICE_APPROVE')";
+    public static final String SUPPLIER_INVOICE_PAY     = "hasAuthority('SUPPLIER_INVOICE_PAY')";
+
+    /** قراءة GRN في سياق فاتورة (للمطابقة) — للمنشئ أو للمراجع دون فتح قائمة GRN العامة */
+    public static final String SUPPLIER_INVOICE_CREATE_OR_REVIEW =
+            "hasAuthority('SUPPLIER_INVOICE_CREATE') or hasAuthority('SUPPLIER_INVOICE_REVIEW')";
 
     /** المخازن والمستودعات: أصناف، مخازن، وحدات، تصنيفات، أرصدة، تعديلات، جودة، قوائم أسعار */
     public static final String WAREHOUSE_SECTION =
@@ -43,4 +54,7 @@ public final class SecurityConstants {
 
     /** الموظفين والـ HR — من لديه SECTION_EMPLOYEES */
     public static final String EMPLOYEES_SECTION = "hasAuthority('SECTION_EMPLOYEES')";
+
+    /** إدارة المستخدمين — من لديه SECTION_USERS (تُعيّن من صفحة الصلاحيات) */
+    public static final String USER_MANAGEMENT = "hasAuthority('SECTION_USERS')";
 }

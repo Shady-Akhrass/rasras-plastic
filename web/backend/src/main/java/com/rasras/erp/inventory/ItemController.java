@@ -15,7 +15,7 @@ import java.util.List;
 @RequestMapping("/inventory/items")
 @RequiredArgsConstructor
 @Tag(name = "Items Master", description = "Items Management APIs")
-@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
+@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION + " or " + SecurityConstants.SUPPLIER_INVOICE_VIEW)
 public class ItemController {
 
     private final ItemService itemService;

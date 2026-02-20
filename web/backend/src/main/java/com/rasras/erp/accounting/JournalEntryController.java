@@ -30,7 +30,7 @@ public class JournalEntryController {
 
     @GetMapping
     @Operation(summary = "Get all journal entries", description = "Returns a paginated list of journal entries")
-    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public ResponseEntity<ApiResponse<Page<JournalEntryDto>>> getAllJournalEntries(
             @PageableDefault(size = 20) Pageable pageable) {
         Page<JournalEntryDto> entries = journalEntryService.getAllJournalEntries(pageable);
@@ -39,7 +39,7 @@ public class JournalEntryController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get journal entry by ID", description = "Returns a journal entry by its ID")
-    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public ResponseEntity<ApiResponse<JournalEntryDto>> getJournalEntryById(@PathVariable Integer id) {
         JournalEntryDto entry = journalEntryService.getJournalEntryById(id);
         return ResponseEntity.ok(ApiResponse.success(entry));
@@ -47,7 +47,7 @@ public class JournalEntryController {
 
     @GetMapping("/number/{entryNumber}")
     @Operation(summary = "Get journal entry by number", description = "Returns a journal entry by its entry number")
-    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public ResponseEntity<ApiResponse<JournalEntryDto>> getJournalEntryByNumber(@PathVariable String entryNumber) {
         JournalEntryDto entry = journalEntryService.getJournalEntryByNumber(entryNumber);
         return ResponseEntity.ok(ApiResponse.success(entry));
@@ -55,7 +55,7 @@ public class JournalEntryController {
 
     @PostMapping
     @Operation(summary = "Create a new journal entry", description = "Creates a new journal entry")
-    @PreAuthorize("hasAuthority('ACCOUNTING_CREATE') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_CREATE')")
     public ResponseEntity<ApiResponse<JournalEntryDto>> createJournalEntry(
             @Valid @RequestBody CreateJournalEntryRequest request) {
         JournalEntryDto entry = journalEntryService.createJournalEntry(request);
@@ -65,7 +65,7 @@ public class JournalEntryController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update journal entry", description = "Updates an existing journal entry")
-    @PreAuthorize("hasAuthority('ACCOUNTING_UPDATE') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_UPDATE')")
     public ResponseEntity<ApiResponse<JournalEntryDto>> updateJournalEntry(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateJournalEntryRequest request) {
@@ -75,7 +75,7 @@ public class JournalEntryController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete journal entry", description = "Deletes a journal entry (only if not posted)")
-    @PreAuthorize("hasAuthority('ACCOUNTING_DELETE') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteJournalEntry(@PathVariable Integer id) {
         journalEntryService.deleteJournalEntry(id);
         return ResponseEntity.ok(ApiResponse.success("Journal entry deleted successfully"));
@@ -83,7 +83,7 @@ public class JournalEntryController {
 
     @PostMapping("/{id}/post")
     @Operation(summary = "Post journal entry", description = "Posts a journal entry (changes status to Posted)")
-    @PreAuthorize("hasAuthority('ACCOUNTING_POST') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_POST')")
     public ResponseEntity<ApiResponse<JournalEntryDto>> postJournalEntry(
             @PathVariable Integer id,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -93,7 +93,7 @@ public class JournalEntryController {
 
     @GetMapping("/by-date-range")
     @Operation(summary = "Get journal entries by date range", description = "Returns journal entries within a date range")
-    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public ResponseEntity<ApiResponse<Page<JournalEntryDto>>> getJournalEntriesByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
@@ -104,7 +104,7 @@ public class JournalEntryController {
 
     @GetMapping("/by-status")
     @Operation(summary = "Get journal entries by status", description = "Returns journal entries with a specific status")
-    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public ResponseEntity<ApiResponse<Page<JournalEntryDto>>> getJournalEntriesByStatus(
             @RequestParam String status,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -114,7 +114,7 @@ public class JournalEntryController {
 
     @GetMapping("/by-fiscal-year")
     @Operation(summary = "Get journal entries by fiscal year", description = "Returns journal entries for a specific fiscal year")
-    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public ResponseEntity<ApiResponse<Page<JournalEntryDto>>> getJournalEntriesByFiscalYear(
             @RequestParam Integer fiscalYearId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -124,7 +124,7 @@ public class JournalEntryController {
 
     @GetMapping("/by-source")
     @Operation(summary = "Get journal entries by source", description = "Returns journal entries for a specific source")
-    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('ACCOUNTING_VIEW')")
     public ResponseEntity<ApiResponse<List<JournalEntryDto>>> getJournalEntriesBySource(
             @RequestParam String sourceType,
             @RequestParam Integer sourceId) {

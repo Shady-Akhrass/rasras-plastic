@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Search, Plus, FileText, Truck, Calendar, ArrowLeft, RefreshCw,
     Eye, CheckCircle2, Clock, DollarSign, XCircle,
@@ -7,7 +7,6 @@ import {
     ExternalLink, Ban, Trash2
 } from 'lucide-react';
 import { supplierInvoiceService, type SupplierInvoiceDto } from '../../services/supplierInvoiceService';
-import { grnService } from '../../services/grnService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
@@ -259,7 +258,9 @@ const InvoiceRow: React.FC<{
     getCurrencyLabel: (currency: string) => string;
     defaultCurrency: string;
     convertAmount: (amount: number, from: string) => number;
-}> = ({ invoice, index, isExpanded, onToggle, onView, onApprove, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => {
+    showApprove?: boolean;
+    showDelete?: boolean;
+}> = ({ invoice, index, isExpanded, onToggle, onView, onApprove, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount, showApprove = true, showDelete = true }) => {
 
 
 
@@ -374,10 +375,12 @@ const InvoiceRow: React.FC<{
                     <div className="flex justify-center gap-2">
                         <button onClick={(e) => { e.stopPropagation(); onView(); }} className="p-2.5 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all duration-200 group/btn" title="عرض"><Eye className="w-4 h-4" /></button>
                         <button onClick={(e) => { e.stopPropagation(); handleDownloadPdf(invoice); }} className="p-2.5 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all duration-200" title="طباعة / تحميل PDF"><FileText className="w-4 h-4" /></button>
-                        {invoice.status === 'Unpaid' && invoice.approvalStatus === 'Pending' && (
+                        {showApprove && invoice.status === 'Unpaid' && invoice.approvalStatus === 'Pending' && (
                             <button onClick={(e) => { e.stopPropagation(); onApprove(); }} className="p-2.5 text-emerald-500 hover:text-white hover:bg-emerald-500 rounded-xl transition-all duration-200" title="اعتماد الصرف"><CheckCircle2 className="w-4 h-4" /></button>
                         )}
-                        <button onClick={(e) => { e.stopPropagation(); onDelete(invoice); }} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all duration-200" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                        {showDelete && (
+                            <button onClick={(e) => { e.stopPropagation(); onDelete(invoice); }} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all duration-200" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                        )}
                         <button className={`p-2.5 rounded-xl transition-all duration-200 ${isExpanded ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-300'}`}><Plus className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-45' : ''}`} /></button>
                     </div>
                 </td>
@@ -506,7 +509,7 @@ const InvoiceRow: React.FC<{
 const GRNRow: React.FC<{
     grn: any;
     index: number;
-    onCreateInvoice: () => void;
+    onCreateInvoice?: () => void;
     onViewPO: () => void;
 }> = ({ grn, index, onCreateInvoice, onViewPO }) => (
     <tr
@@ -564,13 +567,15 @@ const GRNRow: React.FC<{
             </span>
         </td>
         <td className="px-6 py-4">
-            <button
-                onClick={onCreateInvoice}
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40"
-            >
-                <DollarSign className="w-4 h-4" />
-                <span>إنشاء فاتورة</span>
-            </button>
+            {onCreateInvoice && (
+                <button
+                    onClick={onCreateInvoice}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40"
+                >
+                    <DollarSign className="w-4 h-4" />
+                    <span>إنشاء فاتورة</span>
+                </button>
+            )}
         </td>
     </tr>
 );
@@ -639,9 +644,16 @@ const EmptyState: React.FC<{
 
 const SupplierInvoicesPage: React.FC = () => {
     const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
-
     const navigate = useNavigate();
-
+    const location = useLocation();
+    const pathname = location.pathname;
+    const isProcurement = pathname.startsWith('/dashboard/procurement/invoices');
+    const userString = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    const user = userString ? JSON.parse(userString) : null;
+    const userPermissions: string[] = Array.isArray((user as any)?.permissions) ? (user as any).permissions : [];
+    const basePath = isProcurement ? '/dashboard/procurement/invoices' : '/dashboard/finance/invoices';
+    const canCreate = isProcurement && userPermissions.includes('SUPPLIER_INVOICE_CREATE');
+    const canApprove = userPermissions.includes('SUPPLIER_INVOICE_APPROVE');
 
     const [loading, setLoading] = useState(true);
     const [invoices, setInvoices] = useState<SupplierInvoiceDto[]>([]);
@@ -683,11 +695,12 @@ const SupplierInvoicesPage: React.FC = () => {
         }
     };
 
+    // لا تستخدم grnService هنا — يوزر المالية يفتقد صلاحية /inventory/grn. استخدم فقط supplierInvoiceService.getPendingGRNsForInvoicing (endpoint محمي بـ SECTION_FINANCE).
     const fetchPendingGRNs = async () => {
         try {
             setLoading(true);
-            const data = await grnService.getAllGRNs();
-            setPendingGRNs(data.filter((g: any) => g.status === 'Completed'));
+            const data = await supplierInvoiceService.getPendingGRNsForInvoicing();
+            setPendingGRNs(data);
         } catch (error) {
             console.error('Failed to fetch pending GRNs:', error);
             toast.error('فشل تحميل التوريدات المعلقة');
@@ -754,6 +767,10 @@ const SupplierInvoicesPage: React.FC = () => {
         } catch (error: any) {
             const apiMessage = error?.response?.data?.message as string | undefined;
             toast.error(apiMessage || 'فشل حذف الفاتورة');
+            fetchInvoices();
+            setIsDeleteModalOpen(false);
+            setInvoiceToDelete(null);
+            setSelectedIds([]);
         } finally {
             setIsDeleting(false);
         }
@@ -891,15 +908,15 @@ const SupplierInvoicesPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <button
-                            onClick={() =>
-                                navigate('/dashboard/procurement/invoices/new')
-                            }
-                            className="flex items-center gap-2 px-6 py-3.5 bg-white text-brand-primary rounded-xl font-bold hover:bg-white/90 transition-all shadow-lg shadow-black/10 hover:shadow-xl hover:-translate-y-0.5"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>تسجيل فاتورة</span>
-                        </button>
+                        {canCreate && (
+                            <button
+                                onClick={() => navigate(`${basePath}/new`)}
+                                className="flex items-center gap-2 px-6 py-3.5 bg-white text-brand-primary rounded-xl font-bold hover:bg-white/90 transition-all shadow-lg shadow-black/10 hover:shadow-xl hover:-translate-y-0.5"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>تسجيل فاتورة</span>
+                            </button>
+                        )}
                         <button
                             onClick={
                                 activeTab === 'invoices'
@@ -1115,7 +1132,7 @@ const SupplierInvoicesPage: React.FC = () => {
                                 <TableSkeleton columns={activeTab === 'invoices' ? 9 : 6} withCheckbox={activeTab === 'invoices'} />
                             ) : activeTab === 'invoices' ? (
                                 filteredInvoices.length === 0 ? (
-                                    <EmptyState colSpan={9} icon={Receipt} title="لا توجد فواتير" description="ابدأ بتسجيل أول فاتورة توريد بالنظام" action={<button onClick={() => navigate('/dashboard/procurement/invoices/new')} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/30"><Plus className="w-5 h-5" />تسجيل فاتورة جديدة</button>} />
+                                    <EmptyState colSpan={9} icon={Receipt} title="لا توجد فواتير" description="ابدأ بتسجيل أول فاتورة توريد بالنظام" action={canCreate ? <button onClick={() => navigate(`${basePath}/new`)} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/30"><Plus className="w-5 h-5" />تسجيل فاتورة جديدة</button> : undefined} />
                                 ) : (
                                     paginatedInvoices.map((inv, index) => (
                                         <InvoiceRow
@@ -1124,7 +1141,7 @@ const SupplierInvoicesPage: React.FC = () => {
                                             index={index}
                                             isExpanded={expandedInvoiceId === inv.id}
                                             onToggle={() => setExpandedInvoiceId(expandedInvoiceId === inv.id ? null : (inv.id ?? null))}
-                                            onView={() => navigate(`/dashboard/procurement/invoices/${inv.id}`)}
+                                            onView={() => navigate(`${basePath}/${inv.id}`)}
                                             onApprove={() => handleApproveInvoice(inv)}
                                             onDelete={handleDeleteClick}
                                             isSelected={inv.id != null && selectedIds.includes(inv.id)}
@@ -1132,6 +1149,8 @@ const SupplierInvoicesPage: React.FC = () => {
                                             getCurrencyLabel={getCurrencyLabel}
                                             defaultCurrency={defaultCurrency}
                                             convertAmount={convertAmount}
+                                            showApprove={canApprove}
+                                            showDelete={canCreate}
                                         />
 
                                     ))
@@ -1149,11 +1168,7 @@ const SupplierInvoicesPage: React.FC = () => {
                                         key={grn.id}
                                         grn={grn}
                                         index={index}
-                                        onCreateInvoice={() =>
-                                            navigate(
-                                                `/dashboard/procurement/invoices/new?grnId=${grn.id}`
-                                            )
-                                        }
+                                        onCreateInvoice={canCreate ? () => navigate(`/dashboard/procurement/invoices/new?grnId=${grn.id}`) : undefined}
                                         onViewPO={() =>
                                             navigate(
                                                 `/dashboard/procurement/po/${grn.poId}`
@@ -1170,14 +1185,16 @@ const SupplierInvoicesPage: React.FC = () => {
                         {activeTab === 'invoices' ? (
                             <>
                                 <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={handleBulkDeleteClick}
-                                        disabled={selectedIds.length === 0 || isDeleting}
-                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        حذف المحدد ({selectedIds.length})
-                                    </button>
+                                    {canCreate && (
+                                        <button
+                                            onClick={handleBulkDeleteClick}
+                                            disabled={selectedIds.length === 0 || isDeleting}
+                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            حذف المحدد ({selectedIds.length})
+                                        </button>
+                                    )}
                                 </div>
                                 <Pagination currentPage={currentPage} totalItems={filteredInvoices.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
                             </>

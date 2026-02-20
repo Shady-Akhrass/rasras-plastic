@@ -1,6 +1,7 @@
 package com.rasras.erp.user;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import com.rasras.erp.user.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +27,7 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "Get all users", description = "Returns a paginated list of users")
-    @PreAuthorize("hasAuthority('USER_VIEW') or hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.USER_MANAGEMENT)
     public ResponseEntity<ApiResponse<Page<UserDto>>> getAllUsers(
             @PageableDefault(size = 20) Pageable pageable) {
         Page<UserDto> users = userService.getAllUsers(pageable);
@@ -35,7 +36,7 @@ public class UserController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get user by ID", description = "Returns a user by their ID")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.USER_MANAGEMENT)
     public ResponseEntity<ApiResponse<UserDto>> getUserById(@PathVariable Integer id) {
         UserDto user = userService.getUserById(id);
         return ResponseEntity.ok(ApiResponse.success(user));
@@ -43,7 +44,7 @@ public class UserController {
 
     @PostMapping
     @Operation(summary = "Create a new user", description = "Creates a new user account")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.USER_MANAGEMENT)
     public ResponseEntity<ApiResponse<UserDto>> createUser(@Valid @RequestBody CreateUserRequest request) {
         UserDto user = userService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -52,7 +53,7 @@ public class UserController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update user", description = "Updates an existing user")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.USER_MANAGEMENT)
     public ResponseEntity<ApiResponse<UserDto>> updateUser(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -62,7 +63,7 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete user", description = "Soft deletes a user (sets inactive)")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize(SecurityConstants.USER_MANAGEMENT)
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Integer id) {
         userService.deleteUser(id);
         return ResponseEntity.ok(ApiResponse.success("User deleted successfully"));
@@ -70,7 +71,7 @@ public class UserController {
 
     @PostMapping("/{id}/reset-password")
     @Operation(summary = "Reset user password", description = "Resets the password for a user")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @PathVariable Integer id,
             @RequestBody String newPassword) {
@@ -80,7 +81,7 @@ public class UserController {
 
     @GetMapping("/roles")
     @Operation(summary = "Get all roles", description = "Returns a list of all roles")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRoles() {
         List<RoleDto> roles = userService.getAllRoles();
         return ResponseEntity.ok(ApiResponse.success(roles));

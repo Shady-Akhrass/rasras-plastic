@@ -7,6 +7,7 @@ import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import com.rasras.erp.supplier.Supplier;
 import com.rasras.erp.supplier.SupplierRepository;
+import com.rasras.erp.supplier.SupplierInvoiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class GRNService {
     private final UnitRepository unitRepo;
     private final InventoryService inventoryService;
     private final com.rasras.erp.approval.ApprovalService approvalService;
+    private final SupplierInvoiceRepository supplierInvoiceRepo;
 
     @Transactional(readOnly = true)
     public List<GoodsReceiptNoteDto> getAllGRNs() {
@@ -40,6 +42,18 @@ public class GRNService {
         GoodsReceiptNote grn = grnRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("GRN not found"));
         return mapToDto(grn);
+    }
+
+    /**
+     * توريدات مكتملة ولم تُفوتر بعد — للاستخدام من صفحة فواتير الموردين (قسم المالية).
+     * محمي بصلاحية فواتير الموردين (SECTION_FINANCE أو غيره حسب SUPPLIER_INVOICES).
+     */
+    @Transactional(readOnly = true)
+    public List<GoodsReceiptNoteDto> getCompletedGRNsNotInvoiced() {
+        return grnRepo.findByStatusWithItems("Completed").stream()
+                .filter(grn -> !supplierInvoiceRepo.existsByGrnId(grn.getId()))
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional

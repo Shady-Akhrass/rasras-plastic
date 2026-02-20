@@ -81,11 +81,16 @@ public class UserService {
         return toDto(user);
     }
 
+    /**
+     * تعطيل المستخدم (soft delete) بدلاً من الحذف الفعلي، لأن المستخدم مرتبط بمستندات (طلبات اعتماد، طلبات شراء، إلخ).
+     */
     @Transactional
     public void deleteUser(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
-        userRepository.delete(user);
+        user.setIsActive(false);
+        user.setIsLocked(true);
+        userRepository.save(user);
     }
 
     @Transactional

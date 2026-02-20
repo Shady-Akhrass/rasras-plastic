@@ -1,6 +1,7 @@
 package com.rasras.erp.company;
 
 import com.rasras.erp.shared.dto.ApiResponse;
+import com.rasras.erp.shared.security.SecurityConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class CompanyController {
 
     @PutMapping
     @Operation(summary = "Update company info", description = "Updates the company details")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SYS_ADMIN')")
+    @PreAuthorize(SecurityConstants.SYSTEM_ADMIN_ONLY)
     public ResponseEntity<ApiResponse<CompanyInfoDto>> updateCompanyInfo(@RequestBody CompanyInfoDto companyInfoDto) {
         return ResponseEntity.ok(ApiResponse.success(companyInfoService.updateCompanyInfo(companyInfoDto)));
     }

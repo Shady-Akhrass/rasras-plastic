@@ -19,7 +19,6 @@ import {
 import { supplierInvoiceService, type SupplierInvoiceDto, type SupplierInvoiceItemDto } from '../../services/supplierInvoiceService';
 import { supplierService, type SupplierDto } from '../../services/supplierService';
 import { purchaseOrderService } from '../../services/purchaseOrderService';
-import { grnService } from '../../services/grnService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
 import purchaseService from '../../services/purchaseService';
@@ -63,12 +62,19 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
     const navigate = useNavigate();
     const location = useLocation();
+    const pathname = location.pathname;
+    const isProcurementForm = pathname.startsWith('/dashboard/procurement/invoices');
     const isEdit = !!id;
     const queryParams = new URLSearchParams(location.search);
     const quotationId = queryParams.get('quotationId');
     const poId = queryParams.get('poId');
     const grnId = queryParams.get('grnId');
     const isView = queryParams.get('mode') === 'view';
+
+    const userString = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    const user = userString ? JSON.parse(userString) : null;
+    const userPermissions: string[] = Array.isArray((user as any)?.permissions) ? (user as any).permissions : [];
+    const canCreate = userPermissions.includes('SUPPLIER_INVOICE_CREATE');
 
     // Data State
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
@@ -184,6 +190,17 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
     const optimisticData = formData;
 
+    useEffect(() => {
+        const isFinanceNew = pathname.startsWith('/dashboard/finance/invoices') && (pathname.endsWith('/new') || id === 'new');
+        if (isFinanceNew) {
+            navigate('/dashboard/finance/invoices', { replace: true });
+            return;
+        }
+        if (!isEdit && isProcurementForm && !canCreate) {
+            navigate('/dashboard/procurement/invoices', { replace: true });
+        }
+    }, [pathname, id, isEdit, isProcurementForm, canCreate, navigate]);
+
     const handleDownloadPdf = async () => {
         if (!id) return;
         try {
@@ -269,7 +286,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
     const loadGRNData = async (gId: number) => {
         try {
             setLoading(true);
-            const grn = await grnService.getGRNById(gId);
+            const grn = await supplierInvoiceService.getGRNForInvoice(gId);
             if (grn) {
                 let mappedData: SupplierInvoiceDto = {
                     ...formData,
@@ -408,7 +425,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
             setSaving(true);
             await supplierInvoiceService.createInvoice(optimisticData);
             toast.success('تم حفظ الفاتورة بنجاح');
-            navigate('/dashboard/procurement/invoices');
+            navigate(isProcurementForm ? '/dashboard/procurement/invoices' : '/dashboard/finance/invoices');
         } catch (error: any) {
             toast.error(error.response?.data?.message || 'فشل حفظ الفاتورة');
         } finally {

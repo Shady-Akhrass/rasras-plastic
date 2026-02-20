@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import type { GoodsReceiptNoteDto } from './grnService';
 
 export interface SupplierInvoiceDto {
     id?: number;
@@ -79,5 +80,22 @@ export const supplierInvoiceService = {
 
     deleteInvoice: async (id: number) => {
         await apiClient.post(`/suppliers/invoices/${id}/delete`);
+    },
+
+    /**
+     * توريدات مكتملة بانتظار الفوترة — للاستخدام في صفحة فواتير الموردين (قسم المالية).
+     * يستخدم فقط هذا الـ endpoint (محمي بصلاحية SECTION_FINANCE) وليس /inventory/grn.
+     */
+    getPendingGRNsForInvoicing: async (): Promise<GoodsReceiptNoteDto[]> => {
+        const response = await apiClient.get<{ data?: GoodsReceiptNoteDto[] }>('/suppliers/invoices/pending-grns');
+        const body = response.data as { data?: GoodsReceiptNoteDto[] } | GoodsReceiptNoteDto[];
+        if (Array.isArray(body)) return body;
+        return body?.data ?? [];
+    },
+
+    /** جلب إذن إضافة بالـ id لملء نموذج فاتورة — نفس الصلاحية */
+    getGRNForInvoice: async (grnId: number): Promise<GoodsReceiptNoteDto | null> => {
+        const response = await apiClient.get<{ data: GoodsReceiptNoteDto }>(`/suppliers/invoices/grn/${grnId}`);
+        return (response.data as { data?: GoodsReceiptNoteDto })?.data ?? null;
     }
 };

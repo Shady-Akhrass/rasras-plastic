@@ -51,6 +51,7 @@ public class PaymentVoucherController {
     }
 
     @PostMapping
+    @PreAuthorize(SecurityConstants.SUPPLIER_INVOICE_PAY)
     public ResponseEntity<ApiResponse<PaymentVoucherDto>> createVoucher(@RequestBody PaymentVoucherDto voucherDto) {
         return ResponseEntity
                 .ok(ApiResponse.success("Payment voucher created successfully",
@@ -107,8 +108,6 @@ public class PaymentVoucherController {
         String fileName = "PaymentVoucher_" + voucher.getVoucherNumber() + ".pdf";
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdfContents);

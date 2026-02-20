@@ -266,19 +266,15 @@ const DashboardLayout: React.FC = () => {
     const getInitials = (name: string) =>
         name.split(' ').map(n => n[0]).join('').slice(0, 2);
 
-    // ─── Role groups (fallback) ───
-    const ROLES_PROCUREMENT = ['PM', 'BUYER', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'FM'];
-    const ROLES_SALES = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
-    const ROLES_WAREHOUSE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'WHM'];
-    const ROLES_OPERATIONS = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'SM', 'QC'];
-    const ROLES_SYSTEM = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN'];
-    const ROLES_FINANCE = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM', 'ACC', 'FM'];
-    const ROLES_CRM = ['SM', 'ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'];
+    // Role groups removed — sidebar visibility relies on permissions only (SECTION_*).
 
     // ─── Nav items (use hook counts) ───
     const navItems: Array<{
         to: string; icon: React.ElementType; label: string; section: string;
-        roles?: readonly string[]; requiredPermission?: string;
+        requiredPermission?: string;
+        /** Hide item when user has this permission, unless they also have showWhenAlsoHasPermission */
+        hideWhenHasPermission?: string;
+        showWhenAlsoHasPermission?: string;
         warehouseGroup?: string; search?: string; badge?: number; order?: number;
         exact?: boolean;
     }> = [
@@ -294,100 +290,94 @@ const DashboardLayout: React.FC = () => {
             },
             {
                 to: '/dashboard/users', icon: User, label: 'المستخدمين',
-                roles: ['ADMIN', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'main', requiredPermission: 'SECTION_USERS'
             },
             {
                 to: '/dashboard/employees', icon: Users, label: 'الموظفين',
-                roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/leave-types', icon: ClipboardList, label: 'أنواع الإجازات',
-                roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/shifts', icon: Clock, label: 'الشفتات',
-                roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/holidays', icon: Calendar, label: 'العطلات',
-                roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/employee-shifts', icon: Users, label: 'شفتات الموظفين',
-                roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/attendance', icon: ClipboardCheck, label: 'الحضور والانصراف',
-                roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/payroll', icon: DollarSign, label: 'المرتبات',
-                roles: ['ADMIN', 'HR', 'MANAGER', 'SYS_ADMIN', 'SYSTEM_ADMIN'],
                 section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
             },
 
             // Procurement
             {
                 to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء (PR)',
-                section: 'procurement', order: 1, roles: ROLES_PROCUREMENT,
+                section: 'procurement', order: 1,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/rfq', icon: FileText,
                 label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', order: 2,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+                requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين',
-                section: 'procurement', order: 3, roles: ROLES_PROCUREMENT,
+                section: 'procurement', order: 3,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/comparison', icon: Scale,
                 label: 'مقارنة العروض (QCS)', section: 'procurement', order: 4,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+                requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/po', icon: ShoppingCart,
                 label: 'أوامر الشراء (PO)', section: 'procurement', order: 5,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+                requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/waiting-imports', icon: Truck,
                 label: 'الشحنات القادمة', section: 'procurement', order: 5.5,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT',
+                requiredPermission: 'SECTION_PROCUREMENT',
                 badge: waitingImports || undefined
             },
             {
                 to: '/dashboard/procurement/grn', icon: ArrowDownToLine,
                 label: 'إذن استلام / إذن إضافة (GRN)', section: 'procurement', order: 6,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+                requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/invoices', icon: FileText,
-                label: 'فواتير الموردين', section: 'procurement', order: 7,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+                label: 'فواتير الموردين', section: 'procurement', order: 6.5,
+                requiredPermission: 'SUPPLIER_INVOICE_VIEW',
+                hideWhenHasPermission: 'SECTION_FINANCE',
+                showWhenAlsoHasPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign,
                 label: 'الأرصدة المستحقة', section: 'procurement', order: 8,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+                requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/returns', icon: Undo2,
                 label: 'مرتجعات الشراء', section: 'procurement', order: 9,
-                roles: ROLES_PROCUREMENT, requiredPermission: 'SECTION_PROCUREMENT'
+                requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين',
-                section: 'procurement', order: 10, roles: ROLES_PROCUREMENT,
+                section: 'procurement', order: 10,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
 
@@ -395,70 +385,75 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/sales/sections', icon: ShoppingCart,
                 label: 'قسم المبيعات', section: 'sales', order: 1,
-                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/purchase-requisitions', icon: ClipboardList,
-                label: 'طلبات الشراء', section: 'sales', order: 2, roles: ROLES_SALES,
+                label: 'طلبات الشراء', section: 'sales', order: 2,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/customer-requests', icon: User, label: 'طلبات العملاء',
-                section: 'sales', order: 2.5, roles: ROLES_SALES,
+                section: 'sales', order: 2.5,
                 requiredPermission: 'SECTION_SALES',
                 badge: pendingCustomerRequests || undefined
             },
             {
                 to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار',
-                section: 'sales', order: 3, roles: ROLES_SALES,
+                section: 'sales', order: 3,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/orders', icon: ClipboardList,
                 label: 'أوامر البيع (SO)', section: 'sales', order: 4,
-                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/issue-notes', icon: Package,
                 label: 'إذونات الصرف', section: 'sales', order: 5,
-                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/delivery-orders', icon: Truck,
                 label: 'أوامر التوصيل', section: 'sales', order: 6,
-                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/vehicles', icon: Truck,
                 label: 'المركبات', section: 'sales', order: 6.5,
-                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/invoices', icon: FileText,
                 label: 'فواتير المبيعات', section: 'sales', order: 7,
-                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/receipts', icon: Receipt,
                 label: 'إيصالات الدفع', section: 'sales', order: 8,
-                roles: ROLES_SALES, requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES'
             },
 
             // CRM
             {
                 to: '/dashboard/crm/customers', icon: Users, label: 'العملاء',
-                section: 'crm', roles: ROLES_CRM, requiredPermission: 'SECTION_CRM'
+                section: 'crm', requiredPermission: 'SECTION_CRM'
             },
 
             // Finance
             {
+                to: '/dashboard/finance/invoices', icon: FileText,
+                label: 'فواتير الموردين', section: 'finance', order: 3,
+                requiredPermission: 'SUPPLIER_INVOICE_VIEW'
+            },
+            {
                 to: '/dashboard/finance/payment-vouchers', icon: Receipt,
-                label: 'سندات الدفع', section: 'finance', roles: ROLES_FINANCE,
+                label: 'سندات الدفع', section: 'finance',
                 requiredPermission: 'SECTION_FINANCE', order: 1
             },
             {
                 to: '/dashboard/finance/payment-vouchers/new', icon: FileText,
-                label: 'سند صرف جديد', section: 'finance', roles: ROLES_FINANCE,
+                label: 'سند صرف جديد', section: 'finance',
                 requiredPermission: 'SECTION_FINANCE', order: 2
             },
 
@@ -466,70 +461,70 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/inventory/sections', icon: Warehouse,
                 label: 'أقسام المخزن', section: 'warehouse',
-                warehouseGroup: 'management', order: 1, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'management', order: 1,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/warehouses', icon: Building2,
                 label: 'المستودعات', section: 'warehouse',
-                warehouseGroup: 'management', order: 2, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'management', order: 2,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/stocks', icon: Package,
                 label: 'أرصدة المخزون', section: 'warehouse',
-                warehouseGroup: 'management', order: 3, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'management', order: 3,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine,
                 label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle',
-                order: 4, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE'
+                order: 4, requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft,
                 label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle',
-                order: 5, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE'
+                order: 5, requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle,
                 label: 'الأصناف تحت الحد الأدنى', section: 'warehouse',
-                warehouseGroup: 'reports', order: 6, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'reports', order: 6,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/stagnant', icon: Clock,
                 label: 'الأصناف الراكدة', section: 'warehouse',
-                warehouseGroup: 'reports', order: 7, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'reports', order: 7,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/movement', icon: Activity,
                 label: 'حركة الصنف التفصيلية', section: 'warehouse',
-                warehouseGroup: 'reports', order: 8, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'reports', order: 8,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/count', icon: ClipboardCheck,
                 label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports',
-                order: 9, roles: ROLES_WAREHOUSE, requiredPermission: 'SECTION_WAREHOUSE'
+                order: 9, requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/count', icon: AlertTriangle,
                 label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports',
-                search: '?mode=surprise', order: 10, roles: ROLES_WAREHOUSE,
+                search: '?mode=surprise', order: 10,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2,
                 label: 'تقرير المخزون الدوري', section: 'warehouse',
-                warehouseGroup: 'reports', order: 11, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'reports', order: 11,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/variance', icon: GitCompare,
                 label: 'تقرير الفروقات', section: 'warehouse',
-                warehouseGroup: 'reports', order: 12, roles: ROLES_WAREHOUSE,
+                warehouseGroup: 'reports', order: 12,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
 
@@ -538,73 +533,73 @@ const DashboardLayout: React.FC = () => {
                 to: '/dashboard/inventory/quality-inspection', icon: Microscope,
                 label: 'فحص الجودة', section: 'operations',
                 badge: pendingInspections || undefined, order: 1,
-                roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS'
+                requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/quality-parameters', icon: Microscope,
                 label: 'معاملات الجودة', section: 'operations', order: 2,
-                roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS'
+                requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/categories', icon: Package,
                 label: 'تصنيفات الأصناف', section: 'operations', order: 3,
-                roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS'
+                requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف',
-                section: 'operations', order: 4, roles: ROLES_OPERATIONS,
+                section: 'operations', order: 4,
                 requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/price-lists', icon: DollarSign,
                 label: 'قوائم الأسعار', section: 'operations', order: 5,
-                roles: ROLES_OPERATIONS, requiredPermission: 'SECTION_OPERATIONS'
+                requiredPermission: 'SECTION_OPERATIONS'
             },
 
             // System
             {
                 to: '/dashboard/settings/company', icon: Building2,
-                label: 'بيانات الشركة', section: 'system', roles: ROLES_SYSTEM,
+                label: 'بيانات الشركة', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/units', icon: Ruler,
-                label: 'وحدات القياس', section: 'system', roles: ROLES_SYSTEM,
+                label: 'وحدات القياس', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/system', icon: Settings,
-                label: 'إعدادات النظام', section: 'system', roles: ROLES_SYSTEM,
+                label: 'إعدادات النظام', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/users', icon: User,
-                label: 'إدارة المستخدمين', section: 'system', roles: ROLES_SYSTEM,
+                label: 'إدارة المستخدمين', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/roles', icon: Shield,
-                label: 'الأدوار والصلاحيات', section: 'system', roles: ROLES_SYSTEM,
+                label: 'الأدوار والصلاحيات', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/permissions', icon: Lock,
-                label: 'سجل الصلاحيات', section: 'system', roles: ROLES_SYSTEM,
+                label: 'سجل الصلاحيات', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/security', icon: Shield,
-                label: 'الأمان والخصوصية', section: 'system', roles: ROLES_SYSTEM,
+                label: 'الأمان والخصوصية', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/notifications', icon: Bell,
-                label: 'الإشعارات', section: 'system', roles: ROLES_SYSTEM,
+                label: 'الإشعارات', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/database', icon: Database,
-                label: 'قاعدة البيانات', section: 'system', roles: ROLES_SYSTEM,
+                label: 'قاعدة البيانات', section: 'system',
                 requiredPermission: 'SECTION_SYSTEM'
             },
         ];
@@ -619,27 +614,20 @@ const DashboardLayout: React.FC = () => {
         document.title = match ? `${match.label} | نظام RasRas` : 'نظام RasRas';
     }, [location.pathname]);
 
-    // Filter by permissions/roles
+    // Filter by permissions only — no role-based fallback or bypass.
+    // ADMIN/GM see everything because the Seed assigns them all SECTION_* permissions.
     const filteredNavItems = navItems.filter(item => {
-        const upperRole = userRole.toUpperCase();
-
-        // 1. Admin/Superadmin/GM bypass
-        if (['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM'].includes(upperRole)) return true;
-
-        // 2. Check permissions if they exist
-        const hasPerms = userPermissions.length > 0;
-        if (hasPerms && item.requiredPermission) {
-            if (userPermissions.includes(item.requiredPermission)) return true;
+        if (item.hideWhenHasPermission && userPermissions.includes(item.hideWhenHasPermission)) {
+            if (item.showWhenAlsoHasPermission && userPermissions.includes(item.showWhenAlsoHasPermission))
+                ; // don't hide: user has both sections, show the item
+            else
+                return false;
         }
-
-        // 3. Fallback to roles
-        return !item.roles || item.roles.length === 0 ||
-            item.roles.includes(upperRole);
+        if (!item.requiredPermission) return true;
+        return userPermissions.includes(item.requiredPermission);
     });
 
-    const MANAGER_ROLES = ['ADMIN', 'SYS_ADMIN', 'SYSTEM_ADMIN', 'GM',
-        'MANAGER', 'WAREHOUSE_MANAGER', 'WH_MANAGER'];
-    const isManagerRole = MANAGER_ROLES.includes(userRole.toUpperCase());
+    const hasManySections = new Set(filteredNavItems.map(i => i.section)).size > 3;
 
     const sectionIds = ['main', 'hr', 'procurement', 'sales', 'crm', 'finance', 'warehouse',
         'operations', 'system'] as const;
@@ -647,7 +635,7 @@ const DashboardLayout: React.FC = () => {
     const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
         const path = location.pathname;
         const initial: Record<string, boolean> = {};
-        if (isManagerRole) {
+        if (hasManySections) {
             sectionIds.forEach(id => {
                 const items = navItems.filter(i => i.section === id);
                 initial[id] = items.some(item =>
@@ -663,7 +651,7 @@ const DashboardLayout: React.FC = () => {
 
     useEffect(() => {
         const path = location.pathname;
-        if (isManagerRole) {
+        if (hasManySections) {
             setOpenSections(() => {
                 const next: Record<string, boolean> = {};
                 for (const id of sectionIds) {
@@ -691,10 +679,10 @@ const DashboardLayout: React.FC = () => {
                 return next;
             });
         }
-    }, [location.pathname, isManagerRole]);
+    }, [location.pathname, hasManySections]);
 
     const toggleSection = (id: string) => {
-        if (!isManagerRole) return;
+        if (!hasManySections) return;
         setOpenSections(prev => {
             const willBeOpen = !prev[id];
             if (willBeOpen) {

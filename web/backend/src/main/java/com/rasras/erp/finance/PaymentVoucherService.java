@@ -17,6 +17,7 @@ import com.rasras.erp.supplier.SupplierInvoice;
 import com.rasras.erp.supplier.SupplierInvoiceRepository;
 import com.rasras.erp.supplier.SupplierRepository;
 import com.rasras.erp.supplier.SupplierInvoiceService;
+import com.rasras.erp.shared.exception.BadRequestException;
 import com.rasras.erp.approval.ApprovalService;
 import com.rasras.erp.user.UserRepository;
 import com.rasras.erp.user.User;
@@ -75,6 +76,17 @@ public class PaymentVoucherService {
 
         SupplierInvoice invoice = invoiceRepo.findById(firstAllocation.getSupplierInvoiceId())
                 .orElseThrow(() -> new RuntimeException("Supplier Invoice not found"));
+
+        // المطابقة الثلاثية (Strict): لا إنشاء سند دفع دون ربط الفاتورة بـ PO و GRN مكتمل
+        if (invoice.getPoId() == null || invoice.getGrnId() == null) {
+            throw new BadRequestException("لا يمكن إنشاء سند الدفع قبل ربط الفاتورة بأمر شراء (PO) وإذن استلام (GRN) مكتمل.");
+        }
+        GoodsReceiptNote grn = grnRepo.findById(invoice.getGrnId())
+                .orElseThrow(() -> new BadRequestException("إذن الاستلام المرتبط بالفاتورة غير موجود."));
+        String grnStatus = grn.getStatus() != null ? grn.getStatus() : "";
+        if (!"Completed".equals(grnStatus) && !"Billed".equals(grnStatus)) {
+            throw new BadRequestException("لا يمكن إنشاء سند الدفع قبل ربط الفاتورة بأمر شراء (PO) وإذن استلام (GRN) مكتمل.");
+        }
 
         Supplier supplier = supplierRepo.findById(dto.getSupplierId())
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
