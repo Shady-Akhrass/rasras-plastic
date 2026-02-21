@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, XCircle, FileText, Package, ShoppingCart, ArrowLeftRight, Receipt, Truck, AlertTriangle, TrendingDown } from 'lucide-react';
+import { CheckCircle2, XCircle, Package, ShoppingCart, ArrowLeftRight, Receipt, Truck, AlertTriangle, TrendingDown } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
 
 interface InvoiceMatchingProps {

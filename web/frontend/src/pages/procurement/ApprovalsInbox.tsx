@@ -55,6 +55,7 @@ const WORKFLOW_NAME_AR: Record<string, string> = {
     'Quotation Comparison Approval': 'اعتماد مقارنة العروض',
     'Payment Voucher Approval': 'اعتماد سند صرف',
     'Sales Quotation Approval': 'اعتماد عرض سعر مبيعات',
+    'Stock Issue Note Approval': 'اعتماد إذن صرف',
 };
 const STEP_NAME_AR: Record<string, string> = {
     'Procurement Manager Approval': 'اعتماد مدير المشتريات',
@@ -97,6 +98,7 @@ const DOC_TYPE_CONFIGS: Record<string, {
     CustomerRequest: { label: 'طلب عميل', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', icon: MessageSquare, gradient: 'from-fuchsia-500 to-pink-600' },
     CR: { label: 'طلب عميل', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', icon: MessageSquare, gradient: 'from-fuchsia-500 to-pink-600' },
     SalesQuotation: { label: 'عرض سعر مبيعات', bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Tag, gradient: 'from-indigo-500 to-blue-600' },
+    StockIssueNote: { label: 'إذن صرف', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Package, gradient: 'from-emerald-500 to-teal-600' },
 };
 
 const getDocTypeConfig = (type: string) =>
@@ -117,6 +119,7 @@ const TYPE_ROUTES: Record<string, string> = {
     CustomerRequest: '/dashboard/sales/customer-requests',
     CR: '/dashboard/sales/customer-requests',
     SalesQuotation: '/dashboard/sales/quotations',
+    StockIssueNote: '/dashboard/sales/issue-notes',
 };
 
 const isGRNType = (t: string) => t === 'GoodsReceiptNote' || t === 'GRN';
@@ -134,6 +137,7 @@ const FILTER_OPTIONS = [
     { value: 'PaymentVoucher', label: 'سندات صرف', icon: DollarSign },
     { value: 'CustomerRequest', label: 'طلبات عملاء', icon: MessageSquare },
     { value: 'SalesQuotation', label: 'عروض أسعار مبيعات', icon: Tag },
+    { value: 'StockIssueNote', label: 'إذونات صرف', icon: Package },
 ] as const;
 
 // ════════════════════════════════════════════
@@ -794,8 +798,8 @@ const ApprovalsInbox: React.FC = () => {
                 previousIdsRef.current.delete(requestId);
 
                 if (action === 'Approved' && (req?.documentType === 'PaymentVoucher' || req?.documentType === 'PV')) {
-                    // Trigger automatic download ONLY after General Manager Approval
-                    if (req.currentStepName === 'General Manager Approval') {
+                    // Trigger automatic download ONLY after Payment Disbursement (صرف الدفعة)
+                    if (req.currentStepName === 'Payment Disbursement') {
                         paymentVoucherService.downloadVoucherPdf(req.documentId, req.documentNumber)
                             .catch(err => console.error('Auto-download failed:', err));
                     }

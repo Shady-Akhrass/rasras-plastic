@@ -195,7 +195,7 @@ const VoucherTableRow: React.FC<{
                 >
                     <Eye className="w-4 h-4" />
                 </button>
-                {(voucher.status === 'Paid' || voucher.status === 'Approved') && (
+                {voucher.status === 'Paid' && (
                     <button
                         onClick={() => onPrint(voucher.paymentVoucherId!, voucher.voucherNumber)}
                         className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
@@ -292,8 +292,7 @@ const PaymentVouchersPage: React.FC = () => {
     // Validation Modal State
     const [showValidationModal, setShowValidationModal] = useState(false);
     const [validationData, setValidationData] = useState<InvoiceComparisonData | null>(null);
-    const [validationLoading, setValidationLoading] = useState(false);
-
+    
     useEffect(() => {
         fetchVouchers();
     }, []);
@@ -394,7 +393,7 @@ const PaymentVouchersPage: React.FC = () => {
 
 
     const handleViewVoucher = (id: number) => {
-        navigate(`/dashboard/finance/payment-vouchers/${id}`);
+        navigate(`/dashboard/finance/payment-vouchers/${id}?mode=view`);
     };
 
     const handleDownloadPdf = async (id: number, voucherNumber: string) => {
@@ -408,7 +407,6 @@ const PaymentVouchersPage: React.FC = () => {
 
     const handleVerifyInvoice = async (invoice: SupplierInvoiceDto) => {
         try {
-            setValidationLoading(true);
             // Fetch comparison data for this supplier
             const comparisons = await paymentVoucherService.getInvoiceComparison(invoice.supplierId);
             const specificComparison = comparisons.find(c => c.supplierInvoiceId === invoice.id);
@@ -422,8 +420,6 @@ const PaymentVouchersPage: React.FC = () => {
         } catch (error) {
             console.error('Failed to fetch validation data:', error);
             toast.error('فشل تحميل بيانات المطابقة');
-        } finally {
-            setValidationLoading(false);
         }
     };
 

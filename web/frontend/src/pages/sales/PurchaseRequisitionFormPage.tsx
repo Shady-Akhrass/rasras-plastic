@@ -20,7 +20,6 @@ import { approvalService } from '../../services/approvalService';
 import purchaseService, { type PurchaseRequisition, type PurchaseRequisitionItem } from '../../services/purchaseService';
 import { itemService } from '../../services/itemService';
 import { unitService } from '../../services/unitService';
-import employeeService, { type Department } from '../../services/employeeService';
 import toast from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
 import PRLifecycleTracker from '../../components/procurement/PRLifecycleTracker';
@@ -51,7 +50,6 @@ const PurchaseRequisitionFormPage = () => {
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState<Item[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
-    const [departments, setDepartments] = useState<Department[]>([]);
     const [processing, setProcessing] = useState(false);
     const [lifecycle, setLifecycle] = useState<PRLifecycle | null>(null);
 
@@ -104,15 +102,13 @@ const PurchaseRequisitionFormPage = () => {
 
     const loadMasterData = async () => {
         try {
-            const [itemsResponse, unitsResponse, deptsData] = await Promise.all([
+            const [itemsResponse, unitsResponse] = await Promise.all([
                 itemService.getAllItems(),
-                unitService.getAllUnits(),
-                employeeService.getDepartments()
+                unitService.getAllUnits()
             ]);
 
             setItems('data' in itemsResponse ? (itemsResponse as any).data : itemsResponse);
             setUnits('data' in unitsResponse ? (unitsResponse as any).data : unitsResponse);
-            setDepartments(deptsData);
 
             // FIX 2: Removed logic that overwrote department with the first one from API
         } catch (error) {

@@ -48,10 +48,9 @@ export interface SaleOrderDto {
     priceListId?: number;
     priceListName?: string;
     subTotal?: number;
-    discountPercentage?: number;
-    discountAmount?: number;
     taxAmount?: number;
-    shippingCost?: number;
+    deliveryCost?: number;
+    otherCosts?: number;
     totalAmount?: number;
     paymentTerms?: string;
     paymentTermDays?: number;
@@ -153,8 +152,8 @@ const mapToLegacy = (dto: SaleOrderDto): LegacySaleOrderDto => ({
     currency: dto.currency,
     exchangeRate: dto.exchangeRate,
     subTotal: dto.subTotal,
-    discountPercent: dto.discountPercentage,
-    discountAmount: dto.discountAmount,
+    discountPercent: 0,
+    discountAmount: 0,
     taxPercent: undefined,
     taxAmount: dto.taxAmount,
     totalAmount: dto.totalAmount,
@@ -179,10 +178,9 @@ const mapFromLegacy = (dto: LegacySaleOrderDto): SaleOrderDto => ({
     currency: dto.currency,
     exchangeRate: dto.exchangeRate,
     subTotal: dto.subTotal,
-    discountPercentage: dto.discountPercent,
-    discountAmount: dto.discountAmount,
     taxAmount: dto.taxAmount,
-    shippingCost: 0,
+    deliveryCost: 0,
+    otherCosts: 0,
     totalAmount: dto.totalAmount,
     paymentTerms: dto.paymentTerms,
     paymentTermDays: undefined,

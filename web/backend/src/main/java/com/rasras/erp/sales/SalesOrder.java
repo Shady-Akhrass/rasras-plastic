@@ -67,21 +67,17 @@ public class SalesOrder extends AuditableEntity {
     @Column(name = "SubTotal", nullable = false, precision = 18, scale = 2)
     private BigDecimal subTotal;
 
-    @Column(name = "DiscountPercentage", precision = 5, scale = 2)
-    @Builder.Default
-    private BigDecimal discountPercentage = BigDecimal.ZERO;
-
-    @Column(name = "DiscountAmount", precision = 18, scale = 2)
-    @Builder.Default
-    private BigDecimal discountAmount = BigDecimal.ZERO;
-
     @Column(name = "TaxAmount", precision = 18, scale = 2)
     @Builder.Default
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
-    @Column(name = "ShippingCost", precision = 18, scale = 2)
+    @Column(name = "DeliveryCost", precision = 18, scale = 2)
     @Builder.Default
-    private BigDecimal shippingCost = BigDecimal.ZERO;
+    private BigDecimal deliveryCost = BigDecimal.ZERO;
+
+    @Column(name = "OtherCosts", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal otherCosts = BigDecimal.ZERO;
 
     @Column(name = "TotalAmount", nullable = false, precision = 18, scale = 2)
     private BigDecimal totalAmount;
