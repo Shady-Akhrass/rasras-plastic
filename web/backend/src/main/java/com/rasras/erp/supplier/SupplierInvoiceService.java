@@ -10,6 +10,7 @@ import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.procurement.PurchaseOrder;
 import com.rasras.erp.procurement.PurchaseOrderItem;
 import com.rasras.erp.procurement.PurchaseOrderRepository;
+import com.rasras.erp.supplier.dto.InvoiceMatchDetailsDto;
 import com.rasras.erp.supplier.dto.SupplierInvoiceDto;
 import com.rasras.erp.supplier.dto.SupplierInvoiceItemDto;
 import com.rasras.erp.supplier.service.SupplierInvoicePdfService;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -51,7 +53,7 @@ public class SupplierInvoiceService {
         @Transactional(readOnly = true)
         public SupplierInvoiceDto getInvoiceById(Integer id) {
                 SupplierInvoice invoice = invoiceRepo.findById(id)
-                                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                                .orElseThrow(() -> new BadRequestException("الفاتورة غير موجودة أو تم حذفها مسبقاً"));
                 return mapToDto(invoice);
         }
 
@@ -171,13 +173,16 @@ public class SupplierInvoiceService {
         @Transactional
         public SupplierInvoiceDto approvePayment(Integer invoiceId, Integer userId, boolean approved) {
                 SupplierInvoice invoice = invoiceRepo.findById(invoiceId)
-                                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                                .orElseThrow(() -> new BadRequestException("الفاتورة غير موجودة أو تم حذفها مسبقاً"));
 
                 if (!approved) {
                         // رفض الاعتماد لا يحتاج تحقق حدود — يتم فقط تحديث الحالة
                         invoice.setApprovalStatus("Rejected");
                         return mapToDto(invoiceRepo.save(invoice));
                 }
+
+                // المطابقة الثلاثية (Minimal): لا اعتماد دون ربط PO و GRN مكتمل
+                validateThreeWayMatchForApproval(invoice);
 
                 // تحقق من صلاحية المستخدم وفق حدود الاعتماد (PAYMENT_APPROVAL)
                 User user = userRepository.findById(userId)
@@ -230,7 +235,7 @@ public class SupplierInvoiceService {
         @Transactional
         public void recordPayment(Integer invoiceId, BigDecimal paymentAmount, String paidBy) {
                 SupplierInvoice invoice = invoiceRepo.findById(invoiceId)
-                                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                                .orElseThrow(() -> new BadRequestException("الفاتورة غير موجودة أو تم حذفها مسبقاً"));
 
                 // 1. Update invoice paid amount
                 BigDecimal currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : BigDecimal.ZERO;
@@ -398,7 +403,7 @@ public class SupplierInvoiceService {
         @Transactional
         public void deleteInvoice(Integer id) {
                 SupplierInvoice invoice = invoiceRepo.findById(id)
-                                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+                                .orElseThrow(() -> new BadRequestException("الفاتورة غير موجودة أو تم حذفها مسبقاً"));
                 invoiceRepo.delete(invoice);
         }
 
@@ -475,6 +480,109 @@ public class SupplierInvoiceService {
                 result.setGrnTotal(grnTotal);
 
                 return result;
+        }
+
+        /** تحقق المطابقة الثلاثية (Minimal): لا اعتماد دون ربط PO و GRN مكتمل. */
+        private void validateThreeWayMatchForApproval(SupplierInvoice invoice) {
+                if (invoice.getPoId() == null || invoice.getGrnId() == null) {
+                        throw new BadRequestException(
+                                        "لا يمكن اعتماد الفاتورة قبل ربطها بأمر شراء (PO) وإذن استلام (GRN) مكتمل.");
+                }
+                GoodsReceiptNote grn = grnRepo.findById(invoice.getGrnId())
+                                .orElseThrow(() -> new BadRequestException("إذن الاستلام المرتبط غير موجود."));
+                String status = grn.getStatus() != null ? grn.getStatus() : "";
+                if (!"Completed".equals(status) && !"Billed".equals(status)) {
+                        throw new BadRequestException(
+                                        "لا يمكن اعتماد الفاتورة قبل ربطها بأمر شراء (PO) وإذن استلام (GRN) مكتمل.");
+                }
+        }
+
+        @Transactional(readOnly = true)
+        public InvoiceMatchDetailsDto getMatchDetails(Integer invoiceId) {
+                SupplierInvoice invoice = invoiceRepo.findById(invoiceId)
+                                .orElseThrow(() -> new BadRequestException("الفاتورة غير موجودة أو تم حذفها مسبقاً"));
+                Integer poId = invoice.getPoId();
+                Integer grnId = invoice.getGrnId();
+
+                InvoiceMatchDetailsDto.InvoiceMatchDetailsDtoBuilder b = InvoiceMatchDetailsDto.builder()
+                                .invoiceId(invoice.getId())
+                                .invoiceNumber(invoice.getInvoiceNumber())
+                                .invoiceDate(invoice.getInvoiceDate())
+                                .invoiceTotal(invoice.getTotalAmount());
+
+                boolean validForApproval = false;
+                String message = null;
+                PurchaseOrder po = null;
+                GoodsReceiptNote grn = null;
+
+                if (poId != null) {
+                        po = poRepo.findById(poId).orElse(null);
+                        if (po != null)
+                                b.poId(po.getId()).poNumber(po.getPoNumber()).poTotal(po.getTotalAmount());
+                }
+                if (grnId != null) {
+                        grn = grnRepo.findById(grnId).orElse(null);
+                        if (grn != null) {
+                                BigDecimal grnTotal = grn.getTotalAmount();
+                                if (grnTotal == null && grn.getItems() != null) {
+                                        grnTotal = grn.getItems().stream()
+                                                        .map(gi -> gi.getTotalCost() != null ? gi.getTotalCost()
+                                                                        : BigDecimal.ZERO)
+                                                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                                }
+                                b.grnId(grn.getId()).grnNumber(grn.getGrnNumber()).grnTotal(grnTotal != null ? grnTotal
+                                                : BigDecimal.ZERO).grnStatus(grn.getStatus());
+                                String st = grn.getStatus() != null ? grn.getStatus() : "";
+                                validForApproval = poId != null && po != null && ("Completed".equals(st)
+                                                || "Billed".equals(st));
+                        }
+                }
+                if (!validForApproval && (invoice.getPoId() == null || invoice.getGrnId() == null))
+                        message = "لا يمكن اعتماد الفاتورة قبل ربطها بأمر شراء (PO) وإذن استلام (GRN) مكتمل.";
+                b.validForApproval(validForApproval).message(message);
+
+                List<InvoiceMatchDetailsDto.MatchDetailItemDto> rows = new ArrayList<>();
+                if (invoice.getItems() != null) {
+                        Map<Integer, PurchaseOrderItem> poItemsById = (po != null && po.getItems() != null)
+                                        ? po.getItems().stream().collect(Collectors.toMap(PurchaseOrderItem::getId, pi -> pi))
+                                        : Map.of();
+                        Map<Integer, GRNItem> grnItemsById = (grn != null && grn.getItems() != null)
+                                        ? grn.getItems().stream().collect(Collectors.toMap(GRNItem::getId, gi -> gi))
+                                        : Map.of();
+                        for (SupplierInvoiceItem invItem : invoice.getItems()) {
+                                String itemName = invItem.getItem() != null ? invItem.getItem().getItemNameAr() : "";
+                                BigDecimal invQty = invItem.getQuantity();
+                                BigDecimal invPrice = invItem.getUnitPrice();
+                                BigDecimal invTotal = invItem.getTotalPrice();
+                                BigDecimal poQty = null, poPrice = null, poTotal = null;
+                                BigDecimal grnQty = null, grnPrice = null, grnTotal = null;
+                                if (invItem.getGrnItemId() != null) {
+                                        GRNItem gi = grnItemsById.get(invItem.getGrnItemId());
+                                        if (gi != null) {
+                                                grnQty = gi.getAcceptedQty() != null ? gi.getAcceptedQty()
+                                                                : gi.getReceivedQty();
+                                                grnPrice = gi.getUnitCost();
+                                                grnTotal = gi.getTotalCost();
+                                                PurchaseOrderItem pi = poItemsById.get(gi.getPoItemId());
+                                                if (pi != null) {
+                                                        poQty = pi.getOrderedQty();
+                                                        poPrice = pi.getUnitPrice();
+                                                        poTotal = pi.getOrderedQty().multiply(pi.getUnitPrice() != null
+                                                                        ? pi.getUnitPrice() : BigDecimal.ZERO);
+                                                }
+                                        }
+                                }
+                                rows.add(InvoiceMatchDetailsDto.MatchDetailItemDto.builder()
+                                                .itemName(itemName)
+                                                .invoiceQuantity(invQty).invoiceUnitPrice(invPrice)
+                                                .invoiceLineTotal(invTotal)
+                                                .poQuantity(poQty).poUnitPrice(poPrice).poLineTotal(poTotal)
+                                                .grnQuantity(grnQty).grnUnitPrice(grnPrice).grnLineTotal(grnTotal)
+                                                .build());
+                        }
+                }
+                b.items(rows);
+                return b.build();
         }
 
         @lombok.Data

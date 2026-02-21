@@ -89,8 +89,8 @@ import PurchaseOrderFormPage from './pages/procurement/PurchaseOrderFormPage';
 import WaitingImportsPage from './pages/procurement/WaitingImportsPage';
 import GRNsPage from './pages/procurement/GRNsPage';
 import ProcurementGRNFormPage from './pages/procurement/GRNFormPage';
-import SupplierInvoicesPage from './pages/procurement/SupplierInvoicesPage';
-import SupplierInvoiceFormPage from './pages/procurement/SupplierInvoiceFormPage';
+import SupplierInvoicesPage from './pages/finance/SupplierInvoicesPage';
+import SupplierInvoiceFormPage from './pages/finance/SupplierInvoiceFormPage';
 import PurchaseReturnsPage from './pages/procurement/PurchaseReturnsPage';
 import PurchaseReturnFormPage from './pages/procurement/PurchaseReturnFormPage';
 
@@ -276,11 +276,6 @@ function App() {
               <Route path="new" element={<ProcurementGRNFormPage />} />
               <Route path=":id" element={<ProcurementGRNFormPage />} />
             </Route>
-            <Route path="invoices">
-              <Route index element={<SupplierInvoicesPage />} />
-              <Route path="new" element={<SupplierInvoiceFormPage />} />
-              <Route path=":id" element={<SupplierInvoiceFormPage />} />
-            </Route>
             <Route path="returns">
               <Route index element={<PurchaseReturnsPage />} />
               <Route path="new" element={<PurchaseReturnFormPage />} />
@@ -296,8 +291,17 @@ function App() {
               </Route>
               <Route path=":id" element={<SupplierFormPage />} />
             </Route>
+            <Route path="invoices">
+              <Route index element={<SupplierInvoicesPage />} />
+              <Route path="new" element={<SupplierInvoiceFormPage />} />
+              <Route path=":id" element={<SupplierInvoiceFormPage />} />
+            </Route>
           </Route>
           <Route path="finance">
+            <Route path="invoices">
+              <Route index element={<SupplierInvoicesPage />} />
+              <Route path=":id" element={<SupplierInvoiceFormPage />} />
+            </Route>
             <Route path="payment-vouchers">
               <Route index element={<PaymentVouchersPage />} />
               <Route path="new" element={<NewPaymentVoucherPage />} />

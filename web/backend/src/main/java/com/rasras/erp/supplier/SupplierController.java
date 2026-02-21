@@ -12,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/suppliers")
 @RequiredArgsConstructor
-@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION)
+@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION + " or " + SecurityConstants.SUPPLIER_INVOICE_VIEW)
 public class SupplierController {
 
     private final SupplierService supplierService;

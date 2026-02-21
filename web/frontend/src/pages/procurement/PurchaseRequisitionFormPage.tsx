@@ -54,6 +54,8 @@ const PurchaseRequisitionFormPage = () => {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [processing, setProcessing] = useState(false);
     const [lifecycle, setLifecycle] = useState<PRLifecycle | null>(null);
+    /** الإدارة فقط تختار القسم الطالب من القائمة؛ غيرهم يُعيَّن تلقائياً من قسم المستخدم */
+    const [isManagementUser, setIsManagementUser] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState<Partial<PurchaseRequisition>>({
@@ -69,7 +71,6 @@ const PurchaseRequisitionFormPage = () => {
     });
 
     useEffect(() => {
-        // Get user from local storage
         const userString = localStorage.getItem('user');
         if (userString) {
             try {
@@ -78,6 +79,8 @@ const PurchaseRequisitionFormPage = () => {
                     ...prev,
                     requestedByUserId: user.userId || user.id || 0
                 }));
+                const perms: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+                setIsManagementUser(perms.includes('SECTION_MAIN') && perms.includes('SECTION_PROCUREMENT'));
             } catch (e) {
                 console.error("Failed to parse user from local storage", e);
             }
@@ -113,9 +116,33 @@ const PurchaseRequisitionFormPage = () => {
             setUnits('data' in unitsResponse ? (unitsResponse as any).data : unitsResponse);
             setDepartments(deptsData);
 
-            // Default department if not set
-            if (!isEditMode && deptsData.length > 0) {
-                setFormData(prev => ({ ...prev, requestedByDeptId: deptsData[0].departmentId }));
+            if (isEditMode) return;
+
+            const userString = localStorage.getItem('user');
+            let isManagement = false;
+            if (userString) {
+                try {
+                    const user = JSON.parse(userString);
+                    const perms: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+                    isManagement = perms.includes('SECTION_MAIN') && perms.includes('SECTION_PROCUREMENT');
+                } catch (_) { /* ignore */ }
+            }
+
+            if (isManagement) {
+                setFormData(prev => ({ ...prev, requestedByDeptId: prev.requestedByDeptId || 0 }));
+            } else {
+                try {
+                    const me = await employeeService.getMyEmployee();
+                    if (me?.departmentId && deptsData.length > 0) {
+                        setFormData(prev => ({ ...prev, requestedByDeptId: me.departmentId }));
+                    } else if (deptsData.length > 0) {
+                        setFormData(prev => ({ ...prev, requestedByDeptId: deptsData[0].departmentId }));
+                    }
+                } catch (_) {
+                    if (deptsData.length > 0) {
+                        setFormData(prev => ({ ...prev, requestedByDeptId: deptsData[0].departmentId }));
+                    }
+                }
             }
         } catch (error) {
             console.error('Failed to load master data', error);
@@ -423,23 +450,29 @@ const PurchaseRequisitionFormPage = () => {
                                     <Building2 className="w-4 h-4 text-brand-primary" />
                                     القسم الطالب <span className="text-rose-500">*</span>
                                 </label>
-                                <select
-                                    name="requestedByDeptId"
-                                    value={formData.requestedByDeptId}
-                                    disabled={isViewMode}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, requestedByDeptId: parseInt(e.target.value) }))}
-                                    required
-                                    className={`w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl 
-                                        focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold
-                                        ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                >
-                                    <option value="">اختر القسم...</option>
-                                    {departments.map(dept => (
-                                        <option key={dept.departmentId} value={dept.departmentId}>
-                                            {dept.departmentNameAr}
-                                        </option>
-                                    ))}
-                                </select>
+                                {isViewMode || !isManagementUser ? (
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={departments.find(d => d.departmentId === formData.requestedByDeptId)?.departmentNameAr ?? (formData.requestedByDeptName || '—')}
+                                        className="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-xl text-slate-600 font-semibold cursor-not-allowed"
+                                    />
+                                ) : (
+                                    <select
+                                        name="requestedByDeptId"
+                                        value={formData.requestedByDeptId || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, requestedByDeptId: parseInt(e.target.value) || 0 }))}
+                                        required
+                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-brand-primary focus:bg-white outline-none transition-all font-semibold"
+                                    >
+                                        <option value="">اختر القسم...</option>
+                                        {departments.map(dept => (
+                                            <option key={dept.departmentId} value={dept.departmentId}>
+                                                {dept.departmentNameAr}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
 
                             <div className="space-y-2">

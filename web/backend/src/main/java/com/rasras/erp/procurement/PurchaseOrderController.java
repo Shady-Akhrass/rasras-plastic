@@ -13,7 +13,7 @@ import java.util.Map;
 @RequestMapping("/procurement/po")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION)
+@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION + " or " + SecurityConstants.SUPPLIER_INVOICE_VIEW)
 public class PurchaseOrderController {
 
     private final PurchaseOrderService poService;

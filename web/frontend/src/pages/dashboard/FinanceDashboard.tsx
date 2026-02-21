@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-    ShoppingCart, FileText, Tag, Scale, Truck, ArrowDownToLine,
-    Bell, ChevronLeft, Loader2, Package, DollarSign, Undo2,
-    Calendar, Clock, Activity
+    DollarSign, FileText, Banknote, Bell, ChevronLeft, Loader2,
+    Calendar, Clock, Activity, Receipt, CreditCard, TrendingUp
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
-import { purchaseOrderService } from '../../services/purchaseOrderService';
-import purchaseService from '../../services/purchaseService';
+import { paymentVoucherService } from '../../services/paymentVoucherService';
 import { approvalService } from '../../services/approvalService';
+import ExchangeRateCompact from '../../components/ExchangeRate/ExchangeRateCompact';
 
 const itemVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -60,7 +59,7 @@ const QuickAction = ({ icon: Icon, label, path }: { icon: React.ElementType; lab
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate(path)}
-            className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-100 hover:border-brand-primary/30 
+            className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-100 hover:border-brand-primary/30
                 hover:shadow-lg hover:shadow-brand-primary/5 transition-all text-right w-full group"
         >
             <div className="p-2.5 bg-brand-primary/10 rounded-xl group-hover:bg-brand-primary group-hover:scale-110 transition-all">
@@ -72,45 +71,43 @@ const QuickAction = ({ icon: Icon, label, path }: { icon: React.ElementType; lab
     );
 };
 
-const ProcurementDashboard: React.FC = () => {
-    usePageTitle('لوحة التحكم - المشتريات');
+const FinanceDashboard: React.FC = () => {
+    usePageTitle('لوحة التحكم - المالية');
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [pendingApprovals, setPendingApprovals] = useState(0);
-    const [waitingImports, setWaitingImports] = useState(0);
-    const [pendingPRs, setPendingPRs] = useState(0);
-    const [suppliersCount, setSuppliersCount] = useState(0);
-    const [recentPOs, setRecentPOs] = useState<any[]>([]);
+    const [vouchersCount, setVouchersCount] = useState(0);
+    const [pendingVouchersCount, setPendingVouchersCount] = useState(0);
+    const [unpaidInvoicesCount, setUnpaidInvoicesCount] = useState(0);
+    const [recentVouchers, setRecentVouchers] = useState<any[]>([]);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
-    const displayName = user?.fullNameAr || user?.username || 'مدير المشتريات';
+    const displayName = user?.fullNameAr || user?.username || 'المالية';
 
     useEffect(() => {
         const fetch = async () => {
             try {
                 setLoading(true);
-                const [approvals, waiting, prs, suppliers, pos] = await Promise.all([
+                const [approvals, vouchers, unpaid] = await Promise.all([
                     user?.userId ? approvalService.getPendingCount(user.userId) : 0,
-                    purchaseOrderService.getWaitingForArrivalPOs(),
-                    purchaseService.getAllPRs(),
-                    purchaseService.getAllSuppliers(),
-                    purchaseOrderService.getAllPOs()
+                    paymentVoucherService.getAllVouchers(),
+                    paymentVoucherService.getUnpaidInvoices()
                 ]);
 
                 setPendingApprovals(typeof approvals === 'number' ? approvals : 0);
-                setWaitingImports(Array.isArray(waiting) ? waiting.length : 0);
-                setPendingPRs(Array.isArray(prs) ? prs.filter((p: any) => p.status === 'Pending' || p.status === 'Draft').length : 0);
-                setSuppliersCount(Array.isArray(suppliers) ? suppliers.length : 0);
+                const list = Array.isArray(vouchers) ? vouchers : [];
+                setVouchersCount(list.length);
+                setPendingVouchersCount(list.filter((v: any) => v.status === 'Draft' || v.approvalStatus === 'Pending').length);
+                setUnpaidInvoicesCount(Array.isArray(unpaid) ? unpaid.length : 0);
 
-                const posList = Array.isArray(pos) ? pos : [];
-                const sorted = [...posList].sort((a: any, b: any) =>
-                    new Date(b.poDate || 0).getTime() - new Date(a.poDate || 0).getTime()
+                const sorted = [...list].sort((a: any, b: any) =>
+                    new Date(b.voucherDate || 0).getTime() - new Date(a.voucherDate || 0).getTime()
                 );
-                setRecentPOs(sorted.slice(0, 5));
+                setRecentVouchers(sorted.slice(0, 5));
             } catch (e) {
-                console.error('Error loading procurement dashboard', e);
+                console.error('Error loading finance dashboard', e);
             } finally {
                 setLoading(false);
             }
@@ -134,6 +131,10 @@ const ProcurementDashboard: React.FC = () => {
         return currentTime.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     };
 
+    const formatAmount = (amount: number, currency = 'EGP') => {
+        return new Intl.NumberFormat('ar-EG', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount) + ' ' + currency;
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -143,7 +144,7 @@ const ProcurementDashboard: React.FC = () => {
             {/* Header */}
             <motion.div
                 variants={itemVariants}
-                className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 rounded-3xl p-8 text-white"
+                className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-800 rounded-3xl p-8 text-white"
             >
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
@@ -158,16 +159,17 @@ const ProcurementDashboard: React.FC = () => {
                                 <Clock className="w-4 h-4" />
                                 {currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                            <ExchangeRateCompact />
                         </div>
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
-                                <ShoppingCart className="w-8 h-8" />
+                                <DollarSign className="w-8 h-8" />
                             </div>
                             <div>
                                 <h1 className="text-3xl font-bold">
                                     {getGreeting()}، {displayName}
                                 </h1>
-                                <p className="text-white/80">لوحة التحكم الخاصة بالمشتريات</p>
+                                <p className="text-white/80">لوحة التحكم الخاصة بقسم المالية</p>
                             </div>
                         </div>
                     </div>
@@ -190,25 +192,25 @@ const ProcurementDashboard: React.FC = () => {
                             onClick={() => navigate('/dashboard/approvals')}
                         />
                         <StatCard
-                            title="الشحنات القادمة"
-                            value={waitingImports}
-                            icon={Truck}
+                            title="سندات الصرف"
+                            value={vouchersCount}
+                            icon={Receipt}
                             color="primary"
-                            onClick={() => navigate('/dashboard/procurement/waiting-imports')}
+                            onClick={() => navigate('/dashboard/finance/payment-vouchers')}
                         />
                         <StatCard
-                            title="طلبات شراء معلقة"
-                            value={pendingPRs}
+                            title="سندات معلقة"
+                            value={pendingVouchersCount}
                             icon={FileText}
                             color="rose"
-                            onClick={() => navigate('/dashboard/procurement/pr')}
+                            onClick={() => navigate('/dashboard/finance/payment-vouchers')}
                         />
                         <StatCard
-                            title="الموردين"
-                            value={suppliersCount}
-                            icon={Package}
+                            title="فواتير غير مسددة"
+                            value={unpaidInvoicesCount}
+                            icon={CreditCard}
                             color="success"
-                            onClick={() => navigate('/dashboard/procurement/suppliers')}
+                            onClick={() => navigate('/dashboard/finance/payment-vouchers/new')}
                         />
                     </div>
 
@@ -216,64 +218,63 @@ const ProcurementDashboard: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <motion.div variants={itemVariants} className="lg:col-span-1">
                             <div className="flex items-center gap-2 mb-6">
-                                <div className="p-2 bg-brand-primary/10 rounded-lg">
-                                    <Activity className="w-5 h-5 text-brand-primary" />
+                                <div className="p-2 bg-emerald-100 rounded-lg">
+                                    <Activity className="w-5 h-5 text-emerald-600" />
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-900">إجراءات سريعة</h3>
                             </div>
                             <div className="space-y-3">
-                                <QuickAction icon={FileText} label="طلبات الشراء (PR)" path="/dashboard/procurement/pr" />
-                                <QuickAction icon={FileText} label="طلبات عروض الأسعار (RFQ)" path="/dashboard/procurement/rfq" />
-                                <QuickAction icon={Tag} label="عروض الموردين" path="/dashboard/procurement/quotation" />
-                                <QuickAction icon={Scale} label="مقارنة العروض (QCS)" path="/dashboard/procurement/comparison" />
-                                <QuickAction icon={ShoppingCart} label="أوامر الشراء (PO)" path="/dashboard/procurement/po" />
-                                <QuickAction icon={ArrowDownToLine} label="إذونات الاستلام (GRN)" path="/dashboard/procurement/grn" />
+                                <QuickAction icon={Banknote} label="سند صرف جديد" path="/dashboard/finance/payment-vouchers/new" />
+                                <QuickAction icon={Receipt} label="سندات الصرف" path="/dashboard/finance/payment-vouchers" />
                                 <QuickAction icon={FileText} label="فواتير الموردين" path="/dashboard/finance/invoices" />
-                                <QuickAction icon={DollarSign} label="الأرصدة المستحقة" path="/dashboard/procurement/suppliers/outstanding" />
-                                <QuickAction icon={Undo2} label="مرتجعات الشراء" path="/dashboard/procurement/returns" />
+                                <QuickAction icon={TrendingUp} label="صندوق الاعتمادات" path="/dashboard/approvals" />
                             </div>
                         </motion.div>
 
                         <motion.div variants={itemVariants} className="lg:col-span-2">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-2">
-                                    <div className="p-2 bg-brand-primary/10 rounded-lg">
-                                        <ShoppingCart className="w-5 h-5 text-brand-primary" />
+                                    <div className="p-2 bg-emerald-100 rounded-lg">
+                                        <Receipt className="w-5 h-5 text-emerald-600" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-slate-900">آخر أوامر الشراء</h3>
+                                    <h3 className="text-lg font-bold text-slate-900">آخر سندات الصرف</h3>
                                 </div>
                                 <button
-                                    onClick={() => navigate('/dashboard/procurement/po')}
+                                    onClick={() => navigate('/dashboard/finance/payment-vouchers')}
                                     className="text-sm text-brand-primary font-medium hover:underline"
                                 >
                                     عرض الكل
                                 </button>
                             </div>
                             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                                {recentPOs.length === 0 ? (
+                                {recentVouchers.length === 0 ? (
                                     <div className="p-12 text-center text-slate-500">
-                                        <ShoppingCart className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                                        <p>لا توجد أوامر شراء حديثة</p>
+                                        <Receipt className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                                        <p>لا توجد سندات صرف حديثة</p>
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-slate-100">
-                                        {recentPOs.map((po: any) => (
+                                        {recentVouchers.map((v: any) => (
                                             <div
-                                                key={po.id}
-                                                onClick={() => navigate(`/dashboard/procurement/po/${po.id}`)}
+                                                key={v.paymentVoucherId ?? v.id}
+                                                onClick={() => navigate(`/dashboard/finance/payment-vouchers/${v.paymentVoucherId ?? v.id}`)}
                                                 className="flex items-center justify-between p-4 hover:bg-slate-50 cursor-pointer transition-colors"
                                             >
                                                 <div>
-                                                    <p className="font-semibold text-slate-900">#{po.poNumber}</p>
-                                                    <p className="text-sm text-slate-500">{po.supplierNameAr || '-'}</p>
+                                                    <p className="font-semibold text-slate-900">#{v.voucherNumber || '-'}</p>
+                                                    <p className="text-sm text-slate-500">{v.supplierNameAr || v.payeeName || '-'}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${po.status === 'Pending Approval' || po.approvalStatus === 'Pending' ? 'bg-amber-100 text-amber-700' :
-                                                        po.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                                                            'bg-slate-100 text-slate-600'
-                                                        }`}>
-                                                        {po.approvalStatus === 'Pending' ? 'بانتظار الاعتماد' :
-                                                            po.status === 'Completed' ? 'مكتمل' : po.status || '-'}
+                                                    <span className="text-sm font-medium text-slate-700">
+                                                        {formatAmount(v.amount ?? 0, v.currency || 'EGP')}
+                                                    </span>
+                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                        v.approvalStatus === 'Pending' || v.status === 'Draft' ? 'bg-amber-100 text-amber-700' :
+                                                            v.status === 'Paid' || v.paidDate ? 'bg-emerald-100 text-emerald-700' :
+                                                                'bg-slate-100 text-slate-600'
+                                                    }`}>
+                                                        {v.approvalStatus === 'Pending' ? 'بانتظار الاعتماد' :
+                                                            v.paidDate ? 'مسدد' : v.status || '-'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -289,4 +290,4 @@ const ProcurementDashboard: React.FC = () => {
     );
 };
 
-export default ProcurementDashboard;
+export default FinanceDashboard;

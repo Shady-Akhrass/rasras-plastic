@@ -36,13 +36,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String username;
 
-        if (!StringUtils.hasText(authHeader) || !authHeader.startsWith("Bearer ")) {
-            log.debug("No Bearer token found in request to {}", request.getRequestURI());
-            filterChain.doFilter(request, response);
-            return;
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7);
+        } else {
+            String tokenParam = request.getParameter("token");
+            if (StringUtils.hasText(tokenParam)) {
+                jwt = tokenParam;
+            } else {
+                log.debug("No Bearer token found in request to {}", request.getRequestURI());
+                filterChain.doFilter(request, response);
+                return;
+            }
         }
-
-        jwt = authHeader.substring(7);
         log.debug("Processing JWT token for request to {}", request.getRequestURI());
 
         try {

@@ -14,6 +14,11 @@ public interface GoodsReceiptNoteRepository extends JpaRepository<GoodsReceiptNo
 
     List<GoodsReceiptNote> findByPurchaseOrder_Id(Integer poId);
 
+    List<GoodsReceiptNote> findByStatus(String status);
+
+    @Query("SELECT DISTINCT g FROM GoodsReceiptNote g LEFT JOIN FETCH g.items i LEFT JOIN FETCH i.item WHERE g.status = :status")
+    List<GoodsReceiptNote> findByStatusWithItems(@Param("status") String status);
+
     @Query("SELECT DISTINCT g FROM GoodsReceiptNote g LEFT JOIN FETCH g.items i LEFT JOIN FETCH i.item WHERE g.id = :id")
     Optional<GoodsReceiptNote> findByIdWithItems(@Param("id") Integer id);
 }

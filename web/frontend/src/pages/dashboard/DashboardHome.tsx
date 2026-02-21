@@ -5,6 +5,7 @@ import WarehouseDashboard from './WarehouseDashboard';
 import ManagementDashboard from './ManagementDashboard';
 import ProcurementDashboard from './ProcurementDashboard';
 import QualityControlDashboard from './QualityControlDashboard';
+import FinanceDashboard from './FinanceDashboard';
 import {
     Users, Package, TrendingUp, ArrowUpRight, ArrowDownRight, User,
     Loader2, FileText, DollarSign, Calendar, Clock,
@@ -351,16 +352,13 @@ const DashboardHome: React.FC = () => {
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
-    const userRole = (user?.roleCode || user?.roleName || '').toUpperCase();
     const userPermissions: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
 
-    // مراقب الجودة: إما دور مخصص (QC / QUALITY / ...) أو صلاحية العمليات فقط دون المشتريات/المخازن/المبيعات
     const isQualityController =
-        ['QC', 'QUALITY', 'QUALITY_CONTROL', 'QUALITY_INSPECTOR'].includes(userRole) ||
-        (userPermissions.includes('SECTION_OPERATIONS') &&
-            !userPermissions.includes('SECTION_PROCUREMENT') &&
-            !userPermissions.includes('SECTION_WAREHOUSE') &&
-            !userPermissions.includes('SECTION_SALES'));
+        userPermissions.includes('SECTION_OPERATIONS') &&
+        !userPermissions.includes('SECTION_PROCUREMENT') &&
+        !userPermissions.includes('SECTION_WAREHOUSE') &&
+        !userPermissions.includes('SECTION_SALES');
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -381,11 +379,15 @@ const DashboardHome: React.FC = () => {
         return () => clearInterval(timer);
     }, []);
 
-    // تخصيص لوحة التحكم حسب الدور
-    if (userRole === 'WHM') return <WarehouseDashboard />;
-    if (userRole === 'PM' || userRole === 'BUYER') return <ProcurementDashboard />;
-    if (userRole === 'GM' || userRole === 'ADMIN') return <ManagementDashboard />;
+    // Dashboard selection by permissions only — no roleCode checks.
+    // Users with all SECTION_* (ADMIN/GM) get Management; others get their section dashboard.
+    const hasAll = ['SECTION_PROCUREMENT', 'SECTION_FINANCE', 'SECTION_WAREHOUSE', 'SECTION_SALES']
+        .every(s => userPermissions.includes(s));
+    if (hasAll) return <ManagementDashboard />;
     if (isQualityController) return <QualityControlDashboard />;
+    if (userPermissions.includes('SECTION_WAREHOUSE') && !userPermissions.includes('SECTION_PROCUREMENT') && !userPermissions.includes('SECTION_FINANCE')) return <WarehouseDashboard />;
+    if (userPermissions.includes('SECTION_PROCUREMENT') && !userPermissions.includes('SECTION_FINANCE')) return <ProcurementDashboard />;
+    if (userPermissions.includes('SECTION_FINANCE') && !userPermissions.includes('SECTION_PROCUREMENT')) return <FinanceDashboard />;
 
     const employeeDisplayName = user?.fullNameAr || user?.username || 'المستخدم';
 

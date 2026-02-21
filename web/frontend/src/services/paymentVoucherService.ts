@@ -362,27 +362,12 @@ export const paymentVoucherService = {
         return response.data;
     },
 
-    // Download voucher PDF
-    downloadVoucherPdf: async (id: number, voucherNumber: string): Promise<void> => {
-        try {
-            const response = await apiClient.get<{ data: any }>(`/finance/payment-vouchers/${id}/pdf`, {
-                responseType: 'blob'
-            });
-
-            // @ts-ignore
-            const blob = new Blob([response.data], { type: 'application/pdf' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `PaymentVoucher_${voucherNumber}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Failed to download voucher PDF:', error);
-            throw error;
-        }
+    // Download voucher PDF — uses window.open to bypass IDM/download-manager interception
+    downloadVoucherPdf: async (id: number, _voucherNumber: string): Promise<void> => {
+        const token = localStorage.getItem('accessToken');
+        const baseUrl = `${import.meta.env.VITE_API_URL}/api`;
+        const pdfUrl = `${baseUrl}/finance/payment-vouchers/${id}/pdf?token=${encodeURIComponent(token || '')}`;
+        window.open(pdfUrl, '_blank');
     }
 };
 

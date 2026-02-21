@@ -15,7 +15,7 @@ import java.util.List;
 @RequestMapping("/units")
 @RequiredArgsConstructor
 @Tag(name = "Units of Measure", description = "Unit Management APIs")
-@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
+@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION + " or " + SecurityConstants.SUPPLIER_INVOICE_VIEW)
 public class UnitController {
 
     private final UnitService unitService;
