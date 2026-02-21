@@ -17,7 +17,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/finance/payment-vouchers")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @PreAuthorize(SecurityConstants.FINANCE_SECTION)
 public class PaymentVoucherController {
 

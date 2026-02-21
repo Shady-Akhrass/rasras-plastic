@@ -144,7 +144,7 @@ export function useNotificationPolling(pathname: string) {
 
             if (type === 'approvals') {
                 const requests = value?.data || [];
-                const currentIds = new Set(requests.map((r: any) => r.id));
+                const currentIds = new Set<number>(requests.map((r: any) => r.id));
 
                 if (!isInitialLoad.current) {
                     const newRequests = requests.filter(

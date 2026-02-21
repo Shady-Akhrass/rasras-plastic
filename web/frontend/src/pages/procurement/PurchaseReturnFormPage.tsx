@@ -37,7 +37,7 @@ const PurchaseReturnFormPage: React.FC = () => {
     const isEdit = !!id;
     const queryParams = new URLSearchParams(location.search);
     const grnId = queryParams.get('grnId');
-    const isView = queryParams.get('mode') === 'view';
+    const isView = queryParams.get('mode') === 'view' || !!id;
     const approvalId = queryParams.get('approvalId');
 
     const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
@@ -45,6 +45,7 @@ const PurchaseReturnFormPage: React.FC = () => {
     const [grns, setGrns] = useState<any[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
     const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
 
     const [formData, setFormData] = useState<PurchaseReturnDto>({
@@ -67,8 +68,27 @@ const PurchaseReturnFormPage: React.FC = () => {
         loadWarehouses();
         if (grnId) {
             loadGRNData(parseInt(grnId));
+        } else if (id && id !== 'new') {
+            loadReturnData(parseInt(id));
         }
     }, [id, grnId]);
+
+    const loadReturnData = async (returnId: number) => {
+        try {
+            setLoading(true);
+            const response = await purchaseReturnService.getReturnById(returnId);
+            if (response.data) {
+                setFormData({
+                    ...response.data,
+                    items: response.data.items || []
+                });
+            }
+        } catch (e) {
+            toast.error('فشل تحميل بيانات المرتجع');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const loadSuppliers = async () => {
         try {
@@ -112,6 +132,7 @@ const PurchaseReturnFormPage: React.FC = () => {
 
     const loadGRNData = async (gId: number) => {
         try {
+            setLoading(true);
             const grn = await grnService.getGRNById(gId);
             if (grn) {
                 setFormData(prev => ({
@@ -135,6 +156,8 @@ const PurchaseReturnFormPage: React.FC = () => {
             }
         } catch (e) {
             toast.error('فشل تحميل بيانات إذن الإضافة');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -210,6 +233,8 @@ const PurchaseReturnFormPage: React.FC = () => {
         }
     };
 
+    if (loading) return <div className="p-8 text-center">جاري التحميل...</div>;
+
     return (
         <div className="space-y-6 pb-20" dir="rtl">
             <style>{`
@@ -251,9 +276,11 @@ const PurchaseReturnFormPage: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">
-                                {isEdit ? 'تعديل مرتجع مشتريات' : 'مرتجع مشتريات جديد'}
+                                {isView ? 'عرض مرتجع مشتريات' : isEdit ? 'تعديل مرتجع مشتريات' : 'مرتجع مشتريات جديد'}
                             </h1>
-                            <p className="text-white/80 text-lg">تسجيل رد بضاعة للمورد وتعديل أرصدة المخزون</p>
+                            <p className="text-white/80 text-lg">
+                                {isView ? 'عرض تفاصيل رد البضاعة للمورد' : 'تسجيل رد بضاعة للمورد وتعديل أرصدة المخزون'}
+                            </p>
                         </div>
                     </div>
                     {!isView && (

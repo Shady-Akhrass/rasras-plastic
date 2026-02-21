@@ -149,9 +149,11 @@ public class ApprovalService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<ApprovalRequest> requests = requestRepo.findByStatusInWithCurrentStepAndApproverRole(List.of("Pending", "InProgress"));
+        List<ApprovalRequest> requests = requestRepo
+                .findByStatusInWithCurrentStepAndApproverRole(List.of("Pending", "InProgress"));
 
-        // Filter requests: اعتماداً على كود الدور (roleCode) لتفادي اختلاف الـ ID بين الخطوة والمستخدم
+        // Filter requests: اعتماداً على كود الدور (roleCode) لتفادي اختلاف الـ ID بين
+        // الخطوة والمستخدم
         List<ApprovalRequest> filteredRequests;
         if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleCode())) {
             filteredRequests = requests;
@@ -163,7 +165,8 @@ public class ApprovalService {
                         if (step == null)
                             return false;
                         if ("ROLE".equals(step.getApproverType())) {
-                            if (step.getApproverRole() == null) return false;
+                            if (step.getApproverRole() == null)
+                                return false;
                             // مقارنة بكود الدور حتى لو اختلف RoleID (مثلاً مدير المالي FM)
                             return userRoleCode != null
                                     && userRoleCode.equalsIgnoreCase(step.getApproverRole().getRoleCode());
@@ -209,7 +212,8 @@ public class ApprovalService {
 
     private ApprovalRequestDto mapToDto(ApprovalRequest req) {
         BigDecimal amountToUse = req.getTotalAmount();
-        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix display)
+        // Enrich total for QuotationComparison when stored as zero (e.g. legacy or fix
+        // display)
         if ("QuotationComparison".equals(req.getDocumentType())
                 && (amountToUse == null || amountToUse.compareTo(BigDecimal.ZERO) == 0)) {
             amountToUse = comparisonRepo.findById(req.getDocumentId())
@@ -320,7 +324,7 @@ public class ApprovalService {
                         // ✅ Strategy B: إغلاق الطلب نهائياً
                         request.setStatus("Rejected");
                         request.setCompletedDate(LocalDateTime.now());
-                        request.setCurrentStep(null);  // ✅ تصفير CurrentStep
+                        request.setCurrentStep(null); // ✅ تصفير CurrentStep
                         updateLinkedDocumentStatus(request, "Rejected", userId);
                     }
                     requestRepo.save(request);
@@ -488,31 +492,33 @@ public class ApprovalService {
                 qc.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     qc.setStatus("Approved");
-                    
+
                     // ✅ Idempotent PO Creation: إنشاء PO مرة واحدة فقط
                     if (qc.getSelectedQuotation() != null) {
                         boolean poExists = poRepo.findByQuotationId(qc.getSelectedQuotation().getId()).isPresent();
-                        
+
                         if (!poExists) {
                             // NEW: Automatically create PO and initiate its approval
                             createPOFromComparison(qc, userId);
                         } else {
-                            System.out.println("PO already exists for quotation " + 
-                                qc.getSelectedQuotation().getId() + " - skipping creation");
+                            System.out.println("PO already exists for quotation " +
+                                    qc.getSelectedQuotation().getId() + " - skipping creation");
                         }
                     }
                 } else if ("Rejected".equals(status)) {
                     // ✅ إعادة المقارنة إلى Draft للسماح بالتعديل وإعادة الإرسال
                     qc.setStatus("Draft");
                     qc.setApprovalStatus("Rejected"); // تتبع آخر محاولة رفض
-                    
+
                     // ✅ تتبع عدد مرات الرفض
                     Integer rejectionCount = qc.getRejectionCount() != null ? qc.getRejectionCount() : 0;
                     qc.setRejectionCount(rejectionCount + 1);
                     qc.setLastRejectionDate(LocalDateTime.now());
-                    
-                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل تاريخي
-                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات المُغلقة
+
+                    // ✅ ملاحظة: approvalrequest يبقى Rejected/Cancelled في قاعدة البيانات كسجل
+                    // تاريخي
+                    // CurrentStep يصبح null تلقائياً (من ApprovalService) - هذا طبيعي للطلبات
+                    // المُغلقة
                 }
                 comparisonRepo.save(qc);
             });
@@ -640,6 +646,42 @@ public class ApprovalService {
                     pr.setStatus("Rejected");
                 }
                 paymentReceiptRepo.save(pr);
+            });
+        } else if ("StockIssueNote".equalsIgnoreCase(type)) {
+            stockIssueNoteRepo.findById(id).ifPresent(note -> {
+                note.setStatus(status);
+                if ("Approved".equals(status)) {
+                    Integer approverId = note.getUpdatedBy() != null ? note.getUpdatedBy() : userId;
+                    Integer warehouseId = note.getWarehouse().getId();
+
+                    if (note.getItems() != null) {
+                        for (com.rasras.erp.sales.StockIssueNoteItem item : note.getItems()) {
+                            BigDecimal qty = item.getIssuedQty();
+                            BigDecimal unitCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+
+                            inventoryService.updateStock(
+                                    item.getItem().getId(),
+                                    warehouseId,
+                                    qty,
+                                    "OUT",
+                                    "ISSUE",
+                                    "StockIssueNote",
+                                    note.getId(),
+                                    note.getIssueNoteNumber(),
+                                    unitCost,
+                                    approverId);
+
+                            // Update Sales Order delivered quantity if applicable
+                            com.rasras.erp.sales.SalesOrderItem soItem = item.getSalesOrderItem();
+                            if (soItem != null) {
+                                BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty()
+                                        : BigDecimal.ZERO).add(qty);
+                                soItem.setDeliveredQty(newDelivered);
+                            }
+                        }
+                    }
+                }
+                stockIssueNoteRepo.save(note);
             });
         }
     }

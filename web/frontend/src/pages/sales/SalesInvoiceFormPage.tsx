@@ -147,7 +147,7 @@ const SalesInvoiceFormPage: React.FC = () => {
                     customerId: so.customerId,
                     customerNameAr: so.customerNameAr,
                     paymentTerms: so.paymentTerms ?? f.paymentTerms,
-                    discountPercentage: so.discountPercentage ?? 0,
+                    discountPercentage: 0,
                     taxAmount: so.taxAmount ?? 0,
                     items: (so.items || []).map((i) => ({
                         itemId: i.itemId,
@@ -313,12 +313,11 @@ const SalesInvoiceFormPage: React.FC = () => {
                                 {!isNew && <StatusBadge status={form.status || 'Draft'} />}
                                 {isReadOnly && <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20"><Lock className="w-3 h-3" /> للعرض فقط</span>}
                                 {form.approvalStatus && (
-                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${
-                                        form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
-                                        form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
-                                        form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
-                                        'bg-slate-500/20 text-white border-slate-300/30'
-                                    }`}>
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
+                                            form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
+                                                form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
+                                                    'bg-slate-500/20 text-white border-slate-300/30'
+                                        }`}>
                                         {form.approvalStatus === 'Approved' && <CheckCircle2 className="w-3 h-3" />}
                                         {form.approvalStatus === 'Rejected' && <XCircle className="w-3 h-3" />}
                                         {form.approvalStatus === 'Pending' && <Clock className="w-3 h-3" />}

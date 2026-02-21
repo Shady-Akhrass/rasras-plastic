@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, FileText, Banknote, RefreshCw, Eye, DollarSign, Calendar, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, FileText, Banknote, RefreshCw, Eye, DollarSign } from 'lucide-react';
 import { receiptService, type ReceiptDto } from '../../services/receiptService';
 import Pagination from '../../components/common/Pagination';
 import { formatNumber, formatDate } from '../../utils/format';

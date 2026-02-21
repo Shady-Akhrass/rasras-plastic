@@ -1,59 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Package, RefreshCw, Eye, CheckCircle2, Clock, FileText, Truck } from 'lucide-react';
+import { Search, Plus, Package, RefreshCw, Eye } from 'lucide-react';
 import { stockIssueNoteService, type StockIssueNoteDto } from '../../services/stockIssueNoteService';
 import Pagination from '../../components/common/Pagination';
 import { formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
-// Status Badge Component
-const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const config: Record<string, {
-        label: string;
-        bg: string;
-        text: string;
-        border: string;
-        icon: React.ElementType;
-    }> = {
-        'Draft': {
-            label: 'مسودة',
-            bg: 'bg-slate-50',
-            text: 'text-slate-700',
-            border: 'border-slate-200',
-            icon: FileText
-        },
-        'Pending': {
-            label: 'قيد الاعتماد',
-            bg: 'bg-amber-50',
-            text: 'text-amber-700',
-            border: 'border-amber-200',
-            icon: Clock
-        },
-        'Approved': {
-            label: 'معتمد',
-            bg: 'bg-emerald-50',
-            text: 'text-emerald-700',
-            border: 'border-emerald-200',
-            icon: CheckCircle2
-        },
-        'Issued': {
-            label: 'تم الصرف',
-            bg: 'bg-blue-50',
-            text: 'text-blue-700',
-            border: 'border-blue-200',
-            icon: Truck
-        }
-    };
-
-    const c = config[status] || config['Draft'];
-
-    return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${c.bg} ${c.text} ${c.border}`}>
-            <c.icon className="w-3.5 h-3.5" />
-            {c.label}
-        </span>
-    );
-};
 
 const StockIssueNoteListPage: React.FC = () => {
     const navigate = useNavigate();
@@ -75,20 +27,6 @@ const StockIssueNoteListPage: React.FC = () => {
             toast.error('فشل تحميل إذونات الصرف');
             setList([]);
         } finally { setLoading(false); }
-    };
-
-    const handleApprove = async (id: number) => {
-        try {
-            const updated = await stockIssueNoteService.approve(id);
-            if (updated) {
-                toast.success('تم اعتماد إذن الصرف وتحديث المخزون');
-                fetchList();
-            } else {
-                toast.error('فشل الاعتماد');
-            }
-        } catch (e: any) {
-            toast.error(e?.response?.data?.message || 'فشل الاعتماد');
-        }
     };
 
     const filtered = useMemo(() => {
@@ -204,9 +142,6 @@ const StockIssueNoteListPage: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 flex gap-2">
                                             <button onClick={() => navigate(`/dashboard/sales/issue-notes/${n.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg" title="عرض"><Eye className="w-5 h-5" /></button>
-                                            {n.status === 'Draft' && (
-                                                <button onClick={() => handleApprove(n.id!)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="اعتماد"><CheckCircle2 className="w-5 h-5" /></button>
-                                            )}
                                         </td>
                                     </tr>
                                 ))
