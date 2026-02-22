@@ -7,6 +7,7 @@ import {
 import { itemCategoryService, type ItemCategoryDto } from '../../services/itemCategoryService';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { toast } from 'react-hot-toast';
+import { canAccessPath } from '../../utils/permissionUtils';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -431,6 +432,12 @@ const Modal: React.FC<{
 };
 
 const ItemCategoriesPage: React.FC = () => {
+    const userString = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+    const user = userString ? JSON.parse(userString) : null;
+    const userRole = user?.roleCode || user?.roleName || '';
+    const userPermissions: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
+    const hasAccess = canAccessPath('/dashboard/inventory/categories', userRole, userPermissions);
+
     const [categories, setCategories] = useState<ItemCategoryDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -454,8 +461,9 @@ const ItemCategoriesPage: React.FC = () => {
     });
 
     useEffect(() => {
-        fetchCategories();
-    }, []);
+        if (hasAccess) fetchCategories();
+        else setLoading(false);
+    }, [hasAccess]);
 
     const fetchCategories = async () => {
         try {

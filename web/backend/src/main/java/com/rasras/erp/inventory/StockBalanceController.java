@@ -14,7 +14,7 @@ import java.util.List;
 @RequestMapping("/inventory/stocks")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
+@PreAuthorize(SecurityConstants.STOCKS_ACCESS)
 public class StockBalanceController {
 
     private final StockBalanceService stockService;

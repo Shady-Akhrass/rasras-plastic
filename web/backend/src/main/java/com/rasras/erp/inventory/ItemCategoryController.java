@@ -15,7 +15,7 @@ import java.util.List;
 @RequestMapping("/inventory/categories")
 @RequiredArgsConstructor
 @Tag(name = "Item Categories", description = "Item Category Management APIs")
-@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
+@PreAuthorize(SecurityConstants.INVENTORY_CATEGORIES_ACCESS)
 public class ItemCategoryController {
 
     private final ItemCategoryService itemCategoryService;

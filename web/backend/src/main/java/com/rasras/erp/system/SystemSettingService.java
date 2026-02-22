@@ -46,25 +46,38 @@ public class SystemSettingService {
 
     /**
      * Returns only settings that are safe to expose to any authenticated user (e.g. buyers for comparison page).
+     * Never throws: if DB is empty or init fails, returns empty list so frontend can use defaults (e.g. EGP).
      */
     public List<SystemSettingDto> getPublicSettings() {
-        ensureRequireThreeQuotationsExists();
-        return systemSettingRepository.findAll().stream()
-                .filter(s -> PUBLIC_SETTING_KEYS.contains(s.getSettingKey()))
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+        try {
+            ensureRequireThreeQuotationsExists();
+        } catch (Exception e) {
+            // Table empty, constraint, or transient error — return empty list; frontend uses defaults
+        }
+        try {
+            return systemSettingRepository.findAll().stream()
+                    .filter(s -> PUBLIC_SETTING_KEYS.contains(s.getSettingKey()))
+                    .map(this::mapToDto)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     @Transactional
     public void ensureRequireThreeQuotationsExists() {
-        if (systemSettingRepository.findBySettingKey("RequireThreeQuotations").isEmpty()) {
-            systemSettingRepository.save(SystemSetting.builder()
-                    .settingKey("RequireThreeQuotations")
-                    .settingValue("true")
-                    .description("Require at least 3 supplier quotations for comparison")
-                    .category("Procurement")
-                    .dataType("Boolean")
-                    .build());
+        try {
+            if (systemSettingRepository.findBySettingKey("RequireThreeQuotations").isEmpty()) {
+                systemSettingRepository.save(SystemSetting.builder()
+                        .settingKey("RequireThreeQuotations")
+                        .settingValue("true")
+                        .description("Require at least 3 supplier quotations for comparison")
+                        .category("Procurement")
+                        .dataType("Boolean")
+                        .build());
+            }
+        } catch (Exception ignored) {
+            // Table may be empty or missing; getPublicSettings will still return empty list
         }
     }
 

@@ -5,6 +5,7 @@ import LoginPage from './pages/auth/LoginPage';
 import DashboardLayout from './components/layouts/DashboardLayout';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import EmployeeList from './pages/employees/EmployeeList';
+import ProfilePage from './pages/employees/ProfilePage';
 import LeaveTypesPage from './pages/hr/LeaveTypesPage';
 import WorkShiftsPage from './pages/hr/WorkShiftsPage';
 import HolidaysPage from './pages/hr/HolidaysPage';
@@ -124,6 +125,7 @@ function App() {
             <Route index element={<ApprovalsInbox />} />
             <Route path="audit" element={<ApprovalAuditPage />} />
           </Route>
+          <Route path="profile" element={<ProfilePage />} />
           <Route path="employees" element={<EmployeeList />} />
           <Route path="hr">
             <Route path="leave-types" element={<LeaveTypesPage />} />

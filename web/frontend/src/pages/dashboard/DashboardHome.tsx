@@ -6,6 +6,7 @@ import ManagementDashboard from './ManagementDashboard';
 import ProcurementDashboard from './ProcurementDashboard';
 import QualityControlDashboard from './QualityControlDashboard';
 import FinanceDashboard from './FinanceDashboard';
+import SalesDashboard from './SalesDashboard';
 import {
     Users, Package, TrendingUp, ArrowUpRight, ArrowDownRight, User,
     Loader2, FileText, DollarSign, Calendar, Clock,
@@ -379,8 +380,9 @@ const DashboardHome: React.FC = () => {
         return () => clearInterval(timer);
     }, []);
 
-    // Dashboard selection by permissions only — no roleCode checks.
-    // Users with all SECTION_* (ADMIN/GM) get Management; others get their section dashboard.
+    // اختيار لوحة القيادة يعتمد على SECTION_* فقط (لا يُستخدم MENU_* هنا).
+    // من لديه كل الأقسام الأربعة (مشتريات، مالية، مخازن، مبيعات) يرى ManagementDashboard؛
+    // من لديه قسم واحد يرى اللوحة المناسبة؛ من لديه فقط MENU_* بدون أقسام يرى الشاشة الافتراضية (ترحيب).
     const hasAll = ['SECTION_PROCUREMENT', 'SECTION_FINANCE', 'SECTION_WAREHOUSE', 'SECTION_SALES']
         .every(s => userPermissions.includes(s));
     if (hasAll) return <ManagementDashboard />;
@@ -388,6 +390,7 @@ const DashboardHome: React.FC = () => {
     if (userPermissions.includes('SECTION_WAREHOUSE') && !userPermissions.includes('SECTION_PROCUREMENT') && !userPermissions.includes('SECTION_FINANCE')) return <WarehouseDashboard />;
     if (userPermissions.includes('SECTION_PROCUREMENT') && !userPermissions.includes('SECTION_FINANCE')) return <ProcurementDashboard />;
     if (userPermissions.includes('SECTION_FINANCE') && !userPermissions.includes('SECTION_PROCUREMENT')) return <FinanceDashboard />;
+    if (userPermissions.includes('SECTION_SALES')) return <SalesDashboard />;
 
     const employeeDisplayName = user?.fullNameAr || user?.username || 'المستخدم';
 

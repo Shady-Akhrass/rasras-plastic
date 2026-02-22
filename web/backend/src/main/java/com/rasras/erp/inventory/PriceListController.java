@@ -12,7 +12,7 @@ import java.util.List;
 @RequestMapping("/inventory/price-lists")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
+@PreAuthorize(SecurityConstants.PRICE_LISTS_ACCESS)
 public class PriceListController {
     private final PriceListService service;
 

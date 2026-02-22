@@ -368,8 +368,9 @@ const NewPaymentVoucherPage: React.FC = () => {
             setIsDirty(false);
             toast.success('تم إنشاء سند الصرف بنجاح');
             navigate('/dashboard/finance/payment-vouchers');
-        } catch {
-            toast.error('فشل إنشاء سند الصرف');
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            toast.error(msg || 'فشل إنشاء سند الصرف');
         } finally {
             setLoading(false);
         }
