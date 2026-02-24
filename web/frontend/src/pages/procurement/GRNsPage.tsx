@@ -13,6 +13,7 @@ import {
     ClipboardCheck,
     RefreshCw,
     X,
+    XCircle,
     Eye,
     Archive,
     Trash2
@@ -78,8 +79,8 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         },
         'Approved': {
             icon: CheckCircle2,
-            className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-            label: 'إذن معتمد - جاهز للتخزين'
+            className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            label: 'معتمدة'
         },
         'Completed': {
             icon: CheckCircle2,
@@ -156,14 +157,21 @@ const GRNTableRow: React.FC<{
         </td>
         <td className="px-6 py-4">
             <div className="flex flex-col gap-1">
-                <StatusBadge status={receipt.status!} />
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${receipt.approvalStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                    receipt.approvalStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                        'bg-slate-50 text-slate-500 border-slate-200'
-                    }`}>
-                    {receipt.approvalStatus === 'Approved' ? 'معتمد' :
-                        receipt.approvalStatus === 'Rejected' ? 'مرفوض' : 'قيد الاعتماد'}
-                </span>
+                {receipt.approvalStatus === 'Approved' ? (
+                    <StatusBadge status="Approved" />
+                ) : receipt.approvalStatus === 'Rejected' ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-200 w-fit">
+                        <XCircle className="w-3.5 h-3.5" />
+                        مرفوض
+                    </span>
+                ) : (
+                    <>
+                        <StatusBadge status={receipt.status!} />
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit bg-slate-50 text-slate-500 border-slate-200">
+                            قيد الاعتماد
+                        </span>
+                    </>
+                )}
             </div>
         </td>
         <td className="px-6 py-4">

@@ -153,10 +153,10 @@ const PaymentVoucherDetailPage: React.FC = () => {
             },
             {
                 id: 'payment',
-                label: 'صرف الدفعة',
+                label: 'صرف الدفعة (تلقائي بعد اعتماد المدير العام)',
                 subLabel: voucher.status === 'Paid'
-                    ? `تم الصرف: ${voucher.paymentMethod === 'cash' ? 'cash' : (voucher.paymentMethod || '')}`
-                    : 'قيد الانتظار',
+                    ? `تم الصرف تلقائياً${voucher.paidBy ? `: ${voucher.paidBy}` : ''}`
+                    : 'يتم تلقائياً بعد اعتماد المدير العام',
                 status: voucher.status === 'Paid'
                     ? 'completed'
                     : voucher.approvalStatus === 'GMApproved'

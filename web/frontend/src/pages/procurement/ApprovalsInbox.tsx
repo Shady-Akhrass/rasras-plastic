@@ -658,7 +658,8 @@ const ApprovalsInbox: React.FC = () => {
             const currentUser = currentUserJson ? JSON.parse(currentUserJson) : null;
             const uid = currentUser?.userId ?? currentUser?.id ?? currentUserId;
             const permissions: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
-            const canFetchCustomerRequests = permissions.includes('SECTION_SALES') || permissions.includes('SECTION_OPERATIONS');
+            // طلبات العملاء يسمح بها الـ API فقط لـ SECTION_SALES (لا SECTION_OPERATIONS) → تجنب 403
+            const canFetchCustomerRequests = permissions.includes('SECTION_SALES');
 
             const promises: Promise<any>[] = [
                 approvalService.getPendingRequests(uid),
@@ -820,8 +821,12 @@ const ApprovalsInbox: React.FC = () => {
                         { duration: 3000 }
                     );
                 }
-            } catch {
-                toast.error('فشل تنفيذ الإجراء، جاري إعادة التحميل...');
+            } catch (err: any) {
+                const apiMessage = err?.response?.data?.message;
+                const displayMessage = apiMessage && typeof apiMessage === 'string'
+                    ? apiMessage
+                    : 'فشل تنفيذ الإجراء، جاري إعادة التحميل...';
+                toast.error(displayMessage, { duration: apiMessage ? 6000 : 3000, style: apiMessage ? { whiteSpace: 'pre-line' } : undefined });
                 await fetchRequests(false);
             } finally {
                 setProcessingId(null);

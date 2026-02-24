@@ -370,6 +370,16 @@ public class ApprovalService {
             }
         }
 
+        // سند الصرف: بعد اعتماد المدير العام (الخطوة 2) نكمل الاعتماد وننفّذ الصرف تلقائياً دون خطوة "صرف الدفعة"
+        String docType = request.getDocumentType();
+        if (("PaymentVoucher".equalsIgnoreCase(docType) || "PV".equalsIgnoreCase(docType))
+                && currentStep != null && currentStep.getStepNumber() != null && currentStep.getStepNumber() == 2) {
+            request.setStatus("Approved");
+            request.setCompletedDate(LocalDateTime.now());
+            updateLinkedDocumentStatus(request, "Approved", userId);
+            return;
+        }
+
         BigDecimal amount = request.getTotalAmount();
         List<ApprovalLimit> limits = null;
         if (amount != null) {
@@ -663,7 +673,7 @@ public class ApprovalService {
                 .findFirst()
                 .map(com.rasras.erp.inventory.Warehouse::getId)
                 .orElseThrow(() -> new RuntimeException(
-                        "Cannot create GRN: No active warehouses available in the system. Please create a warehouse first."));
+                        "لا يوجد مستودعات نشطة. الرجاء إنشاء مستودع أولاً من قسم المخزون → المستودعات."));
         grn.setWarehouseId(warehouseId);
 
         if (po.getItems() != null) {

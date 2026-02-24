@@ -111,6 +111,7 @@ export function useNotificationPolling(pathname: string) {
         abortRef.current?.abort();
         abortRef.current = new AbortController();
 
+        // الصلاحيات من user المحفوظ عند تسجيل الدخول (JWT / API /me) → localStorage.getItem('user')
         const userString = localStorage.getItem('user');
         const user = userString ? JSON.parse(userString) : null;
         if (!user?.userId) return;
@@ -121,18 +122,23 @@ export function useNotificationPolling(pathname: string) {
         const soundEnabled = localStorage.getItem('approvals_sound') !== 'off';
         const currentPath = pathnameRef.current;
 
-        // Build only the fetches the user is allowed to call (avoid 403)
+        // نستدعي فقط الـ APIs التي يسمح بها دور المستخدم (لتجنب 403 و"فشل تحميل البيانات")
         type TaggedPromise = Promise<{ type: 'approvals' | 'inspections' | 'imports' | 'cr'; value: any }>;
         const tasks: TaggedPromise[] = [];
 
         tasks.push(
             approvalService.getPendingRequests(user.userId).then(value => ({ type: 'approvals' as const, value }))
         );
-        if (has('SECTION_PROCUREMENT') || has('SECTION_WAREHOUSE') || has('SECTION_OPERATIONS')) {
+        // GRN (فحص شحنات): مطابق للـ backend (WAREHOUSE_SECTION = SECTION_WAREHOUSE or SECTION_OPERATIONS or SECTION_PROCUREMENT or INVENTORY_VIEW)
+        if (has('SECTION_PROCUREMENT') || has('SECTION_WAREHOUSE') || has('SECTION_OPERATIONS') || has('INVENTORY_VIEW')) {
             tasks.push(grnService.getAllGRNs().then(value => ({ type: 'inspections' as const, value })));
+        }
+        // أوامر شراء واردة: فقط لمن لديه صلاحية مشتريات أو مبيعات أو فواتير موردين (مطابق للـ backend)
+        if (has('SECTION_PROCUREMENT') || has('SECTION_SALES') || has('SUPPLIER_INVOICE_VIEW')) {
             tasks.push(purchaseOrderService.getWaitingForArrivalPOs().then(value => ({ type: 'imports' as const, value })));
         }
-        if (has('SECTION_SALES') || has('SECTION_OPERATIONS')) {
+        // طلبات العملاء: فقط لمن لديه قسم المبيعات (مدير مالي لا يملك SECTION_SALES → لا نستدعي)
+        if (has('SECTION_SALES')) {
             tasks.push(customerRequestService.getAllRequests().then(value => ({ type: 'cr' as const, value })));
         }
 
@@ -144,7 +150,7 @@ export function useNotificationPolling(pathname: string) {
 
             if (type === 'approvals') {
                 const requests = value?.data || [];
-                const currentIds = new Set(requests.map((r: any) => r.id));
+                const currentIds = new Set<number>(requests.map((r: any) => Number(r.id)));
 
                 if (!isInitialLoad.current) {
                     const newRequests = requests.filter(

@@ -2,6 +2,7 @@ package com.rasras.erp.shared.config;
 
 import com.rasras.erp.shared.security.JwtAuthenticationFilter;
 import com.rasras.erp.shared.security.GlobalRequestLoggingFilter;
+import com.rasras.erp.shared.security.PathPermissionFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +35,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final GlobalRequestLoggingFilter globalRequestLoggingFilter;
+    private final PathPermissionFilter pathPermissionFilter;
     private final UserDetailsService userDetailsService;
 
     private static final String[] PUBLIC_URLS = {
@@ -56,11 +58,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_URLS).permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/company").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/company").authenticated()
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(globalRequestLoggingFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(pathPermissionFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

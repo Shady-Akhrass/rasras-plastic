@@ -3,9 +3,53 @@
  * يمكن منح الدخول إما بصلاحية القسم (SECTION_*) أو بصلاحية عنصر القائمة (MENU_*) للمسار،
  * حتى لا يظهر الرابط في السايد بار ثم يُمنع المستخدم عند الدخول.
  *
+ * من المرحلة 5: يمكن جلب قواعد المسارات من الـ API (GET /api/permissions/path-rules).
+ * إن وُجدت قواعد من الـ API تُستخدم أولاً؛ وإلا يُستخدم PATH_PERMISSION_PATTERNS كـ fallback.
+ *
  * قاعدة إلزامية: كل Route جديد تحت /dashboard في App.tsx يجب أن يكون له نمط مطابق هنا
- * في PATH_PERMISSION_PATTERNS؛ وإلا سيمنع canAccessPath جميع المستخدمين من ذلك المسار.
+ * في PATH_PERMISSION_PATTERNS أو في جدول path_permission (PathType=FRONTEND)؛ وإلا سيمنع canAccessPath.
  */
+
+/** نوع قاعدة مسار قادمة من الـ API (path-rules). */
+export interface PathRuleFromApi {
+  pathPattern: string;
+  httpMethod?: string;
+  permissionCode: string;
+}
+
+/** قواعد المسارات من الـ API. إن وُجدت تُستخدم في canAccessPath بدل المصفوفة الثابتة (مع fallback). */
+let pathRulesFromApi: PathRuleFromApi[] | null = null;
+
+/**
+ * تعيين قواعد المسارات من الـ API (يُستدعى بعد جلب GET /api/permissions/path-rules).
+ * استدعاء setPathRulesFromApi(null) يعيد الاعتماد على المصفوفة الثابتة فقط.
+ */
+export function setPathRulesFromApi(rules: PathRuleFromApi[] | null): void {
+  pathRulesFromApi = rules;
+}
+
+/**
+ * مطابقة مسار مع نمط Ant-style (* = segment واحد، ** = صفر أو أكثر من المقاطع).
+ */
+function antMatch(path: string, pattern: string): boolean {
+  const parts = path.split('/').filter(Boolean);
+  const patternParts = pattern.split('/').filter(Boolean);
+  let p = 0;
+  let q = 0;
+  while (p < patternParts.length && q < parts.length) {
+    if (patternParts[p] === '**') {
+      return true;
+    }
+    if (patternParts[p] === '*' || patternParts[p] === parts[q]) {
+      p++;
+      q++;
+      continue;
+    }
+    return false;
+  }
+  if (p < patternParts.length && patternParts[p] === '**') p++;
+  return p === patternParts.length && q === parts.length;
+}
 
 /**
  * أنماط المسارات: أي صلاحية من المصفوفة تكفي للدخول.
@@ -84,6 +128,13 @@ const PATH_PERMISSION_PATTERNS: Array<{ test: (p: string) => boolean; permission
 
 /** ربط المسار بصلاحية القسم (أول صلاحية في النمط). مُصدَّر للاختبارات. */
 export function getRequiredPermissionForPath(path: string): string | null {
+  if (pathRulesFromApi && pathRulesFromApi.length > 0) {
+    const matching = pathRulesFromApi.filter((r) => antMatch(path, r.pathPattern));
+    if (matching.length > 0) {
+      const first = matching[0].permissionCode;
+      return first === '__PUBLIC__' ? null : first;
+    }
+  }
   for (const { test, permissions } of PATH_PERMISSION_PATTERNS) {
     if (test(path)) {
       const first = permissions[0];
@@ -95,6 +146,7 @@ export function getRequiredPermissionForPath(path: string): string | null {
 
 /**
  * يتحقق إن كان المستخدم يملك صلاحية الدخول للمسار.
+ * إن وُجدت قواعد من الـ API (path-rules) تُستخدم أولاً؛ وإلا fallback إلى PATH_PERMISSION_PATTERNS.
  * يكفي أن يملك أي صلاحية من صلاحيات النمط (SECTION_* أو MENU_*).
  */
 export function canAccessPath(
@@ -102,10 +154,19 @@ export function canAccessPath(
   _userRole: string,
   userPermissions?: string[] | null
 ): boolean {
+  if (pathRulesFromApi && pathRulesFromApi.length > 0) {
+    const matchingRules = pathRulesFromApi.filter((r) => antMatch(path, r.pathPattern));
+    if (matchingRules.length > 0) {
+      const allowedPermissions = [...new Set(matchingRules.map((r) => r.permissionCode))];
+      if (allowedPermissions.includes('__PUBLIC__')) return true;
+      const hasAny = allowedPermissions.some((perm) => userPermissions?.includes(perm));
+      return hasAny;
+    }
+  }
   for (const { test, permissions } of PATH_PERMISSION_PATTERNS) {
     if (!test(path)) continue;
     if (permissions.includes('__PUBLIC__')) return true;
-    const hasAny = permissions.some(perm => userPermissions?.includes(perm));
+    const hasAny = permissions.some((perm) => userPermissions?.includes(perm));
     if (hasAny) return true;
     return false;
   }

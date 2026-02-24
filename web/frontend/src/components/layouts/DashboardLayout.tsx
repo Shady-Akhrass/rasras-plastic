@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
+import { fetchPathRules } from '../../services/authService';
 import { canAccessPath } from '../../utils/permissionUtils';
 import { formatDate, formatTime } from '../../utils/format';
 import { useNotificationPolling } from '../../hooks/useNotificationPolling';
@@ -218,6 +219,11 @@ const DashboardLayout: React.FC = () => {
 
     // Close mobile menu on navigate
     useEffect(() => { setMobileMenuOpen(false); }, [location.pathname]);
+
+    // جلب قواعد المسارات من الـ API عند تحميل اللوحة (مرحلة 5 — تحكم ديناميكي)
+    useEffect(() => {
+        if (localStorage.getItem('accessToken')) fetchPathRules();
+    }, []);
 
     // Auto-logout on JWT expiry + Initialize SW with credentials
     useEffect(() => {

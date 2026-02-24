@@ -13,7 +13,7 @@ import java.util.Map;
 @RequestMapping("/inventory/grn")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize(SecurityConstants.PROCUREMENT_SECTION)
+@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
 public class GRNController {
 
     private final GRNService grnService;
