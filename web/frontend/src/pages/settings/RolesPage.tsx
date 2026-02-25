@@ -374,6 +374,20 @@ const RoleCard: React.FC<{
     </div>
 );
 
+/** تسميات أقسام القائمة الجانبية (صلاحيات MENU_*) للعرض في صفحة الأدوار */
+const MENU_SECTION_LABELS: Record<string, string> = {
+    MAIN: 'الرئيسية',
+    HR: 'الموارد البشرية',
+    PROCUREMENT: 'قسم المشتريات',
+    SALES: 'قسم المبيعات',
+    CRM: 'إدارة العملاء',
+    FINANCE: 'المالية',
+    WAREHOUSE: 'قسم المخازن',
+    OPERATIONS: 'العمليات',
+    SYSTEM: 'النظام',
+};
+const MENU_SECTION_ORDER = ['MAIN', 'HR', 'PROCUREMENT', 'SALES', 'CRM', 'FINANCE', 'WAREHOUSE', 'OPERATIONS', 'SYSTEM'];
+
 // Permission Matrix Component
 const PermissionMatrix: React.FC<{
     permissions: PermissionDto[];
@@ -382,12 +396,28 @@ const PermissionMatrix: React.FC<{
 }> = ({ permissions, selectedIds, onChange }) => {
     const grouped = useMemo(() => {
         return permissions.reduce((acc, perm) => {
-            const module = perm.moduleName || 'Other';
-            if (!acc[module]) acc[module] = [];
-            if (!acc[module].some(p => p.permissionId === perm.permissionId)) acc[module].push(perm);
+            let groupKey: string;
+            if (perm.permissionCode.startsWith('MENU_')) {
+                const part = perm.permissionCode.split('_')[1];
+                groupKey = MENU_SECTION_LABELS[part] || `قائمة (${part})`;
+            } else {
+                groupKey = perm.moduleName || 'Other';
+            }
+            if (!acc[groupKey]) acc[groupKey] = [];
+            if (!acc[groupKey].some(p => p.permissionId === perm.permissionId)) acc[groupKey].push(perm);
             return acc;
         }, {} as Record<string, PermissionDto[]>);
     }, [permissions]);
+
+    const sortedGroupEntries = useMemo(() => {
+        const entries = Object.entries(grouped);
+        const menuGroups = MENU_SECTION_ORDER
+            .map(s => MENU_SECTION_LABELS[s])
+            .filter(label => grouped[label])
+            .map(label => [label, grouped[label]] as [string, PermissionDto[]]);
+        const otherGroups = entries.filter(([k]) => !MENU_SECTION_ORDER.some(s => MENU_SECTION_LABELS[s] === k));
+        return [...menuGroups, ...otherGroups];
+    }, [grouped]);
 
     const togglePermission = (id: number) => {
         if (selectedIds.includes(id)) {
@@ -448,9 +478,9 @@ const PermissionMatrix: React.FC<{
                 </div>
             </div>
 
-            {/* Modules */}
+            {/* Modules — عناصر القائمة الجانبية (الرئيسية، المشتريات، …) ثم بقية الصلاحيات */}
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
-                {Object.entries(grouped).map(([module, perms]) => {
+                {sortedGroupEntries.map(([module, perms]) => {
                     const moduleIds = perms.map(p => p.permissionId);
                     const allSelected = moduleIds.every(id => selectedIds.includes(id));
                     const someSelected = !allSelected && moduleIds.some(id => selectedIds.includes(id));
@@ -801,31 +831,10 @@ const RolesPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* توزيع الأقسام وحدود الاعتماد - للمرجع */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                    <LayoutGrid className="w-4 h-4 text-brand-primary" />
-                    الأدوار: وصول الأقسام وحدود الاعتماد المالية
-                </h3>
-                <p className="text-xs text-slate-600 mb-2">
-                    الأدوار تحكم وصول الأقسام (ظهور القوائم في الشريط الجانبي) وحدود الاعتماد المالية (مصفوفة الصلاحيات). انظر الدورة المستندية الشاملة للمزيد.
-                </p>
-                <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mb-3">
-                    القائمة الفعلية للصلاحيات تعتمد على قاعدة البيانات — هذا صندوق توضيحي فقط.
-                </p>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-slate-600 mb-2">
-                    <li><strong className="text-slate-800">دورة المشتريات:</strong> PM, BUYER, ADMIN, GM</li>
-                    <li><strong className="text-slate-800">دورة المبيعات:</strong> SM, ADMIN, GM</li>
-                    <li><strong className="text-slate-800">المخازن:</strong> WHM, ADMIN, GM</li>
-                    <li><strong className="text-slate-800">العمليات (جودة، وحدات، أسعار):</strong> ADMIN, GM, SM</li>
-                    <li><strong className="text-slate-800">العملاء (CRM):</strong> SM, ADMIN, GM</li>
-                    <li title="تحمي /dashboard/finance/*">
-                        <strong className="text-slate-800">المالية والمحاسبة:</strong> FM, ACC, ADMIN, GM
-                    </li>
-                    <li><strong className="text-slate-800">الإعدادات:</strong> ADMIN</li>
-                </ul>
-                <p className="text-xs text-slate-500">مصفوفة حدود الموافقة: المشتريات (PM/FM/GM)، الشيكات/الدفع (ACC/FM/GM)، الخصم (SM/FM/GM)</p>
-            </div>
+            {/* مرجع سريع */}
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                الأدوار تحكم ظهور القوائم في الشريط الجانبي وحدود الاعتماد المالية. الصلاحيات تُدار من الجدول أدناه ومن مصفوفة الحدود — انظر توثيق الصلاحيات للمزيد.
+            </p>
 
             {/* مصفوفة حدود الموافقة */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">

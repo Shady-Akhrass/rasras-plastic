@@ -223,9 +223,10 @@ public class GlobalExceptionHandler {
         org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)
                 .error("Unhandled exception", ex);
         String msg = ex.getMessage();
+        boolean isArabicOrUserFacing = msg != null && (msg.contains("الرجاء") || msg.contains("لا يوجد") || msg.matches(".*[\\u0600-\\u06FF].*"));
         String displayMsg = (msg != null && !msg.isEmpty())
-                ? ("An unexpected error occurred: " + msg)
-                : "An unexpected error occurred";
+                ? (isArabicOrUserFacing ? msg : "An unexpected error occurred: " + msg)
+                : "حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(displayMsg));

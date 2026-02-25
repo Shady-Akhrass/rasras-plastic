@@ -83,7 +83,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         'Closed': {
             icon: CheckCircle2,
             className: 'bg-emerald-100 text-emerald-700 border-emerald-300',
-            label: 'مغلق'
+            label: 'استلام كامل'
         },
         'Approved': {
             icon: CheckCircle2,
@@ -514,7 +514,7 @@ const PurchaseOrdersPage: React.FC = () => {
                                 <option value="Received">تم الاستلام</option>
                                 <option value="Approved">معتمد</option>
                                 <option value="Confirmed">مؤكد</option>
-                                <option value="Closed">مغلق</option>
+                                <option value="Closed">استلام كامل</option>
                             </select>
                         </div>
 

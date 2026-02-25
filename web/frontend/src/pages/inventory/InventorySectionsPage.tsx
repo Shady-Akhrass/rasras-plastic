@@ -6,6 +6,7 @@ import {
     Zap, ChevronLeft, Warehouse, BarChart3, Calculator,
     FileDown, ArrowRightLeft, LogIn, LogOut
 } from 'lucide-react';
+import { canAccessPath } from '../../utils/permissionUtils';
 
 // Card for each section
 const SectionCard: React.FC<{
@@ -45,6 +46,12 @@ const SectionCard: React.FC<{
 };
 
 const InventorySectionsPage: React.FC = () => {
+    const userString = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+    const user = userString ? JSON.parse(userString) : null;
+    const userRole = user?.roleCode || user?.roleName || '';
+    const userPermissions: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
+    const canAccessCategories = canAccessPath('/dashboard/inventory/categories', userRole, userPermissions);
+
     return (
         <div className="space-y-8">
             <style>{`
@@ -108,13 +115,15 @@ const InventorySectionsPage: React.FC = () => {
                         to="/dashboard/inventory/warehouses"
                         color="purple"
                     />
-                    <SectionCard
-                        icon={Tag}
-                        title="تصنيفات الأصناف"
-                        description="فئات: بولي بروبيلين، بولي إيثيلين، إلخ"
-                        to="/dashboard/inventory/categories"
-                        color="amber"
-                    />
+                    {canAccessCategories && (
+                        <SectionCard
+                            icon={Tag}
+                            title="تصنيفات الأصناف"
+                            description="فئات: بولي بروبيلين، بولي إيثيلين، إلخ"
+                            to="/dashboard/inventory/categories"
+                            color="amber"
+                        />
+                    )}
                     <SectionCard
                         icon={Scale}
                         title="وحدات القياس"

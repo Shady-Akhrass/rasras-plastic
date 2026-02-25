@@ -3,12 +3,14 @@ package com.rasras.erp.user;
 import com.rasras.erp.approval.ApprovalLimitRepository;
 import com.rasras.erp.approval.ApprovalWorkflowStepRepository;
 import com.rasras.erp.shared.exception.BadRequestException;
+import com.rasras.erp.user.dto.EffectivePermissionsDto;
 import com.rasras.erp.user.dto.RoleDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,6 +20,7 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
+    private final PermissionDependencyService permissionDependencyService;
     private final UserRepository userRepository;
     private final ApprovalWorkflowStepRepository approvalWorkflowStepRepository;
     private final ApprovalLimitRepository approvalLimitRepository;
@@ -102,17 +105,19 @@ public class RoleService {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new RuntimeException("Role not found"));
 
-        // حذف صلاحيات الدور مباشرة في DB (استعلام DELETE) ثم flush لضمان تنفيذ الحذف قبل أي إدراج
-        rolePermissionRepository.deleteByRoleRoleId(roleId);
-        rolePermissionRepository.flush();
-
-        // إزالة التكرار لتجنب خرق قيد UNIQUE (RoleID, PermissionID)
-        List<Integer> distinctIds = permissionIds != null
+        // إزالة التكرار
+        List<Integer> distinctSelected = permissionIds != null
                 ? permissionIds.stream().distinct().filter(pid -> pid != null).collect(Collectors.toList())
                 : List.of();
 
-        // Add new permissions
-        List<RolePermission> newPermissions = distinctIds.stream()
+        // Resolve dependencies: effective = selected + transitive closure of required (MENU_* → SECTION_*, etc.)
+        Set<Integer> effectiveIds = permissionDependencyService.computeEffectivePermissionIds(distinctSelected);
+
+        // حذف صلاحيات الدور ثم إدراج الصلاحيات الفعالة فقط (لا نحذف تبعيات ما زالت مطلوبة لأنها جزء من effective)
+        rolePermissionRepository.deleteByRoleRoleId(roleId);
+        rolePermissionRepository.flush();
+
+        List<RolePermission> newPermissions = effectiveIds.stream()
                 .map(permId -> {
                     Permission permission = permissionRepository.findById(permId)
                             .orElseThrow(() -> new RuntimeException("Permission not found: " + permId));
@@ -125,6 +130,29 @@ public class RoleService {
                 .collect(Collectors.toList());
 
         rolePermissionRepository.saveAll(newPermissions);
+    }
+
+    /**
+     * Returns effective permissions for a role (what is stored = selected + dependency closure).
+     * Useful for debugging and for UI to show which permissions the role actually has.
+     */
+    @Transactional(readOnly = true)
+    public EffectivePermissionsDto getEffectivePermissions(Integer roleId) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+        List<RolePermission> rps = rolePermissionRepository.findByRoleRoleId(roleId);
+        List<Integer> ids = rps.stream()
+                .map(rp -> rp.getPermission().getPermissionId())
+                .collect(Collectors.toList());
+        List<String> codes = rps.stream()
+                .map(rp -> rp.getPermission().getPermissionCode())
+                .collect(Collectors.toList());
+        return EffectivePermissionsDto.builder()
+                .roleId(role.getRoleId())
+                .roleCode(role.getRoleCode())
+                .permissionIds(ids)
+                .permissionCodes(codes)
+                .build();
     }
 
     private RoleDto mapToDto(Role role) {

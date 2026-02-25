@@ -182,6 +182,11 @@ const purchaseService = {
         const response = await apiClient.get<{ data: PurchaseRequisition }>(`/procurement/pr/${id}`);
         return response.data.data;
     },
+    /** Count of approved PRs that have no RFQ yet (for RFQ page alert). */
+    getApprovedPRWithoutRFQCount: async (): Promise<number> => {
+        const response = await apiClient.get<{ data: number }>('/procurement/pr/approved-without-rfq-count');
+        return response.data.data ?? 0;
+    },
     createPR: async (pr: PurchaseRequisition) => {
         const response = await apiClient.post<{ data: PurchaseRequisition }>('/procurement/pr', pr);
         return response.data.data;

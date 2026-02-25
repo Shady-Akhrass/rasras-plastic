@@ -14,4 +14,7 @@ public interface PermissionRepository extends JpaRepository<Permission, Integer>
     List<Permission> findByIsActiveTrue();
 
     Optional<Permission> findByPermissionCode(String permissionCode);
+
+    /** للبحث عن صلاحيات عناصر القائمة (MENU_MAIN_*, MENU_PROCUREMENT_*, ...) */
+    List<Permission> findByPermissionCodeStartingWith(String prefix);
 }

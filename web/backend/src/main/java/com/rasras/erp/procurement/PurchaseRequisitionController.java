@@ -26,6 +26,12 @@ public class PurchaseRequisitionController {
         return ResponseEntity.ok(ApiResponse.success(prService.getAllPurchaseRequisitions()));
     }
 
+    /** Count of approved PRs that have no RFQ yet (for RFQ page alert). Must be before /{id}. */
+    @GetMapping("/approved-without-rfq-count")
+    public ResponseEntity<ApiResponse<Long>> getApprovedPRWithoutRFQCount() {
+        return ResponseEntity.ok(ApiResponse.success(prService.getApprovedPRWithoutRFQCount()));
+    }
+
     /** Sales: only PRs created by the current user. Must be declared before /{id}. */
     @GetMapping("/sales")
     public ResponseEntity<ApiResponse<List<PurchaseRequisitionDto>>> getSalesPRs() {

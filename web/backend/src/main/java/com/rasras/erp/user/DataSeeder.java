@@ -36,8 +36,14 @@ public class DataSeeder implements CommandLineRunner {
         // 0.05 صلاحيات الأقسام (للعرض الديناميكي في القائمة الجانبية)
         seedSectionPermissions();
 
+        // 0.055 صلاحيات عناصر القائمة الجانبية (MENU_*) — للتحكم بكل عنصر لكل دور
+        seedMenuItemPermissions();
+
         // 0.06 تعيين صلاحيات الأقسام للأدوار الافتراضية (يعمل تلقائياً عند أول تشغيل)
         seedDefaultRoleSectionPermissions();
+
+        // 0.065 تعيين عناصر القائمة (MENU_*) للأدوار حتى يعمل السايد بار حسب النهج الجديد
+        seedMenuRoleAssignments();
 
         // 0.07 صلاحيات الأفعال (ACCOUNTING_*, إلخ) وتعيينها للأدوار المناسبة
         seedActionPermissions();
@@ -155,6 +161,7 @@ public class DataSeeder implements CommandLineRunner {
                 { "SECTION_PROCUREMENT", "المشتريات", "Procurement", "MENU" },
                 { "SECTION_FINANCE", "المالية", "Finance", "MENU" },
                 { "SECTION_SYSTEM", "إعدادات النظام", "System Settings", "MENU" },
+                { "INVENTORY_VIEW", "عرض المخزون", "View Inventory", "VIEW" },
         };
         for (String[] p : sectionPerms) {
             if (permissionRepository.findByPermissionCode(p[0]).isEmpty()) {
@@ -201,12 +208,12 @@ public class DataSeeder implements CommandLineRunner {
         List<String> allSectionCodes = java.util.Arrays.asList(
                 "SECTION_MAIN", "SECTION_USERS", "SECTION_EMPLOYEES", "SECTION_WAREHOUSE",
                 "SECTION_OPERATIONS", "SECTION_SALES", "SECTION_CRM", "SECTION_PROCUREMENT",
-                "SECTION_FINANCE", "SECTION_SYSTEM");
+                "SECTION_FINANCE", "SECTION_SYSTEM", "INVENTORY_VIEW");
         java.util.Map<String, java.util.List<String>> roleSectionMap = new java.util.HashMap<>();
         roleSectionMap.put("PM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_PROCUREMENT"));
         roleSectionMap.put("BUYER", java.util.Arrays.asList("SECTION_MAIN", "SECTION_PROCUREMENT"));
         roleSectionMap.put("SM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_SALES", "SECTION_CRM"));
-        roleSectionMap.put("WHM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_WAREHOUSE"));
+        roleSectionMap.put("WHM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_WAREHOUSE", "INVENTORY_VIEW"));
         roleSectionMap.put("QC", java.util.Arrays.asList("SECTION_MAIN", "SECTION_OPERATIONS"));
         roleSectionMap.put("GM", allSectionCodes);
         roleSectionMap.put("FM", java.util.Arrays.asList("SECTION_MAIN", "SECTION_FINANCE"));
@@ -218,6 +225,152 @@ public class DataSeeder implements CommandLineRunner {
                 continue;
             for (String permCode : e.getValue()) {
                 assignPermissionToRole(role, permCode);
+            }
+        }
+    }
+
+    /**
+     * صلاحيات عناصر القائمة الجانبية (MENU_*) — عنصر واحد لكل رابط في السايد بار
+     * للتحكم من صفحة الأدوار والصلاحيات بمحتوى كل قائمة منسدلة لكل دور.
+     */
+    private void seedMenuItemPermissions() {
+        log.info("Seeding menu item permissions (MENU_*)...");
+        String[][] menuPerms = {
+                // الرئيسية
+                { "MENU_MAIN_DASHBOARD", "لوحة القيادة", "Dashboard" },
+                { "MENU_MAIN_APPROVALS", "الطلبات والاعتمادات", "Approvals" },
+                { "MENU_MAIN_APPROVALS_AUDIT", "سجل الاعتماد", "Approval Audit" },
+                { "MENU_MAIN_USERS", "المستخدمين", "Users" },
+                { "MENU_MAIN_EMPLOYEE_DATA", "بيانات الموظف", "Employee Data" },
+                // الموارد البشرية
+                { "MENU_HR_EMPLOYEES", "الموظفين", "Employees" },
+                { "MENU_HR_LEAVE_TYPES", "أنواع الإجازات", "Leave Types" },
+                { "MENU_HR_SHIFTS", "الشفتات", "Shifts" },
+                { "MENU_HR_HOLIDAYS", "العطلات", "Holidays" },
+                { "MENU_HR_EMPLOYEE_SHIFTS", "شفتات الموظفين", "Employee Shifts" },
+                { "MENU_HR_ATTENDANCE", "الحضور والانصراف", "Attendance" },
+                { "MENU_HR_PAYROLL", "المرتبات", "Payroll" },
+                // المشتريات
+                { "MENU_PROCUREMENT_PR", "طلبات الشراء (PR)", "Purchase Requisitions" },
+                { "MENU_PROCUREMENT_RFQ", "طلبات عروض الأسعار (RFQ)", "RFQ" },
+                { "MENU_PROCUREMENT_QUOTATION", "عروض الموردين", "Quotations" },
+                { "MENU_PROCUREMENT_COMPARISON", "مقارنة العروض (QCS)", "Comparison" },
+                { "MENU_PROCUREMENT_PO", "أوامر الشراء (PO)", "Purchase Orders" },
+                { "MENU_PROCUREMENT_WAITING_IMPORTS", "الشحنات القادمة", "Waiting Imports" },
+                { "MENU_PROCUREMENT_GRN", "إذن استلام (GRN)", "GRN" },
+                { "MENU_PROCUREMENT_INVOICES", "فواتير الموردين", "Supplier Invoices" },
+                { "MENU_PROCUREMENT_OUTSTANDING", "الأرصدة المستحقة", "Outstanding" },
+                { "MENU_PROCUREMENT_RETURNS", "مرتجعات الشراء", "Returns" },
+                { "MENU_PROCUREMENT_SUPPLIERS", "الموردين", "Suppliers" },
+                // المبيعات
+                { "MENU_SALES_SECTIONS", "قسم المبيعات", "Sales Sections" },
+                { "MENU_SALES_PURCHASE_REQUISITIONS", "طلبات الشراء", "Purchase Requisitions" },
+                { "MENU_SALES_CUSTOMER_REQUESTS", "طلبات العملاء", "Customer Requests" },
+                { "MENU_SALES_QUOTATIONS", "عروض الأسعار", "Quotations" },
+                { "MENU_SALES_ORDERS", "أوامر البيع (SO)", "Sales Orders" },
+                { "MENU_SALES_ISSUE_NOTES", "إذونات الصرف", "Issue Notes" },
+                { "MENU_SALES_DELIVERY_ORDERS", "أوامر التوصيل", "Delivery Orders" },
+                { "MENU_SALES_VEHICLES", "المركبات", "Vehicles" },
+                { "MENU_SALES_INVOICES", "فواتير المبيعات", "Sales Invoices" },
+                { "MENU_SALES_RECEIPTS", "إيصالات الدفع", "Receipts" },
+                // العملاء (CRM)
+                { "MENU_CRM_CUSTOMERS", "العملاء", "Customers" },
+                // المالية
+                { "MENU_FINANCE_INVOICES", "فواتير الموردين", "Supplier Invoices" },
+                { "MENU_FINANCE_PAYMENT_VOUCHERS", "سندات الدفع", "Payment Vouchers" },
+                { "MENU_FINANCE_PAYMENT_VOUCHERS_NEW", "سند صرف جديد", "New Payment Voucher" },
+                // المخازن
+                { "MENU_WAREHOUSE_SECTIONS", "أقسام المخزن", "Sections" },
+                { "MENU_WAREHOUSE_WAREHOUSES", "المستودعات", "Warehouses" },
+                { "MENU_WAREHOUSE_STOCKS", "أرصدة المخزون", "Stocks" },
+                { "MENU_WAREHOUSE_ISSUE", "إذن صرف", "Issue" },
+                { "MENU_WAREHOUSE_TRANSFER", "تحويل بين مخازن", "Transfer" },
+                { "MENU_WAREHOUSE_BELOW_MIN", "الأصناف تحت الحد الأدنى", "Below Min" },
+                { "MENU_WAREHOUSE_STAGNANT", "الأصناف الراكدة", "Stagnant" },
+                { "MENU_WAREHOUSE_MOVEMENT", "حركة الصنف التفصيلية", "Movement" },
+                { "MENU_WAREHOUSE_COUNT", "جرد دوري", "Count" },
+                { "MENU_WAREHOUSE_COUNT_SURPRISE", "جرد مفاجئ", "Surprise Count" },
+                { "MENU_WAREHOUSE_PERIODIC_INVENTORY", "تقرير المخزون الدوري", "Periodic Inventory" },
+                { "MENU_WAREHOUSE_VARIANCE", "تقرير الفروقات", "Variance" },
+                { "MENU_WAREHOUSE_CATEGORIES", "تصنيفات الأصناف", "Item Categories" },
+                { "MENU_WAREHOUSE_ITEMS", "الأصناف", "Items" },
+                // العمليات (فحص الجودة، معاملات الجودة، قوائم الأسعار فقط — التصنيفات والأصناف تحت المخزون)
+                { "MENU_OPERATIONS_CATEGORIES", "تصنيفات الأصناف", "Categories" },
+                { "MENU_OPERATIONS_ITEMS", "الأصناف", "Items" },
+                { "MENU_OPERATIONS_QUALITY_INSPECTION", "فحص الجودة", "Quality Inspection" },
+                { "MENU_OPERATIONS_QUALITY_PARAMETERS", "معاملات الجودة", "Quality Parameters" },
+                { "MENU_OPERATIONS_CATEGORIES", "تصنيفات الأصناف (عمليات)", "Categories (legacy)" },
+                { "MENU_OPERATIONS_ITEMS", "الأصناف (عمليات)", "Items (legacy)" },
+                { "MENU_OPERATIONS_PRICE_LISTS", "قوائم الأسعار", "Price Lists" },
+                // النظام
+                { "MENU_SYSTEM_COMPANY", "بيانات الشركة", "Company" },
+                { "MENU_SYSTEM_UNITS", "وحدات القياس", "Units" },
+                { "MENU_SYSTEM_SETTINGS", "إعدادات النظام", "System Settings" },
+                { "MENU_SYSTEM_USERS", "إدارة المستخدمين", "Users" },
+                { "MENU_SYSTEM_ROLES", "الأدوار والصلاحيات", "Roles" },
+                { "MENU_SYSTEM_PERMISSIONS", "سجل الصلاحيات", "Permissions" },
+                { "MENU_SYSTEM_SECURITY", "الأمان والخصوصية", "Security" },
+                { "MENU_SYSTEM_NOTIFICATIONS", "الإشعارات", "Notifications" },
+                { "MENU_SYSTEM_DATABASE", "قاعدة البيانات", "Database" },
+        };
+        for (String[] p : menuPerms) {
+            if (permissionRepository.findByPermissionCode(p[0]).isEmpty()) {
+                Permission perm = Permission.builder()
+                        .permissionCode(p[0])
+                        .permissionNameAr(p[1])
+                        .permissionNameEn(p[2])
+                        .moduleName("MENU")
+                        .isActive(true)
+                        .build();
+                permissionRepository.save(perm);
+                log.info("Created menu permission: {}", p[0]);
+            }
+        }
+    }
+
+    /**
+     * تعيين صلاحيات عناصر القائمة (MENU_*) للأدوار — ADMIN و GM كل العناصر،
+     * وباقي الأدوار حسب الأقسام (مثل PM: الرئيسية + المشتريات).
+     */
+    private void seedMenuRoleAssignments() {
+        log.info("Seeding menu item assignments to roles...");
+        List<String> menuPrefixes = java.util.Arrays.asList(
+                "MENU_MAIN_", "MENU_HR_", "MENU_PROCUREMENT_", "MENU_SALES_", "MENU_CRM_",
+                "MENU_FINANCE_", "MENU_WAREHOUSE_", "MENU_OPERATIONS_", "MENU_SYSTEM_");
+        // ADMIN: كل صلاحيات القائمة (يُعيَّن في seedSectionPermissions للـ SECTION_*، نضيف هنا MENU_*)
+        Role adminRole = roleRepository.findByRoleCode("ADMIN").orElse(null);
+        if (adminRole != null) {
+            for (String prefix : menuPrefixes) {
+                for (Permission perm : permissionRepository.findByPermissionCodeStartingWith(prefix)) {
+                    assignPermissionToRole(adminRole, perm.getPermissionCode());
+                }
+            }
+        }
+        // GM: كل العناصر
+        Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+        if (gmRole != null) {
+            for (String prefix : menuPrefixes) {
+                for (Permission perm : permissionRepository.findByPermissionCodeStartingWith(prefix)) {
+                    assignPermissionToRole(gmRole, perm.getPermissionCode());
+                }
+            }
+        }
+        // أدوار أخرى: حسب القسم (مطابق لـ seedDefaultRoleSectionPermissions)
+        java.util.Map<String, java.util.List<String>> roleMenuPrefixes = new java.util.HashMap<>();
+        roleMenuPrefixes.put("PM", java.util.Arrays.asList("MENU_MAIN_", "MENU_PROCUREMENT_"));
+        roleMenuPrefixes.put("BUYER", java.util.Arrays.asList("MENU_MAIN_", "MENU_PROCUREMENT_"));
+        roleMenuPrefixes.put("SM", java.util.Arrays.asList("MENU_MAIN_", "MENU_SALES_", "MENU_CRM_"));
+        roleMenuPrefixes.put("WHM", java.util.Arrays.asList("MENU_MAIN_", "MENU_WAREHOUSE_"));
+        roleMenuPrefixes.put("QC", java.util.Arrays.asList("MENU_MAIN_", "MENU_OPERATIONS_"));
+        roleMenuPrefixes.put("FM", java.util.Arrays.asList("MENU_MAIN_", "MENU_FINANCE_"));
+        roleMenuPrefixes.put("ACC", java.util.Arrays.asList("MENU_MAIN_", "MENU_FINANCE_"));
+        for (java.util.Map.Entry<String, java.util.List<String>> e : roleMenuPrefixes.entrySet()) {
+            Role role = roleRepository.findByRoleCode(e.getKey()).orElse(null);
+            if (role == null) continue;
+            for (String prefix : e.getValue()) {
+                for (Permission perm : permissionRepository.findByPermissionCodeStartingWith(prefix)) {
+                    assignPermissionToRole(role, perm.getPermissionCode());
+                }
             }
         }
     }

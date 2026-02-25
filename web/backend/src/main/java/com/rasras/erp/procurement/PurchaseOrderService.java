@@ -144,7 +144,7 @@ public class PurchaseOrderService {
                                 .findFirst()
                                 .map(warehouse -> warehouse.getId())
                                 .orElseThrow(() -> new RuntimeException(
-                                                "No active warehouses available. Please create a warehouse first."));
+                                                "لا يوجد مستودعات نشطة. الرجاء إنشاء مستودع أولاً من قسم المخزون → المستودعات."));
 
                 // Create GRN DTO with all PO items
                 GoodsReceiptNoteDto grnDto = GoodsReceiptNoteDto.builder()
@@ -184,13 +184,9 @@ public class PurchaseOrderService {
                                 .add(grnDto.getShippingCost() != null ? grnDto.getShippingCost() : BigDecimal.ZERO)
                                 .add(grnDto.getOtherCosts() != null ? grnDto.getOtherCosts() : BigDecimal.ZERO));
 
-                // Create GRN using GRNService
+                // Create GRN using GRNService (it updates PO items receivedQty and PO status
+                // via updatePOQuantities: Closed when all items fully received, PartiallyReceived otherwise)
                 GoodsReceiptNoteDto createdGRN = grnService.createGRN(grnDto);
-
-                // Update PO status to PartiallyReceived (will be updated to Closed when all
-                // items received)
-                po.setStatus("PartiallyReceived");
-                poRepo.save(po);
 
                 return createdGRN;
         }

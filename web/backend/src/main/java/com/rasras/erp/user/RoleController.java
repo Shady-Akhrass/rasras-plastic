@@ -1,6 +1,7 @@
 package com.rasras.erp.user;
 
 import com.rasras.erp.user.dto.AssignPermissionsRequest;
+import com.rasras.erp.user.dto.EffectivePermissionsDto;
 import com.rasras.erp.user.dto.RoleDto;
 import com.rasras.erp.shared.security.SecurityConstants;
 import jakarta.validation.Valid;
@@ -51,5 +52,14 @@ public class RoleController {
         List<Integer> ids = request.getPermissionIds() != null ? request.getPermissionIds() : List.of();
         roleService.assignPermissions(id, ids);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Effective permissions for a role (selected + auto-granted dependencies).
+     * For debugging and to verify menu→API permission alignment.
+     */
+    @GetMapping("/{id}/effective-permissions")
+    public ResponseEntity<EffectivePermissionsDto> getEffectivePermissions(@PathVariable Integer id) {
+        return ResponseEntity.ok(roleService.getEffectivePermissions(id));
     }
 }

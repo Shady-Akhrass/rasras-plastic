@@ -69,8 +69,22 @@ public class PurchaseRequisitionService {
                                                 "Purchase Requisition not found"));
         }
 
+        /** Count of approved PRs that have no RFQ yet (for RFQ page alert). */
+        @Transactional(readOnly = true)
+        public long getApprovedPRWithoutRFQCount() {
+                return prRepository.countApprovedWithNoRfq();
+        }
+
         @Transactional
         public PurchaseRequisitionDto createPurchaseRequisition(PurchaseRequisitionDto dto) {
+                if (dto.getRequestedByDeptId() == null || dto.getRequestedByDeptId() <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "القسم الطالب مطلوب (requestedByDeptId)");
+                }
+                if (dto.getRequestedByUserId() == null || dto.getRequestedByUserId() <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "المستخدم الطالب مطلوب (requestedByUserId)");
+                }
                 PurchaseRequisition pr = new PurchaseRequisition();
                 pr.setPrNumber(generatePrNumber());
                 pr.setPrDate(dto.getPrDate() != null ? dto.getPrDate().atStartOfDay() : LocalDateTime.now());
@@ -343,6 +357,18 @@ public class PurchaseRequisitionService {
         }
 
         private PurchaseRequisitionItem mapItemToEntity(PurchaseRequisitionItemDto dto, PurchaseRequisition pr) {
+                if (dto.getItemId() == null || dto.getItemId() <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "عنصر الطلب مطلوب لكل بند (itemId)");
+                }
+                if (dto.getUnitId() == null || dto.getUnitId() <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الوحدة مطلوبة لكل بند (unitId)");
+                }
+                if (dto.getRequestedQty() == null || dto.getRequestedQty().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "الكمية مطلوبة ويجب أن تكون أكبر من صفر لكل بند (requestedQty)");
+                }
                 return PurchaseRequisitionItem.builder()
                                 .purchaseRequisition(pr)
                                 .item(itemRepository.findById(dto.getItemId())

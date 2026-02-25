@@ -13,7 +13,8 @@ import {
     RefreshCw,
     Truck,
     Package,
-    Trash2
+    Trash2,
+    Bell
 } from 'lucide-react';
 import purchaseService, { type RFQ } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
@@ -182,10 +183,21 @@ const RFQsPage: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [rfqToDelete, setRfqToDelete] = useState<{ id: number; rfqNumber: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [approvedPRWithoutRFQCount, setApprovedPRWithoutRFQCount] = useState(0);
 
     useEffect(() => {
         fetchRFQs();
+        fetchApprovedPRWithoutRFQCount();
     }, []);
+
+    const fetchApprovedPRWithoutRFQCount = async () => {
+        try {
+            const count = await purchaseService.getApprovedPRWithoutRFQCount();
+            setApprovedPRWithoutRFQCount(count);
+        } catch {
+            setApprovedPRWithoutRFQCount(0);
+        }
+    };
 
     useEffect(() => {
         setCurrentPage(1);
@@ -196,6 +208,7 @@ const RFQsPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getAllRFQs();
             setRfqs(data);
+            await fetchApprovedPRWithoutRFQCount();
         } catch (error) {
             console.error('Failed to fetch RFQs:', error);
         } finally {
@@ -278,16 +291,27 @@ const RFQsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => navigate('/dashboard/procurement/rfq/new')}
-                            className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
-                                hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
-                                hover:shadow-xl hover:scale-105"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>طلب عرض سعر جديد</span>
-                        </button>
+                    <div className="flex gap-3 items-center">
+                        <div className="relative flex items-center gap-2">
+                            <button
+                                onClick={() => navigate('/dashboard/procurement/rfq/new')}
+                                className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
+                                    hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
+                                    hover:shadow-xl hover:scale-105"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>طلب عرض سعر جديد</span>
+                            </button>
+                            {approvedPRWithoutRFQCount > 0 && (
+                                <div
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-bold shadow-md"
+                                    title={`${approvedPRWithoutRFQCount} طلب شراء معتمد بدون طلب عرض سعر`}
+                                >
+                                    <Bell className="w-4 h-4" />
+                                    <span className="min-w-[1.25rem] text-center">{approvedPRWithoutRFQCount}</span>
+                                </div>
+                            )}
+                        </div>
                         <button
                             onClick={fetchRFQs}
                             className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-xl hover:bg-white/20 transition-all"

@@ -12,7 +12,7 @@ import java.util.List;
 @RequestMapping("/inventory/quality-parameters")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize(SecurityConstants.WAREHOUSE_SECTION)
+@PreAuthorize(SecurityConstants.QUALITY_PARAMETERS_ACCESS)
 public class QualityParameterController {
     private final QualityParameterService service;
 

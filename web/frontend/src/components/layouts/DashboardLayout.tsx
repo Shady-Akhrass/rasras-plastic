@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getSessionRemainingMs } from '../../services/authUtils';
+import { fetchPathRules } from '../../services/authService';
 import { canAccessPath } from '../../utils/permissionUtils';
 import { formatDate, formatTime } from '../../utils/format';
 import { useNotificationPolling } from '../../hooks/useNotificationPolling';
@@ -219,6 +220,11 @@ const DashboardLayout: React.FC = () => {
     // Close mobile menu on navigate
     useEffect(() => { setMobileMenuOpen(false); }, [location.pathname]);
 
+    // جلب قواعد المسارات من الـ API عند تحميل اللوحة (مرحلة 5 — تحكم ديناميكي)
+    useEffect(() => {
+        if (localStorage.getItem('accessToken')) fetchPathRules();
+    }, []);
+
     // Auto-logout on JWT expiry + Initialize SW with credentials
     useEffect(() => {
         const token = localStorage.getItem('accessToken');
@@ -268,262 +274,268 @@ const DashboardLayout: React.FC = () => {
 
     // Role groups removed — sidebar visibility relies on permissions only (SECTION_*).
 
-    // ─── Nav items (use hook counts) ───
+    // ─── Nav items: ظهور العنصر في السايد بار يعتمد على menuPermission (من صفحة الأدوار والصلاحيات) ───
     const navItems: Array<{
         to: string; icon: React.ElementType; label: string; section: string;
+        /** صلاحية عنصر القائمة (MENU_*) — يتحكم في ظهور الرابط في السايد بار لكل دور */
+        menuPermission: string;
         requiredPermission?: string;
-        /** Hide item when user has this permission, unless they also have showWhenAlsoHasPermission */
         hideWhenHasPermission?: string;
         showWhenAlsoHasPermission?: string;
         warehouseGroup?: string; search?: string; badge?: number; order?: number;
         exact?: boolean;
     }> = [
-            { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main' },
+            { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main', menuPermission: 'MENU_MAIN_DASHBOARD' },
             {
                 to: '/dashboard/approvals', icon: Bell, label: 'الطلبات والاعتمادات',
-                section: 'main', badge: (pendingApprovals + pendingCustomerRequests) || undefined,
+                section: 'main', menuPermission: 'MENU_MAIN_APPROVALS',
+                badge: (pendingApprovals + pendingCustomerRequests) || undefined,
                 exact: true
             },
             {
                 to: '/dashboard/approvals/audit', icon: History, label: 'سجل الاعتماد',
-                section: 'main'
+                section: 'main', menuPermission: 'MENU_MAIN_APPROVALS_AUDIT'
             },
             {
                 to: '/dashboard/users', icon: User, label: 'المستخدمين',
-                section: 'main', requiredPermission: 'SECTION_USERS'
+                section: 'main', menuPermission: 'MENU_MAIN_USERS', requiredPermission: 'SECTION_USERS'
+            },
+            {
+                to: '/dashboard/profile', icon: Users, label: 'بيانات الموظف',
+                section: 'main', menuPermission: 'MENU_MAIN_EMPLOYEE_DATA', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/employees', icon: Users, label: 'الموظفين',
-                section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
+                section: 'hr', menuPermission: 'MENU_HR_EMPLOYEES', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/leave-types', icon: ClipboardList, label: 'أنواع الإجازات',
-                section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
+                section: 'hr', menuPermission: 'MENU_HR_LEAVE_TYPES', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/shifts', icon: Clock, label: 'الشفتات',
-                section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
+                section: 'hr', menuPermission: 'MENU_HR_SHIFTS', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/holidays', icon: Calendar, label: 'العطلات',
-                section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
+                section: 'hr', menuPermission: 'MENU_HR_HOLIDAYS', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/employee-shifts', icon: Users, label: 'شفتات الموظفين',
-                section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
+                section: 'hr', menuPermission: 'MENU_HR_EMPLOYEE_SHIFTS', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/attendance', icon: ClipboardCheck, label: 'الحضور والانصراف',
-                section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
+                section: 'hr', menuPermission: 'MENU_HR_ATTENDANCE', requiredPermission: 'SECTION_EMPLOYEES'
             },
             {
                 to: '/dashboard/hr/payroll', icon: DollarSign, label: 'المرتبات',
-                section: 'hr', requiredPermission: 'SECTION_EMPLOYEES'
+                section: 'hr', menuPermission: 'MENU_HR_PAYROLL', requiredPermission: 'SECTION_EMPLOYEES'
             },
 
             // Procurement
             {
                 to: '/dashboard/procurement/pr', icon: FileText, label: 'طلبات الشراء (PR)',
-                section: 'procurement', order: 1,
+                section: 'procurement', menuPermission: 'MENU_PROCUREMENT_PR', order: 1,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/rfq', icon: FileText,
-                label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', order: 2,
+                label: 'طلبات عروض الأسعار (RFQ)', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_RFQ', order: 2,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/quotation', icon: Tag, label: 'عروض الموردين',
-                section: 'procurement', order: 3,
+                section: 'procurement', menuPermission: 'MENU_PROCUREMENT_QUOTATION', order: 3,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/comparison', icon: Scale,
-                label: 'مقارنة العروض (QCS)', section: 'procurement', order: 4,
+                label: 'مقارنة العروض (QCS)', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_COMPARISON', order: 4,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/po', icon: ShoppingCart,
-                label: 'أوامر الشراء (PO)', section: 'procurement', order: 5,
+                label: 'أوامر الشراء (PO)', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_PO', order: 5,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/waiting-imports', icon: Truck,
-                label: 'الشحنات القادمة', section: 'procurement', order: 5.5,
+                label: 'الشحنات القادمة', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_WAITING_IMPORTS', order: 5.5,
                 requiredPermission: 'SECTION_PROCUREMENT',
                 badge: waitingImports || undefined
             },
             {
                 to: '/dashboard/procurement/grn', icon: ArrowDownToLine,
-                label: 'إذن استلام / إذن إضافة (GRN)', section: 'procurement', order: 6,
+                label: 'إذن استلام / إذن إضافة (GRN)', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_GRN', order: 6,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/invoices', icon: FileText,
-                label: 'فواتير الموردين', section: 'procurement', order: 6.5,
+                label: 'فواتير الموردين', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_INVOICES', order: 6.5,
                 requiredPermission: 'SUPPLIER_INVOICE_VIEW',
                 hideWhenHasPermission: 'SECTION_FINANCE',
                 showWhenAlsoHasPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/suppliers/outstanding', icon: DollarSign,
-                label: 'الأرصدة المستحقة', section: 'procurement', order: 8,
+                label: 'الأرصدة المستحقة', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_OUTSTANDING', order: 8,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/returns', icon: Undo2,
-                label: 'مرتجعات الشراء', section: 'procurement', order: 9,
+                label: 'مرتجعات الشراء', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_RETURNS', order: 9,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/procurement/suppliers', icon: Truck, label: 'الموردين',
-                section: 'procurement', order: 10,
+                section: 'procurement', menuPermission: 'MENU_PROCUREMENT_SUPPLIERS', order: 10,
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
 
             // Sales
             {
                 to: '/dashboard/sales/sections', icon: ShoppingCart,
-                label: 'قسم المبيعات', section: 'sales', order: 1,
+                label: 'قسم المبيعات', section: 'sales', menuPermission: 'MENU_SALES_SECTIONS', order: 1,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/purchase-requisitions', icon: ClipboardList,
-                label: 'طلبات الشراء', section: 'sales', order: 2,
+                label: 'طلبات الشراء', section: 'sales', menuPermission: 'MENU_SALES_PURCHASE_REQUISITIONS', order: 2,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/customer-requests', icon: User, label: 'طلبات العملاء',
-                section: 'sales', order: 2.5,
+                section: 'sales', menuPermission: 'MENU_SALES_CUSTOMER_REQUESTS', order: 2.5,
                 requiredPermission: 'SECTION_SALES',
                 badge: pendingCustomerRequests || undefined
             },
             {
                 to: '/dashboard/sales/quotations', icon: Tag, label: 'عروض الأسعار',
-                section: 'sales', order: 3,
+                section: 'sales', menuPermission: 'MENU_SALES_QUOTATIONS', order: 3,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/orders', icon: ClipboardList,
-                label: 'أوامر البيع (SO)', section: 'sales', order: 4,
+                label: 'أوامر البيع (SO)', section: 'sales', menuPermission: 'MENU_SALES_ORDERS', order: 4,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/issue-notes', icon: Package,
-                label: 'إذونات الصرف', section: 'sales', order: 5,
+                label: 'إذونات الصرف', section: 'sales', menuPermission: 'MENU_SALES_ISSUE_NOTES', order: 5,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/delivery-orders', icon: Truck,
-                label: 'أوامر التوصيل', section: 'sales', order: 6,
+                label: 'أوامر التوصيل', section: 'sales', menuPermission: 'MENU_SALES_DELIVERY_ORDERS', order: 6,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/vehicles', icon: Truck,
-                label: 'المركبات', section: 'sales', order: 6.5,
+                label: 'المركبات', section: 'sales', menuPermission: 'MENU_SALES_VEHICLES', order: 6.5,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/invoices', icon: FileText,
-                label: 'فواتير المبيعات', section: 'sales', order: 7,
+                label: 'فواتير المبيعات', section: 'sales', menuPermission: 'MENU_SALES_INVOICES', order: 7,
                 requiredPermission: 'SECTION_SALES'
             },
             {
                 to: '/dashboard/sales/receipts', icon: Receipt,
-                label: 'إيصالات الدفع', section: 'sales', order: 8,
+                label: 'إيصالات الدفع', section: 'sales', menuPermission: 'MENU_SALES_RECEIPTS', order: 8,
                 requiredPermission: 'SECTION_SALES'
             },
 
             // CRM
             {
                 to: '/dashboard/crm/customers', icon: Users, label: 'العملاء',
-                section: 'crm', requiredPermission: 'SECTION_CRM'
+                section: 'crm', menuPermission: 'MENU_CRM_CUSTOMERS', requiredPermission: 'SECTION_CRM'
             },
 
             // Finance
             {
                 to: '/dashboard/finance/invoices', icon: FileText,
-                label: 'فواتير الموردين', section: 'finance', order: 3,
+                label: 'فواتير الموردين', section: 'finance', menuPermission: 'MENU_FINANCE_INVOICES', order: 3,
                 requiredPermission: 'SUPPLIER_INVOICE_VIEW'
             },
             {
                 to: '/dashboard/finance/payment-vouchers', icon: Receipt,
-                label: 'سندات الدفع', section: 'finance',
+                label: 'سندات الدفع', section: 'finance', menuPermission: 'MENU_FINANCE_PAYMENT_VOUCHERS',
                 requiredPermission: 'SECTION_FINANCE', order: 1
             },
             {
                 to: '/dashboard/finance/payment-vouchers/new', icon: FileText,
-                label: 'سند صرف جديد', section: 'finance',
+                label: 'سند صرف جديد', section: 'finance', menuPermission: 'MENU_FINANCE_PAYMENT_VOUCHERS_NEW',
                 requiredPermission: 'SECTION_FINANCE', order: 2
             },
 
             // Warehouse
             {
                 to: '/dashboard/inventory/sections', icon: Warehouse,
-                label: 'أقسام المخزن', section: 'warehouse',
+                label: 'أقسام المخزن', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_SECTIONS',
                 warehouseGroup: 'management', order: 1,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/warehouses', icon: Building2,
-                label: 'المستودعات', section: 'warehouse',
+                label: 'المستودعات', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_WAREHOUSES',
                 warehouseGroup: 'management', order: 2,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/stocks', icon: Package,
-                label: 'أرصدة المخزون', section: 'warehouse',
+                label: 'أرصدة المخزون', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_STOCKS',
                 warehouseGroup: 'management', order: 3,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/warehouse/issue', icon: ArrowUpFromLine,
-                label: 'إذن صرف', section: 'warehouse', warehouseGroup: 'cycle',
+                label: 'إذن صرف', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_ISSUE', warehouseGroup: 'cycle',
                 order: 4, requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/warehouse/transfer', icon: ArrowRightLeft,
-                label: 'تحويل بين مخازن', section: 'warehouse', warehouseGroup: 'cycle',
+                label: 'تحويل بين مخازن', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_TRANSFER', warehouseGroup: 'cycle',
                 order: 5, requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/below-min', icon: AlertTriangle,
-                label: 'الأصناف تحت الحد الأدنى', section: 'warehouse',
+                label: 'الأصناف تحت الحد الأدنى', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_BELOW_MIN',
                 warehouseGroup: 'reports', order: 6,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/stagnant', icon: Clock,
-                label: 'الأصناف الراكدة', section: 'warehouse',
+                label: 'الأصناف الراكدة', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_STAGNANT',
                 warehouseGroup: 'reports', order: 7,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/movement', icon: Activity,
-                label: 'حركة الصنف التفصيلية', section: 'warehouse',
+                label: 'حركة الصنف التفصيلية', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_MOVEMENT',
                 warehouseGroup: 'reports', order: 8,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/count', icon: ClipboardCheck,
-                label: 'جرد دوري', section: 'warehouse', warehouseGroup: 'reports',
+                label: 'جرد دوري', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_COUNT', warehouseGroup: 'reports',
                 order: 9, requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/count', icon: AlertTriangle,
-                label: 'جرد مفاجئ', section: 'warehouse', warehouseGroup: 'reports',
+                label: 'جرد مفاجئ', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_COUNT_SURPRISE', warehouseGroup: 'reports',
                 search: '?mode=surprise', order: 10,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/periodic-inventory', icon: BarChart2,
-                label: 'تقرير المخزون الدوري', section: 'warehouse',
+                label: 'تقرير المخزون الدوري', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_PERIODIC_INVENTORY',
                 warehouseGroup: 'reports', order: 11,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/reports/variance', icon: GitCompare,
-                label: 'تقرير الفروقات', section: 'warehouse',
+                label: 'تقرير الفروقات', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_VARIANCE',
                 warehouseGroup: 'reports', order: 12,
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
@@ -531,75 +543,75 @@ const DashboardLayout: React.FC = () => {
             // Operations
             {
                 to: '/dashboard/inventory/quality-inspection', icon: Microscope,
-                label: 'فحص الجودة', section: 'operations',
+                label: 'فحص الجودة', section: 'operations', menuPermission: 'MENU_OPERATIONS_QUALITY_INSPECTION',
                 badge: pendingInspections || undefined, order: 1,
                 requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/quality-parameters', icon: Microscope,
-                label: 'معاملات الجودة', section: 'operations', order: 2,
+                label: 'معاملات الجودة', section: 'operations', menuPermission: 'MENU_OPERATIONS_QUALITY_PARAMETERS', order: 2,
                 requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/categories', icon: Package,
-                label: 'تصنيفات الأصناف', section: 'operations', order: 3,
+                label: 'تصنيفات الأصناف', section: 'operations', menuPermission: 'MENU_OPERATIONS_CATEGORIES', order: 3,
                 requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/items', icon: Command, label: 'الأصناف',
-                section: 'operations', order: 4,
+                section: 'operations', menuPermission: 'MENU_OPERATIONS_ITEMS', order: 4,
                 requiredPermission: 'SECTION_OPERATIONS'
             },
             {
                 to: '/dashboard/inventory/price-lists', icon: DollarSign,
-                label: 'قوائم الأسعار', section: 'operations', order: 5,
+                label: 'قوائم الأسعار', section: 'operations', menuPermission: 'MENU_OPERATIONS_PRICE_LISTS', order: 5,
                 requiredPermission: 'SECTION_OPERATIONS'
             },
 
             // System
             {
                 to: '/dashboard/settings/company', icon: Building2,
-                label: 'بيانات الشركة', section: 'system',
+                label: 'بيانات الشركة', section: 'system', menuPermission: 'MENU_SYSTEM_COMPANY',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/units', icon: Ruler,
-                label: 'وحدات القياس', section: 'system',
+                label: 'وحدات القياس', section: 'system', menuPermission: 'MENU_SYSTEM_UNITS',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/system', icon: Settings,
-                label: 'إعدادات النظام', section: 'system',
+                label: 'إعدادات النظام', section: 'system', menuPermission: 'MENU_SYSTEM_SETTINGS',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/users', icon: User,
-                label: 'إدارة المستخدمين', section: 'system',
+                label: 'إدارة المستخدمين', section: 'system', menuPermission: 'MENU_SYSTEM_USERS',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/roles', icon: Shield,
-                label: 'الأدوار والصلاحيات', section: 'system',
+                label: 'الأدوار والصلاحيات', section: 'system', menuPermission: 'MENU_SYSTEM_ROLES',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/permissions', icon: Lock,
-                label: 'سجل الصلاحيات', section: 'system',
+                label: 'سجل الصلاحيات', section: 'system', menuPermission: 'MENU_SYSTEM_PERMISSIONS',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/security', icon: Shield,
-                label: 'الأمان والخصوصية', section: 'system',
+                label: 'الأمان والخصوصية', section: 'system', menuPermission: 'MENU_SYSTEM_SECURITY',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/notifications', icon: Bell,
-                label: 'الإشعارات', section: 'system',
+                label: 'الإشعارات', section: 'system', menuPermission: 'MENU_SYSTEM_NOTIFICATIONS',
                 requiredPermission: 'SECTION_SYSTEM'
             },
             {
                 to: '/dashboard/settings/database', icon: Database,
-                label: 'قاعدة البيانات', section: 'system',
+                label: 'قاعدة البيانات', section: 'system', menuPermission: 'MENU_SYSTEM_DATABASE',
                 requiredPermission: 'SECTION_SYSTEM'
             },
         ];
@@ -614,17 +626,19 @@ const DashboardLayout: React.FC = () => {
         document.title = match ? `${match.label} | نظام RasRas` : 'نظام RasRas';
     }, [location.pathname]);
 
-    // Filter by permissions only — no role-based fallback or bypass.
-    // ADMIN/GM see everything because the Seed assigns them all SECTION_* permissions.
+    // ظهور عناصر السايد بار: إذا وُجدت أي صلاحية MENU_* نعتمدها فقط (كل رابط حسب صلاحيته).
+    // إن لم يملك المستخدم أي MENU_* نعتمد requiredPermission للتوافق مع الأدوار القديمة.
     const filteredNavItems = navItems.filter(item => {
+        const hasMenuPerm = userPermissions.includes(item.menuPermission);
+        const hasSectionPerm = !item.requiredPermission || userPermissions.includes(item.requiredPermission);
+        const hasAnyMenuPerm = userPermissions.some(p => p.startsWith('MENU_'));
+        const visibleByPermission = hasMenuPerm || (!hasAnyMenuPerm && hasSectionPerm);
+        if (!visibleByPermission) return false;
         if (item.hideWhenHasPermission && userPermissions.includes(item.hideWhenHasPermission)) {
-            if (item.showWhenAlsoHasPermission && userPermissions.includes(item.showWhenAlsoHasPermission))
-                ; // don't hide: user has both sections, show the item
-            else
+            if (!(item.showWhenAlsoHasPermission && userPermissions.includes(item.showWhenAlsoHasPermission)))
                 return false;
         }
-        if (!item.requiredPermission) return true;
-        return userPermissions.includes(item.requiredPermission);
+        return true;
     });
 
     const hasManySections = new Set(filteredNavItems.map(i => i.section)).size > 3;
@@ -762,40 +776,42 @@ const DashboardLayout: React.FC = () => {
 
                 {/* Nav */}
                 <nav className="flex-1 overflow-y-auto p-4 space-y-0">
-                    {/* الرئيسية */}
-                    <SidebarDropdownSection
-                        id="main" title="الرئيسية" icon={LayoutDashboard}
-                        collapsed={sidebarCollapsed}
-                        isOpen={openSections.main ?? true}
-                        onToggle={() => toggleSection('main')}
-                        hasActiveChild={filteredNavItems
-                            .filter(i => i.section === 'main')
-                            .some(item =>
-                                item.exact ? location.pathname === item.to :
-                                    (location.pathname === item.to ||
-                                        (item.to !== '/dashboard' &&
-                                            location.pathname.startsWith(item.to)))
-                            )}
-                        badge={(pendingApprovals + pendingCustomerRequests) || undefined}
-                        blink={(pendingApprovals + pendingCustomerRequests) > 0}
-                    >
-                        {filteredNavItems.filter(i => i.section === 'main')
-                            .map(item => (
-                                <SidebarLink key={item.to} to={item.to}
-                                    icon={item.icon} label={item.label}
-                                    active={item.exact
-                                        ? location.pathname === item.to
-                                        : (location.pathname === item.to ||
+                    {/* الرئيسية — لا تُعرض إلا إذا وُجد عنصر واحد على الأقل */}
+                    {filteredNavItems.some(i => i.section === 'main') && (
+                        <SidebarDropdownSection
+                            id="main" title="الرئيسية" icon={LayoutDashboard}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.main ?? true}
+                            onToggle={() => toggleSection('main')}
+                            hasActiveChild={filteredNavItems
+                                .filter(i => i.section === 'main')
+                                .some(item =>
+                                    item.exact ? location.pathname === item.to :
+                                        (location.pathname === item.to ||
                                             (item.to !== '/dashboard' &&
-                                                location.pathname.startsWith(item.to)))}
-                                    collapsed={sidebarCollapsed}
-                                    badge={item.badge}
-                                    blink={!!item.badge &&
-                                        (item.to.includes('approvals') ||
-                                            item.to.includes('quality-inspection'))}
-                                />
-                            ))}
-                    </SidebarDropdownSection>
+                                                location.pathname.startsWith(item.to)))
+                                )}
+                            badge={(pendingApprovals + pendingCustomerRequests) || undefined}
+                            blink={(pendingApprovals + pendingCustomerRequests) > 0}
+                        >
+                            {filteredNavItems.filter(i => i.section === 'main')
+                                .map(item => (
+                                    <SidebarLink key={item.to} to={item.to}
+                                        icon={item.icon} label={item.label}
+                                        active={item.exact
+                                            ? location.pathname === item.to
+                                            : (location.pathname === item.to ||
+                                                (item.to !== '/dashboard' &&
+                                                    location.pathname.startsWith(item.to)))}
+                                        collapsed={sidebarCollapsed}
+                                        badge={item.badge}
+                                        blink={!!item.badge &&
+                                            (item.to.includes('approvals') ||
+                                                item.to.includes('quality-inspection'))}
+                                    />
+                                ))}
+                        </SidebarDropdownSection>
+                    )}
 
                     {/* الموارد البشرية */}
                     {filteredNavItems.some(i => i.section === 'hr') && (
@@ -1036,30 +1052,32 @@ const DashboardLayout: React.FC = () => {
                         </SidebarDropdownSection>
                     )}
 
-                    {/* النظام */}
-                    <SidebarDropdownSection
-                        id="system" title="النظام" icon={Settings}
-                        collapsed={sidebarCollapsed}
-                        isOpen={openSections.system ?? false}
-                        onToggle={() => toggleSection('system')}
-                        hasActiveChild={filteredNavItems
-                            .filter(i => i.section === 'system')
-                            .some(item =>
-                                location.pathname.startsWith(item.to))}
-                    >
-                        {filteredNavItems.filter(i => i.section === 'system')
-                            .map(item => (
-                                <SidebarLink key={item.to} to={item.to}
-                                    icon={item.icon} label={item.label}
-                                    active={location.pathname.startsWith(item.to)}
-                                    collapsed={sidebarCollapsed}
-                                    badge={item.badge}
-                                    blink={!!item.badge &&
-                                        (item.to.includes('approvals') ||
-                                            item.to.includes('quality-inspection'))}
-                                />
-                            ))}
-                    </SidebarDropdownSection>
+                    {/* النظام — لا تُعرض إلا إذا وُجد عنصر واحد على الأقل */}
+                    {filteredNavItems.some(i => i.section === 'system') && (
+                        <SidebarDropdownSection
+                            id="system" title="النظام" icon={Settings}
+                            collapsed={sidebarCollapsed}
+                            isOpen={openSections.system ?? false}
+                            onToggle={() => toggleSection('system')}
+                            hasActiveChild={filteredNavItems
+                                .filter(i => i.section === 'system')
+                                .some(item =>
+                                    location.pathname.startsWith(item.to))}
+                        >
+                            {filteredNavItems.filter(i => i.section === 'system')
+                                .map(item => (
+                                    <SidebarLink key={item.to} to={item.to}
+                                        icon={item.icon} label={item.label}
+                                        active={location.pathname.startsWith(item.to)}
+                                        collapsed={sidebarCollapsed}
+                                        badge={item.badge}
+                                        blink={!!item.badge &&
+                                            (item.to.includes('approvals') ||
+                                                item.to.includes('quality-inspection'))}
+                                    />
+                                ))}
+                        </SidebarDropdownSection>
+                    )}
                 </nav>
 
                 {/* User profile */}
@@ -1290,9 +1308,7 @@ const DashboardLayout: React.FC = () => {
                                         duration-200">
                                         <div className="p-2">
                                             <Link
-                                                to={user?.employeeId
-                                                    ? `/dashboard/employees/${user.employeeId}`
-                                                    : '/dashboard/employees'}
+                                                to="/dashboard/profile"
                                                 onClick={() => setUserMenuOpen(false)}
                                                 className="flex items-center gap-3 px-4 
                                                     py-3 rounded-xl text-slate-700 
