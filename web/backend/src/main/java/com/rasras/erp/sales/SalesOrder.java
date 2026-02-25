@@ -116,4 +116,11 @@ public class SalesOrder extends AuditableEntity {
 
     @OneToMany(mappedBy = "salesOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SalesOrderItem> items;
+
+    public void recalculateTotal() {
+        this.totalAmount = (subTotal != null ? subTotal : BigDecimal.ZERO)
+                .add(taxAmount != null ? taxAmount : BigDecimal.ZERO)
+                .add(deliveryCost != null ? deliveryCost : BigDecimal.ZERO)
+                .add(otherCosts != null ? otherCosts : BigDecimal.ZERO);
+    }
 }

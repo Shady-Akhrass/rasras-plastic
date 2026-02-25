@@ -86,7 +86,16 @@ public class PaymentReceiptService {
                 if (invoice != null) {
                     BigDecimal currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount()
                             : BigDecimal.ZERO;
-                    invoice.setPaidAmount(currentPaid.add(alloc.getAllocatedAmount()));
+                    BigDecimal newPaid = currentPaid.add(alloc.getAllocatedAmount());
+                    invoice.setPaidAmount(newPaid);
+
+                    BigDecimal total = invoice.getTotalAmount() != null ? invoice.getTotalAmount() : BigDecimal.ZERO;
+                    if (newPaid.compareTo(total) >= 0) {
+                        invoice.setStatus("Paid");
+                    } else if (newPaid.compareTo(BigDecimal.ZERO) > 0 && !"Paid".equals(invoice.getStatus())) {
+                        invoice.setStatus("Partial");
+                    }
+
                     invoiceRepository.save(invoice);
                 }
             }
@@ -145,7 +154,8 @@ public class PaymentReceiptService {
         PaymentReceipt receipt = receiptRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Payment Receipt not found"));
 
-        if (!"Draft".equals(receipt.getStatus()) && !"Pending".equals(receipt.getStatus()) && !"Rejected".equals(receipt.getStatus())) {
+        if (!"Draft".equals(receipt.getStatus()) && !"Pending".equals(receipt.getStatus())
+                && !"Rejected".equals(receipt.getStatus())) {
             throw new RuntimeException("Cannot delete receipt that is not in Draft, Pending, or Rejected status");
         }
 
@@ -153,7 +163,7 @@ public class PaymentReceiptService {
     }
 
     private String generateVoucherNumber() {
-        return "RCP-" + System.currentTimeMillis();
+        return "RCP-" + (receiptRepository.count() + 1);
     }
 
     private PaymentReceiptDto mapToDto(PaymentReceipt receipt) {

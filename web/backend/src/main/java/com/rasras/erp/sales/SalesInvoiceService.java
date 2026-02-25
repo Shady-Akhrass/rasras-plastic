@@ -7,6 +7,8 @@ import com.rasras.erp.inventory.ItemRepository;
 import com.rasras.erp.inventory.UnitOfMeasure;
 import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.approval.ApprovalService;
+import com.rasras.erp.sales.CustomerRequestDeliveryScheduleRepository;
+import com.rasras.erp.sales.CustomerRequestDeliverySchedule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,8 @@ public class SalesInvoiceService {
     private final ItemRepository itemRepository;
     private final UnitRepository unitRepository;
     private final ApprovalService approvalService;
+    private final DeliveryOrderRepository deliveryOrderRepository;
+    private final CustomerRequestDeliveryScheduleRepository scheduleRepo;
 
     @Transactional(readOnly = true)
     public List<SalesInvoiceDto> getAllInvoices() {
@@ -72,6 +76,8 @@ public class SalesInvoiceService {
         invoice.setDiscountAmount(dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO);
         invoice.setTaxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO);
         invoice.setShippingCost(dto.getShippingCost() != null ? dto.getShippingCost() : BigDecimal.ZERO);
+        invoice.setDeliveryCost(dto.getDeliveryCost() != null ? dto.getDeliveryCost() : BigDecimal.ZERO);
+        invoice.setOtherCosts(dto.getOtherCosts() != null ? dto.getOtherCosts() : BigDecimal.ZERO);
         invoice.setTotalAmount(dto.getTotalAmount() != null ? dto.getTotalAmount() : BigDecimal.ZERO);
         invoice.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
         invoice.setStatus(dto.getStatus() != null ? dto.getStatus() : "Draft");
@@ -113,6 +119,8 @@ public class SalesInvoiceService {
         invoice.setDiscountAmount(dto.getDiscountAmount());
         invoice.setTaxAmount(dto.getTaxAmount());
         invoice.setShippingCost(dto.getShippingCost());
+        invoice.setDeliveryCost(dto.getDeliveryCost());
+        invoice.setOtherCosts(dto.getOtherCosts());
         invoice.setTotalAmount(dto.getTotalAmount());
         invoice.setPaymentTerms(dto.getPaymentTerms());
         invoice.setNotes(dto.getNotes());
@@ -155,11 +163,141 @@ public class SalesInvoiceService {
     }
 
     @Transactional
+    public SalesInvoiceDto createInvoiceFromDeliveryOrder(Integer deliveryOrderId) {
+        DeliveryOrder order = deliveryOrderRepository.findById(deliveryOrderId)
+                .orElseThrow(() -> new RuntimeException("Delivery Order not found"));
+
+        StockIssueNote issueNote = order.getStockIssueNote();
+        SalesOrder salesOrder = issueNote.getSalesOrder();
+
+        SalesInvoice invoice = new SalesInvoice();
+        invoice.setInvoiceNumber(generateInvoiceNumber());
+        invoice.setInvoiceDate(LocalDateTime.now());
+        invoice.setDueDate(LocalDate.now().plusDays(30));
+
+        invoice.setCustomer(order.getCustomer());
+        invoice.setIssueNoteId(issueNote.getId());
+
+        if (salesOrder != null) {
+            invoice.setSalesOrder(salesOrder);
+            invoice.setSalesRepId(salesOrder.getSalesRepId());
+            invoice.setCurrency(salesOrder.getCurrency() != null ? salesOrder.getCurrency() : "EGP");
+            invoice.setExchangeRate(
+                    salesOrder.getExchangeRate() != null ? salesOrder.getExchangeRate() : BigDecimal.ONE);
+        } else {
+            invoice.setCurrency("EGP");
+            invoice.setExchangeRate(BigDecimal.ONE);
+        }
+
+        invoice.setShippingCost(order.getDeliveryCost() != null ? order.getDeliveryCost() : BigDecimal.ZERO);
+        invoice.setDeliveryCost(order.getDeliveryCost() != null ? order.getDeliveryCost() : BigDecimal.ZERO);
+        invoice.setOtherCosts(order.getOtherCosts() != null ? order.getOtherCosts() : BigDecimal.ZERO);
+        invoice.setStatus("Approved");
+        invoice.setApprovalStatus("Approved");
+        invoice.setCreatedBy(order.getUpdatedBy() != null ? order.getUpdatedBy() : 1);
+
+        // Check if this delivery order is linked to specific schedules
+        List<CustomerRequestDeliverySchedule> schedules = scheduleRepo.findByDeliveryOrderId(order.getId());
+        java.util.Map<Integer, BigDecimal> scheduleQuantities = new java.util.HashMap<>();
+        if (schedules != null && !schedules.isEmpty()) {
+            for (CustomerRequestDeliverySchedule s : schedules) {
+                if (s.getProductId() != null && s.getQuantity() != null) {
+                    scheduleQuantities.put(s.getProductId(),
+                            scheduleQuantities.getOrDefault(s.getProductId(), BigDecimal.ZERO).add(s.getQuantity()));
+                }
+            }
+        }
+
+        List<SalesInvoiceItem> invoiceItems = new ArrayList<>();
+        BigDecimal subTotal = BigDecimal.ZERO;
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+
+        if (issueNote.getItems() != null) {
+            for (StockIssueNoteItem issueItem : issueNote.getItems()) {
+                SalesOrderItem soItem = issueItem.getSalesOrderItem();
+                BigDecimal quantity = issueItem.getIssuedQty() != null ? issueItem.getIssuedQty() : BigDecimal.ZERO;
+
+                // Use schedule quantities if available
+                if (!scheduleQuantities.isEmpty()) {
+                    BigDecimal scheduleQty = scheduleQuantities.get(issueItem.getItem().getId());
+                    if (scheduleQty == null || scheduleQty.compareTo(BigDecimal.ZERO) <= 0) {
+                        continue; // Skip this item as it's not in the delivery schedules
+                    }
+                    quantity = scheduleQty;
+                }
+
+                if (quantity.compareTo(BigDecimal.ZERO) <= 0)
+                    continue;
+
+                SalesInvoiceItem invItem = SalesInvoiceItem.builder()
+                        .salesInvoice(invoice)
+                        .issueItemId(issueItem.getId())
+                        .item(issueItem.getItem())
+                        .quantity(quantity)
+                        .unit(issueItem.getUnit())
+                        .unitCost(issueItem.getUnitCost())
+                        .build();
+
+                if (soItem != null) {
+                    invItem.setUnitPrice(soItem.getUnitPrice());
+                    invItem.setDescription(soItem.getDescription());
+                    invItem.setDiscountPercentage(soItem.getDiscountPercentage());
+
+                    // Recalculate discount amount for this quantity
+                    BigDecimal unitDiscount = (soItem.getUnitPrice()
+                            .multiply(soItem.getDiscountPercentage() != null ? soItem.getDiscountPercentage()
+                                    : BigDecimal.ZERO))
+                            .divide(new BigDecimal(100), 2, BigDecimal.ROUND_HALF_UP);
+                    BigDecimal lineDiscount = unitDiscount.multiply(quantity);
+                    invItem.setDiscountAmount(lineDiscount);
+
+                    invItem.setTaxPercentage(soItem.getTaxPercentage());
+
+                    // Recalculate tax amount
+                    BigDecimal taxableAmount = soItem.getUnitPrice().multiply(quantity).subtract(lineDiscount);
+                    BigDecimal lineTax = taxableAmount
+                            .multiply(soItem.getTaxPercentage() != null ? soItem.getTaxPercentage() : BigDecimal.ZERO)
+                            .divide(new BigDecimal(100), 2, BigDecimal.ROUND_HALF_UP);
+                    invItem.setTaxAmount(lineTax);
+
+                    invItem.setTotalPrice(taxableAmount.add(lineTax));
+                } else {
+                    invItem.setUnitPrice(BigDecimal.ZERO);
+                    invItem.setDiscountAmount(BigDecimal.ZERO);
+                    invItem.setTaxAmount(BigDecimal.ZERO);
+                    invItem.setTotalPrice(BigDecimal.ZERO);
+                }
+
+                invoiceItems.add(invItem);
+
+                subTotal = subTotal.add(
+                        invItem.getUnitPrice() != null ? invItem.getUnitPrice().multiply(quantity) : BigDecimal.ZERO);
+                totalTax = totalTax.add(invItem.getTaxAmount() != null ? invItem.getTaxAmount() : BigDecimal.ZERO);
+                totalDiscount = totalDiscount.add(
+                        invItem.getDiscountAmount() != null ? invItem.getDiscountAmount() : BigDecimal.ZERO);
+            }
+        }
+
+        invoice.setItems(invoiceItems);
+        invoice.setSubTotal(subTotal);
+        invoice.setTaxAmount(totalTax);
+        invoice.setDiscountAmount(totalDiscount);
+        invoice.setTotalAmount(subTotal.subtract(totalDiscount).add(totalTax).add(invoice.getDeliveryCost())
+                .add(invoice.getOtherCosts()));
+        invoice.setPaidAmount(BigDecimal.ZERO);
+
+        SalesInvoice saved = invoiceRepository.save(invoice);
+        return mapToDto(saved);
+    }
+
+    @Transactional
     public void deleteInvoice(Integer id) {
         SalesInvoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Invoice not found"));
 
-        if (!"Draft".equals(invoice.getStatus()) && !"Pending".equals(invoice.getStatus()) && !"Rejected".equals(invoice.getStatus())) {
+        if (!"Draft".equals(invoice.getStatus()) && !"Pending".equals(invoice.getStatus())
+                && !"Rejected".equals(invoice.getStatus())) {
             throw new RuntimeException("Cannot delete invoice that is not in Draft, Pending, or Rejected status");
         }
 
@@ -167,7 +305,7 @@ public class SalesInvoiceService {
     }
 
     private String generateInvoiceNumber() {
-        return "INV-" + System.currentTimeMillis();
+        return "INV-" + (invoiceRepository.count() + 1);
     }
 
     private SalesInvoiceDto mapToDto(SalesInvoice invoice) {
@@ -188,6 +326,8 @@ public class SalesInvoiceService {
                 .discountAmount(invoice.getDiscountAmount())
                 .taxAmount(invoice.getTaxAmount())
                 .shippingCost(invoice.getShippingCost())
+                .deliveryCost(invoice.getDeliveryCost())
+                .otherCosts(invoice.getOtherCosts())
                 .totalAmount(invoice.getTotalAmount())
                 .paidAmount(invoice.getPaidAmount())
                 .remainingAmount(invoice.getTotalAmount().subtract(invoice.getPaidAmount()))

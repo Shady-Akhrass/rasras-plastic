@@ -30,7 +30,7 @@ public class QualityInspectionService {
                                                         "Item not found: " + itemReq.getItemId()));
 
                         QualityInspection inspection = new QualityInspection();
-                        inspection.setInspectionNumber("QI-" + System.currentTimeMillis() + "-" + item.getId());
+                        inspection.setInspectionNumber("QI-" + (inspectionRepo.count() + 1));
                         inspection.setInspectionDate(LocalDateTime.now());
                         inspection.setInspectionType("Incoming");
                         inspection.setReferenceId(grnId);
@@ -93,22 +93,23 @@ public class QualityInspectionService {
                                         .map(gi -> gi.getRejectedQty() != null ? gi.getRejectedQty() : BigDecimal.ZERO)
                                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                grn.setTotalAcceptedQty(totalAcc);
-                grn.setTotalRejectedQty(totalRej);
+                        grn.setTotalAcceptedQty(totalAcc);
+                        grn.setTotalRejectedQty(totalRej);
 
-                grnRepo.save(grn);
+                        grnRepo.save(grn);
 
-                // Recalculate GRN amounts based on accepted quantities
-                // This ensures tax and discount are recalculated while keeping shipping/other costs unchanged
-                grnService.recalculateGRNAmountsAfterQC(grnId);
+                        // Recalculate GRN amounts based on accepted quantities
+                        // This ensures tax and discount are recalculated while keeping shipping/other
+                        // costs unchanged
+                        grnService.recalculateGRNAmountsAfterQC(grnId);
 
-                // NEW: Create Purchase Return for rejected quantities
-                if (totalRej.compareTo(BigDecimal.ZERO) > 0) {
-                        createPurchaseReturnFromInspection(grn, bulkRequest.getInspectedByUserId());
-                }
+                        // NEW: Create Purchase Return for rejected quantities
+                        if (totalRej.compareTo(BigDecimal.ZERO) > 0) {
+                                createPurchaseReturnFromInspection(grn, bulkRequest.getInspectedByUserId());
+                        }
 
-                // Auto-submit for approval
-                grnService.submitGRN(grnId, bulkRequest.getInspectedByUserId());
+                        // Auto-submit for approval
+                        grnService.submitGRN(grnId, bulkRequest.getInspectedByUserId());
                 } else {
                         if (allInspected) {
                                 grn.setStatus("Inspected");
@@ -119,7 +120,9 @@ public class QualityInspectionService {
 
         private void createPurchaseReturnFromInspection(GoodsReceiptNote grn, Integer userId) {
                 com.rasras.erp.procurement.dto.PurchaseReturnDto returnDto = new com.rasras.erp.procurement.dto.PurchaseReturnDto();
-                returnDto.setReturnNumber("RET-" + System.currentTimeMillis());
+                returnDto.setReturnNumber("RET-" + System.currentTimeMillis()); // This will be superseded by
+                                                                                // PurchaseReturnService logic if
+                                                                                // initialized there.
                 returnDto.setReturnDate(LocalDateTime.now());
                 returnDto.setGrnId(grn.getId());
                 returnDto.setSupplierId(grn.getSupplier().getId());

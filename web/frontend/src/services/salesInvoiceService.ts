@@ -48,6 +48,8 @@ export interface SalesInvoiceDto {
     discountAmount?: number;
     taxAmount?: number;
     shippingCost?: number;
+    deliveryCost?: number;
+    otherCosts?: number;
     totalAmount?: number;
     paidAmount?: number;
     remainingAmount?: number;

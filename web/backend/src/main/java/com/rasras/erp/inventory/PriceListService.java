@@ -130,7 +130,7 @@ public class PriceListService {
     private PriceList mapToEntity(PriceListDto dto) {
         return PriceList.builder()
                 .priceListCode(
-                        dto.getPriceListCode() != null ? dto.getPriceListCode() : "PL-" + System.currentTimeMillis())
+                        dto.getPriceListCode() != null ? dto.getPriceListCode() : "PL-" + (repository.count() + 1))
                 .priceListName(dto.getPriceListName())
                 .legacyListNameAr(dto.getPriceListName()) // Populate legacy field
                 .listType(dto.getListType())

@@ -76,6 +76,9 @@ public class DeliveryOrder extends AuditableEntity {
     @Column(name = "DeliveryCost", precision = 18, scale = 2)
     private BigDecimal deliveryCost;
 
+    @Column(name = "OtherCosts", precision = 18, scale = 2)
+    private BigDecimal otherCosts;
+
     @Column(name = "IsCostOnCustomer")
     @Builder.Default
     private Boolean isCostOnCustomer = false;
@@ -99,6 +102,9 @@ public class DeliveryOrder extends AuditableEntity {
 
     @Column(name = "PODAttachmentPath", length = 500)
     private String podAttachmentPath;
+
+    @Column(name = "ScheduleID")
+    private Integer scheduleId;
 
     @Column(name = "Notes", length = 1000)
     private String notes;

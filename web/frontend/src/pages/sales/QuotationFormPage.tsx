@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Save,
-    Plus,
     Trash2,
     Tag,
     Calendar,
@@ -406,14 +405,18 @@ const QuotationFormPage: React.FC = () => {
 
                 const qty = extractQuantity(reqItem);
 
+                const taxPerc = 14;
+                const beforeTax = qty * price;
+                const lineTotal = beforeTax * (1 + taxPerc / 100);
+
                 return {
                     itemId: productId,
                     quantity: qty,
                     unitId: extractUnitId(itemDef, reqItem),
                     unitPrice: price,
                     discountPercentage: 0,
-                    taxPercentage: 14,
-                    totalPrice: qty * price,
+                    taxPercentage: taxPerc,
+                    totalPrice: lineTotal,
                     itemNameAr: extractItemName(reqItem, itemDef, found?.priceListItem)
                 };
             });
@@ -451,16 +454,25 @@ const QuotationFormPage: React.FC = () => {
                         // 🔧 FIX: Normalize items array
                         const normalizedItems: SalesQuotationItemDto[] = extractArray<SalesQuotationItemDto>(
                             q.items
-                        ).map(item => ({
-                            ...item,
-                            itemId: safeNumber(item.itemId || (item as any).productId),
-                            quantity: safeNumber(item.quantity || (item as any).qty),
-                            unitId: safeNumber(item.unitId || (item as any).uomId),
-                            unitPrice: safeNumber(item.unitPrice || (item as any).price),
-                            discountPercentage: safeNumber(item.discountPercentage),
-                            taxPercentage: safeNumber(item.taxPercentage, 14),
-                            totalPrice: safeNumber(item.totalPrice)
-                        }));
+                        ).map(item => {
+                            const qty = safeNumber(item.quantity || (item as any).qty);
+                            const price = safeNumber(item.unitPrice || (item as any).price);
+                            const disc = safeNumber(item.discountPercentage);
+                            const taxPerc = safeNumber(item.taxPercentage, 14);
+                            const beforeTax = qty * price * (1 - disc / 100);
+                            const lineTotal = beforeTax * (1 + taxPerc / 100);
+
+                            return {
+                                ...item,
+                                itemId: safeNumber(item.itemId || (item as any).productId),
+                                quantity: qty,
+                                unitId: safeNumber(item.unitId || (item as any).uomId),
+                                unitPrice: price,
+                                discountPercentage: disc,
+                                taxPercentage: taxPerc,
+                                totalPrice: lineTotal
+                            };
+                        });
 
                         setForm({
                             ...q,
@@ -545,10 +557,14 @@ const QuotationFormPage: React.FC = () => {
                     const price = getPriceFromList(itemId, newPriceListItems);
                     const qty = safeNumber(item.quantity);
                     const disc = safeNumber(item.discountPercentage);
+                    const taxPerc = safeNumber(item.taxPercentage, 14);
+                    const beforeTax = qty * price * (1 - disc / 100);
+                    const lineTotal = beforeTax * (1 + taxPerc / 100);
+
                     return {
                         ...item,
                         unitPrice: price,
-                        totalPrice: qty * price * (1 - disc / 100)
+                        totalPrice: lineTotal
                     };
                 });
                 return { ...f, items: updatedItems };
@@ -562,21 +578,6 @@ const QuotationFormPage: React.FC = () => {
     // ──────────────────────────────────────────
     // Item CRUD
     // ──────────────────────────────────────────
-
-    const addItem = () => {
-        setForm(f => ({
-            ...f,
-            items: [...f.items, {
-                itemId: 0,
-                quantity: 1,
-                unitId: 0,
-                unitPrice: 0,
-                discountPercentage: 0,
-                taxPercentage: 14,
-                totalPrice: 0
-            }]
-        }));
-    };
 
     const removeItem = (idx: number) => {
         setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
@@ -921,7 +922,7 @@ const QuotationFormPage: React.FC = () => {
                                         disabled={isLocked || !isNew}
                                         required
                                     >
-                                        <option value="">-- اختر طلب عميل للاستيراد منه --</option>
+                                        <option value="">-- اختر طلب عميل--</option>
                                         {filteredRequests.map((r) => {
                                             const reqId = safeNumber(r.requestId);
                                             const custName = customers.find(c =>
@@ -979,11 +980,11 @@ const QuotationFormPage: React.FC = () => {
                                         onChange={(e) => setForm(f => ({ ...f, quotationDate: e.target.value }))}
                                         min={new Date().toISOString().split('T')[0]}
                                         className={`w-full px-4 py-3 rounded-xl border-2 outline-none transition-all
-                                        ${isLocked
+                                        ${true // Always locked for entry
                                                 ? 'bg-slate-100 border-transparent cursor-not-allowed opacity-70 text-slate-500 font-bold'
                                                 : 'border-slate-100 focus:border-indigo-500 bg-slate-50/50'}`}
                                         required
-                                        disabled={isLocked}
+                                        disabled={true}
                                     />
                                 </div>
 
@@ -1095,7 +1096,6 @@ const QuotationFormPage: React.FC = () => {
                                 <tbody className="divide-y divide-slate-100">
                                     {form.items.map((it, idx) => {
                                         const itemId = safeNumber(it.itemId);
-                                        const selectedItem = items.find(i => safeNumber(i.id) === itemId);
 
                                         return (
                                             <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
@@ -1104,11 +1104,9 @@ const QuotationFormPage: React.FC = () => {
                                                     <select
                                                         value={itemId || ''}
                                                         onChange={(e) => updateItem(idx, { itemId: safeNumber(e.target.value) })}
-                                                        disabled={isLocked}
+                                                        disabled={true} // Always locked to prevent changes
                                                         className={`w-full min-w-[200px] px-3 py-2 border-2 rounded-xl text-sm font-semibold outline-none transition-all
-                                    ${isLocked
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 focus:border-brand-primary'}`}
+                                    bg-slate-100 border-slate-200 cursor-not-allowed opacity-70`}
                                                     >
                                                         <option value="">اختر الصنف...</option>
                                                         {items
@@ -1141,11 +1139,8 @@ const QuotationFormPage: React.FC = () => {
                                                         step="any"
                                                         value={it.quantity || ''}
                                                         onChange={(e) => updateItem(idx, { quantity: safeNumber(e.target.value) })}
-                                                        disabled={isLocked}
-                                                        className={`w-24 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
-                                    ${isLocked
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 text-brand-primary focus:border-brand-primary'}`}
+                                                        disabled={true} // Locked
+                                                        className="w-24 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-bold outline-none transition-all bg-slate-100 cursor-not-allowed opacity-70 text-brand-primary"
                                                     />
                                                 </td>
 
@@ -1157,18 +1152,15 @@ const QuotationFormPage: React.FC = () => {
                                                         step={0.01}
                                                         value={it.unitPrice || ''}
                                                         onChange={(e) => updateItem(idx, { unitPrice: safeNumber(e.target.value) })}
-                                                        disabled={isLocked}
-                                                        className={`w-28 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
-                                    ${isLocked
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 text-emerald-600 focus:border-brand-primary'}`}
+                                                        disabled={true} // Locked
+                                                        className="w-28 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-bold outline-none transition-all bg-slate-100 cursor-not-allowed opacity-70 text-emerald-600"
                                                     />
                                                 </td>
 
-                                                {/* Grade (Read Only Display styled as Input) */}
+                                                {/* Grade Display */}
                                                 <td className="py-4 px-4">
-                                                    <div className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl bg-slate-100 text-center font-semibold text-slate-500 text-sm`}>
-                                                        {selectedItem?.grade || '—'}
+                                                    <div className="w-28 px-3 py-2 border-2 border-slate-200 rounded-xl bg-slate-100 text-center font-semibold text-slate-500 text-sm">
+                                                        {items.find(i => safeNumber(i.id) === itemId)?.grade || '—'}
                                                     </div>
                                                 </td>
 
@@ -1198,11 +1190,8 @@ const QuotationFormPage: React.FC = () => {
                                                         step={0.01}
                                                         value={it.taxPercentage || ''}
                                                         onChange={(e) => updateItem(idx, { taxPercentage: safeNumber(e.target.value) })}
-                                                        disabled={isLocked}
-                                                        className={`w-20 px-3 py-2 border-2 rounded-xl text-sm text-center font-semibold outline-none transition-all
-                                    ${isLocked
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 focus:border-brand-primary text-indigo-600'}`}
+                                                        disabled={true} // Locked
+                                                        className="w-20 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm text-center font-semibold outline-none transition-all bg-slate-100 cursor-not-allowed opacity-70 text-indigo-600"
                                                     />
                                                 </td>
 
@@ -1236,31 +1225,11 @@ const QuotationFormPage: React.FC = () => {
                                         <Package className="w-10 h-10 text-slate-400" />
                                     </div>
                                     <p className="text-slate-400 font-semibold">لا توجد أصناف</p>
-                                    {!isLocked && (
-                                        <button
-                                            type="button"
-                                            onClick={addItem}
-                                            className="mt-4 px-6 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all"
-                                        >
-                                            إضافة صنف يدوياً
-                                        </button>
-                                    )}
+                                    {/* No manual add button */}
                                 </div>
                             )}
 
-                            {/* Add Item Button (If items exist) */}
-                            {form.items.length > 0 && !isLocked && (
-                                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
-                                    <button
-                                        type="button"
-                                        onClick={addItem}
-                                        className="flex items-center gap-2 px-4 py-2 text-brand-primary hover:bg-brand-primary/5 rounded-xl font-bold transition-all text-sm"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>إضافة صنف جديد</span>
-                                    </button>
-                                </div>
-                            )}
+                            {/* Manual add button removed */}
                         </div>
 
                         {/* Footer: Extra Costs Section */}
@@ -1284,11 +1253,10 @@ const QuotationFormPage: React.FC = () => {
                                         step={0.01}
                                         value={form.deliveryCost || ''}
                                         onChange={(e) => setForm(f => ({ ...f, deliveryCost: safeNumber(e.target.value) }))}
-                                        disabled={isLocked}
+                                        disabled={true}
                                         className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
                         text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
-                        transition-all shadow-sm
-                        ${isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                        transition-all shadow-sm bg-slate-100 cursor-not-allowed opacity-70`}
                                         placeholder="0.00"
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
@@ -1315,11 +1283,10 @@ const QuotationFormPage: React.FC = () => {
                                         step={0.01}
                                         value={form.otherCosts || ''}
                                         onChange={(e) => setForm(f => ({ ...f, otherCosts: safeNumber(e.target.value) }))}
-                                        disabled={isLocked}
+                                        disabled={true}
                                         className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
                         text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
-                        transition-all shadow-sm
-                        ${isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                        transition-all shadow-sm bg-slate-100 cursor-not-allowed opacity-70`}
                                         placeholder="0.00"
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">

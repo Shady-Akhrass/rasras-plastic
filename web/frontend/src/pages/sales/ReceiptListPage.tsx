@@ -1,16 +1,33 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, FileText, Banknote, RefreshCw, Eye, DollarSign } from 'lucide-react';
-import { receiptService, type ReceiptDto } from '../../services/receiptService';
+import {
+    Plus,
+    Search,
+    FileText,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    Filter,
+    Wallet,
+    X,
+    Eye,
+    RefreshCw,
+    DollarSign,
+    XCircle,
+    ShieldCheck,
+    Users
+} from 'lucide-react';
+import { receiptService, type PaymentReceiptDto } from '../../services/receiptService';
+import { salesInvoiceService, type SalesInvoiceDto } from '../../services/salesInvoiceService';
 import Pagination from '../../components/common/Pagination';
 import { formatNumber, formatDate } from '../../utils/format';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 
-// --- Reusable Components ---
-
+// Stat Card Component
 const StatCard: React.FC<{
     icon: React.ElementType;
-    value: number | string;
+    value: string | number;
     label: string;
     color: 'primary' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
 }> = ({ icon: Icon, value, label, color }) => {
@@ -24,15 +41,15 @@ const StatCard: React.FC<{
     };
 
     return (
-        <div className="w-full p-5 rounded-2xl border transition-all duration-300 group text-right bg-white border-slate-100 hover:shadow-lg hover:border-brand-primary/20">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
+            hover:border-brand-primary/20 transition-all duration-300 group">
             <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl transition-all duration-300 ${colorClasses[color]} group-hover:scale-110`}>
+                <div className={`p-3 rounded-xl ${colorClasses[color]} 
+                    group-hover:scale-110 transition-transform duration-300`}>
                     <Icon className="w-5 h-5" />
                 </div>
-                <div className="flex-1">
-                    <div className="text-2xl font-bold text-slate-800">
-                        {typeof value === 'number' ? formatNumber(value) : value}
-                    </div>
+                <div>
+                    <div className="text-2xl font-bold text-slate-800">{value}</div>
                     <div className="text-sm text-slate-500">{label}</div>
                 </div>
             </div>
@@ -40,166 +57,724 @@ const StatCard: React.FC<{
     );
 };
 
-const RECEIPT_TYPE_LABELS: Record<string, string> = { FROM_CUSTOMER: 'من عميل', FROM_EMPLOYEE: 'من موظف', GENERAL_INCOME: 'إيراد عام', OTHER: 'أخرى' };
-const PAYMENT_METHOD_LABELS: Record<string, string> = { CASH: 'نقداً', CHEQUE: 'شيك', BANK_TRANSFER: 'تحويل بنكي', PROMISSORY_NOTE: 'كمبيالة' };
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const config: Record<string, { icon: React.ElementType; className: string; label: string }> = {
+        'Pending': {
+            icon: Clock,
+            className: 'bg-amber-50 text-amber-700 border-amber-200',
+            label: 'قيد الانتظار'
+        },
+        'Approved': {
+            icon: CheckCircle2,
+            className: 'bg-brand-primary/5 text-brand-primary border-brand-primary/20',
+            label: 'معتمد'
+        },
+        'Posted': {
+            icon: CheckCircle2,
+            className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            label: 'مرحل'
+        },
+        'Paid': {
+            icon: DollarSign,
+            className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            label: 'مدفوع'
+        },
+        'Cancelled': {
+            icon: XCircle,
+            className: 'bg-rose-50 text-rose-700 border-rose-200',
+            label: 'ملغي'
+        }
+    };
+
+    const { icon: Icon, className, label } = config[status] || config['Pending'];
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${className}`}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+        </span>
+    );
+};
+
+// Approval Badge Component
+const ApprovalBadge: React.FC<{ status: string }> = ({ status }) => {
+    if (!status) return null;
+
+    const config: Record<string, { label: string; className: string }> = {
+        'Pending': {
+            label: 'قيد الاعتماد',
+            className: 'bg-amber-50 text-amber-600 border-amber-100'
+        },
+        'Approved': {
+            label: 'معتمد نهائياً',
+            className: 'bg-emerald-50 text-emerald-600 border-emerald-100'
+        },
+        'Rejected': {
+            label: 'مرفوض',
+            className: 'bg-rose-50 text-rose-600 border-rose-100'
+        }
+    };
+
+    const c = config[status] || config['Pending'];
+
+    return (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.className}`}>
+            {c.label}
+        </span>
+    );
+};
+
+// Table Row Component
+const ReceiptTableRow: React.FC<{
+    receipt: PaymentReceiptDto;
+    index: number;
+    onView: (id: number) => void;
+    getCurrencyLabel: (currency: string) => string;
+    defaultCurrency: string;
+    convertAmount: (amount: number, from: string) => number;
+}> = ({ receipt, index, onView, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+
+    <tr
+        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
+        style={{
+            animationDelay: `${index * 30}ms`,
+            animation: 'fadeInUp 0.3s ease-out forwards'
+        }}
+    >
+
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/80/20 to-brand-primary/80/10 
+                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Wallet className="w-5 h-5 text-brand-primary" />
+                </div>
+                <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                    {receipt.voucherNumber || '—'}
+                </span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-sm font-medium text-slate-700">
+            {receipt.customerNameAr || '—'}
+        </td>
+        <td className="px-6 py-4 text-sm text-slate-600">
+            <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span>{formatDate(receipt.voucherDate)}</span>
+            </div>
+        </td>
+        <td className="px-6 py-4 text-right">
+            <span className="font-bold text-emerald-600">
+                {formatNumber(convertAmount(receipt.amount || 0, receipt.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+            </span>
+        </td>
+
+        <td className="px-6 py-4">
+            <StatusBadge status={receipt.status || 'Pending'} />
+        </td>
+        <td className="px-6 py-4">
+            <ApprovalBadge status={receipt.approvalStatus || 'Pending'} />
+        </td>
+        <td className="px-6 py-4">
+            <div className="flex items-center justify-end gap-2">
+                <button
+                    onClick={() => onView(receipt.id!)}
+                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                    title="عرض التفاصيل"
+                >
+                    <Eye className="w-4 h-4" />
+                </button>
+            </div>
+        </td>
+    </tr>
+);
+
+// Loading Skeleton
+const TableSkeleton: React.FC = () => (
+    <>
+        {[1, 2, 3, 4, 5].map(i => (
+            <tr key={i} className="animate-pulse border-b border-slate-100">
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-lg" />
+                        <div className="h-4 w-20 bg-slate-100 rounded" />
+                    </div>
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-4 w-32 bg-slate-100 rounded" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-4 w-24 bg-slate-100 rounded" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-4 w-24 bg-slate-100 rounded ml-auto" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-6 w-20 bg-slate-100 rounded-full" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="h-6 w-20 bg-slate-100 rounded-full" />
+                </td>
+                <td className="px-6 py-4">
+                    <div className="flex gap-2 justify-end">
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg" />
+                    </div>
+                </td>
+            </tr>
+        ))}
+    </>
+);
+
+// Empty State
+const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
+    <tr>
+        <td colSpan={7} className="px-6 py-16">
+            <div className="text-center">
+                <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
+                    {searchTerm || statusFilter !== 'All' ? (
+                        <Search className="w-12 h-12 text-slate-400" />
+                    ) : (
+                        <Wallet className="w-12 h-12 text-slate-400" />
+                    )}
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                    {searchTerm || statusFilter !== 'All' ? 'لا توجد نتائج' : 'لا توجد إيصالات دفع'}
+                </h3>
+                <p className="text-slate-500 max-w-md mx-auto">
+                    {searchTerm || statusFilter !== 'All'
+                        ? 'لم يتم العثور على إيصالات تطابق معايير البحث'
+                        : 'لم يتم إنشاء أي إيصالات دفع بعد'}
+                </p>
+            </div>
+        </td>
+    </tr>
+);
 
 const ReceiptListPage: React.FC = () => {
+    const { defaultCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
+
     const navigate = useNavigate();
-    const [list, setList] = useState<ReceiptDto[]>([]);
+
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
+    const [receipts, setReceipts] = useState<PaymentReceiptDto[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('All');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
 
-    useEffect(() => { fetchList(); }, []);
-    useEffect(() => { setCurrentPage(1); }, [search]);
+    // Unpaid Invoices Tab
+    const [activeTab, setActiveTab] = useState<'receipts' | 'unpaid-invoices'>('receipts');
+    const [unpaidInvoices, setUnpaidInvoices] = useState<SalesInvoiceDto[]>([]);
+    const [unpaidInvoicesLoading, setUnpaidInvoicesLoading] = useState(false);
+    const [selectedInvoices, setSelectedInvoices] = useState<Set<number>>(new Set());
 
-    const fetchList = async () => {
+    useEffect(() => {
+        fetchReceipts();
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'unpaid-invoices' && unpaidInvoices.length === 0) {
+            fetchUnpaidInvoices();
+        }
+    }, [activeTab]);
+
+    const fetchReceipts = async () => {
         try {
             setLoading(true);
             const data = await receiptService.getAll();
-            setList(Array.isArray(data) ? data : []);
-        } catch (e) {
-            toast.error('فشل تحميل إيصالات الدفع');
-            setList([]);
-        } finally { setLoading(false); }
+            setReceipts(data || []);
+        } catch (error) {
+            console.error('Failed to fetch receipts:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const filtered = useMemo(() => {
-        const f = list.filter((r) =>
-            !search ||
-            (r.receiptNumber || '').toLowerCase().includes(search.toLowerCase()) ||
-            (r.depositorName || '').toLowerCase().includes(search.toLowerCase()) ||
-            (r.invoiceNumber || '').toLowerCase().includes(search.toLowerCase())
-        );
+    const fetchUnpaidInvoices = async () => {
+        try {
+            setUnpaidInvoicesLoading(true);
+            const data = await salesInvoiceService.getAll();
+            const allInvoices = data || [];
+
+            // Filter for approved but unpaid/partial invoices
+            const unpaid = allInvoices.filter(
+                inv => (inv.status === 'Unpaid' || inv.status === 'Partial') && (inv.approvalStatus === 'Approved' || !inv.approvalStatus)
+            );
+
+            setUnpaidInvoices(unpaid);
+        } catch (error) {
+            console.error('Failed to fetch unpaid invoices:', error);
+            toast.error('فشل تحميل الفواتير غير المدفوعة');
+        } finally {
+            setUnpaidInvoicesLoading(false);
+        }
+    };
+
+    const handleInvoiceToggle = (invoiceId: number) => {
+        setSelectedInvoices(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(invoiceId)) {
+                newSet.delete(invoiceId);
+            } else {
+                newSet.add(invoiceId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleCreateReceiptFromInvoices = () => {
+        const selected = unpaidInvoices.filter(inv => selectedInvoices.has(inv.id!));
+        if (selected.length === 0) {
+            return;
+        }
+        navigate('/dashboard/sales/receipts/new', {
+            state: { preSelectedInvoices: selected }
+        });
+    };
+
+    const filteredReceipts = useMemo(() => {
+        const filtered = receipts.filter(r => {
+            const matchesSearch =
+                r.voucherNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                r.customerNameAr?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
+            return matchesSearch && matchesStatus;
+        });
         // الأحدث في الأعلى
-        return [...f].sort((a, b) => {
+        return [...filtered].sort((a, b) => {
             const dateA = a.voucherDate ? new Date(a.voucherDate).getTime() : 0;
             const dateB = b.voucherDate ? new Date(b.voucherDate).getTime() : 0;
             if (dateB !== dateA) return dateB - dateA;
             return (b.id ?? 0) - (a.id ?? 0);
         });
-    }, [list, search]);
+    }, [receipts, searchTerm, statusFilter]);
 
-    const paginated = useMemo(() => {
+    const paginatedReceipts = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
-        return filtered.slice(start, start + pageSize);
-    }, [filtered, currentPage, pageSize]);
+        return filteredReceipts.slice(start, start + pageSize);
+    }, [filteredReceipts, currentPage, pageSize]);
 
-    const stats = useMemo(() => {
-        const total = list.length;
-        const totalAmount = list.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-        return { total, totalAmount };
-    }, [list]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
+
+    const stats = useMemo(() => ({
+        total: receipts.length,
+        pending: receipts.filter(r => r.status === 'Pending').length,
+        approved: receipts.filter(r => r.status === 'Approved' || r.status === 'Posted').length,
+        totalValue: formatNumber(receipts.reduce((sum, r) => sum + convertAmount(r.amount || 0, r.currency || 'EGP'), 0))
+    }), [receipts, defaultCurrency, convertAmount]);
+
+    const handleViewReceipt = (id: number) => {
+        navigate(`/dashboard/sales/receipts/${id}?mode=view`);
+    };
 
     return (
-        <div className="space-y-6 pb-20" dir="rtl">
-            {/* Enhanced Header */}
+        <div className="space-y-6">
+            {/* Custom Styles */}
+            <style>{`
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}</style>
+
+            {/* Header Section */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
-                rounded-3xl p-8 text-white shadow-2xl">
-                {/* Decorative Elements */}
+                rounded-3xl p-8 text-white shadow-lg">
                 <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
-                <div className="absolute top-1/3 left-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
-                <div className="absolute bottom-1/4 right-1/3 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
+                <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-white/20 rounded-full animate-pulse" />
+                <div className="absolute bottom-1/3 left-1/4 w-3 h-3 bg-white/15 rounded-full animate-pulse delay-300" />
 
-                <div className="relative flex items-center justify-between">
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
-                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-                            <Banknote className="w-10 h-10" />
+                        <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+                            <Wallet className="w-10 h-10" />
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">إيصالات الدفع</h1>
-                            <p className="text-white/80 text-lg">سند قبض: عميل، فاتورة، مبلغ، طريقة دفع</p>
+                            <p className="text-white/80 text-lg">إدارة إيصالات دفع العملاء والمقبوضات</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button onClick={fetchList} disabled={loading} className="p-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl border border-white/20 hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
-                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                        </button>
-                        <button onClick={() => navigate('/dashboard/sales/receipts/new')}
-                            className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 rounded-2xl font-bold shadow-xl hover:scale-105 active:scale-95 transition-all">
-                            <Plus className="w-5 h-5" />
-                            <span>إيصال جديد</span>
-                        </button>
-                    </div>
+
+                    <button
+                        onClick={() => navigate('/dashboard/sales/receipts/new')}
+                        className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
+                            hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
+                            hover:shadow-xl hover:scale-105"
+                    >
+                        <Plus className="w-5 h-5" />
+                        <span>إيصال دفع جديد</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2">
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setActiveTab('receipts')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'receipts'
+                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                            : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                    >
+                        <Wallet className="w-5 h-5" />
+                        <span>إيصالات الدفع</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'receipts'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-100 text-slate-600'
+                            }`}>
+                            {receipts.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('unpaid-invoices')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'unpaid-invoices'
+                            ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/25'
+                            : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                    >
+                        <FileText className="w-5 h-5" />
+                        <span>فواتير عملاء غير مدفوعة</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'unpaid-invoices'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-100 text-slate-600'
+                            }`}>
+                            {unpaidInvoices.length}
+                        </span>
+                    </button>
                 </div>
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-                <StatCard icon={FileText} value={stats.total} label="الإجمالي" color="primary" />
-                <StatCard icon={DollarSign} value={stats.totalAmount} label="إجمالي المبالغ" color="success" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard
+                    icon={FileText}
+                    value={stats.total}
+                    label="إجمالي الإيصالات"
+                    color="primary"
+                />
+                <StatCard
+                    icon={Clock}
+                    value={stats.pending}
+                    label="قيد الانتظار"
+                    color="warning"
+                />
+                <StatCard
+                    icon={ShieldCheck}
+                    value={stats.approved}
+                    label="معتمد / مرحل"
+                    color="blue"
+                />
+                <StatCard
+                    icon={DollarSign}
+                    value={`${stats.totalValue} ${getCurrencyLabel(defaultCurrency)}`}
+                    label="إجمالي المقبوضات"
+                    color="success"
+                />
             </div>
 
-            {/* Table Card */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden">
-                <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                    <div className="relative max-w-md">
-                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                            placeholder="بحث برقم السند، المُودِع، أو الفاتورة..." className="w-full pr-12 pl-4 py-3 rounded-xl border-2 border-slate-200 focus:border-brand-primary outline-none transition-all" />
+            {/* Filters - Only for Receipts Tab */}
+            {activeTab === 'receipts' && (
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="relative flex-1">
+                            <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
+                                transition-colors duration-200
+                                ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
+                            <input
+                                type="text"
+                                placeholder="بحث برقم الإيصال أو اسم العميل..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onFocus={() => setIsSearchFocused(true)}
+                                onBlur={() => setIsSearchFocused(false)}
+                                className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 transition-all duration-200 
+                                    outline-none bg-slate-50
+                                    ${isSearchFocused
+                                        ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                                        : 'border-transparent hover:border-slate-200'}`}
+                            />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 
+                                        rounded-full transition-colors"
+                                >
+                                    <X className="w-4 h-4 text-slate-400" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent
+                                hover:border-slate-200 transition-all duration-200">
+                                <Filter className="text-slate-400 w-5 h-5" />
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="bg-transparent outline-none text-slate-700 font-medium cursor-pointer"
+                                >
+                                    <option value="All">جميع الحالات</option>
+                                    <option value="Pending">قيد الانتظار</option>
+                                    <option value="Approved">معتمد</option>
+                                    <option value="Posted">مرحل</option>
+                                    <option value="Cancelled">ملغي</option>
+                                </select>
+                            </div>
+
+                            <button
+                                onClick={fetchReceipts}
+                                disabled={loading}
+                                className="p-3 rounded-xl border border-slate-200 text-slate-600 
+                                    hover:bg-slate-50 hover:border-slate-300 transition-all duration-200
+                                    disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">رقم السند</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">التاريخ</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">نوع القبض</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">المُودِع</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الفاتورة</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">المبلغ</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">طريقة الدفع</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600">الإجراء</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                [...Array(4)].map((_, i) => (
-                                    <tr key={i} className="border-b border-slate-100 animate-pulse">
-                                        <td className="px-6 py-4"><div className="h-4 w-20 bg-slate-200 rounded" /></td>
-                                        <td className="px-6 py-4"><div className="h-4 w-24 bg-slate-200 rounded" /></td>
-                                        <td className="px-6 py-4"><div className="h-4 w-20 bg-slate-200 rounded" /></td>
-                                        <td className="px-6 py-4"><div className="h-4 w-28 bg-slate-200 rounded" /></td>
-                                        <td className="px-6 py-4"><div className="h-4 w-20 bg-slate-200 rounded" /></td>
-                                        <td className="px-6 py-4"><div className="h-4 w-16 bg-slate-200 rounded" /></td>
-                                        <td className="px-6 py-4"><div className="h-4 w-20 bg-slate-200 rounded" /></td>
-                                        <td className="px-6 py-4"><div className="h-8 w-14 bg-slate-200 rounded" /></td>
-                                    </tr>
-                                ))
-                            ) : filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-6 py-16 text-center text-slate-500">
-                                        <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                                        <p>لا توجد إيصالات دفع</p>
-                                        <button onClick={() => navigate('/dashboard/sales/receipts/new')} className="mt-4 text-brand-primary font-medium">إنشاء إيصال</button>
-                                    </td>
-                                </tr>
-                            ) : (
-                                paginated.map((r) => (
-                                    <tr key={r.id} className="border-b border-slate-100 hover:bg-rose-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-rose-700">{r.voucherNumber || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{r.voucherDate ? formatDate(r.voucherDate) : '—'}</td>
-                                        <td className="px-6 py-4 text-slate-700">{RECEIPT_TYPE_LABELS[r.receiptType || ''] || r.receiptType || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-700">{r.depositorName || '—'}</td>
-                                        <td className="px-6 py-4 text-slate-600">{r.invoiceNumber || '—'}</td>
-                                        <td className="px-6 py-4 font-semibold">{formatNumber(r.amount ?? 0)} {r.currency || ''}</td>
-                                        <td className="px-6 py-4 text-slate-600">{PAYMENT_METHOD_LABELS[r.paymentMethod] || r.paymentMethod}</td>
-                                        <td className="px-6 py-4">
-                                            <button onClick={() => navigate(`/dashboard/sales/receipts/${r.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg"><Eye className="w-5 h-5" /></button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+            )}
+
+            {/* Results Count - Only for Receipts Tab */}
+            {activeTab === 'receipts' && !loading && (
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-brand-primary rounded-full" />
+                    <span className="text-slate-600">
+                        عرض <span className="font-bold text-slate-800">{filteredReceipts.length}</span> من{' '}
+                        <span className="font-bold text-slate-800">{receipts.length}</span> إيصال دفع
+                    </span>
                 </div>
-                {!loading && filtered.length > 0 && (
-                    <Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={pageSize} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} />
-                )}
-            </div>
+            )}
+
+            {/* Unpaid Invoices Table */}
+            {activeTab === 'unpaid-invoices' && (
+                <>
+                    {/* Action Bar */}
+                    {selectedInvoices.size > 0 && (
+                        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                    <span className="font-bold text-emerald-800">
+                                        {selectedInvoices.size} فاتورة محددة
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setSelectedInvoices(new Set())}
+                                        className="px-4 py-2 text-slate-600 hover:bg-white rounded-lg transition-colors font-semibold"
+                                    >
+                                        إلغاء التحديد
+                                    </button>
+                                    <button
+                                        onClick={handleCreateReceiptFromInvoices}
+                                        className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg 
+                                            hover:bg-emerald-700 transition-colors font-bold shadow-lg"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        <span>إنشاء إيصال دفع</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={unpaidInvoices.length > 0 && selectedInvoices.size === unpaidInvoices.length}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedInvoices(new Set(unpaidInvoices.map(inv => inv.id!)));
+                                                    } else {
+                                                        setSelectedInvoices(new Set());
+                                                    }
+                                                }}
+                                                className="w-4 h-4 rounded border-slate-300"
+                                            />
+                                        </th>
+                                        <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم الفاتورة</th>
+                                        <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>
+                                        <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">العميل</th>
+                                        <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المبلغ الإجمالي</th>
+                                        <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">آمر البيع</th>
+                                        <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {unpaidInvoicesLoading ? (
+                                        <TableSkeleton />
+                                    ) : unpaidInvoices.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="px-6 py-16">
+                                                <div className="text-center">
+                                                    <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                                        <FileText className="w-12 h-12 text-slate-400" />
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-slate-800 mb-2">
+                                                        لا توجد فواتير غير مدفوعة
+                                                    </h3>
+                                                    <p className="text-slate-500 max-w-md mx-auto">
+                                                        جميع فواتير العملاء تم سدادها
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        unpaidInvoices.map((invoice, index) => {
+                                            const isSelected = selectedInvoices.has(invoice.id!);
+
+                                            return (
+                                                <tr
+                                                    key={invoice.id}
+                                                    className={`hover:bg-brand-primary/5/50 transition-all duration-200 group border-b border-slate-100 last:border-0 ${isSelected ? 'bg-emerald-50' : ''
+                                                        }`}
+                                                    style={{
+                                                        animationDelay: `${index * 30}ms`,
+                                                        animation: 'fadeInUp 0.3s ease-out forwards'
+                                                    }}
+                                                >
+                                                    <td className="px-6 py-4">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={() => handleInvoiceToggle(invoice.id!)}
+                                                            className="w-4 h-4 rounded border-slate-300"
+                                                        />
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-violet-500/10 
+                                                                rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                                <FileText className="w-5 h-5 text-brand-primary" />
+                                                            </div>
+                                                            <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
+                                                                {invoice.invoiceNumber || '—'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-slate-600">
+                                                        <div className="flex items-center gap-2">
+                                                            <Calendar className="w-4 h-4 text-slate-400" />
+                                                            <span>{formatDate(invoice.invoiceDate)}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <Users className="w-4 h-4 text-slate-400" />
+                                                            <span className="text-sm text-slate-700">{invoice.customerNameAr || '—'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <span className="font-bold text-emerald-600">
+                                                            {formatNumber(convertAmount(invoice.totalAmount || 0, invoice.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm text-slate-600">{invoice.soNumber || '—'}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                                            معتمدة
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Receipts Table - Only for Receipts Tab */}
+            {activeTab === 'receipts' && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-200">
+                                <tr>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">رقم الإيصال</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">العميل</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">التاريخ</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المبلغ</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">حالة الإيصال</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">حالة الاعتماد</th>
+                                    <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading ? (
+                                    <TableSkeleton />
+                                ) : filteredReceipts.length === 0 ? (
+                                    <EmptyState searchTerm={searchTerm} statusFilter={statusFilter} />
+                                ) : (
+                                    paginatedReceipts.map((receipt, index) => (
+                                        <ReceiptTableRow
+                                            key={receipt.id}
+                                            receipt={receipt}
+                                            index={index}
+                                            onView={handleViewReceipt}
+                                            getCurrencyLabel={getCurrencyLabel}
+                                            defaultCurrency={defaultCurrency}
+                                            convertAmount={convertAmount}
+                                        />
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Pagination Box */}
+            {activeTab === 'receipts' && filteredReceipts.length > 0 && (
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredReceipts.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                    />
+
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-slate-500 font-medium">النتائج في الصفحة:</span>
+                        <select
+                            value={pageSize}
+                            onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl px-3 py-2 
+                                focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary outline-none transition-all"
+                        >
+                            <option value={15}>15</option>
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                        </select>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

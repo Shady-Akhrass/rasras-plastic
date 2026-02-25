@@ -46,6 +46,18 @@ export interface Customer {
     contacts?: CustomerContact[];
 }
 
+export interface CustomerOutstanding {
+    id: number;
+    customerCode: string;
+    customerNameAr: string;
+    creditLimit: number;
+    totalInvoiced: number;
+    totalPaid: number;
+    totalReturned: number;
+    currentBalance: number;
+    currency: string;
+}
+
 const customerService = {
     getAllCustomers: async () => {
         const response = await apiClient.get<{ data: Customer[] }>('/crm/customers');
@@ -54,6 +66,11 @@ const customerService = {
 
     getActiveCustomers: async () => {
         const response = await apiClient.get<{ data: Customer[] }>('/crm/customers/active');
+        return response.data.data;
+    },
+
+    getOutstandingSummary: async () => {
+        const response = await apiClient.get<{ data: CustomerOutstanding[] }>('/crm/customers/outstanding');
         return response.data.data;
     },
 

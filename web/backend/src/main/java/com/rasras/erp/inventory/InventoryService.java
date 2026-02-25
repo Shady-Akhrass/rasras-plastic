@@ -74,4 +74,47 @@ public class InventoryService {
                 .build();
         movementRepo.save(movement);
     }
+
+    @Transactional
+    public void reserveStock(Item item, Warehouse warehouse, BigDecimal quantity) {
+        if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0)
+            return;
+
+        StockBalance balance = balanceRepo.findByItemIdAndWarehouseId(item.getId(), warehouse.getId())
+                .orElse(StockBalance.builder()
+                        .item(item)
+                        .warehouse(warehouse)
+                        .quantityOnHand(BigDecimal.ZERO)
+                        .quantityReserved(BigDecimal.ZERO)
+                        .build());
+
+        BigDecimal currentOnHand = balance.getQuantityOnHand() != null ? balance.getQuantityOnHand() : BigDecimal.ZERO;
+        BigDecimal currentReserved = balance.getQuantityReserved() != null ? balance.getQuantityReserved()
+                : BigDecimal.ZERO;
+
+        BigDecimal available = currentOnHand.subtract(currentReserved);
+        if (available.compareTo(quantity) < 0) {
+            throw new com.rasras.erp.shared.exception.BadRequestException(
+                    "عجز في المخزون للصنف: " + item.getItemNameAr() +
+                            " (" + item.getItemCode() + "). المتاح: " + available + "، المطلوب: " + quantity);
+        }
+
+        balance.setQuantityReserved(currentReserved.add(quantity));
+        balance.setUpdatedAt(LocalDateTime.now());
+        balanceRepo.save(balance);
+    }
+
+    @Transactional
+    public void releaseReservation(Item item, Warehouse warehouse, BigDecimal quantity) {
+        if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0)
+            return;
+
+        balanceRepo.findByItemIdAndWarehouseId(item.getId(), warehouse.getId()).ifPresent(balance -> {
+            BigDecimal currentReserved = balance.getQuantityReserved() != null ? balance.getQuantityReserved()
+                    : BigDecimal.ZERO;
+            balance.setQuantityReserved(currentReserved.subtract(quantity).max(BigDecimal.ZERO));
+            balance.setUpdatedAt(LocalDateTime.now());
+            balanceRepo.save(balance);
+        });
+    }
 }

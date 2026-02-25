@@ -118,4 +118,14 @@ public class SalesQuotation extends AuditableEntity {
 
     @OneToMany(mappedBy = "salesQuotation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SalesQuotationItem> items;
+
+    public void recalculateTotal() {
+        BigDecimal sub = (subTotal != null ? subTotal : BigDecimal.ZERO);
+        BigDecimal disc = (discountAmount != null ? discountAmount : BigDecimal.ZERO);
+        BigDecimal tax = (taxAmount != null ? taxAmount : BigDecimal.ZERO);
+        BigDecimal deliv = (deliveryCost != null ? deliveryCost : BigDecimal.ZERO);
+        BigDecimal other = (otherCosts != null ? otherCosts : BigDecimal.ZERO);
+
+        this.totalAmount = sub.subtract(disc).add(tax).add(deliv).add(other);
+    }
 }

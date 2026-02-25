@@ -224,7 +224,7 @@ public class SalesQuotationService {
     }
 
     private String generateQuotationNumber() {
-        return "SQ-" + System.currentTimeMillis();
+        return "SQ-" + (quotationRepository.count() + 1);
     }
 
     private SalesQuotationDto mapToDto(SalesQuotation quotation) {

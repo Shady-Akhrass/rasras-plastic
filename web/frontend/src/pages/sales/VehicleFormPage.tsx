@@ -56,7 +56,7 @@ const VehicleFormPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.vehicleCode || !form.plateNumber) {
+        if (!form.plateNumber) {
             toast.error('يرجى ملء الحقول المطلوبة');
             return;
         }
@@ -67,7 +67,7 @@ const VehicleFormPage: React.FC = () => {
                 result = await vehicleService.create(form);
                 if (result) {
                     toast.success('تم إضافة المركبة بنجاح');
-                    navigate(`/dashboard/sales/vehicles/${result.id}`);
+                    navigate('/dashboard/sales/vehicles');
                 } else {
                     toast.error('فشل الإضافة');
                 }
@@ -75,7 +75,7 @@ const VehicleFormPage: React.FC = () => {
                 result = await vehicleService.update(parseInt(id!), form);
                 if (result) {
                     toast.success('تم تحديث المركبة بنجاح');
-                    setForm(result);
+                    navigate('/dashboard/sales/vehicles');
                 } else {
                     toast.error('فشل التحديث');
                 }
@@ -181,10 +181,9 @@ const VehicleFormPage: React.FC = () => {
                             </label>
                             <input
                                 type="text"
-                                value={form.vehicleCode || ''}
-                                onChange={(e) => setForm({ ...form, vehicleCode: e.target.value })}
-                                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-brand-primary outline-none transition-all font-semibold bg-slate-50 hover:bg-white"
-                                required
+                                value={form.vehicleCode || 'سيتم إنشاؤه تلقائياً'}
+                                readOnly
+                                className="w-full px-4 py-3 bg-slate-100 border-2 border-transparent rounded-xl text-slate-500 font-bold cursor-not-allowed outline-none opacity-70"
                             />
                         </div>
                         <div className="space-y-2">

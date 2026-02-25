@@ -14,6 +14,10 @@ export interface DeliveryOrderItemDto {
     qty: number;
     unitId: number;
     unitNameAr?: string;
+    unitPrice?: number;
+    discountPercentage?: number;
+    taxAmount?: number;
+    totalPrice?: number;
     notes?: string;
 }
 
@@ -36,7 +40,12 @@ export interface DeliveryOrderDto {
     scheduledDate?: string;
     scheduledTime?: string;
     actualDeliveryDate?: string;
+    subTotal?: number;
+    discountAmount?: number;
+    taxAmount?: number;
     deliveryCost?: number;
+    otherCosts?: number;
+    totalAmount?: number;
     isCostOnCustomer?: boolean;
     status?: string;
     approvalStatus?: string;
@@ -55,6 +64,8 @@ export interface DeliveryOrderDto {
     saleOrderNumber?: string;
     deliveryPlace?: string;
     vehicleNo?: string;
+    scheduleId?: number;
+    selectedScheduleIds?: number[];
     items?: DeliveryOrderItemDto[];
     vehicles?: VehicleDto[];
 }
@@ -89,10 +100,13 @@ export const deliveryOrderService = {
         }
     },
 
-    createFromIssueNote: async (issueNoteId: number, createdByUserId?: number): Promise<DeliveryOrderDto | null> => {
+    createFromIssueNote: async (issueNoteId: number, scheduleId?: number, createdByUserId?: number): Promise<DeliveryOrderDto | null> => {
         try {
-            const params = createdByUserId != null ? `?createdByUserId=${createdByUserId}` : '';
-            const res = await apiClient.post<{ data?: DeliveryOrderDto }>(`${_api}/from-issue-note/${issueNoteId}${params}`);
+            const params = new URLSearchParams();
+            if (scheduleId != null) params.append('scheduleId', scheduleId.toString());
+            if (createdByUserId != null) params.append('createdByUserId', createdByUserId.toString());
+            const qs = params.toString() ? `?${params.toString()}` : '';
+            const res = await apiClient.post<{ data?: DeliveryOrderDto }>(`${_api}/from-issue-note/${issueNoteId}${qs}`);
             return (res.data as any)?.data ?? null;
         } catch {
             return null;

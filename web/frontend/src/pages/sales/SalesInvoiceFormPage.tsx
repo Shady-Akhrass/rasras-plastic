@@ -3,8 +3,6 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     Save,
     ArrowRight,
-    Plus,
-    Trash2,
     Receipt,
     Clock,
     CheckCircle2,
@@ -21,6 +19,7 @@ import {
 } from 'lucide-react';
 import { salesInvoiceService, type SalesInvoiceDto, type SalesInvoiceItemDto } from '../../services/salesInvoiceService';
 import { saleOrderService } from '../../services/saleOrderService';
+import { deliveryOrderService, type DeliveryOrderDto } from '../../services/deliveryOrderService';
 import customerService from '../../services/customerService';
 import { itemService } from '../../services/itemService';
 import { approvalService } from '../../services/approvalService';
@@ -96,7 +95,8 @@ const SalesInvoiceFormPage: React.FC = () => {
     const [processing, setProcessing] = useState(false);
     const [customers, setCustomers] = useState<any[]>([]);
     const [items, setItems] = useState<any[]>([]);
-    const [saleOrders, setSaleOrders] = useState<any[]>([]);
+    const [deliveryOrders, setDeliveryOrders] = useState<DeliveryOrderDto[]>([]);
+    const [selectedDOId, setSelectedDOId] = useState<number>(0);
     const approvalId = searchParams.get('approvalId');
 
     const [form, setForm] = useState<SalesInvoiceDto>({
@@ -109,6 +109,9 @@ const SalesInvoiceFormPage: React.FC = () => {
         paymentTerms: '',
         discountPercentage: 0,
         taxAmount: 0,
+        shippingCost: 0,
+        deliveryCost: 0,
+        otherCosts: 0,
         paidAmount: 0,
         notes: '',
         status: 'Draft',
@@ -120,53 +123,79 @@ const SalesInvoiceFormPage: React.FC = () => {
     useEffect(() => {
         (async () => {
             try {
-                const [c, i, so] = await Promise.all([
+                const [c, i, allDOs, allInvoices] = await Promise.all([
                     customerService.getActiveCustomers().catch(() => []),
                     (itemService.getActiveItems() as Promise<{ data?: any[] }>).then((r) => Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : []).catch(() => []),
-                    saleOrderService.getAll().catch(() => [])
+                    deliveryOrderService.getAll().catch(() => []),
+                    salesInvoiceService.getAll().catch(() => [])
                 ]);
                 setCustomers(Array.isArray(c) ? c : []);
                 setItems(Array.isArray(i) ? i : []);
-                setSaleOrders(Array.isArray(so) ? so : []);
+
+                // Filter Delivery Orders that are not yet invoiced
+                // We check if DO.id is not used in any invoice's issueNoteId or similar
+                // Actually, let's check by issueNoteId if that's the primary link
+                const invoicedIssueNoteIds = new Set(allInvoices.map(inv => inv.issueNoteId).filter(id => id));
+                const uninvoicedDOs = allDOs.filter(doItem => !invoicedIssueNoteIds.has(doItem.issueNoteId));
+
+                setDeliveryOrders(uninvoicedDOs);
             } catch { toast.error('فشل تحميل البيانات'); }
         })();
     }, []);
 
-    const loadFromSaleOrder = async (soId: number) => {
-        if (!soId) {
-            setForm((f) => ({ ...f, salesOrderId: 0, soNumber: undefined, customerId: 0, customerNameAr: undefined, items: [] }));
+    const loadFromDeliveryOrder = async (doId: number) => {
+        if (!doId) {
+            setSelectedDOId(0);
+            setForm((f) => ({ ...f, salesOrderId: 0, soNumber: undefined, issueNoteId: 0, issueNoteNumber: undefined, customerId: 0, customerNameAr: undefined, items: [] }));
             return;
         }
         try {
-            const so = await saleOrderService.getById(soId);
-            if (so) {
+            const deliveryOrder = await deliveryOrderService.getById(doId);
+            if (deliveryOrder) {
+                setSelectedDOId(doId);
+                const soId = deliveryOrder.saleOrderId;
+                let soDetails: any = null;
+                if (soId) {
+                    soDetails = await saleOrderService.getById(soId).catch(() => null);
+                }
+
                 setForm((f) => ({
                     ...f,
-                    salesOrderId: so.id!,
-                    soNumber: so.soNumber,
-                    customerId: so.customerId,
-                    customerNameAr: so.customerNameAr,
-                    paymentTerms: so.paymentTerms ?? f.paymentTerms,
-                    discountPercentage: 0,
-                    taxAmount: so.taxAmount ?? 0,
-                    items: (so.items || []).map((i) => ({
-                        itemId: i.itemId,
-                        itemNameAr: i.itemNameAr,
-                        itemCode: i.itemCode,
-                        quantity: i.orderedQty,
-                        unitId: i.unitId,
-                        unitNameAr: i.unitNameAr,
-                        unitPrice: i.unitPrice,
-                        discountPercentage: i.discountPercentage,
-                        totalPrice: i.totalPrice
-                    }))
+                    salesOrderId: deliveryOrder.saleOrderId || soDetails?.id || 0,
+                    soNumber: deliveryOrder.saleOrderNumber || soDetails?.soNumber,
+                    issueNoteId: deliveryOrder.issueNoteId,
+                    issueNoteNumber: deliveryOrder.issueNoteNumber,
+                    customerId: deliveryOrder.customerId || soDetails?.customerId || 0,
+                    customerNameAr: deliveryOrder.customerNameAr || soDetails?.customerNameAr,
+                    paymentTerms: soDetails?.paymentTerms ?? f.paymentTerms,
+                    discountPercentage: soDetails?.discountPercentage ?? 0,
+                    taxAmount: deliveryOrder.taxAmount || soDetails?.taxAmount || 0,
+                    deliveryCost: deliveryOrder.deliveryCost || soDetails?.deliveryCost || 0,
+                    otherCosts: deliveryOrder.otherCosts || soDetails?.otherCosts || 0,
+                    items: (deliveryOrder.items || []).map((i) => {
+                        return {
+                            itemId: i.itemId,
+                            itemNameAr: i.itemNameAr,
+                            itemCode: i.itemCode,
+                            quantity: i.qty,
+                            unitId: i.unitId,
+                            unitNameAr: i.unitNameAr,
+                            unitPrice: i.unitPrice || 0,
+                            discountPercentage: i.discountPercentage || 0,
+                            discountAmount: (i.qty * (i.unitPrice || 0)) * ((i.discountPercentage || 0) / 100),
+                            totalPrice: i.totalPrice || 0
+                        };
+                    })
                 }));
             }
-        } catch { toast.error('فشل تحميل أمر البيع'); }
+        } catch { toast.error('فشل تحميل أمر التوصيل'); }
     };
 
     useEffect(() => {
-        if (saleOrderIdParam) loadFromSaleOrder(parseInt(saleOrderIdParam));
+        if (saleOrderIdParam) {
+            // If it's a delivery order ID being passed
+            loadFromDeliveryOrder(parseInt(saleOrderIdParam));
+        }
     }, [saleOrderIdParam]);
 
     useEffect(() => {
@@ -183,12 +212,31 @@ const SalesInvoiceFormPage: React.FC = () => {
         }
     }, [id, isNew, navigate]);
 
-    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, quantity: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, totalPrice: 0 }] })); };
-    const removeItem = (idx: number) => { setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
+
     const updateItem = (idx: number, u: Partial<SalesInvoiceItemDto>) => {
         setForm((f) => {
             const arr = [...f.items];
-            arr[idx] = { ...arr[idx], ...u };
+            const currentItem = { ...arr[idx], ...u };
+
+            // Calculate item total
+            const qty = currentItem.quantity || 0;
+            const price = currentItem.unitPrice || 0;
+            const itemDiscPerc = currentItem.discountPercentage || 0;
+            const itemTaxPerc = currentItem.taxPercentage || 0;
+
+            const itemSubtotal = qty * price;
+            const itemDiscAmount = itemSubtotal * (itemDiscPerc / 100);
+            const taxableAmount = itemSubtotal - itemDiscAmount;
+            const itemTaxAmount = taxableAmount * (itemTaxPerc / 100);
+            const itemTotal = taxableAmount + itemTaxAmount;
+
+            arr[idx] = {
+                ...currentItem,
+                discountAmount: itemDiscAmount,
+                taxAmount: itemTaxAmount,
+                totalPrice: itemTotal
+            };
+
             const it = items.find((x) => x.id === (u.itemId ?? arr[idx].itemId));
             if (u.itemId !== undefined && it) arr[idx].unitId = it.unitId;
             return { ...f, items: arr };
@@ -199,7 +247,9 @@ const SalesInvoiceFormPage: React.FC = () => {
     const disc = subtotal * ((form.discountPercentage || 0) / 100);
     const afterDisc = subtotal - disc;
     const tax = form.taxAmount || 0;
-    const total = afterDisc + tax;
+    const delivery = form.deliveryCost || 0;
+    const other = form.otherCosts || 0;
+    const total = afterDisc + tax + delivery + other;
     const paid = form.paidAmount ?? 0;
     const balance = total - paid;
 
@@ -314,9 +364,9 @@ const SalesInvoiceFormPage: React.FC = () => {
                                 {isReadOnly && <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20"><Lock className="w-3 h-3" /> للعرض فقط</span>}
                                 {form.approvalStatus && (
                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
-                                            form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
-                                                form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
-                                                    'bg-slate-500/20 text-white border-slate-300/30'
+                                        form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
+                                            form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
+                                                'bg-slate-500/20 text-white border-slate-300/30'
                                         }`}>
                                         {form.approvalStatus === 'Approved' && <CheckCircle2 className="w-3 h-3" />}
                                         {form.approvalStatus === 'Rejected' && <XCircle className="w-3 h-3" />}
@@ -389,10 +439,10 @@ const SalesInvoiceFormPage: React.FC = () => {
 
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">أمر البيع (تحميل منه)</label>
-                                <select disabled={isReadOnly} value={form.salesOrderId || ''} onChange={(e) => loadFromSaleOrder(parseInt(e.target.value) || 0)} className={inputClass()}>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">امر توصيل</label>
+                                <select disabled={isReadOnly} value={selectedDOId || ''} onChange={(e) => loadFromDeliveryOrder(parseInt(e.target.value) || 0)} className={inputClass()}>
                                     <option value="">—</option>
-                                    {saleOrders.map((o) => <option key={o.id} value={o.id}>{o.soNumber} — {o.customerNameAr}</option>)}
+                                    {deliveryOrders.map((o) => <option key={o.id} value={o.id}>{o.deliveryOrderNumber} — {o.customerNameAr}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -407,7 +457,7 @@ const SalesInvoiceFormPage: React.FC = () => {
                                     <Calendar className="w-4 h-4 text-brand-primary" />
                                     تاريخ الفاتورة <span className="text-rose-500">*</span>
                                 </label>
-                                <input disabled={isReadOnly} type="date" value={form.invoiceDate || ''} onChange={(e) => setForm((f) => ({ ...f, invoiceDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={inputClass()} required />
+                                <input disabled={true} type="date" value={form.invoiceDate || ''} onChange={(e) => setForm((f) => ({ ...f, invoiceDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={`w-full px-4 py-3 rounded-xl border-2 outline-none transition-all ${true ? 'bg-slate-100 border-transparent cursor-not-allowed opacity-70 text-slate-500 font-bold' : 'border-slate-100 focus:border-indigo-500 bg-slate-50/50'}`} required />
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">تاريخ الاستحقاق</label>
@@ -428,7 +478,7 @@ const SalesInvoiceFormPage: React.FC = () => {
                                     <div className="p-3 bg-purple-100/50 rounded-xl"><Package className="w-5 h-5 text-purple-600" /></div>
                                     <div><h3 className="font-bold text-slate-800 text-lg">الأصناف</h3><p className="text-slate-500 text-sm">{form.items.length} صنف مضاف</p></div>
                                 </div>
-                                {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg"><Plus className="w-4 h-4" /> إضافة صنف</button>}
+                                {/* Item list is locked - no add/edit/delete permited as requested */}
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -438,31 +488,25 @@ const SalesInvoiceFormPage: React.FC = () => {
                                         <th className="py-4 pr-6 text-right">الصنف</th>
                                         <th className="py-4 px-4 text-center">الكمية</th>
                                         <th className="py-4 px-4 text-center">السعر</th>
-                                        <th className="py-4 px-4 text-center">خصم %</th>
+                                        <th className="py-4 px-4 text-center">الخصم %</th>
                                         <th className="py-4 px-4 text-center">الإجمالي</th>
-                                        {!isReadOnly && <th className="py-4 pl-6"></th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {form.items.map((it, idx) => (
                                         <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
                                             <td className="py-4 pr-6">
-                                                <select disabled={isReadOnly} value={it.itemId || ''} onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })} className={smallInputClass('min-w-[200px]')}>
+                                                <select disabled={true} value={it.itemId || ''} onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })} className={smallInputClass('min-w-[200px]')}>
                                                     <option value="">اختر الصنف...</option>
                                                     {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr || i.itemCode}</option>)}
                                                 </select>
                                             </td>
-                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0.001} value={it.quantity || ''} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-bold text-purple-600')} /></td>
-                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-24 text-center font-bold')} /></td>
-                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0} max={100} step={0.01} value={it.discountPercentage || ''} onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-medium text-rose-600')} /></td>
+                                            <td className="py-4 px-4"><input disabled={true} type="number" min={0.001} value={it.quantity || ''} onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-bold text-purple-600')} /></td>
+                                            <td className="py-4 px-4"><input disabled={true} type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-24 text-center font-bold')} /></td>
+                                            <td className="py-4 px-4"><input disabled={true} type="number" min={0} max={100} step={0.01} value={it.discountPercentage || ''} onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-medium text-rose-600')} /></td>
                                             <td className="py-4 px-4 text-center font-bold text-slate-800 tabular-nums">
                                                 {formatNumber(((it.quantity || 0) * (it.unitPrice || 0) * (1 - (it.discountPercentage || 0) / 100)))}
                                             </td>
-                                            {!isReadOnly && (
-                                                <td className="py-4 pl-6 text-left">
-                                                    <button type="button" onClick={() => removeItem(idx)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-4 h-4" /></button>
-                                                </td>
-                                            )}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -487,11 +531,19 @@ const SalesInvoiceFormPage: React.FC = () => {
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
                                 <span className="text-white/60">الخصم الإضافي %</span>
-                                {isReadOnly ? <span className="font-bold">{form.discountPercentage || 0}%</span> : <input type="number" value={form.discountPercentage || ''} onChange={(e) => setForm({ ...form, discountPercentage: parseFloat(e.target.value) || 0 })} className="w-20 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-purple-500 outline-none" />}
+                                <span className="font-bold text-white/90 tabular-nums">{form.discountPercentage || 0}%</span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
                                 <span className="text-white/60">الضريبة</span>
-                                {isReadOnly ? <span className="font-bold">{formatNumber(form.taxAmount || 0)}</span> : <input type="number" value={form.taxAmount || ''} onChange={(e) => setForm({ ...form, taxAmount: parseFloat(e.target.value) || 0 })} className="w-24 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-purple-500 outline-none" />}
+                                <span className="font-bold text-white/90 tabular-nums">{formatNumber(form.taxAmount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                <span className="text-white/60">مصاريف التوصيل</span>
+                                <span className="font-bold text-white/90 tabular-nums">{formatNumber(form.deliveryCost || 0)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                <span className="text-white/60">مصاريف أخرى</span>
+                                <span className="font-bold text-white/90 tabular-nums">{formatNumber(form.otherCosts || 0)}</span>
                             </div>
                             <div className="pt-4 mt-2 border-t border-white/10">
                                 <div className="flex justify-between items-center p-5 bg-brand-primary rounded-2xl shadow-lg shadow-brand-primary/20">
@@ -502,7 +554,7 @@ const SalesInvoiceFormPage: React.FC = () => {
                             <div className="mt-4 p-4 border border-white/5 rounded-2xl bg-white/5 space-y-3">
                                 <div className="flex justify-between text-xs text-white/40">
                                     <span>المدفوع</span>
-                                    {isReadOnly ? <span className="tabular-nums">{formatNumber(paid)}</span> : <input type="number" value={form.paidAmount ?? ''} onChange={(e) => setForm({ ...form, paidAmount: parseFloat(e.target.value) || 0 })} className="w-20 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-emerald-500 outline-none" />}
+                                    <span className="tabular-nums font-bold text-white/90">{formatNumber(paid)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-amber-400 font-bold">
                                     <span>المتبقي</span>

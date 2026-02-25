@@ -199,6 +199,6 @@ public class CustomerRequestService {
     private String generateRequestNumber() {
         // Simple generation logic, ideal implementation handles sequence table
         long count = requestRepository.count();
-        return "CR-" + (2026000 + count + 1);
+        return "CR-" + (count + 1);
     }
 }

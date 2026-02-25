@@ -35,4 +35,10 @@ public class CustomerRequestDeliverySchedule {
 
     @Column(length = 500)
     private String notes;
+
+    @Column(length = 20)
+    @Builder.Default
+    private String status = "Pending";
+
+    private Integer deliveryOrderId;
 }

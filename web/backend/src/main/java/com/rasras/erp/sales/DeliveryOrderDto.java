@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -27,6 +28,8 @@ public class DeliveryOrderDto {
     private Integer zoneId;
     private String deliveryType;
     private Integer vehicleId;
+    private Integer scheduleId;
+    private List<Integer> selectedScheduleIds;
     private Integer contractorId;
     private String driverName;
     private String driverPhone;
@@ -34,6 +37,10 @@ public class DeliveryOrderDto {
     private LocalTime scheduledTime;
     private LocalDate actualDeliveryDate;
     private BigDecimal deliveryCost;
+    private BigDecimal otherCosts;
+    private BigDecimal subTotal;
+    private BigDecimal taxAmount;
+    private BigDecimal totalAmount;
     private Boolean isCostOnCustomer;
     private String status;
     private String approvalStatus;
@@ -42,6 +49,8 @@ public class DeliveryOrderDto {
     private String receiverSignature;
     private String podAttachmentPath;
     private String notes;
+    private String vehicleNo;
+    private List<DeliveryOrderItemDto> items;
     private LocalDateTime createdAt;
     private Integer createdBy;
     private LocalDateTime updatedAt;

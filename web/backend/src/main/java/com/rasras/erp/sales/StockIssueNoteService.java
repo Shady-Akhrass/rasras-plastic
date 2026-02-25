@@ -15,11 +15,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.rasras.erp.sales.CustomerRequestDeliveryScheduleRepository;
+
 @Service
 @RequiredArgsConstructor
 public class StockIssueNoteService {
 
     private final StockIssueNoteRepository issueNoteRepository;
+    private final DeliveryOrderRepository deliveryOrderRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final CustomerRepository customerRepository;
     private final WarehouseRepository warehouseRepository;
@@ -28,12 +31,103 @@ public class StockIssueNoteService {
     private final InventoryService inventoryService;
     private final StockBalanceRepository stockBalanceRepository;
     private final ApprovalService approvalService;
+    private final CustomerRequestDeliveryScheduleRepository scheduleRepository;
 
     @Transactional(readOnly = true)
     public List<StockIssueNoteDto> getAll() {
         return issueNoteRepository.findAll().stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PendingDeliveryNoteDto> getPendingDeliveryNotes() {
+        List<StockIssueNote> approvedNotes = issueNoteRepository.findByStatus("Approved");
+
+        // Map existing delivery orders to a set of "NoteID-ScheduleID" strings for
+        // independent filtering
+        // Map all schedules that have a delivery order assigned (and not cancelled)
+        java.util.Set<Integer> nonCancelledDoIds = deliveryOrderRepository.findAll().stream()
+                .filter(doOrder -> !"Cancelled".equals(doOrder.getStatus()))
+                .map(DeliveryOrder::getId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        java.util.Set<String> fulfilled = scheduleRepository.findAll().stream()
+                .filter(s -> s.getDeliveryOrderId() != null && nonCancelledDoIds.contains(s.getDeliveryOrderId()))
+                .map(s -> {
+                    DeliveryOrder doOrder = deliveryOrderRepository.findById(s.getDeliveryOrderId()).orElse(null);
+                    Integer sinId = (doOrder != null && doOrder.getStockIssueNote() != null)
+                            ? doOrder.getStockIssueNote().getId()
+                            : 0;
+                    return sinId + "-" + s.getScheduleId();
+                })
+                .collect(java.util.stream.Collectors.toSet());
+
+        // Also add legacy single schedule links
+        deliveryOrderRepository.findAll().stream()
+                .filter(doOrder -> nonCancelledDoIds.contains(doOrder.getId()) && doOrder.getScheduleId() != null)
+                .forEach(doOrder -> fulfilled.add(doOrder.getStockIssueNote().getId() + "-" + doOrder.getScheduleId()));
+        List<PendingDeliveryNoteDto> result = new ArrayList<>();
+
+        for (StockIssueNote note : approvedNotes) {
+            SalesOrder so = note.getSalesOrder();
+            boolean handledBySchedules = false;
+
+            if (so != null && so.getSalesQuotation() != null && so.getSalesQuotation().getCustomerRequest() != null) {
+                CustomerRequest cr = so.getSalesQuotation().getCustomerRequest();
+                if (cr.getSchedules() != null && !cr.getSchedules().isEmpty()) {
+                    handledBySchedules = true;
+                    // For each schedule, check if it already has a delivery order
+                    for (CustomerRequestDeliverySchedule schedule : cr.getSchedules()) {
+                        if ("Fulfilled".equals(schedule.getStatus()) ||
+                                schedule.getDeliveryOrderId() != null ||
+                                fulfilled.contains(note.getId() + "-" + schedule.getScheduleId())) {
+                            continue;
+                        }
+
+                        result.add(PendingDeliveryNoteDto.builder()
+                                .issueNoteId(note.getId())
+                                .issueNoteNumber(note.getIssueNoteNumber())
+                                .issueDate(note.getIssueDate() != null ? note.getIssueDate().toLocalDate() : null)
+                                .customerId(note.getCustomer().getId())
+                                .customerNameAr(note.getCustomer().getCustomerNameAr())
+                                .customerCode(note.getCustomer().getCustomerCode())
+                                .salesOrderId(so.getId())
+                                .soNumber(so.getSoNumber())
+                                .scheduleId(schedule.getScheduleId())
+                                .deliveryDate(schedule.getDeliveryDate())
+                                .itemsCount(note.getItems() != null ? note.getItems().size() : 0)
+                                .status(note.getStatus())
+                                .notes(schedule.getNotes())
+                                .build());
+                    }
+                }
+            }
+
+            if (!handledBySchedules) {
+                // Normal case: check if a DO exists for this note (with no specific schedule)
+                if (fulfilled.contains(note.getId() + "-null")) {
+                    continue;
+                }
+
+                result.add(PendingDeliveryNoteDto.builder()
+                        .issueNoteId(note.getId())
+                        .issueNoteNumber(note.getIssueNoteNumber())
+                        .issueDate(note.getIssueDate() != null ? note.getIssueDate().toLocalDate() : null)
+                        .customerId(note.getCustomer().getId())
+                        .customerNameAr(note.getCustomer().getCustomerNameAr())
+                        .customerCode(note.getCustomer().getCustomerCode())
+                        .salesOrderId(so != null ? so.getId() : null)
+                        .soNumber(so != null ? so.getSoNumber() : null)
+                        .deliveryDate(note.getDeliveryDate() != null ? note.getDeliveryDate().toLocalDate() : null)
+                        .itemsCount(note.getItems() != null ? note.getItems().size() : 0)
+                        .status(note.getStatus())
+                        .notes(note.getNotes())
+                        .build());
+            }
+        }
+
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -292,7 +386,8 @@ public class StockIssueNoteService {
             }
         }
 
-        return mapToDto(issueNoteRepository.save(note));
+        StockIssueNote saved = issueNoteRepository.save(note);
+        return mapToDto(saved);
     }
 
     @Transactional
@@ -325,9 +420,11 @@ public class StockIssueNoteService {
         StockIssueNote note = issueNoteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Stock Issue Note not found"));
 
-        if (!"Draft".equals(note.getStatus()) && !"Pending".equals(note.getStatus()) && !"Rejected".equals(note.getStatus())) {
+        if (!"Draft".equals(note.getStatus()) && !"Pending".equals(note.getStatus())
+                && !"Rejected".equals(note.getStatus())) {
             throw new RuntimeException("Cannot delete Issue Note that is not in Draft, Pending, or Rejected status");
         }
+        releaseReservation(note); // Release stock reservation on delete
         issueNoteRepository.delete(note);
     }
 
@@ -339,38 +436,24 @@ public class StockIssueNoteService {
         StockIssueNote note = issueNoteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Stock Issue Note not found"));
 
-        if (!"Draft".equals(note.getStatus())) {
-            throw new RuntimeException("Issue Note is already approved or in another status");
+        if (!"Draft".equals(note.getStatus()) && !"Pending".equals(note.getStatus())
+                && !"Rejected".equals(note.getStatus())) {
+            throw new RuntimeException("Issue Note cannot be approved from its current status: " + note.getStatus());
         }
 
         int userId = approvedByUserId != null ? approvedByUserId : 1;
-        Integer warehouseId = note.getWarehouse().getId();
 
-        for (StockIssueNoteItem item : note.getItems()) {
-            Integer itemId = item.getItem().getId();
-            BigDecimal qty = item.getIssuedQty();
-            BigDecimal unitCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
-
-            inventoryService.updateStock(
-                    itemId, warehouseId, qty, "OUT",
-                    "ISSUE", "StockIssueNote", note.getId(), note.getIssueNoteNumber(),
-                    unitCost, userId);
-
-            SalesOrderItem soItem = item.getSalesOrderItem();
-            if (soItem != null) {
-                BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty()
-                        : BigDecimal.ZERO).add(qty);
-                soItem.setDeliveredQty(newDelivered);
-            }
-        }
-
+        // Final approval of SIN only updates status.
+        // Stock is deducted later upon Delivery Order approval.
         note.setStatus("Approved");
+        note.setApprovedDate(LocalDateTime.now());
         note.setUpdatedBy(userId);
+
         return mapToDto(issueNoteRepository.save(note));
     }
 
     private String generateIssueNoteNumber() {
-        return "SIN-" + System.currentTimeMillis();
+        return "SIN-" + (issueNoteRepository.count() + 1);
     }
 
     private StockIssueNoteDto mapToDto(StockIssueNote note) {
@@ -434,5 +517,21 @@ public class StockIssueNoteService {
                 .notes(item.getNotes())
                 .build();
         return dto;
+    }
+
+    private void reserveStock(StockIssueNote note) {
+        if (note.getItems() == null)
+            return;
+        for (StockIssueNoteItem item : note.getItems()) {
+            inventoryService.reserveStock(item.getItem(), note.getWarehouse(), item.getIssuedQty());
+        }
+    }
+
+    private void releaseReservation(StockIssueNote note) {
+        if (note.getItems() == null)
+            return;
+        for (StockIssueNoteItem item : note.getItems()) {
+            inventoryService.releaseReservation(item.getItem(), note.getWarehouse(), item.getIssuedQty());
+        }
     }
 }

@@ -23,6 +23,11 @@ public class StockIssueNoteController {
         return ResponseEntity.ok(ApiResponse.success(issueNoteService.getAll()));
     }
 
+    @GetMapping("/pending-delivery")
+    public ResponseEntity<ApiResponse<List<PendingDeliveryNoteDto>>> getPendingDeliveryNotes() {
+        return ResponseEntity.ok(ApiResponse.success(issueNoteService.getPendingDeliveryNotes()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<StockIssueNoteDto>> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(issueNoteService.getById(id)));

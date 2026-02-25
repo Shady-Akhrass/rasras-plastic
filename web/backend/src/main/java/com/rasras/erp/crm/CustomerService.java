@@ -34,6 +34,27 @@ public class CustomerService {
         return mapToDto(customer);
     }
 
+    @Transactional(readOnly = true)
+    public List<CustomerOutstandingDto> getOutstandingSummary() {
+        return customerRepository.findAll().stream()
+                .map(this::mapToOutstandingDto)
+                .collect(Collectors.toList());
+    }
+
+    private CustomerOutstandingDto mapToOutstandingDto(Customer customer) {
+        return CustomerOutstandingDto.builder()
+                .id(customer.getId())
+                .customerCode(customer.getCustomerCode())
+                .customerNameAr(customer.getCustomerNameAr())
+                .creditLimit(customer.getCreditLimit())
+                .totalInvoiced(customer.getTotalInvoiced())
+                .totalPaid(customer.getTotalPaid())
+                .totalReturned(customer.getTotalReturned())
+                .currentBalance(customer.getCurrentBalance())
+                .currency(customer.getCurrency())
+                .build();
+    }
+
     @Transactional
     public CustomerDto createCustomer(CustomerDto dto) {
         if (customerRepository.existsByCustomerCode(dto.getCustomerCode())) {
@@ -211,7 +232,10 @@ public class CustomerService {
                 .build();
     }
 
-    /** لا نُدخل 0 كقيمة لـ Foreign Key؛ نستبدلها بـ null لتفادي انتهاك القيد في قاعدة البيانات */
+    /**
+     * لا نُدخل 0 كقيمة لـ Foreign Key؛ نستبدلها بـ null لتفادي انتهاك القيد في
+     * قاعدة البيانات
+     */
     private static Integer normalizeFk(Integer id) {
         return (id != null && id != 0) ? id : null;
     }

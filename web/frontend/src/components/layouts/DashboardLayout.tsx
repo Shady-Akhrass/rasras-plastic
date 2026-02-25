@@ -201,7 +201,7 @@ const DashboardLayout: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    const { pendingApprovals, pendingInspections, waitingImports, pendingCustomerRequests } =
+    const { pendingApprovals, pendingInspections, waitingImports, pendingCustomerRequests, waitingDeliveries, hasDeliveriesToday } =
         useNotificationPolling(location.pathname);
 
     const userString = localStorage.getItem('user');
@@ -282,7 +282,7 @@ const DashboardLayout: React.FC = () => {
         requiredPermission?: string;
         hideWhenHasPermission?: string;
         showWhenAlsoHasPermission?: string;
-        warehouseGroup?: string; search?: string; badge?: number; order?: number;
+        warehouseGroup?: string; search?: string; badge?: number; blink?: boolean; order?: number;
         exact?: boolean;
     }> = [
             { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة القيادة', section: 'main', menuPermission: 'MENU_MAIN_DASHBOARD' },
@@ -428,7 +428,9 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/sales/delivery-orders', icon: Truck,
                 label: 'أوامر التوصيل', section: 'sales', menuPermission: 'MENU_SALES_DELIVERY_ORDERS', order: 6,
-                requiredPermission: 'SECTION_SALES'
+                requiredPermission: 'SECTION_SALES',
+                badge: waitingDeliveries || undefined,
+                blink: hasDeliveriesToday
             },
             {
                 to: '/dashboard/sales/vehicles', icon: Truck,
@@ -450,6 +452,10 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/crm/customers', icon: Users, label: 'العملاء',
                 section: 'crm', menuPermission: 'MENU_CRM_CUSTOMERS', requiredPermission: 'SECTION_CRM'
+            },
+            {
+                to: '/dashboard/crm/customers/outstanding', icon: DollarSign, label: 'أرصدة العملاء',
+                section: 'crm', menuPermission: 'MENU_CRM_OUTSTANDING', requiredPermission: 'SECTION_CRM'
             },
 
             // Finance
@@ -635,7 +641,9 @@ const DashboardLayout: React.FC = () => {
         const visibleByPermission = hasMenuPerm || (!hasAnyMenuPerm && hasSectionPerm);
         if (!visibleByPermission) return false;
         if (item.hideWhenHasPermission && userPermissions.includes(item.hideWhenHasPermission)) {
-            if (!(item.showWhenAlsoHasPermission && userPermissions.includes(item.showWhenAlsoHasPermission)))
+            if (item.showWhenAlsoHasPermission && userPermissions.includes(item.showWhenAlsoHasPermission))
+                return true; // don't hide: user has both sections, show the item
+            else
                 return false;
         }
         return true;

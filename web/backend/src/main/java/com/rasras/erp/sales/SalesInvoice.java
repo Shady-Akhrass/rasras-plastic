@@ -75,6 +75,14 @@ public class SalesInvoice extends AuditableEntity {
     @Builder.Default
     private BigDecimal shippingCost = BigDecimal.ZERO;
 
+    @Column(name = "DeliveryCost", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal deliveryCost = BigDecimal.ZERO;
+
+    @Column(name = "OtherCosts", precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal otherCosts = BigDecimal.ZERO;
+
     @Column(name = "TotalAmount", nullable = false, precision = 18, scale = 2)
     private BigDecimal totalAmount;
 

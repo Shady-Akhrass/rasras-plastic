@@ -44,6 +44,7 @@ import RolesPage from './pages/settings/RolesPage';
 import PermissionsPage from './pages/settings/PermissionsPage';
 import CustomersPage from './pages/crm/CustomersPage';
 import CustomerFormPage from './pages/crm/CustomerFormPage';
+import CustomerOutstandingPage from './pages/sales/CustomerOutstandingPage';
 import PaymentVouchersPage from './pages/finance/PaymentVouchersPage';
 import NewPaymentVoucherPage from './pages/finance/NewPaymentVoucherPage';
 import PaymentVoucherDetailPage from './pages/finance/PaymentVoucherDetailPage';
@@ -77,6 +78,7 @@ import SalesInvoiceListPage from './pages/sales/SalesInvoiceListPage';
 import SalesInvoiceFormPage from './pages/sales/SalesInvoiceFormPage';
 import ReceiptListPage from './pages/sales/ReceiptListPage';
 import ReceiptFormPage from './pages/sales/ReceiptFormPage';
+import ReceiptDetailPage from './pages/sales/ReceiptDetailPage';
 import SalesReportsPage from './pages/sales/SalesReportsPage';
 import PurchaseRequisitionsListPage from './pages/sales/PurchaseRequisitionsListPage';
 import SalesPurchaseRequisitionFormPage from './pages/sales/PurchaseRequisitionFormPage';
@@ -192,6 +194,7 @@ function App() {
             <Route index element={<Navigate to="customers" replace />} />
             <Route path="customers">
               <Route index element={<CustomersPage />} />
+              <Route path="outstanding" element={<CustomerOutstandingPage />} />
               <Route path=":id" element={<CustomerFormPage />} />
             </Route>
           </Route>
@@ -241,7 +244,7 @@ function App() {
             <Route path="receipts">
               <Route index element={<ReceiptListPage />} />
               <Route path="new" element={<ReceiptFormPage />} />
-              <Route path=":id" element={<ReceiptFormPage />} />
+              <Route path=":id" element={<ReceiptDetailPage />} />
             </Route>
             <Route path="reports" element={<SalesReportsPage />} />
           </Route>

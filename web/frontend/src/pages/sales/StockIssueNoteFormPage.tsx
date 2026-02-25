@@ -145,7 +145,7 @@ const StockIssueNoteFormPage: React.FC = () => {
                 // Submit for approval instead of auto-approving
                 await stockIssueNoteService.submitForApproval(created.id);
                 toast.success('تم إنشاء إذن الصرف وإرساله للاعتماد بنجاح');
-                navigate(`/dashboard/sales/issue-notes/${created.id}`);
+                navigate('/dashboard/sales/issue-notes');
             } else {
                 toast.error('فشل الإنشاء');
             }
@@ -219,7 +219,7 @@ const StockIssueNoteFormPage: React.FC = () => {
             const updated = await stockIssueNoteService.update(form.id!, form);
             if (updated) {
                 toast.success('تم تحديث إذن الصرف');
-                setForm({ ...updated, items: updated.items || [] });
+                navigate('/dashboard/sales/issue-notes');
             } else {
                 toast.error('فشل التحديث');
             }

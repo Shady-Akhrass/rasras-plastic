@@ -37,6 +37,11 @@ public class VehicleService {
 
     @Transactional
     public VehicleDto create(VehicleDto dto) {
+        // Auto-generate vehicle code if not provided
+        if (dto.getVehicleCode() == null || dto.getVehicleCode().trim().isEmpty()) {
+            dto.setVehicleCode(generateVehicleCode());
+        }
+
         // Check if vehicle code already exists
         if (vehicleRepository.findByVehicleCode(dto.getVehicleCode()).isPresent()) {
             throw new RuntimeException("Vehicle code already exists: " + dto.getVehicleCode());
@@ -74,14 +79,16 @@ public class VehicleService {
         Vehicle existing = vehicleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vehicle not found"));
 
-        // Check if vehicle code is being changed and if it conflicts with another vehicle
+        // Check if vehicle code is being changed and if it conflicts with another
+        // vehicle
         if (!existing.getVehicleCode().equals(dto.getVehicleCode())) {
             if (vehicleRepository.findByVehicleCode(dto.getVehicleCode()).isPresent()) {
                 throw new RuntimeException("Vehicle code already exists: " + dto.getVehicleCode());
             }
         }
 
-        // Check if plate number is being changed and if it conflicts with another vehicle
+        // Check if plate number is being changed and if it conflicts with another
+        // vehicle
         if (!existing.getPlateNumber().equals(dto.getPlateNumber())) {
             if (vehicleRepository.findByPlateNumber(dto.getPlateNumber()).isPresent()) {
                 throw new RuntimeException("Plate number already exists: " + dto.getPlateNumber());
@@ -113,6 +120,10 @@ public class VehicleService {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vehicle not found"));
         vehicleRepository.delete(vehicle);
+    }
+
+    private String generateVehicleCode() {
+        return "V-" + (vehicleRepository.count() + 1);
     }
 
     private VehicleDto mapToDto(Vehicle vehicle) {

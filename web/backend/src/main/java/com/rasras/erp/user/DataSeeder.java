@@ -383,16 +383,18 @@ public class DataSeeder implements CommandLineRunner {
         log.info("Seeding action-level permissions...");
 
         String[][] actionPerms = {
-                { "ACCOUNTING_VIEW",   "عرض القيود المحاسبية",   "View Journal Entries",   "ACCOUNTING" },
-                { "ACCOUNTING_CREATE", "إنشاء قيد محاسبي",       "Create Journal Entry",   "ACCOUNTING" },
-                { "ACCOUNTING_UPDATE", "تعديل قيد محاسبي",       "Update Journal Entry",   "ACCOUNTING" },
-                { "ACCOUNTING_DELETE", "حذف قيد محاسبي",         "Delete Journal Entry",   "ACCOUNTING" },
-                { "ACCOUNTING_POST",   "ترحيل قيد محاسبي",       "Post Journal Entry",     "ACCOUNTING" },
-                { "SUPPLIER_INVOICE_CREATE",  "إنشاء فاتورة مورد",     "Create Supplier Invoice",   "SUPPLIER_INVOICE" },
-                { "SUPPLIER_INVOICE_VIEW",   "عرض فواتير الموردين",   "View Supplier Invoices",     "SUPPLIER_INVOICE" },
-                { "SUPPLIER_INVOICE_REVIEW",  "مراجعة/مطابقة فاتورة",  "Review/Match Supplier Invoice", "SUPPLIER_INVOICE" },
-                { "SUPPLIER_INVOICE_APPROVE", "اعتماد صرف فاتورة",     "Approve Supplier Invoice Payment", "SUPPLIER_INVOICE" },
-                { "SUPPLIER_INVOICE_PAY",     "دفع فاتورة (سند صرف)",  "Pay Supplier Invoice",   "SUPPLIER_INVOICE" },
+                { "ACCOUNTING_VIEW", "عرض القيود المحاسبية", "View Journal Entries", "ACCOUNTING" },
+                { "ACCOUNTING_CREATE", "إنشاء قيد محاسبي", "Create Journal Entry", "ACCOUNTING" },
+                { "ACCOUNTING_UPDATE", "تعديل قيد محاسبي", "Update Journal Entry", "ACCOUNTING" },
+                { "ACCOUNTING_DELETE", "حذف قيد محاسبي", "Delete Journal Entry", "ACCOUNTING" },
+                { "ACCOUNTING_POST", "ترحيل قيد محاسبي", "Post Journal Entry", "ACCOUNTING" },
+                { "SUPPLIER_INVOICE_CREATE", "إنشاء فاتورة مورد", "Create Supplier Invoice", "SUPPLIER_INVOICE" },
+                { "SUPPLIER_INVOICE_VIEW", "عرض فواتير الموردين", "View Supplier Invoices", "SUPPLIER_INVOICE" },
+                { "SUPPLIER_INVOICE_REVIEW", "مراجعة/مطابقة فاتورة", "Review/Match Supplier Invoice",
+                        "SUPPLIER_INVOICE" },
+                { "SUPPLIER_INVOICE_APPROVE", "اعتماد صرف فاتورة", "Approve Supplier Invoice Payment",
+                        "SUPPLIER_INVOICE" },
+                { "SUPPLIER_INVOICE_PAY", "دفع فاتورة (سند صرف)", "Pay Supplier Invoice", "SUPPLIER_INVOICE" },
         };
 
         for (String[] p : actionPerms) {
@@ -414,33 +416,39 @@ public class DataSeeder implements CommandLineRunner {
 
         for (String roleCode : java.util.Arrays.asList("ADMIN", "GM", "FM", "ACC")) {
             Role role = roleRepository.findByRoleCode(roleCode).orElse(null);
-            if (role == null) continue;
+            if (role == null)
+                continue;
             for (String permCode : accountingPerms) {
                 assignPermissionToRole(role, permCode);
             }
         }
 
-        // فواتير الموردين — PM/BUYER: إنشاء وعرض؛ FM/ACC: عرض ومراجعة واعتماد ودفع؛ ADMIN/GM: الكل
+        // فواتير الموردين — PM/BUYER: إنشاء وعرض؛ FM/ACC: عرض ومراجعة واعتماد ودفع؛
+        // ADMIN/GM: الكل
         List<String> supplierInvoicePerms = java.util.Arrays.asList(
                 "SUPPLIER_INVOICE_CREATE", "SUPPLIER_INVOICE_VIEW", "SUPPLIER_INVOICE_REVIEW",
                 "SUPPLIER_INVOICE_APPROVE", "SUPPLIER_INVOICE_PAY");
         for (String roleCode : java.util.Arrays.asList("PM", "BUYER")) {
             Role role = roleRepository.findByRoleCode(roleCode).orElse(null);
-            if (role == null) continue;
+            if (role == null)
+                continue;
             for (String permCode : java.util.Arrays.asList("SUPPLIER_INVOICE_CREATE", "SUPPLIER_INVOICE_VIEW")) {
                 assignPermissionToRole(role, permCode);
             }
         }
         for (String roleCode : java.util.Arrays.asList("FM", "ACC")) {
             Role role = roleRepository.findByRoleCode(roleCode).orElse(null);
-            if (role == null) continue;
-            for (String permCode : java.util.Arrays.asList("SUPPLIER_INVOICE_VIEW", "SUPPLIER_INVOICE_REVIEW", "SUPPLIER_INVOICE_APPROVE", "SUPPLIER_INVOICE_PAY")) {
+            if (role == null)
+                continue;
+            for (String permCode : java.util.Arrays.asList("SUPPLIER_INVOICE_VIEW", "SUPPLIER_INVOICE_REVIEW",
+                    "SUPPLIER_INVOICE_APPROVE", "SUPPLIER_INVOICE_PAY")) {
                 assignPermissionToRole(role, permCode);
             }
         }
         for (String roleCode : java.util.Arrays.asList("ADMIN", "GM")) {
             Role role = roleRepository.findByRoleCode(roleCode).orElse(null);
-            if (role == null) continue;
+            if (role == null)
+                continue;
             for (String permCode : supplierInvoicePerms) {
                 assignPermissionToRole(role, permCode);
             }
@@ -449,7 +457,8 @@ public class DataSeeder implements CommandLineRunner {
 
     private void assignPermissionToRole(Role role, String permCode) {
         Permission perm = permissionRepository.findByPermissionCode(permCode).orElse(null);
-        if (perm == null) return;
+        if (perm == null)
+            return;
         boolean exists = rolePermissionRepository.findByRoleRoleId(role.getRoleId()).stream()
                 .anyMatch(rp -> rp.getPermission().getPermissionId().equals(perm.getPermissionId()));
         if (!exists) {
@@ -729,6 +738,120 @@ public class DataSeeder implements CommandLineRunner {
                         .approverRole(accRole)
                         .build();
                 stepRepo.save(step3);
+            }
+        }
+
+        // 8. Delivery Order Approval Workflow
+        if (!workflowRepo.findByWorkflowCode("DELIVERY_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow doWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("DELIVERY_APPROVAL")
+                    .workflowName("Delivery Order Approval")
+                    .documentType("DeliveryOrder")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(doWorkflow);
+
+            Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
+            if (gmRole != null) {
+                com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
+                        .builder()
+                        .workflow(doWorkflow)
+                        .stepNumber(1)
+                        .stepName("General Manager Approval")
+                        .approverType("ROLE")
+                        .approverRole(gmRole)
+                        .build();
+                stepRepo.save(step1);
+            }
+        }
+
+        // 9. Sales Quotation Approval
+        if (!workflowRepo.findByWorkflowCode("QUOTATION_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("QUOTATION_APPROVAL")
+                    .workflowName("Sales Quotation Approval")
+                    .documentType("SalesQuotation")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(workflow);
+
+            Role smRole = roleRepository.findByRoleCode("SM").orElse(null);
+            if (smRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(workflow).stepNumber(1).stepName("Sales Manager Approval")
+                        .approverType("ROLE").approverRole(smRole).build());
+            }
+        }
+
+        // 10. Sales Order Approval
+        if (!workflowRepo.findByWorkflowCode("SO_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("SO_APPROVAL")
+                    .workflowName("Sales Order Approval")
+                    .documentType("SalesOrder")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(workflow);
+
+            Role smRole = roleRepository.findByRoleCode("SM").orElse(null);
+            if (smRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(workflow).stepNumber(1).stepName("Sales Manager Approval")
+                        .approverType("ROLE").approverRole(smRole).build());
+            }
+        }
+
+        // 11. Stock Issue Note Approval
+        if (!workflowRepo.findByWorkflowCode("ISSUE_NOTE_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("ISSUE_NOTE_APPROVAL")
+                    .workflowName("Stock Issue Note Approval")
+                    .documentType("StockIssueNote")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(workflow);
+
+            Role whmRole = roleRepository.findByRoleCode("WHM").orElse(null);
+            if (whmRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(workflow).stepNumber(1).stepName("Warehouse Manager Approval")
+                        .approverType("ROLE").approverRole(whmRole).build());
+            }
+        }
+
+        // 12. Sales Invoice Approval
+        if (!workflowRepo.findByWorkflowCode("INVOICE_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("INVOICE_APPROVAL")
+                    .workflowName("Sales Invoice Approval")
+                    .documentType("SalesInvoice")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(workflow);
+
+            Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+            if (fmRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(workflow).stepNumber(1).stepName("Finance Manager Approval")
+                        .approverType("ROLE").approverRole(fmRole).build());
+            }
+        }
+
+        // 13. Payment Receipt Approval
+        if (!workflowRepo.findByWorkflowCode("RECEIPT_APPROVAL").isPresent()) {
+            com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                    .workflowCode("RECEIPT_APPROVAL")
+                    .workflowName("Payment Receipt Approval")
+                    .documentType("PaymentReceipt")
+                    .isActive(true)
+                    .build();
+            workflowRepo.save(workflow);
+
+            Role fmRole = roleRepository.findByRoleCode("FM").orElse(null);
+            if (fmRole != null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(workflow).stepNumber(1).stepName("Finance Manager Approval")
+                        .approverType("ROLE").approverRole(fmRole).build());
             }
         }
     }

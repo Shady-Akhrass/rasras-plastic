@@ -166,6 +166,10 @@ const POTableRow: React.FC<{
             {formatNumber(convertAmount(order.shippingCost || 0, order.currency || 'EGP'))}
         </td>
 
+        <td className="px-6 py-4 text-center font-bold text-amber-600">
+            {formatNumber(convertAmount(order.otherCosts || 0, order.currency || 'EGP'))}
+        </td>
+
         <td className="px-6 py-4">
             <StatusBadge status={order.status!} />
         </td>
@@ -230,7 +234,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
-        <td colSpan={8} className="px-6 py-16">
+        <td colSpan={9} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm || statusFilter !== 'All' ? (
@@ -564,6 +568,7 @@ const PurchaseOrdersPage: React.FC = () => {
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">المورد</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الإجمالي</th>
                                 <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">مصاريف الشحن</th>
+                                <th className="px-6 py-4 text-center text-sm font-bold text-slate-700">مصاريف أخرى</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">الحالة</th>
                                 <th className="px-6 py-4 text-right text-sm font-bold text-slate-700">إجراءات</th>
                             </tr>

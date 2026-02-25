@@ -30,7 +30,7 @@ import { useSystemSettings } from '../../hooks/useSystemSettings';
 interface FormFieldProps {
     label: string;
     icon?: any;
-    isReadOnly: boolean;  // Changed from isView to isReadOnly
+    isReadOnly: boolean;
     value?: any;
     children: React.ReactNode;
     className?: string;
@@ -120,6 +120,8 @@ const SupplierInvoiceFormPage: React.FC = () => {
             const discountAmount = grossAmount * discountRate;
             const taxableAmount = grossAmount - discountAmount;
             const taxAmount = taxableAmount * taxRate;
+            
+            // This is the individual item total (Price - Discount + Tax)
             const totalPrice = taxableAmount + taxAmount;
 
             subTotalSum += grossAmount;
@@ -136,7 +138,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
         const currentTotal = Number(invoice.totalAmount) || 0;
         const otherCosts = Number(invoice.otherCosts) || 0;
+        // Sum of all items (inc tax)
         const netItems = (subTotalSum - totalDiscountSum) + totalTaxSum;
+        
+        // Auto-calculate delivery if the user entered a Grand Total that is higher than the sum of items
         const derivedDelivery = Math.max(0, currentTotal - netItems - otherCosts);
 
         return {
@@ -767,7 +772,7 @@ const SupplierInvoiceFormPage: React.FC = () => {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
-                    {/* Financial Summary (Already Read-Only by Design) */}
+                    {/* Financial Summary */}
                     <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-2xl animate-slide-in" style={{ animationDelay: '200ms' }}>
                         <div className="flex items-center gap-3 pb-6 border-b border-white/10">
                             <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
@@ -777,9 +782,10 @@ const SupplierInvoiceFormPage: React.FC = () => {
                         </div>
                         <div className="space-y-4 mt-6">
                             <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                                <span className="text-white/60 text-sm">إجمالي الأصناف (صافي)</span>
+                                <span className="text-white/60 text-sm">إجمالي الأصناف (شامل الضريبة)</span>
                                 <span className="font-bold text-lg">
-                                    {formatNumber(optimisticData.totalAmount - (optimisticData.taxAmount || 0) - (optimisticData.deliveryCost || 0))}
+                                    {/* Updated calculation to match the Sum of Item Totals from the Table */}
+                                    {formatNumber((optimisticData.subTotal || 0) - (optimisticData.discountAmount || 0) + (optimisticData.taxAmount || 0))}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center p-4 bg-rose-500/10 rounded-xl border border-rose-500/20">

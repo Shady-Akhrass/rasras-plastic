@@ -36,9 +36,10 @@ public class DeliveryOrderController {
     @PostMapping("/from-issue-note/{issueNoteId}")
     public ResponseEntity<ApiResponse<DeliveryOrderDto>> createFromIssueNote(
             @PathVariable Integer issueNoteId,
+            @RequestParam(required = false) Integer scheduleId,
             @RequestParam(required = false) Integer createdByUserId) {
         return ResponseEntity.ok(ApiResponse.success(
-                deliveryOrderService.createFromIssueNote(issueNoteId, createdByUserId)));
+                deliveryOrderService.createFromIssueNote(issueNoteId, scheduleId, createdByUserId)));
     }
 
     @PostMapping

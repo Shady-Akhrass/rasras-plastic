@@ -9,5 +9,10 @@ import java.util.Optional;
 @Repository
 public interface DeliveryOrderRepository extends JpaRepository<DeliveryOrder, Integer> {
     Optional<DeliveryOrder> findByDeliveryOrderNumber(String deliveryOrderNumber);
+
     List<DeliveryOrder> findByStockIssueNote_IdOrderByOrderDateDesc(Integer issueNoteId);
+
+    List<DeliveryOrder> findByStockIssueNote_SalesOrder_Id(Integer salesOrderId);
+
+    List<DeliveryOrder> findByStockIssueNote_SalesOrder_SalesQuotation_Id(Integer quotationId);
 }

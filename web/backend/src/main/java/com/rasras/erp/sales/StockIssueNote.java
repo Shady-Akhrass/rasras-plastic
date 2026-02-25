@@ -91,6 +91,12 @@ public class StockIssueNote extends AuditableEntity {
     @Column(name = "Notes", length = 1000)
     private String notes;
 
+    @Column(name = "ApprovedByUserID")
+    private Integer approvedByUserId;
+
+    @Column(name = "ApprovedDate")
+    private LocalDateTime approvedDate;
+
     @OneToMany(mappedBy = "stockIssueNote", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StockIssueNoteItem> items;
 }

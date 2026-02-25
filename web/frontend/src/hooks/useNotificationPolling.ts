@@ -4,6 +4,7 @@ import { approvalService } from '../services/approvalService';
 import { grnService } from '../services/grnService';
 import { purchaseOrderService } from '../services/purchaseOrderService';
 import { customerRequestService } from '../services/customerRequestService';
+import { stockIssueNoteService } from '../services/stockIssueNoteService';
 import toast from 'react-hot-toast';
 
 // ─── Sound & Browser Notification Helpers ───
@@ -72,6 +73,8 @@ export interface NotificationCounts {
     pendingInspections: number;
     waitingImports: number;
     pendingCustomerRequests: number;
+    waitingDeliveries: number;
+    hasDeliveriesToday: boolean;
 }
 
 export function useNotificationPolling(pathname: string) {
@@ -80,6 +83,8 @@ export function useNotificationPolling(pathname: string) {
         pendingInspections: 0,
         waitingImports: 0,
         pendingCustomerRequests: 0,
+        waitingDeliveries: 0,
+        hasDeliveriesToday: false,
     });
 
     // ─── Refs to track previous state (no re-renders) ───
@@ -122,8 +127,8 @@ export function useNotificationPolling(pathname: string) {
         const soundEnabled = localStorage.getItem('approvals_sound') !== 'off';
         const currentPath = pathnameRef.current;
 
-        // نستدعي فقط الـ APIs التي يسمح بها دور المستخدم (لتجنب 403 و"فشل تحميل البيانات")
-        type TaggedPromise = Promise<{ type: 'approvals' | 'inspections' | 'imports' | 'cr'; value: any }>;
+        // Build only the fetches the user is allowed to call (avoid 403)
+        type TaggedPromise = Promise<{ type: 'approvals' | 'inspections' | 'imports' | 'cr' | 'deliveries'; value: any }>;
         const tasks: TaggedPromise[] = [];
 
         tasks.push(
@@ -140,6 +145,7 @@ export function useNotificationPolling(pathname: string) {
         // طلبات العملاء: فقط لمن لديه قسم المبيعات (مدير مالي لا يملك SECTION_SALES → لا نستدعي)
         if (has('SECTION_SALES')) {
             tasks.push(customerRequestService.getAllRequests().then(value => ({ type: 'cr' as const, value })));
+            tasks.push(stockIssueNoteService.getPendingDeliveryNotes().then(value => ({ type: 'deliveries' as const, value })));
         }
 
         const results = await Promise.allSettled(tasks);
@@ -212,6 +218,16 @@ export function useNotificationPolling(pathname: string) {
                         ? prev
                         : { ...prev, pendingCustomerRequests: pendingCount }
                 );
+            } else if (type === 'deliveries') {
+                const deliveries = value || [];
+                const today = new Date().toISOString().split('T')[0];
+                const hasToday = deliveries.some((d: any) => d.deliveryDate?.startsWith(today));
+
+                setCounts(prev => ({
+                    ...prev,
+                    waitingDeliveries: deliveries.length,
+                    hasDeliveriesToday: hasToday
+                }));
             }
         }
 

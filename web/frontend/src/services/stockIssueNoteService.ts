@@ -53,6 +53,22 @@ export interface StockIssueNoteDto {
     items: StockIssueNoteItemDto[];
 }
 
+export interface PendingDeliveryNoteDto {
+    issueNoteId: number;
+    issueNoteNumber: string;
+    issueDate?: string;
+    customerId: number;
+    customerNameAr?: string;
+    customerCode?: string;
+    salesOrderId?: number;
+    soNumber?: string;
+    scheduleId?: number;
+    deliveryDate?: string;
+    itemsCount: number;
+    status: string;
+    notes?: string;
+}
+
 /** تحذير نقص كمية صنف عند التحقق من توفر المخزون */
 export interface StockAvailabilityWarningDto {
     itemId: number;
@@ -172,6 +188,15 @@ export const stockIssueNoteService = {
             return (res.data as any)?.data ?? null;
         } catch {
             return null;
+        }
+    },
+
+    getPendingDeliveryNotes: async (): Promise<PendingDeliveryNoteDto[]> => {
+        try {
+            const res = await apiClient.get<{ data?: PendingDeliveryNoteDto[] }>(`${_api}/pending-delivery`);
+            return (res.data as any)?.data ?? [];
+        } catch {
+            return [];
         }
     },
 };

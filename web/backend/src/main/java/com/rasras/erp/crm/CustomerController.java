@@ -28,6 +28,11 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success(customerService.getActiveCustomers()));
     }
 
+    @GetMapping("/outstanding")
+    public ResponseEntity<ApiResponse<List<CustomerOutstandingDto>>> getOutstandingSummary() {
+        return ResponseEntity.ok(ApiResponse.success(customerService.getOutstandingSummary()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CustomerDto>> getCustomerById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(customerService.getCustomerById(id)));

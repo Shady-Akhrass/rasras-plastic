@@ -259,7 +259,7 @@ public class SalesOrderService {
     }
 
     private String generateOrderNumber() {
-        return "SO-" + System.currentTimeMillis();
+        return "SO-" + (orderRepository.count() + 1);
     }
 
     private SalesOrderDto mapToDto(SalesOrder order) {

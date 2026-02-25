@@ -3,8 +3,6 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     Save,
     ArrowRight,
-    Plus,
-    Trash2,
     FileText,
     Lock,
     Info,
@@ -31,9 +29,10 @@ import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
 
-const safeNumber = (val: any) => {
-    const num = Number(val);
-    return isNaN(num) ? 0 : num;
+const safeNumber = (value: any, fallback: number = 0): number => {
+    if (value === null || value === undefined || value === '') return fallback;
+    const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+    return isNaN(num) || !isFinite(num) ? fallback : num;
 };
 
 
@@ -111,18 +110,27 @@ const SaleOrderFormPage: React.FC = () => {
                     taxAmount: q.taxAmount ?? 0,
                     deliveryCost: q.deliveryCost ?? 0,
                     otherCosts: q.otherCosts ?? 0,
-                    items: (q.items || []).map((i) => ({
-                        itemId: i.itemId,
-                        itemNameAr: i.itemNameAr,
-                        itemCode: i.itemCode,
-                        orderedQty: i.quantity,
-                        unitId: i.unitId,
-                        unitNameAr: i.unitNameAr,
-                        unitPrice: i.unitPrice,
-                        discountPercentage: i.discountPercentage,
-                        taxPercentage: i.taxPercentage,
-                        totalPrice: i.totalPrice
-                    }))
+                    items: (q.items || []).map((i) => {
+                        const qty = i.quantity;
+                        const price = i.unitPrice;
+                        const disc = i.discountPercentage || 0;
+                        const taxPerc = i.taxPercentage || 14;
+                        const beforeTax = qty * price * (1 - disc / 100);
+                        const lineTotal = beforeTax * (1 + taxPerc / 100);
+
+                        return {
+                            itemId: i.itemId,
+                            itemNameAr: i.itemNameAr,
+                            itemCode: i.itemCode,
+                            orderedQty: qty,
+                            unitId: i.unitId,
+                            unitNameAr: i.unitNameAr,
+                            unitPrice: price,
+                            discountPercentage: disc,
+                            taxPercentage: taxPerc,
+                            totalPrice: lineTotal
+                        };
+                    })
                 }));
             }
         } catch { toast.error('فشل تحميل عرض السعر'); }
@@ -138,7 +146,18 @@ const SaleOrderFormPage: React.FC = () => {
             (async () => {
                 try {
                     const o = await saleOrderService.getById(parseInt(id));
-                    if (o) setForm({ ...o, items: o.items || [] });
+                    if (o) {
+                        const items = (o.items || []).map(it => {
+                            const qty = safeNumber(it.orderedQty);
+                            const price = safeNumber(it.unitPrice);
+                            const disc = safeNumber(it.discountPercentage);
+                            const taxPerc = safeNumber(it.taxPercentage, 14);
+                            const beforeTax = qty * price * (1 - disc / 100);
+                            const lineTotal = beforeTax * (1 + taxPerc / 100);
+                            return { ...it, totalPrice: lineTotal };
+                        });
+                        setForm({ ...o, items });
+                    }
                     else { toast.error('أمر البيع غير موجود'); navigate('/dashboard/sales/orders'); }
                 } catch { toast.error('فشل تحميل أمر البيع'); navigate('/dashboard/sales/orders'); }
                 finally { setLoading(false); }
@@ -146,8 +165,6 @@ const SaleOrderFormPage: React.FC = () => {
         }
     }, [id, isNew, navigate]);
 
-    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, orderedQty: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, taxPercentage: 0, totalPrice: 0 }] })); };
-    const removeItem = (idx: number) => { setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
     const updateItem = (idx: number, u: Partial<SaleOrderItemDto>) => {
         setForm((f) => {
             const arr = [...f.items];
@@ -203,7 +220,14 @@ const SaleOrderFormPage: React.FC = () => {
                 deliveryCost: delivery,
                 otherCosts: other,
                 totalAmount: grandTotal,
-                items: form.items
+                items: form.items.map(it => {
+                    const qty = safeNumber(it.orderedQty);
+                    const price = safeNumber(it.unitPrice);
+                    const disc = safeNumber(it.discountPercentage);
+                    const taxPerc = safeNumber(it.taxPercentage, 14);
+                    const lineTotal = qty * price * (1 - disc / 100) * (1 + taxPerc / 100);
+                    return { ...it, totalPrice: lineTotal };
+                })
             };
             let createdOrder: SaleOrderDto | null = null;
             if (isNew) {
@@ -410,7 +434,7 @@ const SaleOrderFormPage: React.FC = () => {
                                     <Calendar className="w-4 h-4 text-brand-primary" />
                                     تاريخ الأمر <span className="text-rose-500">*</span>
                                 </label>
-                                <input disabled={isReadOnly} type="date" value={form.soDate || ''} onChange={(e) => setForm((f) => ({ ...f, soDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={inputClass()} required />
+                                <input disabled={true} type="date" value={form.soDate || ''} onChange={(e) => setForm((f) => ({ ...f, soDate: e.target.value }))} min={new Date().toISOString().split('T')[0]} className={`w-full px-4 py-3 rounded-xl border-2 outline-none transition-all ${true ? 'bg-slate-100 border-transparent cursor-not-allowed opacity-70 text-slate-500 font-bold' : 'border-slate-100 focus:border-indigo-500 bg-slate-50/50'}`} required />
                             </div>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">تاريخ التسليم</label>
@@ -421,7 +445,7 @@ const SaleOrderFormPage: React.FC = () => {
                                     <DollarSign className="w-4 h-4 text-brand-primary" />
                                     العملة
                                 </label>
-                                <select disabled={isReadOnly} value={form.currency || 'EGP'} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} className={inputClass()}>
+                                <select disabled={true} value={form.currency || 'EGP'} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} className={inputClass('bg-slate-100 border-slate-200 cursor-not-allowed opacity-70')}>
                                     <option value="EGP">ج.م (EGP)</option>
                                     <option value="USD">$ (USD)</option>
                                     <option value="SAR">ر.س (SAR)</option>
@@ -450,7 +474,6 @@ const SaleOrderFormPage: React.FC = () => {
                                         <p className="text-slate-500 text-sm">{form.items.length} صنف مضاف</p>
                                     </div>
                                 </div>
-                                {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg"><Plus className="w-4 h-4" /> إضافة صنف</button>}
                             </div>
                         </div>
 
@@ -466,7 +489,6 @@ const SaleOrderFormPage: React.FC = () => {
                                         <th className="py-4 px-4 text-center">خصم %</th>
                                         <th className="py-4 px-4 text-center">الضريبة %</th>
                                         <th className="py-4 px-4 text-center">الإجمالي</th>
-                                        {!isReadOnly && <th className="py-4 pl-6"></th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -481,11 +503,9 @@ const SaleOrderFormPage: React.FC = () => {
                                                     <select
                                                         value={itemId || ''}
                                                         onChange={(e) => updateItem(idx, { itemId: safeNumber(e.target.value) })}
-                                                        disabled={isReadOnly}
+                                                        disabled={true} // Locked
                                                         className={`w-full min-w-[200px] px-3 py-2 border-2 rounded-xl text-sm font-semibold outline-none transition-all
-                                                                    ${isReadOnly
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 focus:border-brand-primary'}`}
+                                                                    bg-slate-100 border-slate-200 cursor-not-allowed opacity-70`}
                                                     >
                                                         <option value="">اختر الصنف...</option>
                                                         {items.map((i) => (
@@ -504,11 +524,9 @@ const SaleOrderFormPage: React.FC = () => {
                                                         step="any"
                                                         value={it.orderedQty || ''}
                                                         onChange={(e) => updateItem(idx, { orderedQty: safeNumber(e.target.value) })}
-                                                        disabled={isReadOnly}
+                                                        disabled={true} // Locked
                                                         className={`w-24 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
-                                                                    ${isReadOnly
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 text-brand-primary focus:border-brand-primary'}`}
+                                                                    bg-slate-100 border-slate-200 cursor-not-allowed opacity-70 text-brand-primary`}
                                                     />
                                                 </td>
 
@@ -520,11 +538,9 @@ const SaleOrderFormPage: React.FC = () => {
                                                         step={0.01}
                                                         value={it.unitPrice || ''}
                                                         onChange={(e) => updateItem(idx, { unitPrice: safeNumber(e.target.value) })}
-                                                        disabled={isReadOnly}
+                                                        disabled={true} // Locked
                                                         className={`w-28 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
-                                                                    ${isReadOnly
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 text-emerald-600 focus:border-brand-primary'}`}
+                                                                    bg-slate-100 border-slate-200 cursor-not-allowed opacity-70 text-emerald-600`}
                                                     />
                                                 </td>
 
@@ -544,11 +560,9 @@ const SaleOrderFormPage: React.FC = () => {
                                                         step={0.01}
                                                         value={it.discountPercentage || ''}
                                                         onChange={(e) => updateItem(idx, { discountPercentage: safeNumber(e.target.value) })}
-                                                        disabled={isReadOnly}
+                                                        disabled={true} // Locked
                                                         className={`w-20 px-3 py-2 border-2 rounded-xl text-sm text-center font-semibold outline-none transition-all
-                                                                    ${isReadOnly
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 focus:border-brand-primary text-rose-500'}`}
+                                                                    bg-slate-100 border-slate-200 cursor-not-allowed opacity-70 text-rose-500`}
                                                     />
                                                 </td>
 
@@ -561,31 +575,15 @@ const SaleOrderFormPage: React.FC = () => {
                                                         step={0.01}
                                                         value={it.taxPercentage || ''}
                                                         onChange={(e) => updateItem(idx, { taxPercentage: safeNumber(e.target.value) })}
-                                                        disabled={isReadOnly}
+                                                        disabled={true} // Locked
                                                         className={`w-20 px-3 py-2 border-2 rounded-xl text-sm text-center font-semibold outline-none transition-all
-                                                                    ${isReadOnly
-                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
-                                                                : 'bg-white border-slate-200 focus:border-brand-primary text-indigo-600'}`}
+                                                                    bg-slate-100 border-slate-200 cursor-not-allowed opacity-70 text-indigo-600`}
                                                     />
                                                 </td>
 
-                                                {/* Total Price Display */}
                                                 <td className="py-4 px-4 text-center font-bold text-slate-800">
-                                                    {formatNumber(((it.orderedQty || 0) * (it.unitPrice || 0) * (1 - (it.discountPercentage || 0) / 100)), { minimumFractionDigits: 2 })}
+                                                    {formatNumber(((it.orderedQty || 0) * (it.unitPrice || 0) * (1 - (it.discountPercentage || 0) / 100) * (1 + (it.taxPercentage || 0) / 100)), { minimumFractionDigits: 2 })}
                                                 </td>
-
-                                                {/* Delete Action */}
-                                                {!isReadOnly && (
-                                                    <td className="py-4 pl-6 text-left">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeItem(idx)}
-                                                            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                )}
                                             </tr>
                                         );
                                     })}
@@ -598,30 +596,8 @@ const SaleOrderFormPage: React.FC = () => {
                                     <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
                                         <Package className="w-10 h-10 text-slate-400" />
                                     </div>
-                                    <p className="text-slate-400 font-semibold">لا توجد أصناف</p>
-                                    {!isReadOnly && (
-                                        <button
-                                            type="button"
-                                            onClick={addItem}
-                                            className="mt-4 px-6 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all"
-                                        >
-                                            إضافة صنف يدوياً
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Add Item Button (If items exist) */}
-                            {form.items.length > 0 && !isReadOnly && (
-                                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
-                                    <button
-                                        type="button"
-                                        onClick={addItem}
-                                        className="flex items-center gap-2 px-4 py-2 text-brand-primary hover:bg-brand-primary/5 rounded-xl font-bold transition-all text-sm"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>إضافة صنف جديد</span>
-                                    </button>
+                                    <p className="text-slate-400 font-semibold text-lg">لا توجد أصناف</p>
+                                    <p className="text-slate-400 text-sm mt-2">اختر عرض سعر لتحميل الأصناف تلقائياً</p>
                                 </div>
                             )}
                         </div>
@@ -647,11 +623,10 @@ const SaleOrderFormPage: React.FC = () => {
                                         step={0.01}
                                         value={form.deliveryCost || ''}
                                         onChange={(e) => setForm(f => ({ ...f, deliveryCost: safeNumber(e.target.value) }))}
-                                        disabled={isReadOnly}
+                                        disabled={true} // Locked
                                         className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
                         text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
-                        transition-all shadow-sm
-                        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                        transition-all shadow-sm bg-slate-100 cursor-not-allowed opacity-70`}
                                         placeholder="0.00"
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
@@ -678,11 +653,10 @@ const SaleOrderFormPage: React.FC = () => {
                                         step={0.01}
                                         value={form.otherCosts || ''}
                                         onChange={(e) => setForm(f => ({ ...f, otherCosts: safeNumber(e.target.value) }))}
-                                        disabled={isReadOnly}
+                                        disabled={true} // Locked
                                         className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
                         text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
-                        transition-all shadow-sm
-                        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                        transition-all shadow-sm bg-slate-100 cursor-not-allowed opacity-70`}
                                         placeholder="0.00"
                                     />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">

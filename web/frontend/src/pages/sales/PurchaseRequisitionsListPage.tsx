@@ -180,7 +180,7 @@ const PRTableRow: React.FC<{
             </td>
             <td className="px-6 py-4">
                 <span className="text-xs text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-md">
-                   {pr.status === 'Approved' ? 'مكتمل' : pr.status === 'Rejected' ? 'مرفوض' : 'قيد المراجعة'}
+                    {pr.status === 'Approved' ? 'مكتمل' : pr.status === 'Rejected' ? 'مرفوض' : 'قيد المراجعة'}
                 </span>
             </td>
             <td className="px-6 py-4">
@@ -194,7 +194,7 @@ const PRTableRow: React.FC<{
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         <span>{isExpanded ? 'إخفاء' : 'تتبع'}</span>
                     </button>
-                    
+
                     {/* Actions Container */}
                     <div className="flex items-center gap-1">
                         {pr.status === 'Draft' && (
@@ -207,7 +207,7 @@ const PRTableRow: React.FC<{
                                 <Send className="w-4 h-4" />
                             </button>
                         )}
-                        
+
                         {(pr.status === 'Draft' || pr.status === 'Pending' || pr.status === 'Rejected') && (
                             <button
                                 onClick={() => onEdit(pr.id!)}
@@ -220,10 +220,10 @@ const PRTableRow: React.FC<{
                         )}
 
                         <button
-                             onClick={() => onView(pr.id!)}
-                             className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
-                                 rounded-lg transition-all duration-200"
-                             title="عرض التفاصيل"
+                            onClick={() => onView(pr.id!)}
+                            className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 
+                                rounded-lg transition-all duration-200"
+                            title="عرض التفاصيل"
                         >
                             <FileText className="w-4 h-4" />
                         </button>
@@ -328,6 +328,8 @@ const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ se
     </tr>
 );
 
+const SALES_DEPT_NAME = 'المبيعات';
+
 const PurchaseRequisitionsListPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -362,7 +364,12 @@ const PurchaseRequisitionsListPage: React.FC = () => {
         try {
             setLoading(true);
             const data = await purchaseService.getSalesPRs();
-            setPrs(Array.isArray(data) ? data : []);
+            const allPRs = Array.isArray(data) ? data : [];
+            // Filter to only show المبيعات department records
+            const salesOnly = allPRs.filter(
+                pr => pr.requestedByDeptName === SALES_DEPT_NAME || !pr.requestedByDeptName
+            );
+            setPrs(salesOnly);
         } catch (error) {
             console.error('Failed to fetch PRs:', error);
             toast.error('فشل تحميل قائمة الطلبات');
@@ -422,7 +429,7 @@ const PurchaseRequisitionsListPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || pr.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        
+
         return [...filtered].sort((a, b) => {
             const dateA = a.prDate ? new Date(a.prDate).getTime() : 0;
             const dateB = b.prDate ? new Date(b.prDate).getTime() : 0;

@@ -20,6 +20,7 @@ import {
     Warehouse,
     Archive,
     Inbox,
+    Truck,
     X,
     ChevronDown,
     Loader2,
@@ -56,6 +57,7 @@ const WORKFLOW_NAME_AR: Record<string, string> = {
     'Payment Voucher Approval': 'اعتماد سند صرف',
     'Sales Quotation Approval': 'اعتماد عرض سعر مبيعات',
     'Stock Issue Note Approval': 'اعتماد إذن صرف',
+    'Delivery Order Approval': 'اعتماد أمر توصيل',
 };
 const STEP_NAME_AR: Record<string, string> = {
     'Procurement Manager Approval': 'اعتماد مدير المشتريات',
@@ -63,7 +65,14 @@ const STEP_NAME_AR: Record<string, string> = {
     'General Manager Approval': 'اعتماد المدير العام',
     'Quality Controller Approval': 'اعتماد مراقب الجودة',
     'Sales Manager Approval': 'اعتماد مدير المبيعات',
+    'Warehouse Manager Approval': 'اعتماد مدير المستودع',
     'Payment Disbursement': 'صرف الدفعة',
+};
+const USERNAME_AR: Record<string, string> = {
+    'shady': 'شادي',
+    'asdfg': 'أحمد',
+    'Mohammed': 'محمد',
+    'yazan': 'يزن',
 };
 const tr = (en: string | undefined, map: Record<string, string>) =>
     en && map[en] ? map[en] : en || '';
@@ -99,6 +108,8 @@ const DOC_TYPE_CONFIGS: Record<string, {
     CR: { label: 'طلب عميل', bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', icon: MessageSquare, gradient: 'from-fuchsia-500 to-pink-600' },
     SalesQuotation: { label: 'عرض سعر مبيعات', bg: 'bg-indigo-50', text: 'text-indigo-600', icon: Tag, gradient: 'from-indigo-500 to-blue-600' },
     StockIssueNote: { label: 'إذن صرف', bg: 'bg-emerald-50', text: 'text-emerald-600', icon: Package, gradient: 'from-emerald-500 to-teal-600' },
+    DeliveryOrder: { label: 'أمر توصيل', bg: 'bg-amber-50', text: 'text-amber-600', icon: Truck, gradient: 'from-amber-500 to-orange-600' },
+    DO: { label: 'أمر توصيل', bg: 'bg-amber-50', text: 'text-amber-600', icon: Truck, gradient: 'from-amber-500 to-orange-600' },
 };
 
 const getDocTypeConfig = (type: string) =>
@@ -120,6 +131,8 @@ const TYPE_ROUTES: Record<string, string> = {
     CR: '/dashboard/sales/customer-requests',
     SalesQuotation: '/dashboard/sales/quotations',
     StockIssueNote: '/dashboard/sales/issue-notes',
+    DeliveryOrder: '/dashboard/sales/delivery-orders',
+    DO: '/dashboard/sales/delivery-orders',
 };
 
 const isGRNType = (t: string) => t === 'GoodsReceiptNote' || t === 'GRN';
@@ -138,6 +151,7 @@ const FILTER_OPTIONS = [
     { value: 'CustomerRequest', label: 'طلبات عملاء', icon: MessageSquare },
     { value: 'SalesQuotation', label: 'عروض أسعار مبيعات', icon: Tag },
     { value: 'StockIssueNote', label: 'إذونات صرف', icon: Package },
+    { value: 'DeliveryOrder', label: 'أوامر توصيل', icon: Truck },
 ] as const;
 
 // ════════════════════════════════════════════
@@ -425,8 +439,8 @@ const RequestCard: React.FC<{
                                 <span className={`inline-flex items-center px-2.5 py-1 ${config.bg} ${config.text} rounded-lg text-xs font-bold`}>
                                     {config.label}
                                 </span>
-                                <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-                                    #{request.documentNumber}
+                                <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded" dir="ltr">
+                                    {(request.documentNumber || '').replace('DO-', 'أمر توصيل-').replace('SO-', 'أمر بيع-').replace('PO-', 'أمر شراء-').replace('GRN-', 'إذن إضافة-').replace('PR-', 'طلب شراء-').replace('CR-', 'طلب عميل-')}
                                 </span>
                                 {request.priority === 'High' && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold border border-rose-200">
@@ -448,7 +462,7 @@ const RequestCard: React.FC<{
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500">
                                 <div className="flex items-center gap-1.5">
                                     <User className="w-3.5 h-3.5 text-slate-400" />
-                                    <span className="font-medium">{request.requestedByName || 'غير محدد'}</span>
+                                    <span className="font-medium">{tr(request.requestedByName, USERNAME_AR) || 'غير محدد'}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <Calendar className="w-3.5 h-3.5 text-slate-400" />

@@ -77,7 +77,20 @@ public class Customer {
     private BigDecimal creditLimit;
 
     @Column(name = "CurrentBalance")
-    private BigDecimal currentBalance;
+    @Builder.Default
+    private BigDecimal currentBalance = BigDecimal.ZERO;
+
+    @Column(name = "TotalInvoiced")
+    @Builder.Default
+    private BigDecimal totalInvoiced = BigDecimal.ZERO;
+
+    @Column(name = "TotalPaid")
+    @Builder.Default
+    private BigDecimal totalPaid = BigDecimal.ZERO;
+
+    @Column(name = "TotalReturned")
+    @Builder.Default
+    private BigDecimal totalReturned = BigDecimal.ZERO;
 
     @Column(name = "Currency")
     private String currency;

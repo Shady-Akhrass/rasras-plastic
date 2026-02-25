@@ -1,8 +1,10 @@
 package com.rasras.erp.approval;
 
 import com.rasras.erp.inventory.GoodsReceiptNoteRepository;
+import com.rasras.erp.inventory.GoodsReceiptNote;
 import com.rasras.erp.inventory.GRNItem;
 import com.rasras.erp.inventory.InventoryService;
+import com.rasras.erp.inventory.Warehouse;
 import com.rasras.erp.procurement.PurchaseOrderRepository;
 import com.rasras.erp.procurement.PurchaseRequisitionRepository;
 import com.rasras.erp.supplier.SupplierRepository;
@@ -23,11 +25,18 @@ import com.rasras.erp.sales.SalesQuotationRepository;
 import com.rasras.erp.sales.SalesInvoiceRepository;
 import com.rasras.erp.sales.DeliveryOrderRepository;
 import com.rasras.erp.sales.StockIssueNoteRepository;
+import com.rasras.erp.sales.StockIssueNote;
+import com.rasras.erp.sales.StockIssueNoteItem;
+import com.rasras.erp.sales.SalesOrderItem;
 import com.rasras.erp.sales.PaymentReceiptRepository;
+import com.rasras.erp.sales.CustomerRequestDeliveryScheduleRepository;
+import com.rasras.erp.sales.CustomerRequestDeliverySchedule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.context.annotation.Lazy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
@@ -66,6 +75,12 @@ public class ApprovalService {
     private final DeliveryOrderRepository deliveryOrderRepo;
     private final StockIssueNoteRepository stockIssueNoteRepo;
     private final PaymentReceiptRepository paymentReceiptRepo;
+    private final com.rasras.erp.crm.CustomerRepository customerRepo;
+    private final CustomerRequestDeliveryScheduleRepository scheduleRepo;
+
+    @Autowired
+    @Lazy
+    private com.rasras.erp.sales.SalesInvoiceService salesInvoiceService;
 
     @Transactional
     public ApprovalRequest initiateApproval(String workflowCode, String docType, Integer docId,
@@ -336,7 +351,6 @@ public class ApprovalService {
         Integer id = request.getDocumentId();
         User actor = userRepo.findById(userId).orElse(null);
         String actorName = actor != null ? actor.getUsername() : "System";
-
         if ("PaymentVoucher".equalsIgnoreCase(type) || "PV".equalsIgnoreCase(type)) {
             voucherRepo.findById(id).ifPresent(pv -> {
                 ApprovalWorkflowStep currentStep = request.getCurrentStep();
@@ -352,6 +366,18 @@ public class ApprovalService {
                     }
                 }
                 voucherRepo.save(pv);
+            });
+        } else if ("StockIssueNote".equalsIgnoreCase(type)) {
+            stockIssueNoteRepo.findById(id).ifPresent(note -> {
+                ApprovalWorkflowStep currentStep = request.getCurrentStep();
+                if (currentStep != null && currentStep.getStepNumber() == 1) {
+                    // Step 1 (Sales Manager) Approved -> Reserve Stock
+                    if (note.getItems() != null) {
+                        for (com.rasras.erp.sales.StockIssueNoteItem item : note.getItems()) {
+                            inventoryService.reserveStock(item.getItem(), note.getWarehouse(), item.getIssuedQty());
+                        }
+                    }
+                }
             });
         }
     }
@@ -637,11 +663,113 @@ public class ApprovalService {
                 }
                 salesQuotationRepo.save(sq);
             });
+        } else if ("DeliveryOrder".equalsIgnoreCase(type)) {
+            deliveryOrderRepo.findById(id).ifPresent(order -> {
+                order.setApprovalStatus(status);
+                if ("Approved".equals(status)) {
+                    order.setStatus("Completed"); // Mark as fully delivered
+
+                    // Deduct stock upon final delivery approval
+                    StockIssueNote note = order.getStockIssueNote();
+                    if (note != null && note.getItems() != null) {
+                        Warehouse warehouse = note.getWarehouse();
+                        Integer approverId = note.getUpdatedBy() != null ? note.getUpdatedBy() : userId;
+
+                        // Check if this delivery order is linked to specific schedules
+                        List<CustomerRequestDeliverySchedule> schedules = scheduleRepo
+                                .findByDeliveryOrderId(order.getId());
+                        java.util.Map<Integer, BigDecimal> scheduleQuantities = new java.util.HashMap<>();
+                        if (schedules != null && !schedules.isEmpty()) {
+                            for (CustomerRequestDeliverySchedule s : schedules) {
+                                if (s.getProductId() != null && s.getQuantity() != null) {
+                                    scheduleQuantities.put(s.getProductId(),
+                                            scheduleQuantities.getOrDefault(s.getProductId(), BigDecimal.ZERO)
+                                                    .add(s.getQuantity()));
+                                }
+                            }
+                        }
+
+                        for (com.rasras.erp.sales.StockIssueNoteItem item : note.getItems()) {
+                            BigDecimal qty = item.getIssuedQty();
+
+                            // If we have specific schedules, use their quantities instead of the whole SIN
+                            // item quantity
+                            if (!scheduleQuantities.isEmpty()) {
+                                BigDecimal scheduleQty = scheduleQuantities.get(item.getItem().getId());
+                                if (scheduleQty == null || scheduleQty.compareTo(BigDecimal.ZERO) <= 0) {
+                                    // This item is NOT in the selected schedules, skip deduction
+                                    continue;
+                                }
+                                qty = scheduleQty;
+                            }
+
+                            BigDecimal unitCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+
+                            // 1. Release reservation
+                            inventoryService.releaseReservation(item.getItem(), warehouse, qty);
+
+                            // 2. Actual stock reduction (Deduct from QuantityOnHand)
+                            inventoryService.updateStock(
+                                    item.getItem().getId(),
+                                    warehouse.getId(),
+                                    qty,
+                                    "OUT",
+                                    "ISSUE",
+                                    "DeliveryOrder",
+                                    order.getId(),
+                                    order.getDeliveryOrderNumber(),
+                                    unitCost,
+                                    approverId);
+
+                            // 3. Update Sales Order delivered quantity if applicable
+                            SalesOrderItem soItem = item.getSalesOrderItem();
+                            if (soItem != null) {
+                                BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty()
+                                        : BigDecimal.ZERO).add(qty);
+                                soItem.setDeliveredQty(newDelivered);
+                            }
+                        }
+
+                        // NEW: Automatically create Sales Invoice upon delivery approval
+                        try {
+                            salesInvoiceService.createInvoiceFromDeliveryOrder(order.getId());
+                        } catch (Exception e) {
+                            System.err.println("Failed to auto-create Sales Invoice: " + e.getMessage());
+                        }
+                    }
+                } else if ("Rejected".equals(status)) {
+                    order.setStatus("Rejected");
+                    // Release reservation if the delivery is cancelled
+                    StockIssueNote note = order.getStockIssueNote();
+                    if (note != null && note.getItems() != null) {
+                        for (com.rasras.erp.sales.StockIssueNoteItem item : note.getItems()) {
+                            inventoryService.releaseReservation(item.getItem(), note.getWarehouse(),
+                                    item.getIssuedQty());
+                        }
+                    }
+                }
+                deliveryOrderRepo.save(order);
+            });
         } else if ("SalesInvoice".equalsIgnoreCase(type)) {
             salesInvoiceRepo.findById(id).ifPresent(inv -> {
+                String oldStatus = inv.getApprovalStatus();
                 inv.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     inv.setStatus("Approved");
+
+                    // Update customer balance upon invoice approval
+                    if (!"Approved".equals(oldStatus)) {
+                        com.rasras.erp.crm.Customer customer = inv.getCustomer();
+                        if (customer != null) {
+                            BigDecimal amount = inv.getTotalAmount() != null ? inv.getTotalAmount() : BigDecimal.ZERO;
+                            customer.setTotalInvoiced((customer.getTotalInvoiced() != null ? customer.getTotalInvoiced()
+                                    : BigDecimal.ZERO).add(amount));
+                            customer.setCurrentBalance(
+                                    (customer.getCurrentBalance() != null ? customer.getCurrentBalance()
+                                            : BigDecimal.ZERO).add(amount));
+                            customerRepo.save(customer);
+                        }
+                    }
                 } else if ("Rejected".equals(status)) {
                     inv.setStatus("Rejected");
                 }
@@ -649,9 +777,24 @@ public class ApprovalService {
             });
         } else if ("PaymentReceipt".equalsIgnoreCase(type)) {
             paymentReceiptRepo.findById(id).ifPresent(pr -> {
+                String oldStatus = pr.getApprovalStatus();
                 pr.setApprovalStatus(status);
                 if ("Approved".equals(status)) {
                     pr.setStatus("Approved");
+
+                    // Update customer balance upon receipt approval
+                    if (!"Approved".equals(oldStatus)) {
+                        com.rasras.erp.crm.Customer customer = pr.getCustomer();
+                        if (customer != null) {
+                            BigDecimal amount = pr.getAmount() != null ? pr.getAmount() : BigDecimal.ZERO;
+                            customer.setTotalPaid((customer.getTotalPaid() != null ? customer.getTotalPaid()
+                                    : BigDecimal.ZERO).add(amount));
+                            customer.setCurrentBalance(
+                                    (customer.getCurrentBalance() != null ? customer.getCurrentBalance()
+                                            : BigDecimal.ZERO).subtract(amount));
+                            customerRepo.save(customer);
+                        }
+                    }
                 } else if ("Rejected".equals(status)) {
                     pr.setStatus("Rejected");
                 }
@@ -661,33 +804,15 @@ public class ApprovalService {
             stockIssueNoteRepo.findById(id).ifPresent(note -> {
                 note.setStatus(status);
                 if ("Approved".equals(status)) {
-                    Integer approverId = note.getUpdatedBy() != null ? note.getUpdatedBy() : userId;
-                    Integer warehouseId = note.getWarehouse().getId();
-
+                    // Final approval of SIN only updates status.
+                    // Stock is deducted later upon Delivery Order approval.
+                    note.setApprovedDate(LocalDateTime.now());
+                    note.setApprovedByUserId(userId);
+                } else if ("Rejected".equals(status)) {
                     if (note.getItems() != null) {
-                        for (com.rasras.erp.sales.StockIssueNoteItem item : note.getItems()) {
-                            BigDecimal qty = item.getIssuedQty();
-                            BigDecimal unitCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
-
-                            inventoryService.updateStock(
-                                    item.getItem().getId(),
-                                    warehouseId,
-                                    qty,
-                                    "OUT",
-                                    "ISSUE",
-                                    "StockIssueNote",
-                                    note.getId(),
-                                    note.getIssueNoteNumber(),
-                                    unitCost,
-                                    approverId);
-
-                            // Update Sales Order delivered quantity if applicable
-                            com.rasras.erp.sales.SalesOrderItem soItem = item.getSalesOrderItem();
-                            if (soItem != null) {
-                                BigDecimal newDelivered = (soItem.getDeliveredQty() != null ? soItem.getDeliveredQty()
-                                        : BigDecimal.ZERO).add(qty);
-                                soItem.setDeliveredQty(newDelivered);
-                            }
+                        for (StockIssueNoteItem item : note.getItems()) {
+                            inventoryService.releaseReservation(item.getItem(), note.getWarehouse(),
+                                    item.getIssuedQty());
                         }
                     }
                 }
@@ -698,8 +823,8 @@ public class ApprovalService {
 
     private void createGRNFromPO(PurchaseOrder po, Integer userId) {
         // Create GRN with status "Pending Inspection"
-        com.rasras.erp.inventory.GoodsReceiptNote grn = new com.rasras.erp.inventory.GoodsReceiptNote();
-        grn.setGrnNumber("GRN-" + System.currentTimeMillis()); // simplified generation
+        GoodsReceiptNote grn = new GoodsReceiptNote();
+        grn.setGrnNumber("GRN-" + (grnRepo.count() + 1));
         grn.setGrnDate(LocalDateTime.now());
         grn.setPurchaseOrder(po);
         grn.setSupplier(po.getSupplier());
@@ -713,7 +838,7 @@ public class ApprovalService {
         // config)
         Integer warehouseId = warehouseRepo.findByIsActiveTrue().stream()
                 .findFirst()
-                .map(com.rasras.erp.inventory.Warehouse::getId)
+                .map(Warehouse::getId)
                 .orElseThrow(() -> new RuntimeException(
                         "لا يوجد مستودعات نشطة. الرجاء إنشاء مستودع أولاً من قسم المخزون → المستودعات."));
         grn.setWarehouseId(warehouseId);

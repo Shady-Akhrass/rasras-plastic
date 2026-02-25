@@ -9,5 +9,8 @@ import java.util.Optional;
 @Repository
 public interface StockIssueNoteRepository extends JpaRepository<StockIssueNote, Integer> {
     Optional<StockIssueNote> findByIssueNoteNumber(String issueNoteNumber);
+
     List<StockIssueNote> findBySalesOrder_IdOrderByIssueDateDesc(Integer salesOrderId);
+
+    List<StockIssueNote> findByStatus(String status);
 }

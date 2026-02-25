@@ -34,6 +34,8 @@ public class SalesInvoiceDto {
     private BigDecimal discountAmount;
     private BigDecimal taxAmount;
     private BigDecimal shippingCost;
+    private BigDecimal deliveryCost;
+    private BigDecimal otherCosts;
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;
     private BigDecimal remainingAmount;
