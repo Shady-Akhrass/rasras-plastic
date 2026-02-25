@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Plus,
     Search,
     FileText,
     Calendar,
@@ -14,13 +13,11 @@ import {
     Eye,
     Truck,
     X,
-    Filter,
-    Trash2
+    Filter
 } from 'lucide-react';
 import { formatNumber, formatDate } from '../../utils/format';
 import { purchaseReturnService, type PurchaseReturnDto } from '../../services/purchaseReturnService';
 import Pagination from '../../components/common/Pagination';
-import ConfirmModal from '../../components/common/ConfirmModal';
 import toast from 'react-hot-toast';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 
@@ -103,13 +100,10 @@ const ReturnTableRow: React.FC<{
     returnItem: PurchaseReturnDto;
     index: number;
     onView: (id: number) => void;
-    onDelete: (returnItem: PurchaseReturnDto) => void;
-    isSelected: boolean;
-    onToggleSelect: (id: number) => void;
     getCurrencyLabel: (currency: string) => string;
     defaultCurrency: string;
     convertAmount: (amount: number, from: string) => number;
-}> = ({ returnItem, index, onView, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+}> = ({ returnItem, index, onView, getCurrencyLabel, defaultCurrency, convertAmount }) => (
 
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
@@ -118,14 +112,6 @@ const ReturnTableRow: React.FC<{
             animation: 'fadeInUp 0.3s ease-out forwards'
         }}
     >
-        <td className="px-4 py-4 text-center">
-            <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
-                checked={isSelected}
-                onChange={() => returnItem.id && onToggleSelect(returnItem.id)}
-            />
-        </td>
         <td className="px-6 py-4">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
@@ -172,13 +158,6 @@ const ReturnTableRow: React.FC<{
                 >
                     <Eye className="w-4 h-4" />
                 </button>
-                <button
-                    onClick={() => onDelete(returnItem)}
-                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                    title="حذف"
-                >
-                    <Trash2 className="w-4 h-4" />
-                </button>
             </div>
         </td>
     </tr>
@@ -189,9 +168,6 @@ const TableSkeleton: React.FC = () => (
     <>
         {[1, 2, 3, 4, 5].map(i => (
             <tr key={i} className="animate-pulse border-b border-slate-100">
-                <td className="px-4 py-4 text-center">
-                    <div className="w-4 h-4 bg-slate-100 rounded" />
-                </td>
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg" />
@@ -204,7 +180,7 @@ const TableSkeleton: React.FC = () => (
                 <td className="px-6 py-4"><div className="h-4 w-28 bg-slate-100 rounded ml-auto" /></td>
                 <td className="px-6 py-4"><div className="h-6 w-24 bg-slate-100 rounded-full mx-auto" /></td>
                 <td className="px-6 py-4">
-                    <div className="w-8 h-8 bg-slate-100 rounded-lg" />
+                    <div className="w-8 h-8 bg-slate-100 rounded-lg mx-auto" />
                 </td>
             </tr>
         ))}
@@ -214,7 +190,7 @@ const TableSkeleton: React.FC = () => (
 // Empty State
 const EmptyState: React.FC<{ searchTerm: string; statusFilter: string }> = ({ searchTerm, statusFilter }) => (
     <tr>
-        <td colSpan={8} className="px-6 py-16">
+        <td colSpan={7} className="px-6 py-16">
             <div className="text-center">
                 <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-2xl flex items-center justify-center">
                     {searchTerm || statusFilter !== 'All' ? (
@@ -247,10 +223,6 @@ const PurchaseReturnsPage: React.FC = () => {
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [returnToDelete, setReturnToDelete] = useState<PurchaseReturnDto | null>(null);
-    const [selectedIds, setSelectedIds] = useState<number[]>([]);
-    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchReturns();
@@ -305,58 +277,7 @@ const PurchaseReturnsPage: React.FC = () => {
 
 
     const handleViewReturn = (id: number) => {
-        navigate(`/dashboard/procurement/returns/${id}`);
-    };
-
-    const handleDeleteClick = (returnItem: PurchaseReturnDto) => {
-        setReturnToDelete(returnItem);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleToggleSelect = (id: number) => {
-        setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-        );
-    };
-
-    const handleToggleSelectAllPage = () => {
-        const pageIds = paginatedReturns.map(r => r.id!).filter(Boolean);
-        const allSelected = pageIds.every(id => selectedIds.includes(id));
-        if (allSelected) {
-            setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
-        } else {
-            setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
-        }
-    };
-
-    const handleBulkDeleteClick = () => {
-        if (selectedIds.length === 0) {
-            toast.error('يرجى اختيار مرتجعات شراء أولاً');
-            return;
-        }
-        setReturnToDelete(null);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleDeleteConfirm = async () => {
-        const idsToDelete = returnToDelete?.id ? [returnToDelete.id] : selectedIds;
-        if (!idsToDelete.length) return;
-        setIsDeleting(true);
-        try {
-            for (const id of idsToDelete) {
-                await purchaseReturnService.deleteReturn(id);
-            }
-            toast.success(idsToDelete.length === 1 ? 'تم حذف مرتجع الشراء بنجاح' : 'تم حذف مرتجعات الشراء بنجاح');
-            fetchReturns();
-            setIsDeleteModalOpen(false);
-            setReturnToDelete(null);
-            setSelectedIds([]);
-        } catch (error: any) {
-            const apiMessage = error?.response?.data?.message as string | undefined;
-            toast.error(apiMessage || 'فشل حذف مرتجع الشراء');
-        } finally {
-            setIsDeleting(false);
-        }
+        navigate(`/dashboard/procurement/returns/${id}?mode=view`);
     };
 
     return (
@@ -394,16 +315,6 @@ const PurchaseReturnsPage: React.FC = () => {
                             <p className="text-white/70 text-lg">إدارة عمليات رد البضائع للموردين وتسوية الأرصدة</p>
                         </div>
                     </div>
-
-                    <button
-                        onClick={() => navigate('/dashboard/procurement/returns/new')}
-                        className="flex items-center gap-3 px-6 py-3 bg-white text-brand-primary rounded-xl 
-                            hover:bg-white/90 transition-all duration-200 font-bold shadow-lg 
-                            hover:shadow-xl hover:scale-105"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>إنشاء طلب مرتجع</span>
-                    </button>
                 </div>
             </div>
 
@@ -515,17 +426,6 @@ const PurchaseReturnsPage: React.FC = () => {
                         <table className="w-full border-collapse">
                             <thead>
                                 <tr className="bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
-                                    <th className="px-4 py-5 text-center text-xs font-black text-slate-400 uppercase tracking-widest">
-                                        <input
-                                            type="checkbox"
-                                            className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
-                                            checked={
-                                                paginatedReturns.length > 0 &&
-                                                paginatedReturns.every(r => r.id && selectedIds.includes(r.id))
-                                            }
-                                            onChange={handleToggleSelectAllPage}
-                                        />
-                                    </th>
                                     <th className="px-6 py-5 text-right text-xs font-black text-slate-400 uppercase tracking-widest">رقم المرتجع</th>
                                     <th className="px-6 py-5 text-right text-xs font-black text-slate-400 uppercase tracking-widest">المورد</th>
                                     <th className="px-6 py-5 text-right text-xs font-black text-slate-400 uppercase tracking-widest">المستند المرجعي</th>
@@ -547,33 +447,17 @@ const PurchaseReturnsPage: React.FC = () => {
                                             returnItem={returnItem}
                                             index={index}
                                             onView={handleViewReturn}
-                                            onDelete={handleDeleteClick}
-                                            isSelected={!!returnItem.id && selectedIds.includes(returnItem.id)}
-                                            onToggleSelect={handleToggleSelect}
                                             getCurrencyLabel={getCurrencyLabel}
                                             defaultCurrency={defaultCurrency}
                                             convertAmount={convertAmount}
                                         />
-
                                     ))
                                 )}
                             </tbody>
                         </table>
                     </div>
                     {!loading && filteredReturns.length > 0 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={handleBulkDeleteClick}
-                                    disabled={selectedIds.length === 0 || isDeleting}
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold
-                                        border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100
-                                        disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    حذف المحدد ({selectedIds.length})
-                                </button>
-                            </div>
+                        <div className="flex items-center justify-end px-4 py-3 border-t border-slate-100">
                             <Pagination
                                 currentPage={currentPage}
                                 totalItems={filteredReturns.length}
@@ -585,22 +469,6 @@ const PurchaseReturnsPage: React.FC = () => {
                     )}
                 </div>
             </div>
-
-            <ConfirmModal
-                isOpen={isDeleteModalOpen}
-                title="حذف مرتجع الشراء"
-                message={
-                    returnToDelete
-                        ? `هل أنت متأكد من حذف مرتجع الشراء رقم ${returnToDelete.returnNumber}؟ سيتم حذف البيانات المرتبطة به. لا يمكن حذف مرتجع معتمد.`
-                        : `هل أنت متأكد من حذف عدد ${selectedIds.length} من مرتجعات الشراء؟ سيتم حذف البيانات المرتبطة بها.`
-                }
-                confirmText="حذف"
-                cancelText="إلغاء"
-                onConfirm={handleDeleteConfirm}
-                onCancel={() => { setIsDeleteModalOpen(false); setReturnToDelete(null); }}
-                isLoading={isDeleting}
-                variant="danger"
-            />
         </div>
     );
 };

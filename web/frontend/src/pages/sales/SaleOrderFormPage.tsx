@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     Save,
@@ -17,7 +17,11 @@ import {
     XCircle,
     Clock,
     RefreshCw,
-    Eye
+    Eye,
+    Truck,
+    Sparkles,
+    CreditCard,
+    ShoppingCart
 } from 'lucide-react';
 import { saleOrderService, type SaleOrderDto, type SaleOrderItemDto } from '../../services/saleOrderService';
 import { salesQuotationService } from '../../services/salesQuotationService';
@@ -26,6 +30,12 @@ import { itemService } from '../../services/itemService';
 import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
+
+const safeNumber = (val: any) => {
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+};
+
 
 const SaleOrderFormPage: React.FC = () => {
     const navigate = useNavigate();
@@ -52,8 +62,9 @@ const SaleOrderFormPage: React.FC = () => {
         currency: 'EGP',
         exchangeRate: 1,
         paymentTerms: '',
-        discountPercentage: 0,
         taxAmount: 0,
+        deliveryCost: 0,
+        otherCosts: 0,
         notes: '',
         status: 'Draft',
         items: []
@@ -72,13 +83,13 @@ const SaleOrderFormPage: React.FC = () => {
                 ]);
                 setCustomers(Array.isArray(c) ? c : []);
                 setItems(Array.isArray(i) ? i : []);
-                
+
                 // Filter quotations that don't have a sales order
                 const usedQuotationIds = (Array.isArray(so) ? so : [])
                     .map((order: any) => order.salesQuotationId)
                     .filter((id: number) => id);
                 const available = (Array.isArray(q) ? q : [])
-                    .filter((quotation: any) => !usedQuotationIds.includes(quotation.id));
+                    .filter((quotation: any) => !usedQuotationIds.includes(quotation.id) && quotation.status === 'Approved');
                 setAvailableQuotations(available);
             } catch { toast.error('فشل تحميل البيانات'); }
         })();
@@ -97,8 +108,9 @@ const SaleOrderFormPage: React.FC = () => {
                     customerNameAr: q.customerNameAr,
                     currency: q.currency,
                     paymentTerms: q.paymentTerms ?? f.paymentTerms,
-                    discountPercentage: q.discountPercentage ?? 0,
                     taxAmount: q.taxAmount ?? 0,
+                    deliveryCost: q.deliveryCost ?? 0,
+                    otherCosts: q.otherCosts ?? 0,
                     items: (q.items || []).map((i) => ({
                         itemId: i.itemId,
                         itemNameAr: i.itemNameAr,
@@ -108,6 +120,7 @@ const SaleOrderFormPage: React.FC = () => {
                         unitNameAr: i.unitNameAr,
                         unitPrice: i.unitPrice,
                         discountPercentage: i.discountPercentage,
+                        taxPercentage: i.taxPercentage,
                         totalPrice: i.totalPrice
                     }))
                 }));
@@ -133,7 +146,7 @@ const SaleOrderFormPage: React.FC = () => {
         }
     }, [id, isNew, navigate]);
 
-    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, orderedQty: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, totalPrice: 0 }] })); };
+    const addItem = () => { setForm((f) => ({ ...f, items: [...f.items, { itemId: 0, orderedQty: 1, unitId: 0, unitPrice: 0, discountPercentage: 0, taxPercentage: 0, totalPrice: 0 }] })); };
     const removeItem = (idx: number) => { setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
     const updateItem = (idx: number, u: Partial<SaleOrderItemDto>) => {
         setForm((f) => {
@@ -145,10 +158,35 @@ const SaleOrderFormPage: React.FC = () => {
         });
     };
 
-    const subtotal = form.items.reduce((s, i) => s + (i.orderedQty || 0) * (i.unitPrice || 0) * (1 - (i.discountPercentage || 0) / 100), 0);
-    const disc = subtotal * ((form.discountPercentage || 0) / 100);
-    const tax = form.taxAmount || 0;
-    const total = subtotal - disc + tax;
+    const rawItemsTotal = useMemo(() =>
+        form.items.reduce((s, i) => s + (safeNumber(i.orderedQty) * safeNumber(i.unitPrice)), 0)
+        , [form.items]);
+
+    const itemDiscountsTotal = useMemo(() =>
+        form.items.reduce((s, i) => {
+            const qty = safeNumber(i.orderedQty);
+            const price = safeNumber(i.unitPrice);
+            const disc = safeNumber(i.discountPercentage);
+            return s + (qty * price * (disc / 100));
+        }, 0)
+        , [form.items]);
+
+    const subtotal = rawItemsTotal - itemDiscountsTotal;
+
+    const totalTaxAmount = useMemo(() =>
+        form.items.reduce((sum, i) => {
+            const qty = safeNumber(i.orderedQty);
+            const price = safeNumber(i.unitPrice);
+            const disc = safeNumber(i.discountPercentage);
+            const taxPerc = safeNumber(i.taxPercentage);
+            const beforeTax = qty * price * (1 - disc / 100);
+            return sum + (beforeTax * (taxPerc / 100));
+        }, 0)
+        , [form.items]);
+
+    const delivery = safeNumber(form.deliveryCost);
+    const other = safeNumber(form.otherCosts);
+    const grandTotal = subtotal + totalTaxAmount + delivery + other;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -158,7 +196,15 @@ const SaleOrderFormPage: React.FC = () => {
         if (form.items.length === 0) { toast.error('أضف بنداً واحداً على الأقل'); return; }
         setSaving(true);
         try {
-            const payload: SaleOrderDto = { ...form, subTotal: subtotal, discountAmount: disc, taxAmount: tax, totalAmount: total, items: form.items };
+            const payload: SaleOrderDto = {
+                ...form,
+                subTotal: subtotal,
+                taxAmount: totalTaxAmount,
+                deliveryCost: delivery,
+                otherCosts: other,
+                totalAmount: grandTotal,
+                items: form.items
+            };
             let createdOrder: SaleOrderDto | null = null;
             if (isNew) {
                 createdOrder = await saleOrderService.create(payload);
@@ -233,9 +279,6 @@ const SaleOrderFormPage: React.FC = () => {
         focus:border-emerald-500 outline-none transition-all font-semibold
         ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'} ${extra}`;
 
-    const smallInputClass = (extra = '') =>
-        `px-3 py-2 border-2 border-transparent rounded-xl text-sm outline-none transition-all font-semibold
-        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white focus:border-emerald-500'} ${extra}`;
 
     if (!isNew && !form.soNumber && loading) return <div className="p-8 text-center">جاري التحميل...</div>;
 
@@ -268,12 +311,11 @@ const SaleOrderFormPage: React.FC = () => {
                                 <h1 className="text-3xl font-bold">{isNew ? 'أمر بيع جديد' : `أمر بيع: ${form.soNumber || ''}`}</h1>
                                 {isReadOnly && <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20"><Lock className="w-3 h-3" /> للعرض فقط</span>}
                                 {form.approvalStatus && (
-                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${
-                                        form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
                                         form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
-                                        form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
-                                        'bg-slate-500/20 text-white border-slate-300/30'
-                                    }`}>
+                                            form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
+                                                'bg-slate-500/20 text-white border-slate-300/30'
+                                        }`}>
                                         {form.approvalStatus === 'Approved' && <CheckCircle2 className="w-3 h-3" />}
                                         {form.approvalStatus === 'Rejected' && <XCircle className="w-3 h-3" />}
                                         {form.approvalStatus === 'Pending' && <Clock className="w-3 h-3" />}
@@ -346,18 +388,21 @@ const SaleOrderFormPage: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <FileText className="w-4 h-4 text-brand-primary" />
+                                    عرض السعر <span className="text-rose-500">*</span>
+                                </label>
+                                <select required disabled={isReadOnly} value={form.salesQuotationId || ''} onChange={(e) => loadFromQuotation(parseInt(e.target.value) || 0)} className={inputClass()}>
+                                    <option value="">اختر عرض السعر...</option>
+                                    {availableQuotations.map((q) => <option key={q.id} value={q.id}>{q.quotationNumber} — {q.customerNameAr}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                                    <FileText className="w-4 h-4 text-brand-primary" />
                                     العميل <span className="text-rose-500">*</span>
                                 </label>
                                 <select disabled={isReadOnly} value={form.customerId || ''} onChange={(e) => setForm((f) => ({ ...f, customerId: parseInt(e.target.value) || 0 }))} className={inputClass()}>
                                     <option value="">اختر العميل...</option>
                                     {customers.map((c) => <option key={c.id} value={c.id}>{c.customerNameAr}</option>)}
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-bold text-slate-600">عرض السعر (اختياري)</label>
-                                <select disabled={isReadOnly} value={form.salesQuotationId || ''} onChange={(e) => loadFromQuotation(parseInt(e.target.value) || 0)} className={inputClass()}>
-                                    <option value="">—</option>
-                                    {availableQuotations.map((q) => <option key={q.id} value={q.id}>{q.quotationNumber} — {q.customerNameAr}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -390,57 +435,261 @@ const SaleOrderFormPage: React.FC = () => {
                     </div>
 
                     {/* Items Card */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '100ms' }}>
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
+                        style={{ animationDelay: '100ms' }}>
+
+                        {/* Header */}
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-brand-primary/10 rounded-xl">
-                                        <Package className="w-5 h-5 text-brand-primary" />
+                                    <div className="p-3 bg-purple-100 rounded-xl">
+                                        <ShoppingCart className="w-5 h-5 text-purple-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف</h3>
+                                        <h3 className="font-bold text-slate-800 text-lg">الأصناف المطلوبة</h3>
                                         <p className="text-slate-500 text-sm">{form.items.length} صنف مضاف</p>
                                     </div>
                                 </div>
                                 {!isReadOnly && <button type="button" onClick={addItem} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg"><Plus className="w-4 h-4" /> إضافة صنف</button>}
                             </div>
                         </div>
+
+                        {/* Table Content */}
                         <div className="overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full min-w-[900px]">
                                 <thead>
                                     <tr className="bg-slate-50 text-slate-600 text-sm font-bold border-b border-slate-200">
-                                        <th className="py-4 pr-6 text-right">الصنف</th>
-                                        <th className="py-4 px-4 text-center">الكمية</th>
-                                        <th className="py-4 px-4 text-center">السعر</th>
+                                        <th className="py-4 pr-6 text-right">الصنف <span className="text-rose-500">*</span></th>
+                                        <th className="py-4 px-4 text-center">الكمية <span className="text-rose-500">*</span></th>
+                                        <th className="py-4 px-4 text-center">السعر <span className="text-rose-500">*</span></th>
+                                        <th className="py-4 px-4 text-center">درجة البوليمر</th>
                                         <th className="py-4 px-4 text-center">خصم %</th>
+                                        <th className="py-4 px-4 text-center">الضريبة %</th>
                                         <th className="py-4 px-4 text-center">الإجمالي</th>
                                         {!isReadOnly && <th className="py-4 pl-6"></th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {form.items.map((it, idx) => (
-                                        <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
-                                            <td className="py-4 pr-6">
-                                                <select disabled={isReadOnly} value={it.itemId || ''} onChange={(e) => updateItem(idx, { itemId: parseInt(e.target.value) || 0 })} className={smallInputClass('min-w-[200px]')}>
-                                                    <option value="">اختر الصنف...</option>
-                                                    {items.map((i) => <option key={i.id} value={i.id}>{i.itemNameAr || i.itemCode}</option>)}
-                                                </select>
-                                            </td>
-                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0.001} value={it.orderedQty || ''} onChange={(e) => updateItem(idx, { orderedQty: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-bold text-emerald-600')} /></td>
-                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0} step={0.01} value={it.unitPrice || ''} onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-24 text-center font-bold')} /></td>
-                                            <td className="py-4 px-4"><input disabled={isReadOnly} type="number" min={0} max={100} step={0.01} value={it.discountPercentage || ''} onChange={(e) => updateItem(idx, { discountPercentage: parseFloat(e.target.value) || 0 })} className={smallInputClass('w-20 text-center font-medium text-rose-600')} /></td>
-                                            <td className="py-4 px-4 text-center font-bold text-slate-800 tabular-nums">
-                                                {formatNumber(((it.orderedQty || 0) * (it.unitPrice || 0) * (1 - (it.discountPercentage || 0) / 100)))}
-                                            </td>
-                                            {!isReadOnly && (
-                                                <td className="py-4 pl-6 text-left">
-                                                    <button type="button" onClick={() => removeItem(idx)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-4 h-4" /></button>
+                                    {form.items.map((it, idx) => {
+                                        const itemId = safeNumber(it.itemId);
+                                        const selectedItem = items.find(i => safeNumber(i.id) === itemId);
+
+                                        return (
+                                            <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                                                {/* Item Select */}
+                                                <td className="py-4 pr-6">
+                                                    <select
+                                                        value={itemId || ''}
+                                                        onChange={(e) => updateItem(idx, { itemId: safeNumber(e.target.value) })}
+                                                        disabled={isReadOnly}
+                                                        className={`w-full min-w-[200px] px-3 py-2 border-2 rounded-xl text-sm font-semibold outline-none transition-all
+                                                                    ${isReadOnly
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 focus:border-brand-primary'}`}
+                                                    >
+                                                        <option value="">اختر الصنف...</option>
+                                                        {items.map((i) => (
+                                                            <option key={i.id} value={i.id}>
+                                                                {i.itemNameAr || i.itemCode}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </td>
-                                            )}
-                                        </tr>
-                                    ))}
+
+                                                {/* Quantity Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0.001}
+                                                        step="any"
+                                                        value={it.orderedQty || ''}
+                                                        onChange={(e) => updateItem(idx, { orderedQty: safeNumber(e.target.value) })}
+                                                        disabled={isReadOnly}
+                                                        className={`w-24 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
+                                                                    ${isReadOnly
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 text-brand-primary focus:border-brand-primary'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Unit Price Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        step={0.01}
+                                                        value={it.unitPrice || ''}
+                                                        onChange={(e) => updateItem(idx, { unitPrice: safeNumber(e.target.value) })}
+                                                        disabled={isReadOnly}
+                                                        className={`w-28 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
+                                                                    ${isReadOnly
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 text-emerald-600 focus:border-brand-primary'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Grade (Read Only Display styled as Input) */}
+                                                <td className="py-4 px-4">
+                                                    <div className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl bg-slate-100 text-center font-semibold text-slate-500 text-sm`}>
+                                                        {selectedItem?.grade || '—'}
+                                                    </div>
+                                                </td>
+
+                                                {/* Discount Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        step={0.01}
+                                                        value={it.discountPercentage || ''}
+                                                        onChange={(e) => updateItem(idx, { discountPercentage: safeNumber(e.target.value) })}
+                                                        disabled={isReadOnly}
+                                                        className={`w-20 px-3 py-2 border-2 rounded-xl text-sm text-center font-semibold outline-none transition-all
+                                                                    ${isReadOnly
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 focus:border-brand-primary text-rose-500'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Tax Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        step={0.01}
+                                                        value={it.taxPercentage || ''}
+                                                        onChange={(e) => updateItem(idx, { taxPercentage: safeNumber(e.target.value) })}
+                                                        disabled={isReadOnly}
+                                                        className={`w-20 px-3 py-2 border-2 rounded-xl text-sm text-center font-semibold outline-none transition-all
+                                                                    ${isReadOnly
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 focus:border-brand-primary text-indigo-600'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Total Price Display */}
+                                                <td className="py-4 px-4 text-center font-bold text-slate-800">
+                                                    {formatNumber(((it.orderedQty || 0) * (it.unitPrice || 0) * (1 - (it.discountPercentage || 0) / 100)), { minimumFractionDigits: 2 })}
+                                                </td>
+
+                                                {/* Delete Action */}
+                                                {!isReadOnly && (
+                                                    <td className="py-4 pl-6 text-left">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeItem(idx)}
+                                                            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
+
+                            {/* Empty State */}
+                            {form.items.length === 0 && (
+                                <div className="py-20 text-center">
+                                    <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                        <Package className="w-10 h-10 text-slate-400" />
+                                    </div>
+                                    <p className="text-slate-400 font-semibold">لا توجد أصناف</p>
+                                    {!isReadOnly && (
+                                        <button
+                                            type="button"
+                                            onClick={addItem}
+                                            className="mt-4 px-6 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all"
+                                        >
+                                            إضافة صنف يدوياً
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Add Item Button (If items exist) */}
+                            {form.items.length > 0 && !isReadOnly && (
+                                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
+                                    <button
+                                        type="button"
+                                        onClick={addItem}
+                                        className="flex items-center gap-2 px-4 py-2 text-brand-primary hover:bg-brand-primary/5 rounded-xl font-bold transition-all text-sm"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>إضافة صنف جديد</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer: Extra Costs Section */}
+                        <div className="p-6 bg-slate-50/50 border-t border-slate-100">
+
+                            {/* Delivery Cost */}
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                        <Truck className="w-5 h-5 text-brand-primary" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 tracking-tight">مصاريف الشحن</h4>
+                                        <p className="text-slate-500 text-xs font-medium">تكلفة الشحن والتوصيل لهذا الأمر</p>
+                                    </div>
+                                </div>
+                                <div className="relative w-full md:w-56">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={form.deliveryCost || ''}
+                                        onChange={(e) => setForm(f => ({ ...f, deliveryCost: safeNumber(e.target.value) }))}
+                                        disabled={isReadOnly}
+                                        className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
+                        text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
+                        transition-all shadow-sm
+                        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                        placeholder="0.00"
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
+                                        {form.currency}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Other Costs */}
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 mt-4 border-t border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-amber-500/10 rounded-xl">
+                                        <Sparkles className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 tracking-tight">مصاريف أخرى</h4>
+                                        <p className="text-slate-500 text-xs font-medium">أي تكاليف إضافية أخرى</p>
+                                    </div>
+                                </div>
+                                <div className="relative w-full md:w-56">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={form.otherCosts || ''}
+                                        onChange={(e) => setForm(f => ({ ...f, otherCosts: safeNumber(e.target.value) }))}
+                                        disabled={isReadOnly}
+                                        className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
+                        text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
+                        transition-all shadow-sm
+                        ${isReadOnly ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                        placeholder="0.00"
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
+                                        {form.currency}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -448,29 +697,67 @@ const SaleOrderFormPage: React.FC = () => {
                 {/* ═══ SIDEBAR ═══ */}
                 <div className="space-y-6">
                     {/* Financial Summary */}
-                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-2xl animate-slide-in" style={{ animationDelay: '200ms' }}>
-                        <div className="flex items-center gap-3 pb-6 border-b border-white/10">
-                            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl"><DollarSign className="w-6 h-6 text-emerald-400" /></div>
-                            <h3 className="font-bold text-xl">الملخص المالي</h3>
-                            {isReadOnly && <Lock className="w-4 h-4 text-white/30 mr-auto" />}
-                        </div>
-                        <div className="space-y-4 mt-6">
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                                <span className="text-white/60">المجموع الفرعي</span>
-                                <span className="font-bold text-lg text-white/90 tabular-nums">{formatNumber(subtotal)} {form.currency}</span>
+                    <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-8 text-white shadow-2xl animate-slide-in delay-200 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl" />
+                        <div className="absolute bottom-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full translate-x-1/3 translate-y-1/3 blur-2xl" />
+
+                        <div className="relative space-y-6">
+                            <div className="flex items-center gap-3 pb-6 border-b border-white/5">
+                                <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
+                                    <DollarSign className="w-6 h-6 text-emerald-400" />
+                                </div>
+                                <h3 className="font-bold text-xl">الملخص المالي</h3>
                             </div>
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                                <span className="text-white/60">الخصم الإضافي %</span>
-                                {isReadOnly ? <span className="font-bold">{form.discountPercentage || 0}%</span> : <input type="number" value={form.discountPercentage || ''} onChange={(e) => setForm({ ...form, discountPercentage: parseFloat(e.target.value) || 0 })} className="w-20 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-emerald-500 outline-none" />}
-                            </div>
-                            <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                                <span className="text-white/60">الضريبة</span>
-                                {isReadOnly ? <span className="font-bold">{formatNumber(form.taxAmount || 0)}</span> : <input type="number" value={form.taxAmount || ''} onChange={(e) => setForm({ ...form, taxAmount: parseFloat(e.target.value) || 0 })} className="w-24 bg-transparent text-right font-bold text-white border-b border-white/20 focus:border-emerald-500 outline-none" />}
-                            </div>
-                            <div className="pt-4 mt-2 border-t border-white/10">
-                                <div className="flex justify-between items-center p-5 bg-brand-primary rounded-2xl shadow-lg shadow-brand-primary/20">
-                                    <span className="font-bold text-white uppercase tracking-wider">الإجمالي النهائي</span>
-                                    <div className="text-3xl font-black text-white">{formatNumber(total)} <span className="text-lg font-bold">{form.currency}</span></div>
+
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center text-slate-400">
+                                    <span className="text-sm">إجمالي البنود</span>
+                                    <span className="font-bold text-white/90">{formatNumber(rawItemsTotal)} {form.currency}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center text-rose-400">
+                                    <span className="text-sm">إجمالي الخصومات</span>
+                                    <span className="font-bold">-{formatNumber(itemDiscountsTotal)} {form.currency}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-2 border-y border-white/5 text-slate-300">
+                                    <span className="text-sm font-semibold">الإجمالي قبل الضريبة</span>
+                                    <span className="font-bold">{formatNumber(subtotal)} {form.currency}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                    <span className="text-emerald-400 font-semibold text-sm">ضريبة القيمة المضافة</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-lg text-emerald-400">
+                                            {formatNumber(totalTaxAmount)}
+                                        </span>
+                                        <span className="text-xs text-emerald-400/60 font-medium">{form.currency}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center px-4 py-2 text-white/60">
+                                    <span className="text-sm">مصاريف الشحن</span>
+                                    <span className="font-bold">{formatNumber(delivery)} {form.currency}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center px-4 py-2 text-white/60">
+                                    <span className="text-sm">مصاريف إضافية أخرى</span>
+                                    <span className="font-bold">{formatNumber(other)} {form.currency}</span>
+                                </div>
+
+                                <div className="pt-6 mt-2 border-t border-white/10">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">الإجمالي النهائي</div>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-4xl font-black text-white">{formatNumber(grandTotal)}</span>
+                                                <span className="text-indigo-400 font-bold">{form.currency}</span>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-indigo-500/20 rounded-2xl border border-indigo-500/30">
+                                            <CreditCard className="w-8 h-8 text-indigo-400" />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

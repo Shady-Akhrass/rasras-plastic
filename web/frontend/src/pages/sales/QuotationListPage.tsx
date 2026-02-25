@@ -377,26 +377,6 @@ const QuotationListPage: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-left">
                                             <div className="flex items-center justify-end gap-2">
-                                                {q.status === 'Approved' && (
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            if (window.confirm('هل أنت متأكد من تحويل هذا العرض إلى طلب مبيعات؟')) {
-                                                                try {
-                                                                    await salesQuotationService.convertToSalesOrder(q.id!);
-                                                                    toast.success('تم تحويل العرض إلى طلب مبيعات بنجاح');
-                                                                    fetchList();
-                                                                } catch {
-                                                                    toast.error('فشل تحويل العرض');
-                                                                }
-                                                            }
-                                                        }}
-                                                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                        title="تحويل لطلب مبيعات"
-                                                    >
-                                                        <CheckCircle2 className="w-5 h-5" />
-                                                    </button>
-                                                )}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/sales/quotations/${q.id}`); }}
                                                     className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"

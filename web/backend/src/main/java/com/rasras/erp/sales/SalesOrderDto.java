@@ -32,10 +32,9 @@ public class SalesOrderDto {
     private Integer priceListId;
     private String priceListName;
     private BigDecimal subTotal;
-    private BigDecimal discountPercentage;
-    private BigDecimal discountAmount;
     private BigDecimal taxAmount;
-    private BigDecimal shippingCost;
+    private BigDecimal deliveryCost;
+    private BigDecimal otherCosts;
     private BigDecimal totalAmount;
     private String paymentTerms;
     private Integer paymentTermDays;

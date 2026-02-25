@@ -78,11 +78,9 @@ public class SalesOrderService {
         }
 
         order.setSubTotal(dto.getSubTotal() != null ? dto.getSubTotal() : BigDecimal.ZERO);
-        order.setDiscountPercentage(
-                dto.getDiscountPercentage() != null ? dto.getDiscountPercentage() : BigDecimal.ZERO);
-        order.setDiscountAmount(dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO);
         order.setTaxAmount(dto.getTaxAmount() != null ? dto.getTaxAmount() : BigDecimal.ZERO);
-        order.setShippingCost(dto.getShippingCost() != null ? dto.getShippingCost() : BigDecimal.ZERO);
+        order.setDeliveryCost(dto.getDeliveryCost() != null ? dto.getDeliveryCost() : BigDecimal.ZERO);
+        order.setOtherCosts(dto.getOtherCosts() != null ? dto.getOtherCosts() : BigDecimal.ZERO);
         order.setTotalAmount(dto.getTotalAmount() != null ? dto.getTotalAmount() : BigDecimal.ZERO);
         order.setPaymentTerms(dto.getPaymentTerms());
         order.setPaymentTermDays(dto.getPaymentTermDays());
@@ -126,9 +124,9 @@ public class SalesOrderService {
                 .exchangeRate(quotation.getExchangeRate())
                 .priceListId(quotation.getPriceList() != null ? quotation.getPriceList().getId() : null)
                 .subTotal(quotation.getSubTotal())
-                .discountPercentage(quotation.getDiscountPercentage())
-                .discountAmount(quotation.getDiscountAmount())
                 .taxAmount(quotation.getTaxAmount())
+                .deliveryCost(quotation.getDeliveryCost())
+                .otherCosts(quotation.getOtherCosts())
                 .totalAmount(quotation.getTotalAmount())
                 .paymentTerms(quotation.getPaymentTerms())
                 .status("Draft")
@@ -177,10 +175,9 @@ public class SalesOrderService {
         order.setCurrency(dto.getCurrency());
         order.setExchangeRate(dto.getExchangeRate());
         order.setSubTotal(dto.getSubTotal());
-        order.setDiscountPercentage(dto.getDiscountPercentage());
-        order.setDiscountAmount(dto.getDiscountAmount());
         order.setTaxAmount(dto.getTaxAmount());
-        order.setShippingCost(dto.getShippingCost());
+        order.setDeliveryCost(dto.getDeliveryCost());
+        order.setOtherCosts(dto.getOtherCosts());
         order.setTotalAmount(dto.getTotalAmount());
         order.setPaymentTerms(dto.getPaymentTerms());
         order.setPaymentTermDays(dto.getPaymentTermDays());
@@ -229,7 +226,8 @@ public class SalesOrderService {
         SalesOrder order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sales Order not found"));
 
-        if (!"Draft".equals(order.getStatus()) && !"Pending".equals(order.getStatus()) && !"Rejected".equals(order.getStatus())) {
+        if (!"Draft".equals(order.getStatus()) && !"Pending".equals(order.getStatus())
+                && !"Rejected".equals(order.getStatus())) {
             throw new RuntimeException("Cannot delete order that is not in Draft, Pending, or Rejected status");
         }
 
@@ -279,10 +277,9 @@ public class SalesOrderService {
                 .currency(order.getCurrency())
                 .exchangeRate(order.getExchangeRate())
                 .subTotal(order.getSubTotal())
-                .discountPercentage(order.getDiscountPercentage())
-                .discountAmount(order.getDiscountAmount())
                 .taxAmount(order.getTaxAmount())
-                .shippingCost(order.getShippingCost())
+                .deliveryCost(order.getDeliveryCost())
+                .otherCosts(order.getOtherCosts())
                 .totalAmount(order.getTotalAmount())
                 .paymentTerms(order.getPaymentTerms())
                 .paymentTermDays(order.getPaymentTermDays())

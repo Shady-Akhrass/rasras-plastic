@@ -13,7 +13,9 @@ import {
     Building2,
     RefreshCw,
     Clock,
-    Eye
+    Eye,
+    FileDown,
+    Loader2
 } from 'lucide-react';
 import { paymentVoucherService, type PaymentVoucherDto, type InvoiceComparisonData } from '../../services/paymentVoucherService';
 import { approvalService } from '../../services/approvalService';
@@ -42,6 +44,20 @@ const PaymentVoucherDetailPage: React.FC = () => {
     const [bankDetails, setBankDetails] = useState<SupplierBankDto[]>([]);
     const [actionLoading, setActionLoading] = useState(false);
     const [comparisonData, setComparisonData] = useState<InvoiceComparisonData | null>(null);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadPdf = async () => {
+        if (!voucher || !voucher.paymentVoucherId) return;
+        try {
+            setIsDownloading(true);
+            await paymentVoucherService.downloadVoucherPdf(voucher.paymentVoucherId, voucher.voucherNumber);
+        } catch (error) {
+            console.error('Failed to download PDF:', error);
+            toast.error('فشل تحميل ملف PDF');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     // ... (rest of useEffect and fetchVoucher)
 
@@ -196,6 +212,9 @@ const PaymentVoucherDetailPage: React.FC = () => {
                 case 'pay':
                     await paymentVoucherService.processPayment(voucher.paymentVoucherId, approvedBy);
                     toast.success('تم صرف الدفعة بنجاح');
+                    // Automatically download PDF after disbursement
+                    paymentVoucherService.downloadVoucherPdf(voucher.paymentVoucherId, voucher.voucherNumber)
+                        .catch(err => console.error('Auto-download failed:', err));
                     break;
                 case 'reject':
                     await paymentVoucherService.rejectVoucher(voucher.paymentVoucherId, approvedBy, reason!);
@@ -320,6 +339,21 @@ const PaymentVoucherDetailPage: React.FC = () => {
                             <Printer className="w-5 h-5" />
                             <span>طباعة</span>
                         </button>
+
+                        {voucher.status === 'Paid' && (
+                            <button
+                                onClick={handleDownloadPdf}
+                                disabled={isDownloading}
+                                className="flex items-center gap-3 px-6 py-3.5 bg-emerald-500 text-white rounded-2xl font-bold border border-emerald-400 hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+                            >
+                                {isDownloading ? (
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : (
+                                    <FileDown className="w-5 h-5" />
+                                )}
+                                <span>تحميل PDF</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -551,7 +585,7 @@ const PaymentVoucherDetailPage: React.FC = () => {
 
                         <div className="space-y-4">
                             {/* Finance Manager Actions */}
-                            {voucher.approvalStatus === 'Pending' && voucher.status !== 'Cancelled' && (
+                            {voucher.approvalStatus === 'Pending' && voucher.status !== 'Cancelled' && !isView && (
                                 <div className="space-y-3">
                                     <button
                                         onClick={() => handleAction('approveFinance')}
@@ -573,7 +607,7 @@ const PaymentVoucherDetailPage: React.FC = () => {
                             )}
 
                             {/* General Manager Actions */}
-                            {voucher.approvalStatus === 'FinanceApproved' && (
+                            {voucher.approvalStatus === 'FinanceApproved' && !isView && (
                                 <div className="space-y-3">
                                     <button
                                         onClick={() => handleAction('approveGeneral')}
@@ -611,7 +645,7 @@ const PaymentVoucherDetailPage: React.FC = () => {
                             )}
 
                             {/* Payment Action */}
-                            {(voucher.approvalStatus === 'GMApproved' || voucher.approvalStatus === 'Approved') && voucher.status !== 'Paid' && (
+                            {(voucher.approvalStatus === 'GMApproved' || voucher.approvalStatus === 'Approved') && voucher.status !== 'Paid' && !isView && (
                                 <button
                                     onClick={() => handleAction('pay')}
                                     disabled={actionLoading}
@@ -623,7 +657,7 @@ const PaymentVoucherDetailPage: React.FC = () => {
                             )}
 
                             {/* Cancel Action */}
-                            {voucher.status !== 'Paid' && voucher.status !== 'Cancelled' && (
+                            {voucher.status !== 'Paid' && voucher.status !== 'Cancelled' && !isView && (
                                 <button
                                     onClick={() => handleAction('cancel')}
                                     disabled={actionLoading}

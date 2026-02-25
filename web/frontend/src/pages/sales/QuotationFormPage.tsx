@@ -18,7 +18,11 @@ import {
     Package,
     RefreshCw,
     Eye,
-    ShoppingCart
+    ShoppingCart,
+    Truck,
+    XCircle,
+    Lock,
+    Sparkles
 } from 'lucide-react';
 import { salesQuotationService, type SalesQuotationDto, type SalesQuotationItemDto } from '../../services/salesQuotationService';
 import { customerRequestService } from '../../services/customerRequestService';
@@ -116,7 +120,7 @@ const extractItemName = (reqItem: any, itemDef?: ItemDto | null, pli?: PriceList
 const extractUnitId = (itemDef?: ItemDto | null, reqItem?: any): number => {
     return safeNumber(
         itemDef?.unitId ||
-        itemDef?.uomId ||
+        (itemDef as any)?.uomId ||
         (itemDef as any)?.unit_id ||
         reqItem?.unitId ||
         reqItem?.uomId ||
@@ -124,18 +128,6 @@ const extractUnitId = (itemDef?: ItemDto | null, reqItem?: any): number => {
     );
 };
 
-/** Get unit display name from an item */
-const getUnitName = (item?: ItemDto | null): string => {
-    if (!item) return '—';
-    return (
-        (item as any).unitName ||
-        (item as any).uomName ||
-        (item as any).unitNameAr ||
-        (item as any).unit?.name ||
-        (item as any).unit?.nameAr ||
-        '—'
-    );
-};
 
 // ──────────────────────────────────────────────
 // COMPONENT
@@ -171,7 +163,6 @@ const QuotationFormPage: React.FC = () => {
         currency: defaultCurrency || 'EGP',
         exchangeRate: 1,
         paymentTerms: '',
-        discountPercentage: 0,
         taxAmount: 0,
         deliveryCost: 0,
         otherCosts: 0,
@@ -363,7 +354,10 @@ const QuotationFormPage: React.FC = () => {
 
     const handleRequestSelection = useCallback(async (requestId: number) => {
         setSelectedRequestId(requestId);
-        if (!requestId) return;
+        if (!requestId) {
+            setForm(f => ({ ...f, requestId: undefined, items: [] }));
+            return;
+        }
 
         const request = approvedRequests.find(r =>
             safeNumber(r.requestId) === requestId
@@ -375,14 +369,7 @@ const QuotationFormPage: React.FC = () => {
 
         const priceListId = safeNumber(request.priceListId || form.priceListId);
 
-        setForm(f => ({
-            ...f,
-            customerId: safeNumber(request.customerId),
-            priceListId: priceListId,
-            requestId: requestId
-        }));
-
-        // Load price list items
+        // Load price list items and collect them to use immediately for mapping
         let currentPriceListItems = priceListItems;
         if (priceListId) {
             const preloaded = allPriceListsWithItems.find(pl =>
@@ -405,9 +392,10 @@ const QuotationFormPage: React.FC = () => {
 
         // 🔧 FIX: Map request items with safe extraction
         const requestItems = extractArray<any>(request.items || []);
+        let quotationItems: SalesQuotationItemDto[] = [];
 
         if (requestItems.length > 0) {
-            const quotationItems: SalesQuotationItemDto[] = requestItems.map(reqItem => {
+            quotationItems = requestItems.map(reqItem => {
                 const productId = extractItemId(reqItem);
                 const itemDef = items.find(i => safeNumber(i.id) === productId);
 
@@ -429,8 +417,18 @@ const QuotationFormPage: React.FC = () => {
                     itemNameAr: extractItemName(reqItem, itemDef, found?.priceListItem)
                 };
             });
+        }
 
-            setForm(f => ({ ...f, items: quotationItems }));
+        // 🔧 CONSOLIDATED UPDATE: Apply all changes in a single setForm call to avoid race conditions
+        setForm(f => ({
+            ...f,
+            customerId: safeNumber(request.customerId),
+            priceListId: priceListId,
+            requestId: requestId,
+            items: quotationItems
+        }));
+
+        if (quotationItems.length > 0) {
             toast.success('تم استيراد البيانات من طلب العميل');
         }
     }, [approvedRequests, form.priceListId, priceListItems, allPriceListsWithItems, items, findItemInPriceLists, getPriceFromList]);
@@ -468,7 +466,6 @@ const QuotationFormPage: React.FC = () => {
                             ...q,
                             customerId: safeNumber(q.customerId),
                             priceListId: safeNumber(q.priceListId),
-                            discountPercentage: safeNumber(q.discountPercentage),
                             taxAmount: safeNumber(q.taxAmount),
                             deliveryCost: safeNumber(q.deliveryCost),
                             otherCosts: safeNumber(q.otherCosts),
@@ -637,18 +634,25 @@ const QuotationFormPage: React.FC = () => {
     // Computed Totals
     // ──────────────────────────────────────────
 
-    const subtotal = useMemo(() =>
+    // 1. Raw total before any discounts
+    const rawItemsTotal = useMemo(() =>
+        form.items.reduce((s, i) => s + (safeNumber(i.quantity) * safeNumber(i.unitPrice)), 0)
+        , [form.items]);
+
+    // 2. Sum of all line item discounts
+    const itemDiscountsTotal = useMemo(() =>
         form.items.reduce((s, i) => {
             const qty = safeNumber(i.quantity);
             const price = safeNumber(i.unitPrice);
             const disc = safeNumber(i.discountPercentage);
-            return s + (qty * price * (1 - disc / 100));
+            return s + (qty * price * (disc / 100));
         }, 0)
         , [form.items]);
 
-    const globalDiscAmount = subtotal * (safeNumber(form.discountPercentage) / 100);
-    const afterGlobalDisc = subtotal - globalDiscAmount;
+    // 3. Subtotal AFTER item discounts
+    const subtotal = rawItemsTotal - itemDiscountsTotal;
 
+    // 6. Tax aggregate
     const totalTaxAmount = useMemo(() =>
         form.items.reduce((sum, i) => {
             const qty = safeNumber(i.quantity);
@@ -662,7 +666,7 @@ const QuotationFormPage: React.FC = () => {
 
     const delivery = safeNumber(form.deliveryCost);
     const other = safeNumber(form.otherCosts);
-    const grandTotal = afterGlobalDisc + totalTaxAmount + delivery + other;
+    const grandTotal = subtotal + totalTaxAmount + delivery + other;
 
     // ──────────────────────────────────────────
     // Form Submission
@@ -690,7 +694,7 @@ const QuotationFormPage: React.FC = () => {
             const payload: SalesQuotationDto = {
                 ...form,
                 subTotal: subtotal,
-                discountAmount: globalDiscAmount,
+                discountAmount: itemDiscountsTotal,
                 taxAmount: totalTaxAmount,
                 totalAmount: grandTotal
             };
@@ -1053,6 +1057,8 @@ const QuotationFormPage: React.FC = () => {
                     {/* Items Card */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden animate-slide-in"
                         style={{ animationDelay: '100ms' }}>
+
+                        {/* Header */}
                         <div className="p-6 bg-gradient-to-l from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center gap-3">
                                 <div className="p-3 bg-purple-100 rounded-xl">
@@ -1064,162 +1070,270 @@ const QuotationFormPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="p-8">
-                            {form.items.length === 0 ? (
-                                <div className="text-center py-12 text-slate-400">
-                                    <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                    <p className="font-medium">لا توجد بنود بعد</p>
-                                    <p className="text-sm mt-1">اختر طلب عميل أو أضف بنوداً يدوياً</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full min-w-[800px] text-right">
-                                        <thead className="text-slate-500 text-sm border-b border-slate-100">
-                                            <tr>
-                                                <th className="px-4 py-4 font-bold">الصنف</th>
-                                                <th className="px-4 py-4 font-bold">الكمية</th>
-                                                <th className="px-4 py-4 font-bold">الوحدة</th>
-                                                <th className="px-4 py-4 font-bold">سعر الوحدة</th>
-                                                <th className="px-4 py-4 font-bold">خصم %</th>
-                                                <th className="px-4 py-4 font-bold">ضريبة %</th>
-                                                <th className="px-4 py-4 font-bold text-left">الإجمالي</th>
-                                                {!isLocked && <th className="px-4 py-4"></th>}
+
+                        {/* Table Content */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[900px]">
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-600 text-sm font-bold border-b border-slate-200">
+                                        <th className="py-4 pr-6 text-right">
+                                            الصنف <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">
+                                            الكمية <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">
+                                            السعر <span className="text-rose-500">*</span>
+                                        </th>
+                                        <th className="py-4 px-4 text-center">درجة البوليمر</th>
+                                        <th className="py-4 px-4 text-center">خصم %</th>
+                                        <th className="py-4 px-4 text-center">الضريبة %</th>
+                                        <th className="py-4 px-4 text-center">الإجمالي</th>
+                                        {!isLocked && <th className="py-4 pl-6"></th>}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {form.items.map((it, idx) => {
+                                        const itemId = safeNumber(it.itemId);
+                                        const selectedItem = items.find(i => safeNumber(i.id) === itemId);
+
+                                        return (
+                                            <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                                                {/* Item Select */}
+                                                <td className="py-4 pr-6">
+                                                    <select
+                                                        value={itemId || ''}
+                                                        onChange={(e) => updateItem(idx, { itemId: safeNumber(e.target.value) })}
+                                                        disabled={isLocked}
+                                                        className={`w-full min-w-[200px] px-3 py-2 border-2 rounded-xl text-sm font-semibold outline-none transition-all
+                                    ${isLocked
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 focus:border-brand-primary'}`}
+                                                    >
+                                                        <option value="">اختر الصنف...</option>
+                                                        {items
+                                                            .filter(i => {
+                                                                const iId = safeNumber(i.id);
+                                                                return allPriceListItemIds.has(iId) || iId === itemId;
+                                                            })
+                                                            .map((i) => {
+                                                                const iId = safeNumber(i.id);
+                                                                const foundPL = allPriceListsWithItems.find(pl =>
+                                                                    (pl.items || []).some(pli => safeNumber(pli.itemId) === iId)
+                                                                );
+                                                                const pli = (foundPL?.items || []).find(p => safeNumber(p.itemId) === iId);
+                                                                const priceVal = extractPrice(pli);
+                                                                const priceHint = priceVal > 0 ? ` - ${priceVal.toFixed(2)}` : '';
+                                                                return (
+                                                                    <option key={iId} value={iId}>
+                                                                        {i.itemNameAr || i.itemCode}{priceHint}
+                                                                    </option>
+                                                                );
+                                                            })}
+                                                    </select>
+                                                </td>
+
+                                                {/* Quantity Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0.001}
+                                                        step="any"
+                                                        value={it.quantity || ''}
+                                                        onChange={(e) => updateItem(idx, { quantity: safeNumber(e.target.value) })}
+                                                        disabled={isLocked}
+                                                        className={`w-24 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
+                                    ${isLocked
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 text-brand-primary focus:border-brand-primary'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Unit Price Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        step={0.01}
+                                                        value={it.unitPrice || ''}
+                                                        onChange={(e) => updateItem(idx, { unitPrice: safeNumber(e.target.value) })}
+                                                        disabled={isLocked}
+                                                        className={`w-28 px-3 py-2 border-2 rounded-xl text-sm text-center font-bold outline-none transition-all
+                                    ${isLocked
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 text-emerald-600 focus:border-brand-primary'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Grade (Read Only Display styled as Input) */}
+                                                <td className="py-4 px-4">
+                                                    <div className={`w-28 px-3 py-2 border-2 border-slate-200 rounded-xl bg-slate-100 text-center font-semibold text-slate-500 text-sm`}>
+                                                        {selectedItem?.grade || '—'}
+                                                    </div>
+                                                </td>
+
+                                                {/* Discount Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        step={0.01}
+                                                        value={it.discountPercentage || ''}
+                                                        onChange={(e) => updateItem(idx, { discountPercentage: safeNumber(e.target.value) })}
+                                                        disabled={isLocked}
+                                                        className={`w-20 px-3 py-2 border-2 rounded-xl text-sm text-center font-semibold outline-none transition-all
+                                    ${isLocked
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 focus:border-brand-primary text-rose-500'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Tax Input */}
+                                                <td className="py-4 px-4">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        step={0.01}
+                                                        value={it.taxPercentage || ''}
+                                                        onChange={(e) => updateItem(idx, { taxPercentage: safeNumber(e.target.value) })}
+                                                        disabled={isLocked}
+                                                        className={`w-20 px-3 py-2 border-2 rounded-xl text-sm text-center font-semibold outline-none transition-all
+                                    ${isLocked
+                                                                ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                                                                : 'bg-white border-slate-200 focus:border-brand-primary text-indigo-600'}`}
+                                                    />
+                                                </td>
+
+                                                {/* Total Price Display */}
+                                                <td className="py-4 px-4 text-center font-bold text-slate-800">
+                                                    {formatNumber(safeNumber(it.totalPrice), { minimumFractionDigits: 2 })}
+                                                </td>
+
+                                                {/* Delete Action */}
+                                                {!isLocked && (
+                                                    <td className="py-4 pl-6 text-left">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeItem(idx)}
+                                                            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {form.items.map((it, idx) => {
-                                                const itemId = safeNumber(it.itemId);
-                                                const selectedItem = items.find(i => safeNumber(i.id) === itemId);
-                                                return (
-                                                    <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
-                                                        <td className="px-2 py-4">
-                                                            <select
-                                                                value={itemId || ''}
-                                                                onChange={(e) => updateItem(idx, { itemId: safeNumber(e.target.value) })}
-                                                                className={`w-full max-w-[250px] px-3 py-2 border-2 rounded-xl outline-none transition-all text-sm font-medium
-                                                                ${isLocked
-                                                                        ? 'bg-slate-50 border-transparent cursor-not-allowed opacity-80'
-                                                                        : 'border-slate-100 bg-white focus:border-indigo-500 shadow-sm hover:border-slate-200'}`}
-                                                                disabled={isLocked}
-                                                            >
-                                                                <option value="">اختر الصنف...</option>
-                                                                {items
-                                                                    .filter(i => {
-                                                                        const iId = safeNumber(i.id);
-                                                                        return allPriceListItemIds.has(iId) || iId === itemId;
-                                                                    })
-                                                                    .map((i) => {
-                                                                        const iId = safeNumber(i.id);
-                                                                        const foundPL = allPriceListsWithItems.find(pl =>
-                                                                            (pl.items || []).some(pli => safeNumber(pli.itemId) === iId)
-                                                                        );
-                                                                        const pli = (foundPL?.items || []).find(p => safeNumber(p.itemId) === iId);
-                                                                        const priceVal = extractPrice(pli);
-                                                                        const priceHint = priceVal > 0 ? ` - ${priceVal.toFixed(2)}` : '';
-                                                                        return (
-                                                                            <option key={iId} value={iId}>
-                                                                                {i.itemNameAr || i.itemCode} ({i.grade || i.itemCode}){priceHint}
-                                                                            </option>
-                                                                        );
-                                                                    })}
-                                                            </select>
-                                                        </td>
-                                                        <td className="px-2 py-4">
-                                                            <input
-                                                                type="number"
-                                                                min={0.001}
-                                                                step="any"
-                                                                value={it.quantity || ''}
-                                                                onChange={(e) => updateItem(idx, { quantity: safeNumber(e.target.value) })}
-                                                                className={`w-24 px-3 py-2 border-2 rounded-xl outline-none transition-all text-center font-bold
-                                                                ${isLocked
-                                                                        ? 'bg-slate-50 border-transparent cursor-not-allowed opacity-80 shadow-none'
-                                                                        : 'border-slate-100 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5'}`}
-                                                                disabled={isLocked}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-4 text-sm text-slate-600 font-medium">
-                                                            {getUnitName(selectedItem)}
-                                                        </td>
-                                                        <td className="px-2 py-4">
-                                                            <div className="relative">
-                                                                <DollarSign className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                                                <input
-                                                                    type="number"
-                                                                    min={0}
-                                                                    step={0.01}
-                                                                    value={it.unitPrice || ''}
-                                                                    onChange={(e) => updateItem(idx, { unitPrice: safeNumber(e.target.value) })}
-                                                                    className={`w-32 pr-8 pl-3 py-2 border-2 rounded-xl outline-none transition-all text-left font-bold
-                                                                    ${isLocked
-                                                                            ? 'bg-slate-50 border-transparent cursor-not-allowed opacity-80 shadow-none'
-                                                                            : 'border-slate-100 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5'}`}
-                                                                    disabled={isLocked}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-2 py-4">
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                max={100}
-                                                                step={0.01}
-                                                                value={it.discountPercentage || ''}
-                                                                onChange={(e) => updateItem(idx, { discountPercentage: safeNumber(e.target.value) })}
-                                                                className={`w-16 px-3 py-2 border-2 rounded-xl outline-none transition-all text-center font-medium
-                                                                ${isLocked
-                                                                        ? 'bg-slate-50 border-transparent cursor-not-allowed opacity-80'
-                                                                        : 'border-slate-100 bg-white focus:border-indigo-500'}`}
-                                                                disabled={isLocked}
-                                                            />
-                                                        </td>
-                                                        <td className="px-2 py-4">
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                max={100}
-                                                                step={0.01}
-                                                                value={it.taxPercentage || ''}
-                                                                onChange={(e) => updateItem(idx, { taxPercentage: safeNumber(e.target.value) })}
-                                                                className={`w-16 px-3 py-2 border-2 rounded-xl outline-none transition-all text-center font-medium
-                                                                ${isLocked
-                                                                        ? 'bg-slate-50 border-transparent cursor-not-allowed opacity-80'
-                                                                        : 'border-slate-100 bg-white focus:border-indigo-500'}`}
-                                                                disabled={isLocked}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-4">
-                                                            <div className="text-left">
-                                                                <span className="text-sm font-bold text-slate-800">
-                                                                    {formatNumber(safeNumber(it.totalPrice), { minimumFractionDigits: 2 })}
-                                                                </span>
-                                                                <span className="text-xs text-slate-400 mr-1">{form.currency}</span>
-                                                            </div>
-                                                        </td>
-                                                        {!isLocked && (
-                                                            <td className="px-2 py-4">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => removeItem(idx)}
-                                                                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                                                >
-                                                                    <Trash2 className="w-5 h-5" />
-                                                                </button>
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+
+                            {/* Empty State */}
+                            {form.items.length === 0 && (
+                                <div className="py-20 text-center">
+                                    <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                        <Package className="w-10 h-10 text-slate-400" />
+                                    </div>
+                                    <p className="text-slate-400 font-semibold">لا توجد أصناف</p>
+                                    {!isLocked && (
+                                        <button
+                                            type="button"
+                                            onClick={addItem}
+                                            className="mt-4 px-6 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all"
+                                        >
+                                            إضافة صنف يدوياً
+                                        </button>
+                                    )}
                                 </div>
                             )}
+
+                            {/* Add Item Button (If items exist) */}
+                            {form.items.length > 0 && !isLocked && (
+                                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
+                                    <button
+                                        type="button"
+                                        onClick={addItem}
+                                        className="flex items-center gap-2 px-4 py-2 text-brand-primary hover:bg-brand-primary/5 rounded-xl font-bold transition-all text-sm"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>إضافة صنف جديد</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer: Extra Costs Section */}
+                        <div className="p-6 bg-slate-50/50 border-t border-slate-100">
+
+                            {/* Delivery Cost */}
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                        <Truck className="w-5 h-5 text-brand-primary" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 tracking-tight">مصاريف الشحن</h4>
+                                        <p className="text-slate-500 text-xs font-medium">تكلفة الشحن والتوصيل لهذا العرض</p>
+                                    </div>
+                                </div>
+                                <div className="relative w-full md:w-56">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={form.deliveryCost || ''}
+                                        onChange={(e) => setForm(f => ({ ...f, deliveryCost: safeNumber(e.target.value) }))}
+                                        disabled={isLocked}
+                                        className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
+                        text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
+                        transition-all shadow-sm
+                        ${isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                        placeholder="0.00"
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
+                                        {form.currency}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Other Costs */}
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 mt-4 border-t border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-amber-500/10 rounded-xl">
+                                        <Sparkles className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 tracking-tight">مصاريف أخرى</h4>
+                                        <p className="text-slate-500 text-xs font-medium">أي تكاليف إضافية أخرى</p>
+                                    </div>
+                                </div>
+                                <div className="relative w-full md:w-56">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={form.otherCosts || ''}
+                                        onChange={(e) => setForm(f => ({ ...f, otherCosts: safeNumber(e.target.value) }))}
+                                        disabled={isLocked}
+                                        className={`w-full px-5 py-3 border-2 border-slate-200 rounded-2xl 
+                        text-xl text-center font-black text-brand-primary outline-none focus:border-brand-primary 
+                        transition-all shadow-sm
+                        ${isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-white'}`}
+                                        placeholder="0.00"
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
+                                        {form.currency}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Totals Summary Card */}
+                {/* Right Column: Settings and Summary */}
                 <div className="space-y-6">
+
                     <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-8 text-white shadow-2xl animate-slide-in delay-200 relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl" />
                         <div className="absolute bottom-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full translate-x-1/3 translate-y-1/3 blur-2xl" />
@@ -1234,27 +1348,18 @@ const QuotationFormPage: React.FC = () => {
 
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center text-slate-400">
-                                    <span className="text-sm">الإجمالي قبل الخصم</span>
-                                    <span className="font-bold text-white">{formatNumber(subtotal)} {form.currency}</span>
+                                    <span className="text-sm">إجمالي البنود</span>
+                                    <span className="font-bold text-white/90">{formatNumber(rawItemsTotal)} {form.currency}</span>
                                 </div>
 
-                                <div className="space-y-3 p-4 bg-white/5 rounded-2xl border border-white/5 backdrop-blur-sm">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-rose-400 font-semibold text-sm">خصم إضافي %</span>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="number"
-                                                min={0}
-                                                max={100}
-                                                step={0.01}
-                                                value={form.discountPercentage || ''}
-                                                onChange={(e) => setForm(f => ({ ...f, discountPercentage: safeNumber(e.target.value) }))}
-                                                className="w-16 bg-transparent text-center font-bold text-rose-400 outline-none border-b border-rose-400/30 focus:border-rose-400"
-                                                disabled={isLocked}
-                                            />
-                                            <span className="text-xs text-rose-400/60 font-medium">-{formatNumber(globalDiscAmount)}</span>
-                                        </div>
-                                    </div>
+                                <div className="flex justify-between items-center text-rose-400">
+                                    <span className="text-sm">إجمالي الخصومات</span>
+                                    <span className="font-bold">-{formatNumber(itemDiscountsTotal)} {form.currency}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-2 border-y border-white/5 text-slate-300">
+                                    <span className="text-sm font-semibold">الإجمالي قبل الضريبة</span>
+                                    <span className="font-bold">{formatNumber(subtotal)} {form.currency}</span>
                                 </div>
 
                                 <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
@@ -1267,36 +1372,14 @@ const QuotationFormPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                    <span className="text-white/60 text-sm">مصاريف الشحن</span>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            step={0.01}
-                                            value={form.deliveryCost || ''}
-                                            onChange={(e) => setForm(f => ({ ...f, deliveryCost: safeNumber(e.target.value) }))}
-                                            className="w-20 bg-transparent text-left font-bold text-white outline-none border-b border-white/20 focus:border-brand-primary"
-                                            disabled={isLocked}
-                                        />
-                                        <span className="text-xs text-white/40 font-medium">{form.currency}</span>
-                                    </div>
+                                <div className="flex justify-between items-center px-4 py-2 text-white/60">
+                                    <span className="text-sm">مصاريف الشحن</span>
+                                    <span className="font-bold">{formatNumber(delivery)} {form.currency}</span>
                                 </div>
 
-                                <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
-                                    <span className="text-white/60 text-sm">مصاريف أخرى</span>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            step={0.01}
-                                            value={form.otherCosts || ''}
-                                            onChange={(e) => setForm(f => ({ ...f, otherCosts: safeNumber(e.target.value) }))}
-                                            className="w-20 bg-transparent text-left font-bold text-white outline-none border-b border-white/20 focus:border-brand-primary"
-                                            disabled={isLocked}
-                                        />
-                                        <span className="text-xs text-white/40 font-medium">{form.currency}</span>
-                                    </div>
+                                <div className="flex justify-between items-center px-4 py-2 text-white/60">
+                                    <span className="text-sm">مصاريف إضافية أخرى</span>
+                                    <span className="font-bold">{formatNumber(other)} {form.currency}</span>
                                 </div>
 
                                 <div className="pt-6 mt-2 border-t border-white/10">

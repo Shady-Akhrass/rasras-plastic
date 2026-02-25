@@ -10,7 +10,6 @@ import {
     Clock,
     RefreshCw,
     Trash2,
-    Edit,
     X,
     User
 } from 'lucide-react';
@@ -54,11 +53,10 @@ const StatCard: React.FC<{
 // Status Badge Component
 const StatusBadge: React.FC<{ isActive: boolean }> = ({ isActive }) => {
     return (
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${
-            isActive
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${isActive
                 ? 'bg-emerald-500/20 text-emerald-600 border-emerald-300/30'
                 : 'bg-amber-500/20 text-amber-600 border-amber-300/30'
-        }`}>
+            }`}>
             {isActive ? (
                 <>
                     <CheckCircle2 className="w-3 h-3" />
@@ -165,7 +163,7 @@ const VehicleListPage: React.FC = () => {
                 v.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 v.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 v.driverName?.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = statusFilter === 'All' || 
+            const matchesStatus = statusFilter === 'All' ||
                 (statusFilter === 'Active' && v.isActive) ||
                 (statusFilter === 'Inactive' && !v.isActive);
             return matchesSearch && matchesStatus;

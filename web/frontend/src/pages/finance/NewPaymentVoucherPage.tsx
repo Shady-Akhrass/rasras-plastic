@@ -110,7 +110,7 @@ const PaymentMethodCard: React.FC<{
     selected: boolean;
     disabled?: boolean;
     onClick: () => void;
-}> = ({ value, label, icon: Icon, selected, disabled, onClick }) => (
+}> = ({ label, icon: Icon, selected, disabled, onClick }) => (
     <button
         type="button"
         onClick={onClick}

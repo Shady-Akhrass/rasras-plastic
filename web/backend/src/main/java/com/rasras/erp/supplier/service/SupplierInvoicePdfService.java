@@ -614,9 +614,9 @@ public class SupplierInvoicePdfService {
 
     private Image loadLogo(String logoPath) {
         try {
-            ClassPathResource res = new ClassPathResource("images/logo.jpeg");
+            ClassPathResource res = new ClassPathResource("images/logo.png");
             if (res.exists()) return Image.getInstance(res.getURL());
-            File f = new File("src/main/resources/images/logo.jpeg");
+            File f = new File("src/main/resources/images/logo.png");
             if (f.exists()) return Image.getInstance(f.getAbsolutePath());
         } catch (Exception ignored) {}
         return null;

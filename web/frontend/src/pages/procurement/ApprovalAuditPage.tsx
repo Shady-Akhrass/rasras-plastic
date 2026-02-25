@@ -4,7 +4,6 @@ import {
     History,
     Search,
     RefreshCw,
-    FileText,
     User,
     Calendar,
     CheckCircle2,
