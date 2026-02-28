@@ -77,6 +77,11 @@ const InvoiceMatchingValidation: React.FC<InvoiceMatchingProps> = ({
     message,
     items = []
 }) => {
+    // ─── Calculate poSubTotal from items (الكمية × السعر) ───
+    const calculatedPoSubTotal = items.length > 0
+        ? items.reduce((sum, item) => sum + ((item.poQuantity || 0) * (item.poUnitPrice || 0)), 0)
+        : poSubTotal;
+
     const reconciliationItems = items.map(item => {
         const poQty = item.poQuantity || 0;
         const retQty = item.returnedQuantity || 0;
@@ -118,16 +123,67 @@ const InvoiceMatchingValidation: React.FC<InvoiceMatchingProps> = ({
     }).length;
     const matchPercentage = items.length > 0 ? Math.round((matchedItems / items.length) * 100) : 0;
 
+    // ─── Build cost comparison rows ───
+    type CostRow = {
+        label: string;
+        po: number | undefined;
+        grn: number | undefined;
+        inv: number | undefined;
+        isDeduction?: boolean;
+    };
+
+    const costRows: CostRow[] = [
+        {
+            label: 'إجمالي البنود (الكمية × السعر)',
+            po: calculatedPoSubTotal,
+            grn: grnSubTotal,
+            inv: invoiceSubTotal,
+        },
+        ...(hasReturns
+            ? [{
+                label: 'يخصم: مرتجعات',
+                po: returnSubTotal,
+                grn: undefined as number | undefined,
+                inv: undefined as number | undefined,
+                isDeduction: true,
+            }]
+            : []),
+        {
+            label: 'يخصم: الخصم',
+            po: displayPoDiscount,
+            grn: grnDiscountAmount,
+            inv: invoiceDiscountAmount,
+            isDeduction: true,
+        },
+        {
+            label: 'الضريبة',
+            po: displayPoTax,
+            grn: grnTaxAmount,
+            inv: invoiceTaxAmount,
+        },
+        {
+            label: 'مصاريف النقل / التوصيل',
+            po: poShippingCost,
+            grn: grnShippingCost,
+            inv: invoiceDeliveryCost,
+        },
+        {
+            label: 'مصاريف أخرى',
+            po: poOtherCosts,
+            grn: grnOtherCosts,
+            inv: invoiceOtherCosts,
+        },
+    ];
+
     return (
         <div className="space-y-5" dir="rtl">
             {/* ── Validation Status Banner ── */}
             <div
                 className={`relative overflow-hidden rounded-2xl border ${effectiveIsValid
-                        ? 'border-emerald-200 bg-gradient-to-l from-emerald-50 via-white to-emerald-50/60'
-                        : 'border-rose-200 bg-gradient-to-l from-rose-50 via-white to-rose-50/60'
+                    ? 'border-emerald-200 bg-gradient-to-l from-emerald-50 via-white to-emerald-50/60'
+                    : 'border-rose-200 bg-gradient-to-l from-rose-50 via-white to-rose-50/60'
                     }`}
             >
-                {/* decorative accent bar */}
                 <div className={`absolute top-0 right-0 bottom-0 w-1.5 ${effectiveIsValid ? 'bg-emerald-500' : 'bg-rose-500'}`} />
 
                 <div className="flex items-center gap-4 px-7 py-5">
@@ -151,7 +207,6 @@ const InvoiceMatchingValidation: React.FC<InvoiceMatchingProps> = ({
                         </p>
                     </div>
 
-                    {/* quick stats pill */}
                     {items.length > 0 && (
                         <div className={`flex-shrink-0 hidden sm:flex flex-col items-center justify-center px-5 py-2.5 rounded-xl ${effectiveIsValid ? 'bg-emerald-100/80' : 'bg-rose-100/80'
                             }`}>
@@ -250,30 +305,43 @@ const InvoiceMatchingValidation: React.FC<InvoiceMatchingProps> = ({
                     </div>
 
                     {/* Cost rows */}
-                    {[
-                        { label: 'إجمالي البنود (Sub-total)', po: poSubTotal, grn: grnSubTotal, inv: invoiceSubTotal },
-                        ...(hasReturns ? [{ label: 'يخصم: مرتجعات', po: -returnSubTotal, grn: undefined as number | undefined, inv: undefined as number | undefined, isReturn: true }] : []),
-                        { label: 'الخصم', po: displayPoDiscount, grn: grnDiscountAmount, inv: invoiceDiscountAmount },
-                        { label: 'الضريبة', po: displayPoTax, grn: grnTaxAmount, inv: invoiceTaxAmount },
-                        { label: 'مصاريف النقل / التوصيل', po: poShippingCost, grn: grnShippingCost, inv: invoiceDeliveryCost },
-                        { label: 'مصاريف أخرى', po: poOtherCosts, grn: grnOtherCosts, inv: invoiceOtherCosts },
-                    ].map((row, idx) => {
-                        const isReturn = (row as any).isReturn;
+                    {costRows.map((row, idx) => {
+                        const isDed = row.isDeduction === true;
                         return (
                             <div
                                 key={idx}
-                                className={`grid grid-cols-4 gap-3 py-2.5 border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/60 ${isReturn ? 'bg-rose-50/40' : ''
+                                className={`grid grid-cols-4 gap-3 py-2.5 border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/60 ${isDed ? 'bg-rose-50/40' : ''
                                     }`}
                             >
-                                <div className={`text-xs font-semibold ${isReturn ? 'text-rose-600' : 'text-slate-600'}`}>{row.label}</div>
-                                <div className={`text-center text-xs font-bold ${isReturn ? 'text-rose-500' : 'text-slate-700'}`}>
-                                    {row.po !== undefined ? (isReturn ? `(${formatNumber(Math.abs(row.po))})` : formatNumber(row.po)) : '—'}
+                                {/* ── Label ── */}
+                                <div className={`text-xs font-semibold flex items-center gap-1.5 ${isDed ? 'text-rose-600' : 'text-slate-600'}`}>
+                                    {isDed && (
+                                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-100 flex-shrink-0">
+                                            <span className="text-[10px] font-black text-rose-500 leading-none">−</span>
+                                        </span>
+                                    )}
+                                    {row.label}
                                 </div>
-                                <div className="text-center text-xs font-bold text-slate-700">
-                                    {row.grn !== undefined ? formatNumber(row.grn) : '—'}
+
+                                {/* ── PO value ── */}
+                                <div className={`text-center text-xs font-bold ${isDed ? 'text-rose-500' : 'text-slate-700'}`}>
+                                    {row.po !== undefined
+                                        ? (isDed ? `(${formatNumber(Math.abs(row.po))})` : formatNumber(row.po))
+                                        : '—'}
                                 </div>
-                                <div className="text-center text-xs font-extrabold text-violet-700">
-                                    {row.inv !== undefined ? formatNumber(row.inv) : '—'}
+
+                                {/* ── GRN value ── */}
+                                <div className={`text-center text-xs font-bold ${isDed ? 'text-rose-500' : 'text-slate-700'}`}>
+                                    {row.grn !== undefined
+                                        ? (isDed ? `(${formatNumber(Math.abs(row.grn))})` : formatNumber(row.grn))
+                                        : '—'}
+                                </div>
+
+                                {/* ── Invoice value ── */}
+                                <div className={`text-center text-xs font-extrabold ${isDed ? 'text-rose-600' : 'text-violet-700'}`}>
+                                    {row.inv !== undefined
+                                        ? (isDed ? `(${formatNumber(Math.abs(row.inv))})` : formatNumber(row.inv))
+                                        : '—'}
                                 </div>
                             </div>
                         );
@@ -487,13 +555,18 @@ const InvoiceMatchingValidation: React.FC<InvoiceMatchingProps> = ({
                             { label: 'يضاف: إجمالي الضريبة', value: reconciliationTaxAmount, show: reconciliationTaxAmount > 0, positive: true },
                         ].filter(r => r.show).map((row, idx) => (
                             <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-200/60 last:border-0">
-                                <span className={`text-sm font-semibold ${row.negative ? 'text-rose-600' : row.positive ? 'text-emerald-600' : 'text-slate-600'
+                                <span className={`text-sm font-semibold flex items-center gap-1.5 ${row.negative ? 'text-rose-600' : row.positive ? 'text-emerald-600' : 'text-slate-600'
                                     }`}>
+                                    {row.negative && (
+                                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-100 flex-shrink-0">
+                                            <span className="text-[10px] font-black text-rose-500 leading-none">−</span>
+                                        </span>
+                                    )}
                                     {row.label}
                                 </span>
                                 <span className={`text-sm font-bold ${row.negative ? 'text-rose-600' : row.positive ? 'text-emerald-600' : 'text-slate-800'
                                     }`}>
-                                    {row.negative ? '− ' : row.positive ? '+ ' : ''}{formatNumber(row.value)}
+                                    {row.negative ? `(${formatNumber(row.value)})` : row.positive ? `+ ${formatNumber(row.value)}` : formatNumber(row.value)}
                                 </span>
                             </div>
                         ))}

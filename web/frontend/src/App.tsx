@@ -194,13 +194,13 @@ function App() {
             <Route index element={<Navigate to="customers" replace />} />
             <Route path="customers">
               <Route index element={<CustomersPage />} />
-              <Route path="outstanding" element={<CustomerOutstandingPage />} />
               <Route path=":id" element={<CustomerFormPage />} />
             </Route>
           </Route>
           <Route path="sales">
             <Route index element={<Navigate to="sections" replace />} />
             <Route path="sections" element={<SalesSectionsPage />} />
+            <Route path="customers-outstanding" element={<CustomerOutstandingPage />} />
             <Route path="purchase-requisitions">
               <Route index element={<PurchaseRequisitionsListPage />} />
               <Route path="new" element={<SalesPurchaseRequisitionFormPage />} />

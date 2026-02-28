@@ -440,8 +440,13 @@ const SalesInvoiceFormPage: React.FC = () => {
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">امر توصيل</label>
-                                <select disabled={isReadOnly} value={selectedDOId || ''} onChange={(e) => loadFromDeliveryOrder(parseInt(e.target.value) || 0)} className={inputClass()}>
+                                <select disabled={isReadOnly} value={selectedDOId || (form.issueNoteId ? 'current' : '')} onChange={(e) => loadFromDeliveryOrder(parseInt(e.target.value) || 0)} className={inputClass()}>
                                     <option value="">—</option>
+                                    {form.issueNoteId && !selectedDOId && (
+                                        <option value="current">
+                                            {form.issueNoteNumber || `امر توصيل`} {form.customerNameAr ? `— ${form.customerNameAr}` : ''}
+                                        </option>
+                                    )}
                                     {deliveryOrders.map((o) => <option key={o.id} value={o.id}>{o.deliveryOrderNumber} — {o.customerNameAr}</option>)}
                                 </select>
                             </div>

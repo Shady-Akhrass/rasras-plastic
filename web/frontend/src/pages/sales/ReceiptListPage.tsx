@@ -33,10 +33,10 @@ const StatCard: React.FC<{
 }> = ({ icon: Icon, value, label, color }) => {
     const colorClasses = {
         primary: 'bg-brand-primary/10 text-brand-primary',
-        success: 'bg-emerald-100 text-emerald-600',
+        success: 'bg-emerald-100 text-brand-primary',
         warning: 'bg-amber-100 text-amber-600',
         purple: 'bg-purple-100 text-purple-600',
-        blue: 'bg-blue-100 text-blue-600',
+        blue: 'bg-blue-100 text-brand-primary',
         rose: 'bg-rose-100 text-rose-600'
     };
 
@@ -108,7 +108,7 @@ const ApprovalBadge: React.FC<{ status: string }> = ({ status }) => {
         },
         'Approved': {
             label: 'معتمد نهائياً',
-            className: 'bg-emerald-50 text-emerald-600 border-emerald-100'
+            className: 'bg-emerald-50 text-brand-primary border-emerald-100'
         },
         'Rejected': {
             label: 'مرفوض',
@@ -164,7 +164,7 @@ const ReceiptTableRow: React.FC<{
             </div>
         </td>
         <td className="px-6 py-4 text-right">
-            <span className="font-bold text-emerald-600">
+            <span className="font-bold text-brand-primary">
                 {formatNumber(convertAmount(receipt.amount || 0, receipt.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
             </span>
         </td>
@@ -179,7 +179,7 @@ const ReceiptTableRow: React.FC<{
             <div className="flex items-center justify-end gap-2">
                 <button
                     onClick={() => onView(receipt.id!)}
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                    className="p-2 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                     title="عرض التفاصيل"
                 >
                     <Eye className="w-4 h-4" />
@@ -565,7 +565,7 @@ const ReceiptListPage: React.FC = () => {
                         <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                    <CheckCircle2 className="w-5 h-5 text-brand-primary" />
                                     <span className="font-bold text-emerald-800">
                                         {selectedInvoices.size} فاتورة محددة
                                     </span>
@@ -660,7 +660,7 @@ const ReceiptListPage: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-violet-500/10 
+                                                            <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                                                                 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                                                                 <FileText className="w-5 h-5 text-brand-primary" />
                                                             </div>
@@ -682,7 +682,7 @@ const ReceiptListPage: React.FC = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <span className="font-bold text-emerald-600">
+                                                        <span className="font-bold text-brand-primary">
                                                             {formatNumber(convertAmount(invoice.totalAmount || 0, invoice.currency || 'EGP'))} {getCurrencyLabel(defaultCurrency)}
                                                         </span>
                                                     </td>

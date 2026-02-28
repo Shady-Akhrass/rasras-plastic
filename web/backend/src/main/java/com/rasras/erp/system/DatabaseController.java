@@ -116,7 +116,7 @@ public class DatabaseController {
     public ResponseEntity<ApiResponse<String>> clearTables(@RequestBody Map<String, Object> payload) {
         try {
             List<String> tables = (List<String>) payload.get("tables");
-            boolean disableFk = (boolean) payload.getOrDefault("disableFk", false);
+            boolean disableFk = Boolean.TRUE.equals(payload.get("disableFkChecks"));
 
             if (tables == null || tables.isEmpty()) {
                 return ResponseEntity.badRequest().body(ApiResponse.error("No tables selected"));

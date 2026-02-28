@@ -393,6 +393,10 @@ const DashboardLayout: React.FC = () => {
                 requiredPermission: 'SECTION_PROCUREMENT'
             },
 
+            {
+                to: '/dashboard/sales/customers-outstanding', icon: DollarSign, label: 'أرصدة العملاء',
+                section: 'sales', menuPermission: 'MENU_SALES_OUTSTANDING', requiredPermission: 'SECTION_SALES', order: 8.5
+            },
             // Sales
             {
                 to: '/dashboard/sales/sections', icon: ShoppingCart,
@@ -452,10 +456,6 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/crm/customers', icon: Users, label: 'العملاء',
                 section: 'crm', menuPermission: 'MENU_CRM_CUSTOMERS', requiredPermission: 'SECTION_CRM'
-            },
-            {
-                to: '/dashboard/crm/customers/outstanding', icon: DollarSign, label: 'أرصدة العملاء',
-                section: 'crm', menuPermission: 'MENU_CRM_OUTSTANDING', requiredPermission: 'SECTION_CRM'
             },
 
             // Finance

@@ -13,7 +13,6 @@ import {
     AlertCircle,
     Info,
     User,
-    XCircle,
     Lock,
     DollarSign
 } from 'lucide-react';
@@ -334,18 +333,6 @@ const StockIssueNoteFormPage: React.FC = () => {
                                     {isNew ? 'إذن صرف جديد' : `إذن صرف رقم ${form.issueNoteNumber || '—'}`}
                                 </h1>
                                 {isReadOnly && <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-lg text-xs font-bold border border-white/20"><Lock className="w-3 h-3" /> للعرض فقط</span>}
-                                {form.approvalStatus && (
-                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${form.approvalStatus === 'Approved' ? 'bg-emerald-500/20 text-white border-emerald-300/30' :
-                                        form.approvalStatus === 'Rejected' ? 'bg-rose-500/20 text-white border-rose-300/30' :
-                                            form.approvalStatus === 'Pending' ? 'bg-amber-500/20 text-white border-amber-300/30' :
-                                                'bg-slate-500/20 text-white border-slate-300/30'
-                                        }`}>
-                                        {form.approvalStatus === 'Approved' && <CheckCircle2 className="w-3 h-3" />}
-                                        {form.approvalStatus === 'Rejected' && <XCircle className="w-3 h-3" />}
-                                        {form.approvalStatus === 'Pending' && <Clock className="w-3 h-3" />}
-                                        {form.approvalStatus === 'Approved' ? 'معتمد' : form.approvalStatus === 'Rejected' ? 'مرفوض' : form.approvalStatus === 'Pending' ? 'قيد الانتظار' : form.approvalStatus}
-                                    </span>
-                                )}
                             </div>
                             <span className="text-white/80 text-lg">
                                 {isNew ? 'إصدار إذن صرف من المخزون بناءً على أمر بيع' : 'عرض وتعديل تفاصيل إذن الصرف'}
@@ -408,6 +395,11 @@ const StockIssueNoteFormPage: React.FC = () => {
                                     disabled={!isNew}
                                 >
                                     <option value="">اختر أمر البيع...</option>
+                                    {form.salesOrderId && !salesOrders.find(o => o.id === form.salesOrderId && !issueNotes.some(note => note.salesOrderId === o.id)) && (
+                                        <option value={form.salesOrderId}>
+                                            {form.soNumber || `أمر بيع ${form.salesOrderId}`} {form.customerNameAr ? ` — ${form.customerNameAr}` : ''}
+                                        </option>
+                                    )}
                                     {salesOrders
                                         .filter(o => o.approvalStatus === 'Approved')
                                         .filter(o => !issueNotes.some(note => note.salesOrderId === o.id))

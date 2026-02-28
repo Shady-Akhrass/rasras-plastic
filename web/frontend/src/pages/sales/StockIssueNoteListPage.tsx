@@ -1,11 +1,81 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Package, RefreshCw, Eye } from 'lucide-react';
+import { Search, Plus, Warehouse, RefreshCw, Eye, FileText, Clock, CheckCircle2, Truck, Lock, AlertCircle } from 'lucide-react';
 import { stockIssueNoteService, type StockIssueNoteDto } from '../../services/stockIssueNoteService';
 import Pagination from '../../components/common/Pagination';
 import { formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
+
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const config: Record<string, {
+        label: string;
+        bg: string;
+        text: string;
+        border: string;
+        icon: React.ElementType;
+    }> = {
+        'Draft': {
+            label: 'مسودة',
+            bg: 'bg-slate-50',
+            text: 'text-slate-600',
+            border: 'border-slate-200',
+            icon: FileText
+        },
+        'Pending': {
+            label: 'قيد الاعتماد',
+            bg: 'bg-amber-50',
+            text: 'text-amber-700',
+            border: 'border-amber-200',
+            icon: Clock
+        },
+        'Confirmed': {
+            label: 'مؤكد',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-700',
+            border: 'border-emerald-200',
+            icon: CheckCircle2
+        },
+        'Shipped': {
+            label: 'تم الشحن',
+            bg: 'bg-blue-50',
+            text: 'text-blue-700',
+            border: 'border-blue-200',
+            icon: Truck
+        },
+        'Closed': {
+            label: 'مغلق',
+            bg: 'bg-slate-100',
+            text: 'text-slate-700',
+            border: 'border-slate-300',
+            icon: Lock
+        },
+        'Approved': {
+            label: 'معتمد',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-700',
+            border: 'border-emerald-200',
+            icon: CheckCircle2
+        },
+        'Rejected': {
+            label: 'مرفوض',
+            bg: 'bg-rose-50',
+            text: 'text-rose-700',
+            border: 'border-rose-200',
+            icon: AlertCircle
+        }
+    };
+
+    const c = config[status] || config['Draft'];
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${c.bg} ${c.text} ${c.border}`}>
+            <c.icon className="w-3.5 h-3.5" />
+            {c.label}
+        </span>
+    );
+};
 
 const StockIssueNoteListPage: React.FC = () => {
     const navigate = useNavigate();
@@ -64,7 +134,7 @@ const StockIssueNoteListPage: React.FC = () => {
                 <div className="relative flex items-center justify-between">
                     <div className="flex items-center gap-5">
                         <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-                            <Package className="w-10 h-10" />
+                            <Warehouse className="w-10 h-10" />
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold mb-2">إذونات الصرف</h1>
@@ -122,7 +192,7 @@ const StockIssueNoteListPage: React.FC = () => {
                             ) : filtered.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-6 py-16 text-center text-slate-500">
-                                        <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                                        <Warehouse className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                                         <p>لا توجد إذونات صرف</p>
                                         <button onClick={() => navigate('/dashboard/sales/issue-notes/new')} className="mt-4 text-brand-primary font-medium">إنشاء إذن صرف</button>
                                     </td>
@@ -130,15 +200,23 @@ const StockIssueNoteListPage: React.FC = () => {
                             ) : (
                                 paginated.map((n) => (
                                     <tr key={n.id} className="border-b border-slate-100 hover:bg-amber-50/50">
-                                        <td className="px-6 py-4 font-mono font-bold text-amber-700">{n.issueNoteNumber || '—'}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
+                                                    rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                    <Warehouse className="w-5 h-5 text-brand-primary" />
+                                                </div>
+                                                <span className="font-mono font-bold text-brand-primary">
+                                                    {n.issueNoteNumber || '—'}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4 text-slate-600">{n.issueDate ? formatDate(n.issueDate) : '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{n.soNumber || '—'}</td>
                                         <td className="px-6 py-4 text-slate-700">{n.customerNameAr || '—'}</td>
                                         <td className="px-6 py-4 text-slate-600">{n.warehouseNameAr || '—'}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-lg text-xs font-medium ${n.status === 'Approved' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>
-                                                {n.status === 'Draft' ? 'مسودة' : n.status === 'Approved' ? 'معتمد' : n.status || '—'}
-                                            </span>
+                                            <StatusBadge status={n.status || 'Draft'} />
                                         </td>
                                         <td className="px-6 py-4 flex gap-2">
                                             <button onClick={() => navigate(`/dashboard/sales/issue-notes/${n.id}`)} className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg" title="عرض"><Eye className="w-5 h-5" /></button>

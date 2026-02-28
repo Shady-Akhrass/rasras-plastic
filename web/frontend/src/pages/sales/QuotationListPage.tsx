@@ -30,10 +30,10 @@ const StatCard: React.FC<{
 }> = ({ icon: Icon, value, label, color }) => {
     const colorClasses = {
         primary: 'bg-brand-primary/10 text-brand-primary',
-        success: 'bg-emerald-100 text-emerald-600',
+        success: 'bg-emerald-100 text-brand-primary',
         warning: 'bg-amber-100 text-amber-600',
         purple: 'bg-purple-100 text-purple-600',
-        blue: 'bg-blue-100 text-blue-600',
+        blue: 'bg-blue-100 text-brand-primary',
         rose: 'bg-rose-100 text-rose-600'
     };
 
@@ -147,9 +147,13 @@ const QuotationListPage: React.FC = () => {
         });
     }, [list, search, statusFilter]);
 
+    // Compute per-row grand total the same way the form does
+    const computeGrandTotal = (q: SalesQuotationDto) =>
+        (Number(q.subTotal) || 0) + (Number(q.taxAmount) || 0) + (Number(q.deliveryCost) || 0) + (Number(q.otherCosts) || 0);
+
     const stats = useMemo(() => {
         const total = list.length;
-        const totalAmount = list.reduce((sum, q) => sum + (Number(q.totalAmount) || 0), 0);
+        const totalAmount = list.reduce((sum, q) => sum + computeGrandTotal(q), 0);
         const accepted = list.filter(q => q.status === 'Approved').length;
         const pending = list.filter(q => q.status === 'Pending').length;
 
@@ -205,7 +209,7 @@ const QuotationListPage: React.FC = () => {
                         </button>
                         <button
                             onClick={() => navigate('/dashboard/sales/quotations/new')}
-                            className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 rounded-2xl 
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
                                 font-bold shadow-xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
                         >
                             <Plus className="w-5 h-5" />
@@ -229,7 +233,7 @@ const QuotationListPage: React.FC = () => {
                     <div className="relative flex-1">
                         <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
                             transition-colors duration-200
-                            ${isSearchFocused ? 'text-indigo-600' : 'text-slate-400'}`} />
+                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                         <input
                             type="text"
                             placeholder="بحث برقم العرض أو اسم العميل..."
@@ -321,7 +325,7 @@ const QuotationListPage: React.FC = () => {
                                     <tr
                                         key={q.id}
                                         onClick={() => navigate(`/dashboard/sales/quotations/${q.id}`)}
-                                        className="hover:bg-indigo-50/50 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
+                                        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
                                         style={{
                                             animationDelay: `${index * 30}ms`,
                                             animation: 'fadeInUp 0.3s ease-out forwards'
@@ -329,11 +333,11 @@ const QuotationListPage: React.FC = () => {
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-50 
+                                                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                                                     rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                    <Tag className="w-5 h-5 text-indigo-600" />
+                                                    <Tag className="w-5 h-5 text-brand-primary" />
                                                 </div>
-                                                <span className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                                <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
                                                     {q.quotationNumber || '—'}
                                                 </span>
                                             </div>
@@ -356,30 +360,17 @@ const QuotationListPage: React.FC = () => {
                                         <td className="px-6 py-4 text-sm text-slate-800 font-bold text-left">
                                             <div className="flex items-center justify-end gap-2">
                                                 <DollarSign className="w-4 h-4 text-emerald-500" />
-                                                <span>{formatNumber(q.totalAmount ?? 0)} {q.currency || 'EGP'}</span>
+                                                <span>{formatNumber(computeGrandTotal(q))} {q.currency || 'EGP'}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1">
-                                                <StatusBadge status={q.status || 'Draft'} />
-                                                {q.approvalStatus && (
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${q.approvalStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                                        q.approvalStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                            q.approvalStatus === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                                                'bg-slate-50 text-slate-500 border-slate-200'
-                                                        }`}>
-                                                        {q.approvalStatus === 'Approved' ? 'معتمد' :
-                                                            q.approvalStatus === 'Rejected' ? 'مرفوض' :
-                                                                q.approvalStatus === 'Pending' ? 'قيد الاعتماد' : q.approvalStatus}
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <StatusBadge status={q.status || 'Draft'} />
                                         </td>
                                         <td className="px-6 py-4 text-left">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/sales/quotations/${q.id}`); }}
-                                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                    className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                                                     title="عرض التفاصيل"
                                                 >
                                                     <Eye className="w-5 h-5" />

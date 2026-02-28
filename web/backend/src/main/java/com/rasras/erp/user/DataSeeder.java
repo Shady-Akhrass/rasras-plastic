@@ -24,6 +24,8 @@ public class DataSeeder implements CommandLineRunner {
     private final com.rasras.erp.approval.ApprovalLimitRepository limitRepo;
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
+    private final PathPermissionRepository pathPermissionRepository;
+    private final PathPermissionService pathPermissionService;
 
     @Override
     @Transactional
@@ -42,11 +44,15 @@ public class DataSeeder implements CommandLineRunner {
         // 0.06 تعيين صلاحيات الأقسام للأدوار الافتراضية (يعمل تلقائياً عند أول تشغيل)
         seedDefaultRoleSectionPermissions();
 
-        // 0.065 تعيين عناصر القائمة (MENU_*) للأدوار حتى يعمل السايد بار حسب النهج الجديد
+        // 0.065 تعيين عناصر القائمة (MENU_*) للأدوار حتى يعمل السايد بار حسب النهج
+        // الجديد
         seedMenuRoleAssignments();
 
         // 0.07 صلاحيات الأفعال (ACCOUNTING_*, إلخ) وتعيينها للأدوار المناسبة
         seedActionPermissions();
+
+        // 0.08 قواعد path_permission (ربط مسارات API بصلاحيات)
+        seedPathPermissions();
 
         // 0.1 Seed Approval Workflows
         seedApprovalWorkflows();
@@ -294,7 +300,8 @@ public class DataSeeder implements CommandLineRunner {
                 { "MENU_WAREHOUSE_VARIANCE", "تقرير الفروقات", "Variance" },
                 { "MENU_WAREHOUSE_CATEGORIES", "تصنيفات الأصناف", "Item Categories" },
                 { "MENU_WAREHOUSE_ITEMS", "الأصناف", "Items" },
-                // العمليات (فحص الجودة، معاملات الجودة، قوائم الأسعار فقط — التصنيفات والأصناف تحت المخزون)
+                // العمليات (فحص الجودة، معاملات الجودة، قوائم الأسعار فقط — التصنيفات والأصناف
+                // تحت المخزون)
                 { "MENU_OPERATIONS_CATEGORIES", "تصنيفات الأصناف", "Categories" },
                 { "MENU_OPERATIONS_ITEMS", "الأصناف", "Items" },
                 { "MENU_OPERATIONS_QUALITY_INSPECTION", "فحص الجودة", "Quality Inspection" },
@@ -337,7 +344,8 @@ public class DataSeeder implements CommandLineRunner {
         List<String> menuPrefixes = java.util.Arrays.asList(
                 "MENU_MAIN_", "MENU_HR_", "MENU_PROCUREMENT_", "MENU_SALES_", "MENU_CRM_",
                 "MENU_FINANCE_", "MENU_WAREHOUSE_", "MENU_OPERATIONS_", "MENU_SYSTEM_");
-        // ADMIN: كل صلاحيات القائمة (يُعيَّن في seedSectionPermissions للـ SECTION_*، نضيف هنا MENU_*)
+        // ADMIN: كل صلاحيات القائمة (يُعيَّن في seedSectionPermissions للـ SECTION_*،
+        // نضيف هنا MENU_*)
         Role adminRole = roleRepository.findByRoleCode("ADMIN").orElse(null);
         if (adminRole != null) {
             for (String prefix : menuPrefixes) {
@@ -366,7 +374,8 @@ public class DataSeeder implements CommandLineRunner {
         roleMenuPrefixes.put("ACC", java.util.Arrays.asList("MENU_MAIN_", "MENU_FINANCE_"));
         for (java.util.Map.Entry<String, java.util.List<String>> e : roleMenuPrefixes.entrySet()) {
             Role role = roleRepository.findByRoleCode(e.getKey()).orElse(null);
-            if (role == null) continue;
+            if (role == null)
+                continue;
             for (String prefix : e.getValue()) {
                 for (Permission perm : permissionRepository.findByPermissionCodeStartingWith(prefix)) {
                     assignPermissionToRole(role, perm.getPermissionCode());
@@ -376,7 +385,8 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     /**
-     * صلاحيات الأفعال (Action-level): محاسبة، مستخدمين — تُنشأ وتُعيَّن للأدوار المناسبة
+     * صلاحيات الأفعال (Action-level): محاسبة، مستخدمين — تُنشأ وتُعيَّن للأدوار
+     * المناسبة
      * حتى يعمل Backend بـ hasAuthority فقط (بدون hasAnyRole).
      */
     private void seedActionPermissions() {
@@ -469,6 +479,54 @@ public class DataSeeder implements CommandLineRunner {
                     .build());
             log.info("Assigned {} to {}", permCode, role.getRoleCode());
         }
+    }
+
+    /**
+     * Seed path_permission rules for API endpoints that require dynamic permission
+     * checks.
+     * These rules tell PathPermissionFilter which permission is needed for each API
+     * path.
+     */
+    private void seedPathPermissions() {
+        log.info("Seeding path permission rules...");
+
+        // Database settings endpoints — require SECTION_SYSTEM
+        String[][] rules = {
+                { "/api/settings/database/**", "*", "SECTION_SYSTEM", "10" },
+        };
+
+        for (String[] rule : rules) {
+            String pathPattern = rule[0];
+            String httpMethod = rule[1];
+            String permCode = rule[2];
+            int priority = Integer.parseInt(rule[3]);
+
+            // Check if rule already exists
+            boolean exists = pathPermissionRepository.findAllByOrderByPriorityDesc().stream()
+                    .anyMatch(r -> r.getPathPattern().equals(pathPattern)
+                            && r.getHttpMethod().equals(httpMethod)
+                            && r.getPathType() == PathType.API);
+            if (exists)
+                continue;
+
+            Permission perm = permissionRepository.findByPermissionCode(permCode).orElse(null);
+            if (perm == null) {
+                log.warn("Permission {} not found, skipping path rule for {}", permCode, pathPattern);
+                continue;
+            }
+
+            pathPermissionRepository.save(PathPermission.builder()
+                    .pathPattern(pathPattern)
+                    .httpMethod(httpMethod)
+                    .permission(perm)
+                    .priority(priority)
+                    .pathType(PathType.API)
+                    .build());
+            log.info("Created path permission: {} {} -> {}", httpMethod, pathPattern, permCode);
+        }
+
+        // Reload cache so the filter picks up new rules immediately
+        pathPermissionService.reloadCache();
     }
 
     private void seedApprovalWorkflows() {

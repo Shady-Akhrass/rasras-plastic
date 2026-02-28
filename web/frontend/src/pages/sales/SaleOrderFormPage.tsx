@@ -416,6 +416,11 @@ const SaleOrderFormPage: React.FC = () => {
                                 </label>
                                 <select required disabled={isReadOnly} value={form.salesQuotationId || ''} onChange={(e) => loadFromQuotation(parseInt(e.target.value) || 0)} className={inputClass()}>
                                     <option value="">اختر عرض السعر...</option>
+                                    {form.salesQuotationId && !availableQuotations.find(q => q.id === form.salesQuotationId) && (
+                                        <option value={form.salesQuotationId}>
+                                            {form.quotationNumber || `عرض سعر ${form.salesQuotationId}`} {form.customerNameAr ? ` — ${form.customerNameAr}` : ''}
+                                        </option>
+                                    )}
                                     {availableQuotations.map((q) => <option key={q.id} value={q.id}>{q.quotationNumber} — {q.customerNameAr}</option>)}
                                 </select>
                             </div>

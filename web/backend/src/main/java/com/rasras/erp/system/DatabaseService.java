@@ -277,12 +277,22 @@ public class DatabaseService {
 
     public void clearTables(List<String> tables, boolean disableFkChecks) {
         try {
+            // Fetch actual base tables (exclude views) from information_schema
+            String dbName = getDatabaseName();
+            List<String> baseTables = jdbcTemplate.queryForList(
+                    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'",
+                    String.class, dbName);
+
             if (disableFkChecks) {
                 jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
             }
             for (String table : tables) {
                 if (!table.matches("^[a-zA-Z0-9_]+$")) {
                     throw new IllegalArgumentException("Invalid table name: " + table);
+                }
+                if (!baseTables.contains(table)) {
+                    log.warn("Skipping '{}': not a base table (likely a view)", table);
+                    continue;
                 }
                 jdbcTemplate.execute("TRUNCATE TABLE " + table);
             }

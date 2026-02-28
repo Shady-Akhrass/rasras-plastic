@@ -93,6 +93,7 @@ const PATH_PERMISSION_PATTERNS: Array<{ test: (p: string) => boolean; permission
   { test: (p) => p.startsWith('/dashboard/procurement'), permissions: ['SECTION_PROCUREMENT'] },
   // المبيعات
   { test: (p) => p.startsWith('/dashboard/sales/sections'), permissions: ['SECTION_SALES', 'MENU_SALES_SECTIONS'] },
+  { test: (p) => p.startsWith('/dashboard/sales/customers-outstanding'), permissions: ['SECTION_SALES', 'MENU_SALES_OUTSTANDING', 'MENU_CRM_OUTSTANDING'] },
   { test: (p) => p.startsWith('/dashboard/sales/purchase-requisitions'), permissions: ['SECTION_SALES', 'MENU_SALES_PURCHASE_REQUISITIONS'] },
   { test: (p) => p.startsWith('/dashboard/sales/customer-requests'), permissions: ['SECTION_SALES', 'MENU_SALES_CUSTOMER_REQUESTS'] },
   { test: (p) => p.startsWith('/dashboard/sales/quotations'), permissions: ['SECTION_SALES', 'MENU_SALES_QUOTATIONS'] },

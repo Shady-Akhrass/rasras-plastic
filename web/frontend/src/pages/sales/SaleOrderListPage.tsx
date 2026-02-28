@@ -16,7 +16,8 @@ import {
     DollarSign,
     Package,
     Calendar,
-    Users
+    Users,
+    AlertCircle
 } from 'lucide-react';
 import { saleOrderService, type SaleOrderDto } from '../../services/saleOrderService';
 import Pagination from '../../components/common/Pagination';
@@ -33,10 +34,10 @@ const StatCard: React.FC<{
 }> = ({ icon: Icon, value, label, color }) => {
     const colorClasses = {
         primary: 'bg-brand-primary/10 text-brand-primary',
-        success: 'bg-emerald-100 text-emerald-600',
+        success: 'bg-emerald-100 text-brand-primary',
         warning: 'bg-amber-100 text-amber-600',
         purple: 'bg-purple-100 text-purple-600',
-        blue: 'bg-blue-100 text-blue-600',
+        blue: 'bg-blue-100 text-brand-primary',
         rose: 'bg-rose-100 text-rose-600'
     };
 
@@ -91,7 +92,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             label: 'تم الشحن',
             bg: 'bg-blue-50',
             text: 'text-blue-700',
-            border: 'border-blue-200',
+            border: 'border-brand-primary/20',
             icon: Truck
         },
         'Closed': {
@@ -100,6 +101,20 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
             text: 'text-slate-700',
             border: 'border-slate-300',
             icon: Lock
+        },
+        'Approved': {
+            label: 'معتمد',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-700',
+            border: 'border-emerald-200',
+            icon: CheckCircle2
+        },
+        'Rejected': {
+            label: 'مرفوض',
+            bg: 'bg-rose-50',
+            text: 'text-rose-700',
+            border: 'border-rose-200',
+            icon: AlertCircle
         }
     };
 
@@ -245,7 +260,7 @@ const SaleOrderListPage: React.FC = () => {
                         </button>
                         <button
                             onClick={() => navigate('/dashboard/sales/orders/new')}
-                            className="flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 rounded-2xl 
+                            className="flex items-center gap-3 px-8 py-4 bg-white text-brand-primary rounded-2xl 
                                 font-bold shadow-xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
                         >
                             <Plus className="w-5 h-5" />
@@ -269,7 +284,7 @@ const SaleOrderListPage: React.FC = () => {
                     <div className="relative flex-1">
                         <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
                             transition-colors duration-200
-                            ${isSearchFocused ? 'text-indigo-600' : 'text-slate-400'}`} />
+                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                         <input
                             type="text"
                             placeholder="بحث برقم الأمر أو اسم العميل..."
@@ -367,7 +382,7 @@ const SaleOrderListPage: React.FC = () => {
                                     <tr
                                         key={o.id}
                                         onClick={() => navigate(`/dashboard/sales/orders/${o.id}?mode=view`)}
-                                        className="hover:bg-indigo-50/50 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
+                                        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
                                         style={{
                                             animationDelay: `${index * 30}ms`,
                                             animation: 'fadeInUp 0.3s ease-out forwards'
@@ -375,11 +390,11 @@ const SaleOrderListPage: React.FC = () => {
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-50 
+                                                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                                                     rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                    <Package className="w-5 h-5 text-indigo-600" />
+                                                    <Package className="w-5 h-5 text-brand-primary" />
                                                 </div>
-                                                <span className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                                <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">
                                                     {o.soNumber || '—'}
                                                 </span>
                                             </div>
@@ -406,26 +421,13 @@ const SaleOrderListPage: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1">
-                                                <StatusBadge status={o.status || 'Draft'} />
-                                                {o.approvalStatus && (
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${o.approvalStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                                        o.approvalStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                            o.approvalStatus === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                                                'bg-slate-50 text-slate-500 border-slate-200'
-                                                        }`}>
-                                                        {o.approvalStatus === 'Approved' ? 'معتمد' :
-                                                            o.approvalStatus === 'Rejected' ? 'مرفوض' :
-                                                                o.approvalStatus === 'Pending' ? 'قيد الاعتماد' : o.approvalStatus}
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <StatusBadge status={o.status || 'Draft'} />
                                         </td>
                                         <td className="px-6 py-4 text-left">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/sales/orders/${o.id}?mode=view`); }}
-                                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                    className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                                                     title="عرض التفاصيل"
                                                 >
                                                     <Eye className="w-5 h-5" />
@@ -434,7 +436,7 @@ const SaleOrderListPage: React.FC = () => {
                                                     <>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/sales/orders/${o.id}`); }}
-                                                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                            className="p-2 text-slate-400 hover:text-brand-primary hover:bg-emerald-50 rounded-lg transition-all"
                                                             title="تعديل"
                                                         >
                                                             <Pencil className="w-4 h-4" />

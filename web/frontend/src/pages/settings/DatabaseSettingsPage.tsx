@@ -217,12 +217,12 @@ const DatabaseSettingsPage: React.FC = () => {
             });
             const data = await response.json();
             if (data.success) {
-                showNotification('success', data.message);
+                showNotification('success', data.data || 'تم إفراغ الجداول المحددة بنجاح');
                 fetchOverview();
                 setSelectedTables([]);
                 setShowClearConfirm(false);
             } else {
-                showNotification('error', data.message);
+                showNotification('error', data.message || 'فشل في إفراغ الجداول');
             }
         } catch (error: any) {
             showNotification('error', error.message);

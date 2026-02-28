@@ -26,17 +26,17 @@ const StatCard: React.FC<{
     color: 'indigo' | 'success' | 'warning' | 'purple' | 'blue' | 'rose';
 }> = ({ icon: Icon, value, label, color }) => {
     const colorClasses = {
-        indigo: 'bg-indigo-100 text-indigo-600',
-        success: 'bg-emerald-100 text-emerald-600',
+        indigo: 'bg-indigo-100 text-brand-primary',
+        success: 'bg-emerald-100 text-brand-primary',
         warning: 'bg-amber-100 text-amber-600',
         purple: 'bg-purple-100 text-purple-600',
-        blue: 'bg-blue-100 text-blue-600',
+        blue: 'bg-blue-100 text-brand-primary',
         rose: 'bg-rose-100 text-rose-600'
     };
 
     return (
         <div className="bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-lg 
-            hover:border-indigo-200 transition-all duration-300 group">
+            hover:border-brand-primary/20 transition-all duration-300 group">
             <div className="flex items-center gap-4">
                 <div className={`p-3 rounded-xl ${colorClasses[color]}`}>
                     <Icon className="w-6 h-6" />
@@ -54,7 +54,7 @@ const StatCard: React.FC<{
 const StatusBadge: React.FC<{ isActive: boolean }> = ({ isActive }) => {
     return (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border ${isActive
-                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-300/30'
+                ? 'bg-emerald-500/20 text-brand-primary border-emerald-300/30'
                 : 'bg-amber-500/20 text-amber-600 border-amber-300/30'
             }`}>
             {isActive ? (
@@ -233,7 +233,7 @@ const VehicleListPage: React.FC = () => {
                     <div className="relative flex-1">
                         <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 
                             transition-colors duration-200
-                            ${isSearchFocused ? 'text-indigo-600' : 'text-slate-400'}`} />
+                            ${isSearchFocused ? 'text-brand-primary' : 'text-slate-400'}`} />
                         <input
                             type="text"
                             placeholder="بحث بالكود، رقم اللوحة، الماركة، السائق..."
@@ -277,7 +277,7 @@ const VehicleListPage: React.FC = () => {
                             onClick={fetchVehicles}
                             disabled={loading}
                             className="p-3 rounded-xl border border-slate-200 text-slate-600 
-                                hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 
+                                hover:bg-brand-primary/10 hover:border-brand-primary/20 hover:text-brand-primary 
                                 transition-all duration-200 disabled:opacity-50"
                         >
                             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -295,7 +295,7 @@ const VehicleListPage: React.FC = () => {
                                 <th className="px-4 py-4 text-center text-sm font-bold text-slate-700">
                                     <input
                                         type="checkbox"
-                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-indigo-500"
                                         checked={
                                             paginatedVehicles.length > 0 &&
                                             paginatedVehicles.every(v => v.id && selectedIds.includes(v.id))
@@ -319,7 +319,7 @@ const VehicleListPage: React.FC = () => {
                                 <tr>
                                     <td colSpan={10} className="text-center py-20">
                                         <div className="flex flex-col items-center gap-4">
-                                            <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                                            <div className="w-12 h-12 border-4 border-brand-primary/20 border-t-indigo-600 rounded-full animate-spin" />
                                             <span className="text-slate-500 font-medium">جاري التحميل...</span>
                                         </div>
                                     </td>
@@ -342,7 +342,7 @@ const VehicleListPage: React.FC = () => {
                                 paginatedVehicles.map((vehicle, index) => (
                                     <tr
                                         key={vehicle.id}
-                                        className="hover:bg-indigo-50/50 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
+                                        className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
                                         onClick={() => navigate(`/dashboard/sales/vehicles/${vehicle.id}`)}
                                         style={{
                                             animationDelay: `${index * 30}ms`,
@@ -352,19 +352,19 @@ const VehicleListPage: React.FC = () => {
                                         <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                                             <input
                                                 type="checkbox"
-                                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                className="w-4 h-4 rounded border-slate-300 text-brand-primary focus:ring-indigo-500"
                                                 checked={!!vehicle.id && selectedIds.includes(vehicle.id)}
                                                 onChange={() => vehicle.id && handleToggleSelect(vehicle.id)}
                                             />
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-50 
+                                                <div className="w-10 h-10 bg-gradient-to-br from-brand-primary/20 to-brand-primary/10 
                                                     rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                    <Truck className="w-5 h-5 text-indigo-600" />
+                                                    <Truck className="w-5 h-5 text-brand-primary" />
                                                 </div>
                                                 <div>
-                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors block">
+                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors block">
                                                         {vehicle.vehicleCode || 'بدون كود'}
                                                     </span>
                                                 </div>
@@ -400,7 +400,7 @@ const VehicleListPage: React.FC = () => {
                                             <div className="flex justify-end gap-2">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/sales/vehicles/${vehicle.id}`); }}
-                                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                    className="p-2 text-slate-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
                                                     title="عرض التفاصيل"
                                                 >
                                                     <FileText className="w-4 h-4" />

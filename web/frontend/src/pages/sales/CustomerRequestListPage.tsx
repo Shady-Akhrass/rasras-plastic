@@ -32,10 +32,10 @@ const StatCard: React.FC<{
 }> = ({ icon: Icon, value, label, color }) => {
     const colorClasses = {
         primary: 'bg-brand-primary/10 text-brand-primary',
-        success: 'bg-emerald-100 text-emerald-600',
+        success: 'bg-emerald-100 text-brand-primary',
         warning: 'bg-amber-100 text-amber-600',
         purple: 'bg-purple-100 text-purple-600',
-        blue: 'bg-blue-100 text-blue-600',
+        blue: 'bg-blue-100 text-brand-primary',
         rose: 'bg-rose-100 text-rose-600'
     };
 
@@ -385,11 +385,11 @@ const CustomerRequestListPage: React.FC = () => {
                     animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                            <CheckCircle2 className="w-5 h-5 text-brand-primary" />
                         </div>
                         <div>
                             <span className="font-bold block">{successMessage}</span>
-                            <span className="text-sm text-emerald-600">تم التحديث بنجاح</span>
+                            <span className="text-sm text-brand-primary">تم التحديث بنجاح</span>
                         </div>
                     </div>
                     <button
