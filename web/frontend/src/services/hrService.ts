@@ -20,6 +20,12 @@ import apiClient from './apiClient';
  * - صرف المرتبات
  */
 
+export interface HrSettingDto {
+  settingKey: string;
+  settingValue: string;
+  description?: string;
+}
+
 export interface LeaveTypeDto {
   leaveTypeCode: string;
   leaveTypeNameAr: string;
@@ -82,6 +88,22 @@ export interface AttendanceDto {
   notes?: string;
 }
 
+export interface HolidayBulkDto {
+  fromDate: string;
+  toDate: string;
+  holidayNameAr: string;
+  holidayNameEn?: string;
+  isActive?: boolean;
+}
+
+export interface AssignLeaveDto {
+  employeeId: number;
+  leaveTypeCode: string;
+  fromDate: string;
+  toDate: string;
+  notes?: string;
+}
+
 export interface PayrollItemDto {
   componentId: number;
   componentNameAr?: string | null;
@@ -101,12 +123,23 @@ export interface PayrollDto {
   netSalary?: number | null;
   status?: string;
   paymentDate?: string | null;
+  totalHours?: number | null;
   items: PayrollItemDto[];
 }
 
 type ApiResp<T> = { success: boolean; message?: string; data: T };
 
 export const hrService = {
+  // HR Settings
+  async getSettings() {
+    const res = await apiClient.get<ApiResp<HrSettingDto[]>>(`/hr/settings`);
+    return res.data;
+  },
+  async upsertSetting(dto: HrSettingDto) {
+    const res = await apiClient.put<ApiResp<HrSettingDto>>(`/hr/settings`, dto);
+    return res.data;
+  },
+
   // Leave Types
   async getLeaveTypes(activeOnly = false) {
     const res = await apiClient.get<ApiResp<LeaveTypeDto[]>>(`/hr/leave-types?activeOnly=${activeOnly}`);
@@ -146,6 +179,10 @@ export const hrService = {
   },
   async createHoliday(dto: HolidayDto) {
     const res = await apiClient.post<ApiResp<HolidayDto>>(`/hr/holidays`, dto);
+    return res.data;
+  },
+  async createBulkHolidays(dto: HolidayBulkDto) {
+    const res = await apiClient.post<ApiResp<HolidayDto[]>>(`/hr/holidays/bulk`, dto);
     return res.data;
   },
   async updateHoliday(id: number, dto: HolidayDto) {
@@ -191,6 +228,10 @@ export const hrService = {
       const res = await apiClient.post<ApiResp<AttendanceDto>>(`/hr/attendance`, dto);
       return res.data;
     }
+  },
+  async assignLeave(dto: AssignLeaveDto) {
+    const res = await apiClient.post<ApiResp<void>>(`/hr/attendance/assign-leave`, dto);
+    return res.data;
   },
 
   // Payroll

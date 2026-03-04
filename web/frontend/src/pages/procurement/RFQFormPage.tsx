@@ -6,7 +6,8 @@ import {
     Hash, Layers, ClipboardList, CheckCircle2, Check, Search, Users, Eye,
     AlertCircle, Zap, Link2, ChevronDown, BadgeDollarSign
 } from 'lucide-react';
-import purchaseService, { type RFQ, type RFQItem, type Supplier } from '../../services/purchaseService';
+import purchaseService, { type RFQ, type RFQItem, type Supplier, type PurchaseRequisition, type PurchaseRequisitionItem } from '../../services/purchaseService';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { unitService, type UnitDto } from '../../services/unitService';
@@ -878,6 +879,7 @@ const RFQFormPage: React.FC = () => {
                 await purchaseService.updateRFQ(parseInt(id!), {
                     ...formData, supplierId: selectedSupplierIds[0]
                 } as RFQ);
+                window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
                 toast.success('تم تحديث طلب عرض السعر بنجاح', { id: toastId, icon: '🎉' });
                 navigate('/dashboard/procurement/rfq');
             } catch (error) {
@@ -906,6 +908,7 @@ const RFQFormPage: React.FC = () => {
         });
 
         if (successes > 0) {
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success(`تم إنشاء ${formatNumber(successes)} طلب عرض سعر بنجاح`, { icon: '🎉', duration: 4000 });
             navigate('/dashboard/procurement/rfq');
         }
@@ -917,6 +920,7 @@ const RFQFormPage: React.FC = () => {
             setProcessing(true);
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
             await approvalService.takeAction(parseInt(approvalId), 1, action);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
             navigate('/dashboard/procurement/approvals');
         } catch (error) {

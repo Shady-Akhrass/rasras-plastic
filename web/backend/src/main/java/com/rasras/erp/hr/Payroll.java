@@ -56,7 +56,9 @@ public class Payroll extends AuditableEntity {
     @Column(name = "BankAccountID")
     private Integer bankAccountId;
 
+    @Column(name = "TotalHours", precision = 5, scale = 2)
+    private BigDecimal totalHours;
+
     @Column(name = "Notes", length = 500)
     private String notes;
 }
-

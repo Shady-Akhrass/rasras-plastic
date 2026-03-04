@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Calendar, CheckCircle2, Clock, RefreshCw, Save, Search, Users,
   XCircle, ChevronRight, ChevronLeft, Timer,
   UserCheck, UserX, CalendarDays, Zap, SunMedium, CheckCheck,
   AlertCircle, Coffee, ClipboardList, ListChecks, Filter,
-  UserMinus, Briefcase, Building2
+  UserMinus, Briefcase, Building2,
+  Trash2, Plus
 } from 'lucide-react';
 import { hrService } from '../../services/hrService';
-import type { AttendanceDto } from '../../services/hrService';
+import type { AttendanceDto, HrSettingDto, HolidayDto, HolidayBulkDto } from '../../services/hrService';
 import employeeService, { type Employee } from '../../services/employeeService';
 import { toast } from 'react-hot-toast';
 
@@ -20,11 +21,18 @@ const ARABIC_MONTHS = [
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
 ];
 
-const getDayName = (dateStr: string) => ARABIC_DAYS[new Date(dateStr).getDay()];
-const isWeekend = (dateStr: string) => {
-  const d = new Date(dateStr).getDay();
-  return d === 5 || d === 6;
+// Helper closure to inject dynamic settings
+const createIsWeekendOrHoliday = (weekendDays: number[], holidays: HolidayDto[]) => (dateStr: string) => {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  if (weekendDays.includes(day)) return { isWeekend: true, isHoliday: false, label: 'أجازة أسبوعية' };
+
+  const h = holidays.find(x => x.holidayDate === dateStr);
+  if (h) return { isWeekend: false, isHoliday: true, label: h.holidayNameAr };
+
+  return { isWeekend: false, isHoliday: false, label: '' };
 };
+
 const isToday = (dateStr: string) => dateStr === new Date().toISOString().slice(0, 10);
 const formatDateArabic = (dateStr: string) => {
   const d = new Date(dateStr);
@@ -163,7 +171,11 @@ const SkeletonRow = ({ cols = 5 }: { cols?: number }) => (
 // ════════════════════════════════════════════
 // ─── Tab: Individual Record (سجل الحضور) ───
 // ════════════════════════════════════════════
-const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
+const IndividualRecordTab: React.FC<{
+  employees: Employee[],
+  settings: HrSettingDto[],
+  holidays: HolidayDto[]
+}> = ({ employees, settings, holidays }) => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | ''>('');
   const [fromDate, setFromDate] = useState(new Date().toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
@@ -204,7 +216,7 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
 
   const getRow = useCallback((date: string): AttendanceDto => {
     const existing = items.find(
-      x => x.attendanceDate === date &&
+      (x: AttendanceDto) => x.attendanceDate === date &&
         (!selectedEmployeeId || x.employeeId === selectedEmployeeId)
     );
     return existing ?? {
@@ -217,10 +229,10 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
 
   const upsertRow = useCallback((row: AttendanceDto) => {
     setHasChanges(true);
-    setItems(prev => {
+    setItems((prev: AttendanceDto[]) => {
       const copy = [...prev];
       const idx = copy.findIndex(
-        x => x.attendanceId === row.attendanceId &&
+        (x: AttendanceDto) => x.attendanceId === row.attendanceId &&
           x.attendanceDate === row.attendanceDate &&
           x.employeeId === row.employeeId
       );
@@ -236,6 +248,10 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
       return;
     }
     const row = getRow(date);
+    if (row.status === 'EXCUSED') {
+      toast.error('لا يمكن تعديل حضور الموظف في يوم أخذ فيه أذناً');
+      return;
+    }
     upsertRow({
       ...row,
       employeeId: selectedEmployeeId as number,
@@ -244,6 +260,15 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
       checkOutTime: checked ? '16:00' : null,
     });
   }, [selectedEmployeeId, getRow, upsertRow]);
+
+  const getDayInfo = useMemo(() => {
+    let weekendDays = [5, 6]; // Default to Fri/Sat
+    const wSetting = settings.find(s => s.settingKey === 'WEEKLY_HOLIDAYS');
+    if (wSetting && wSetting.settingValue) {
+      try { weekendDays = JSON.parse(wSetting.settingValue); } catch (e) { }
+    }
+    return createIsWeekendOrHoliday(weekendDays, holidays);
+  }, [settings, holidays]);
 
   const onTimeChange = useCallback((
     date: string, field: 'checkInTime' | 'checkOutTime', value: string
@@ -272,9 +297,13 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
       toast.error('اختر موظفاً أولاً');
       return;
     }
-    const workDays = dates.filter(d => !isWeekend(d));
-    workDays.forEach(date => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const workDays = dates.filter((d: string) =>
+      !getDayInfo(d).isWeekend && !getDayInfo(d).isHoliday && d <= todayStr
+    );
+    workDays.forEach((date: string) => {
       const row = getRow(date);
+      if (row.status === 'EXCUSED') return; // Don't override excused absences
       upsertRow({
         ...row,
         employeeId: selectedEmployeeId as number,
@@ -284,7 +313,7 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
       });
     });
     toast.success(`تم تحديد ${workDays.length} يوم عمل كحاضر`);
-  }, [selectedEmployeeId, dates, getRow, upsertRow]);
+  }, [selectedEmployeeId, dates, getRow, upsertRow, getDayInfo]);
 
   const onSave = async () => {
     if (!selectedEmployeeId) {
@@ -292,7 +321,7 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
       return;
     }
     const toSave = items.filter(
-      x => x.employeeId === selectedEmployeeId && dates.includes(x.attendanceDate)
+      (x: AttendanceDto) => x.employeeId === selectedEmployeeId && dates.includes(x.attendanceDate)
     );
     if (toSave.length === 0) {
       toast.error('لا توجد سجلات للحفظ');
@@ -345,16 +374,24 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
 
   const stats = useMemo(() => {
     const filtered = items.filter(
-      x => (!selectedEmployeeId || x.employeeId === selectedEmployeeId) &&
+      (x: AttendanceDto) => (!selectedEmployeeId || x.employeeId === selectedEmployeeId) &&
         dates.includes(x.attendanceDate)
     );
-    const present = filtered.filter(x => x.status === 'PRESENT').length;
-    const workDays = dates.filter(d => !isWeekend(d)).length;
-    const absent = Math.max(0, workDays - present);
-    const totalOT = filtered.reduce((s, x) => s + (x.overtimeHours || 0), 0);
-    const weekends = dates.filter(d => isWeekend(d)).length;
-    return { present, absent, totalOT, weekends, workDays };
-  }, [items, dates, selectedEmployeeId]);
+    const present = filtered.filter((x: AttendanceDto) => x.status === 'PRESENT').length;
+    let workDaysCounter = 0;
+    let weekendCounter = 0;
+
+    dates.forEach((d: string) => {
+      const info = getDayInfo(d);
+      if (info.isWeekend || info.isHoliday) weekendCounter++;
+      else workDaysCounter++;
+    });
+
+    const excused = filtered.filter((x: AttendanceDto) => x.status === 'EXCUSED').length;
+    const absent = Math.max(0, workDaysCounter - present - excused);
+    const totalOT = filtered.reduce((s: number, x: AttendanceDto) => s + (x.overtimeHours || 0), 0);
+    return { present, absent, excused, totalOT, weekends: weekendCounter, workDays: workDaysCounter };
+  }, [items, dates, selectedEmployeeId, getDayInfo]);
 
   const selectedEmployee = employees.find(e => e.employeeId === selectedEmployeeId);
 
@@ -380,14 +417,15 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
 
       {/* Stats */}
       {dates.length > 0 && selectedEmployeeId && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <StatCard icon={UserCheck} label="أيام الحضور" value={stats.present}
             sub={`من ${stats.workDays} يوم عمل`} color="emerald" />
           <StatCard icon={UserX} label="أيام الغياب" value={stats.absent} color="rose" />
+          <StatCard icon={UserMinus} label="مستأذن" value={stats.excused} color="violet" />
           <StatCard icon={Timer} label="ساعات إضافية" value={stats.totalOT}
             sub="إجمالي الساعات" color="amber" />
           <StatCard icon={Coffee} label="أيام العطل" value={stats.weekends}
-            sub="جمعة + سبت" color="blue" />
+            sub="إجازات وأعياد" color="blue" />
         </div>
       )}
 
@@ -410,12 +448,12 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
             </button>
           ))}
           <div className="flex items-center gap-1 mr-auto">
-            <button onClick={() => navigateDates('next')}
+            <button onClick={() => navigateDates('prev')}
               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 
                 hover:text-slate-600 transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
-            <button onClick={() => navigateDates('prev')}
+            <button onClick={() => navigateDates('next')}
               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 
                 hover:text-slate-600 transition-colors">
               <ChevronLeft className="w-4 h-4" />
@@ -591,21 +629,25 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
                   </td>
                 </tr>
               ) : (
-                dates.map(date => {
+                dates.map((date: string) => {
                   const row = getRow(date);
                   const present = row.status === 'PRESENT';
-                  const weekend = isWeekend(date);
-                  const today = isToday(date);
+                  const excused = row.status === 'EXCUSED';
+                  const dayInfo = getDayInfo(date);
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const isRestricted = dayInfo.isWeekend || dayInfo.isHoliday || date > todayStr;
+                  const today = date === todayStr;
 
                   return (
                     <tr key={date}
                       className={`transition-colors duration-150
-                        ${weekend
+                        ${isRestricted
                           ? 'bg-amber-50/40'
                           : today
                             ? 'bg-brand-primary/[0.03]'
                             : 'hover:bg-slate-50/80'}
-                        ${present && !weekend ? 'bg-emerald-50/30' : ''}`}>
+                        ${present && !isRestricted ? 'bg-emerald-50/30' : ''}
+                        ${excused ? 'bg-indigo-50/40' : ''}`}>
 
                       {/* Date */}
                       <td className="px-5 py-3.5">
@@ -614,7 +656,7 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
                             justify-center text-sm font-bold shrink-0
                             ${today
                               ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/30'
-                              : weekend
+                              : isRestricted
                                 ? 'bg-amber-100 text-amber-700'
                                 : 'bg-slate-100 text-slate-600'}`}>
                             {new Date(date).getDate()}
@@ -623,10 +665,10 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
                             <p className={`text-sm font-semibold
                               ${today
                                 ? 'text-brand-primary'
-                                : weekend
+                                : isRestricted
                                   ? 'text-amber-700'
                                   : 'text-slate-700'}`}>
-                              {getDayName(date)}
+                              {ARABIC_DAYS[new Date(date).getDay()]}
                               {today && (
                                 <span className="mr-2 inline-flex items-center gap-1 
                                   px-2 py-0.5 rounded-full text-[10px] font-bold 
@@ -644,31 +686,47 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
                       {/* Toggle */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center justify-center gap-2">
-                          <ToggleSwitch checked={present}
-                            onChange={v => onTogglePresent(date, v)}
-                            disabled={weekend} />
-                          <span className={`text-xs font-semibold min-w-[40px]
-                            ${present
-                              ? 'text-emerald-600'
-                              : weekend
-                                ? 'text-amber-500'
-                                : 'text-slate-400'}`}>
-                            {weekend ? 'عطلة' : present ? 'حاضر' : 'غائب'}
-                          </span>
+                          {excused ? (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200">
+                              <UserMinus className="w-3.5 h-3.5" /> مستأذن
+                            </span>
+                          ) : isRestricted && (dayInfo.isHoliday || dayInfo.isWeekend) ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold border border-amber-200">
+                              <Calendar className="w-3.5 h-3.5" /> {dayInfo.label}
+                            </span>
+                          ) : (
+                            <>
+                              <ToggleSwitch checked={present}
+                                onChange={v => onTogglePresent(date, v)}
+                                disabled={isRestricted} />
+                              <span className={`text-xs font-semibold min-w-[40px]
+                                ${present
+                                  ? 'text-emerald-600'
+                                  : isRestricted
+                                    ? 'text-amber-500'
+                                    : 'text-slate-400'}`}>
+                                {isRestricted ? (date > todayStr ? 'قادم' : 'غائب') : present ? 'حاضر' : 'غائب'}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </td>
 
                       {/* Check In */}
                       <td className="px-5 py-3.5">
                         <div className="flex justify-center">
-                          {present ? (
+                          {excused ? (
+                            <span className="text-indigo-400 text-xs">—</span>
+                          ) : present ? (
                             <input type="time"
                               value={row.checkInTime || '08:00'}
+                              disabled={isRestricted}
                               onChange={e => onTimeChange(date, 'checkInTime', e.target.value)}
-                              className="w-32 bg-emerald-50 border border-emerald-200 
-                                rounded-lg px-3 py-2 text-xs font-mono text-emerald-700 
-                                focus:outline-none focus:ring-2 focus:ring-emerald-300 
-                                focus:border-emerald-400 transition-all duration-200"
+                              className={`w-32 border rounded-lg px-3 py-2 text-xs font-mono 
+                                focus:outline-none focus:ring-2 transition-all duration-200
+                                ${isRestricted
+                                  ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : 'bg-emerald-50 border-emerald-200 text-emerald-700 focus:ring-emerald-300 focus:border-emerald-400'}`}
                               dir="ltr" />
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
@@ -679,14 +737,18 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
                       {/* Check Out */}
                       <td className="px-5 py-3.5">
                         <div className="flex justify-center">
-                          {present ? (
+                          {excused ? (
+                            <span className="text-indigo-400 text-xs">—</span>
+                          ) : present ? (
                             <input type="time"
                               value={row.checkOutTime || '16:00'}
+                              disabled={isRestricted}
                               onChange={e => onTimeChange(date, 'checkOutTime', e.target.value)}
-                              className="w-32 bg-rose-50 border border-rose-200 
-                                rounded-lg px-3 py-2 text-xs font-mono text-rose-700 
-                                focus:outline-none focus:ring-2 focus:ring-rose-300 
-                                focus:border-rose-400 transition-all duration-200"
+                              className={`w-32 border rounded-lg px-3 py-2 text-xs font-mono 
+                                focus:outline-none focus:ring-2 transition-all duration-200
+                                ${isRestricted
+                                  ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : 'bg-rose-50 border-rose-200 text-rose-700 focus:ring-rose-300 focus:border-rose-400'}`}
                               dir="ltr" />
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
@@ -706,13 +768,15 @@ const IndividualRecordTab: React.FC<{ employees: Employee[] }> = ({ employees })
                             <input type="number" min={0} max={12} step={0.5}
                               value={row.overtimeHours ?? 0}
                               onChange={e => onOvertimeChange(date, e.target.value)}
-                              disabled={weekend}
+                              disabled={isRestricted || excused}
                               className={`w-28 border rounded-lg pr-8 pl-3 py-2 
                                 text-xs font-mono text-center focus:outline-none 
                                 focus:ring-2 transition-all duration-200
-                                ${(row.overtimeHours ?? 0) > 0
-                                  ? 'bg-amber-50 border-amber-200 text-amber-700 focus:ring-amber-300 focus:border-amber-400'
-                                  : 'bg-slate-50 border-slate-200 text-slate-500 focus:ring-slate-300 focus:border-slate-300'}`} />
+                                ${isRestricted || excused
+                                  ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : (row.overtimeHours ?? 0) > 0
+                                    ? 'bg-amber-50 border-amber-200 text-amber-700 focus:ring-amber-300 focus:border-amber-400'
+                                    : 'bg-slate-50 border-slate-200 text-slate-500 focus:ring-slate-300 focus:border-slate-300'}`} />
                             {(row.overtimeHours ?? 0) > 0 && (
                               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 
                                 text-[10px] font-bold text-amber-500">س</span>
@@ -783,8 +847,13 @@ const statusConfig: Record<DailyStatus, {
   },
 };
 
-const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+const DailyCheckTab: React.FC<{
+  employees: Employee[],
+  settings: HrSettingDto[],
+  holidays: HolidayDto[]
+}> = ({ employees, settings, holidays }) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
   const [rows, setRows] = useState<DailyRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -830,7 +899,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
   }, [loadDaily, employees.length]);
 
   const updateRow = useCallback((employeeId: number, updates: Partial<AttendanceDto>) => {
-    setRows(prev => prev.map(r =>
+    setRows((prev: DailyRow[]) => prev.map((r: DailyRow) =>
       r.employee.employeeId === employeeId
         ? { ...r, attendance: { ...r.attendance, ...updates }, changed: true }
         : r
@@ -838,10 +907,10 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
   }, []);
 
   const toggleStatus = useCallback((employeeId: number) => {
-    setRows(prev => prev.map(r => {
+    setRows((prev: DailyRow[]) => prev.map((r: DailyRow) => {
       if (r.employee.employeeId !== employeeId) return r;
       const current = r.attendance.status as DailyStatus;
-      const order: DailyStatus[] = ['PRESENT', 'LATE', 'EXCUSED', 'ABSENT'];
+      const order: DailyStatus[] = ['PRESENT', 'LATE', 'ABSENT'];
       const nextIdx = (order.indexOf(current) + 1) % order.length;
       const next = order[nextIdx];
       return {
@@ -864,7 +933,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
   }, []);
 
   const setAllStatus = useCallback((status: DailyStatus) => {
-    setRows(prev => prev.map(r => ({
+    setRows((prev: DailyRow[]) => prev.map((r: DailyRow) => ({
       ...r,
       changed: true,
       attendance: {
@@ -884,7 +953,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
   }, []);
 
   const onSaveDaily = async () => {
-    const toSave = rows.filter(r => r.changed);
+    const toSave = rows.filter((r: DailyRow) => r.changed);
     if (toSave.length === 0) {
       toast('لا يوجد تعديلات للحفظ', { icon: 'ℹ️' });
       return;
@@ -912,7 +981,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
   const goToday = () => setDate(new Date().toISOString().slice(0, 10));
 
   const filteredRows = useMemo(() => {
-    return rows.filter(r => {
+    return rows.filter((r: DailyRow) => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const name = (r.employee.fullNameAr || '').toLowerCase();
@@ -931,15 +1000,27 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
 
   const stats = useMemo(() => {
     const total = rows.length;
-    const present = rows.filter(r => r.attendance.status === 'PRESENT').length;
-    const late = rows.filter(r => r.attendance.status === 'LATE').length;
-    const excused = rows.filter(r => r.attendance.status === 'EXCUSED').length;
-    const absent = rows.filter(r => r.attendance.status === 'ABSENT').length;
-    const changed = rows.filter(r => r.changed).length;
+    const present = rows.filter((r: DailyRow) => r.attendance.status === 'PRESENT').length;
+    const late = rows.filter((r: DailyRow) => r.attendance.status === 'LATE').length;
+    const excused = rows.filter((r: DailyRow) => r.attendance.status === 'EXCUSED').length;
+    const absent = rows.filter((r: DailyRow) => r.attendance.status === 'ABSENT').length;
+    const changed = rows.filter((r: DailyRow) => r.changed).length;
     return { total, present, late, excused, absent, changed };
   }, [rows]);
 
-  const weekend = isWeekend(date);
+  const getDayInfo = useMemo(() => {
+    let weekendDays = [5, 6];
+    const wSetting = settings.find(s => s.settingKey === 'WEEKLY_HOLIDAYS');
+    if (wSetting && wSetting.settingValue) {
+      try { weekendDays = JSON.parse(wSetting.settingValue); } catch (e) { }
+    }
+    return createIsWeekendOrHoliday(weekendDays, holidays);
+  }, [settings, holidays]);
+
+  const dayInfo = getDayInfo(date);
+  const isRestricted = dayInfo.isWeekend || dayInfo.isHoliday || date > today;
+
+  const weekend = getDayInfo(date).isWeekend;
 
   return (
     <div className="space-y-5">
@@ -949,7 +1030,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
           justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
-              <button onClick={() => navigateDate('next')}
+              <button onClick={() => navigateDate('prev')}
                 className="p-2 rounded-lg hover:bg-white hover:shadow-sm 
                   text-slate-500 hover:text-slate-700 transition-all">
                 <ChevronRight className="w-5 h-5" />
@@ -961,7 +1042,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     : 'hover:bg-white hover:shadow-sm text-slate-600'}`}>
                 اليوم
               </button>
-              <button onClick={() => navigateDate('prev')}
+              <button onClick={() => navigateDate('next')}
                 className="p-2 rounded-lg hover:bg-white hover:shadow-sm 
                   text-slate-500 hover:text-slate-700 transition-all">
                 <ChevronLeft className="w-5 h-5" />
@@ -1010,21 +1091,23 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               تحديث
             </button>
-            <button onClick={onSaveDaily} disabled={saving || stats.changed === 0}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 font-semibold 
-                text-sm rounded-xl transition-all border
-                ${stats.changed > 0
-                  ? 'bg-brand-primary hover:bg-brand-primary/90 text-white border-brand-primary shadow-lg shadow-brand-primary/25'
-                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
-              {saving
-                ? <RefreshCw className="w-4 h-4 animate-spin" />
-                : <Save className="w-4 h-4" />}
-              حفظ الحضور
-              {stats.changed > 0 && (
-                <span className="bg-white/20 text-white text-[11px] font-bold 
-                  px-1.5 py-0.5 rounded-full">{stats.changed}</span>
-              )}
-            </button>
+            {!isRestricted && (
+              <button onClick={onSaveDaily} disabled={saving || stats.changed === 0}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 font-semibold 
+                  text-sm rounded-xl transition-all border
+                  ${stats.changed > 0
+                    ? 'bg-brand-primary hover:bg-brand-primary/90 text-white border-brand-primary shadow-lg shadow-brand-primary/25'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
+                {saving
+                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                  : <Save className="w-4 h-4" />}
+                حفظ الحضور
+                {stats.changed > 0 && (
+                  <span className="bg-white/20 text-white text-[11px] font-bold 
+                    px-1.5 py-0.5 rounded-full">{stats.changed}</span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1108,7 +1191,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
               الكل
             </button>
-            {departments.map(dept => (
+            {departments.map((dept: string) => (
               <button key={dept} onClick={() => setFilterDept(dept)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold 
                   transition-all
@@ -1121,24 +1204,25 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
           </div>
         )}
 
-        {/* Bulk Actions */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-          <span className="text-xs font-semibold text-slate-400 ml-2">
-            إجراء جماعي:
-          </span>
-          {Object.entries(statusConfig).map(([key, cfg]) => {
-            const Icon = cfg.icon;
-            return (
-              <button key={key}
-                onClick={() => setAllStatus(key as DailyStatus)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 
-                  rounded-lg text-xs font-semibold transition-all 
-                  ${cfg.bg} ${cfg.color} ${cfg.border} border hover:opacity-80`}>
-                <Icon className="w-3.5 h-3.5" /> الكل {cfg.label}
-              </button>
-            );
-          })}
-        </div>
+        {!isRestricted && (
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+            <span className="text-xs font-semibold text-slate-400 ml-2">
+              إجراء جماعي:
+            </span>
+            {Object.entries(statusConfig).filter(([key]) => key !== 'EXCUSED').map(([key, cfg]) => {
+              const Icon = cfg.icon;
+              return (
+                <button key={key}
+                  onClick={() => setAllStatus(key as DailyStatus)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 
+                    rounded-lg text-xs font-semibold transition-all 
+                    ${cfg.bg} ${cfg.color} ${cfg.border} border hover:opacity-80`}>
+                  <Icon className="w-3.5 h-3.5" /> الكل {cfg.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Employee Table */}
@@ -1193,9 +1277,11 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                   return (
                     <tr key={row.employee.employeeId}
                       className={`transition-all duration-150 group
-                        ${row.changed
-                          ? 'bg-amber-50/30 border-r-4 border-r-amber-400'
-                          : 'hover:bg-slate-50/80'}
+                        ${dayInfo.isHoliday || dayInfo.isWeekend
+                          ? 'bg-amber-50/40'
+                          : row.changed
+                            ? 'bg-amber-50/30 border-r-4 border-r-amber-400'
+                            : 'hover:bg-slate-50/80'}
                         ${row.attendance.status === 'PRESENT'
                           ? 'hover:bg-emerald-50/30'
                           : ''}
@@ -1252,16 +1338,25 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
 
                       {/* Status */}
                       <td className="px-5 py-3">
-                        <button
-                          onClick={() => toggleStatus(row.employee.employeeId!)}
-                          className={`inline-flex items-center gap-2 px-4 py-2 
-                            rounded-xl text-xs font-bold transition-all duration-200 
-                            border cursor-pointer hover:shadow-md active:scale-95
-                            ${st.bg} ${st.color} ${st.border}`}>
-                          <StatusIcon className="w-4 h-4" />
-                          {st.label}
-                          <ChevronDown className="w-3 h-3 opacity-50" />
-                        </button>
+                        {dayInfo.isHoliday || dayInfo.isWeekend ? (
+                          <div className={`inline-flex items-center gap-2 px-4 py-2 
+                            rounded-xl text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200`}>
+                            <Calendar className="w-4 h-4" />
+                            {dayInfo.label}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => !isRestricted && toggleStatus(row.employee.employeeId!)}
+                            disabled={isRestricted || row.attendance.status === 'EXCUSED'}
+                            className={`inline-flex items-center gap-2 px-4 py-2 
+                              rounded-xl text-xs font-bold transition-all duration-200 
+                              border ${isRestricted || row.attendance.status === 'EXCUSED' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:shadow-md active:scale-95'}
+                              ${st.bg} ${st.color} ${st.border}`}>
+                            <StatusIcon className="w-4 h-4" />
+                            {st.label}
+                            {!isRestricted && row.attendance.status !== 'EXCUSED' && <ChevronDown className="w-3 h-3 opacity-50" />}
+                          </button>
+                        )}
                       </td>
 
                       {/* Check In */}
@@ -1270,14 +1365,16 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                           {isPresent ? (
                             <input type="time"
                               value={row.attendance.checkInTime || '08:00'}
+                              disabled={isRestricted || row.attendance.status === 'EXCUSED'}
                               onChange={e => updateRow(
                                 row.employee.employeeId!,
                                 { checkInTime: e.target.value || null }
                               )}
-                              className="w-32 bg-emerald-50 border border-emerald-200 
-                                rounded-lg px-3 py-2 text-xs font-mono 
-                                text-emerald-700 focus:outline-none focus:ring-2 
-                                focus:ring-emerald-300 transition-all"
+                              className={`w-32 border rounded-lg px-3 py-2 text-xs font-mono 
+                                focus:outline-none focus:ring-2 transition-all
+                                ${isRestricted || row.attendance.status === 'EXCUSED'
+                                  ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : 'bg-emerald-50 border-emerald-200 text-emerald-700 focus:ring-emerald-300'}`}
                               dir="ltr" />
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
@@ -1291,14 +1388,16 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                           {isPresent ? (
                             <input type="time"
                               value={row.attendance.checkOutTime || '16:00'}
+                              disabled={isRestricted || row.attendance.status === 'EXCUSED'}
                               onChange={e => updateRow(
                                 row.employee.employeeId!,
                                 { checkOutTime: e.target.value || null }
                               )}
-                              className="w-32 bg-rose-50 border border-rose-200 
-                                rounded-lg px-3 py-2 text-xs font-mono text-rose-700 
-                                focus:outline-none focus:ring-2 focus:ring-rose-300 
-                                transition-all"
+                              className={`w-32 border rounded-lg px-3 py-2 text-xs font-mono 
+                                focus:outline-none focus:ring-2 transition-all
+                                ${isRestricted || row.attendance.status === 'EXCUSED'
+                                  ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : 'bg-rose-50 border-rose-200 text-rose-700 focus:ring-rose-300'}`}
                               dir="ltr" />
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
@@ -1317,6 +1416,7 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                                 : 'text-slate-300'}`} />
                             <input type="number" min={0} max={12} step={0.5}
                               value={row.attendance.overtimeHours ?? 0}
+                              disabled={isRestricted || row.attendance.status === 'EXCUSED'}
                               onChange={e => updateRow(
                                 row.employee.employeeId!,
                                 {
@@ -1328,9 +1428,11 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                               className={`w-24 border rounded-lg pr-7 pl-2 py-2 
                                 text-xs font-mono text-center focus:outline-none 
                                 focus:ring-2 transition-all
-                                ${(row.attendance.overtimeHours ?? 0) > 0
-                                  ? 'bg-amber-50 border-amber-200 text-amber-700 focus:ring-amber-300'
-                                  : 'bg-slate-50 border-slate-200 text-slate-500 focus:ring-slate-300'}`} />
+                                ${isRestricted || row.attendance.status === 'EXCUSED'
+                                  ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : (row.attendance.overtimeHours ?? 0) > 0
+                                    ? 'bg-amber-50 border-amber-200 text-amber-700 focus:ring-amber-300'
+                                    : 'bg-slate-50 border-slate-200 text-slate-500 focus:ring-slate-300'}`} />
                           </div>
                         </div>
                       </td>
@@ -1398,22 +1500,296 @@ const DailyCheckTab: React.FC<{ employees: Employee[] }> = ({ employees }) => {
 };
 
 // ════════════════════════════════════════════
+// ─── Tab: Holidays Management (إدارة الإجازات) ───
+// ════════════════════════════════════════════
+const HolidaysTab: React.FC<{
+  settings: HrSettingDto[],
+  holidays: HolidayDto[],
+  reloadSettings: () => void,
+  reloadHolidays: () => void
+}> = ({ settings, holidays, reloadSettings, reloadHolidays }) => {
+  const [weekendDays, setWeekendDays] = useState<number[]>([5, 6]);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const [holidayForm, setHolidayForm] = useState<HolidayBulkDto>({
+    fromDate: new Date().toISOString().slice(0, 10),
+    toDate: new Date().toISOString().slice(0, 10),
+    holidayNameAr: '',
+    isActive: true,
+  });
+  const [savingHoliday, setSavingHoliday] = useState(false);
+  const [deletingHoliday, setDeletingHoliday] = useState<number | null>(null);
+
+  useEffect(() => {
+    const wSetting = settings.find(s => s.settingKey === 'WEEKLY_HOLIDAYS');
+    if (wSetting && wSetting.settingValue) {
+      try { setWeekendDays(JSON.parse(wSetting.settingValue)); } catch (e) { }
+    }
+  }, [settings]);
+
+  const toggleWeekendDay = (dayIndex: number) => {
+    setWeekendDays(prev =>
+      prev.includes(dayIndex)
+        ? prev.filter(d => d !== dayIndex)
+        : [...prev, dayIndex]
+    );
+  };
+
+  const onSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await hrService.upsertSetting({
+        settingKey: 'WEEKLY_HOLIDAYS',
+        settingValue: JSON.stringify(weekendDays),
+        description: 'Weekly Off Days'
+      });
+      toast.success('تم حفظ إعدادات العطلة الأسبوعية');
+      reloadSettings();
+    } catch {
+      toast.error('فشل حفظ الإعدادات');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const onSaveHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!holidayForm.holidayNameAr || !holidayForm.fromDate || !holidayForm.toDate) {
+      toast.error('يرجى تعبئة كافة الحقول المطلوبة');
+      return;
+    }
+    setSavingHoliday(true);
+    try {
+      const res = await hrService.createBulkHolidays(holidayForm);
+      if (res.success) {
+        toast.success(`تم إضافة العطلة بنجاح (${res.data?.length || 0} أيام)`);
+        setHolidayForm({
+          ...holidayForm,
+          holidayNameAr: '',
+        });
+        reloadHolidays();
+      }
+    } catch {
+      toast.error('فشل إضافة العطلة. تأكد من أن التواريخ غير مسجلة مسبقاً.');
+    } finally {
+      setSavingHoliday(false);
+    }
+  };
+
+  const onDeleteHoliday = async (id: number) => {
+    if (!confirm('حذف هذه العطلة؟')) return;
+    setDeletingHoliday(id);
+    try {
+      await hrService.deleteHoliday(id);
+      toast.success('تم حذف العطلة');
+      reloadHolidays();
+    } catch {
+      toast.error('فشل الحذف');
+    } finally {
+      setDeletingHoliday(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Weekly Holidays Box */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <CalendarDays className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-lg">الراحة الأسبوعية</h3>
+              <p className="text-sm text-slate-500">حدد أيام العطلة الأسبوعية الثابتة</p>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <div className="flex flex-wrap gap-2 mt-4">
+              {ARABIC_DAYS.map((dayName, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => toggleWeekendDay(idx)}
+                  className={`px-4 py-2.5 rounded-xl font-bold transition-all text-sm
+                    ${weekendDays.includes(idx)
+                      ? 'bg-blue-100 text-blue-700 border-2 border-blue-200'
+                      : 'bg-slate-50 text-slate-500 border-2 border-slate-100 hover:bg-slate-100'}`}
+                >
+                  {dayName}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-6 mt-6 border-t border-slate-100 flex justify-end">
+            <button
+              onClick={onSaveSettings}
+              disabled={savingSettings}
+              className="btn-primary min-w-[140px] flex items-center justify-center gap-2"
+            >
+              {savingSettings ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              حفظ الإعدادات
+            </button>
+          </div>
+        </div>
+
+        {/* Public Holidays Box */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <SunMedium className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-lg">الأعياد والمناسبات</h3>
+              <p className="text-sm text-slate-500">أضف أيام العطل الرسمية لجميع الموظفين</p>
+            </div>
+          </div>
+
+          <form onSubmit={onSaveHoliday} className="space-y-4">
+            <div>
+              <label className="text-sm font-bold text-slate-700 mb-2 block">اسم المناسبة *</label>
+              <input
+                type="text"
+                value={holidayForm.holidayNameAr}
+                onChange={e => setHolidayForm({ ...holidayForm, holidayNameAr: e.target.value })}
+                className="w-full input-field"
+                placeholder="عيد الفطر، رأس السنة..."
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-bold text-slate-700 mb-2 block">من تاريخ *</label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().slice(0, 10)}
+                  value={holidayForm.fromDate}
+                  onChange={e => setHolidayForm({ ...holidayForm, fromDate: e.target.value })}
+                  className="w-full input-field font-mono text-sm"
+                  dir="ltr"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-bold text-slate-700 mb-2 block">إلى تاريخ *</label>
+                <input
+                  type="date"
+                  min={holidayForm.fromDate}
+                  value={holidayForm.toDate}
+                  onChange={e => setHolidayForm({ ...holidayForm, toDate: e.target.value })}
+                  className="w-full input-field font-mono text-sm"
+                  dir="ltr"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={savingHoliday}
+                className="bg-amber-500 hover:bg-amber-600 text-white min-w-[140px] px-6 py-2.5 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                {savingHoliday ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                إضافة العطلة
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+
+      {/* Holidays List */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-bold text-slate-800">قائمة العطلات المُسجلة</h3>
+          <span className="bg-amber-50 text-amber-600 text-xs font-bold px-3 py-1 rounded-full">
+            {holidays.length} مناسَبة
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500">
+                <th className="px-5 py-3 text-right">التاريخ</th>
+                <th className="px-5 py-3 text-right">المناسبة</th>
+                <th className="px-5 py-3 text-right w-20">إجراء</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {holidays.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="text-center py-8 text-slate-400">لا توجد عطلات مُسجلة</td>
+                </tr>
+              ) : (
+                holidays.sort((a, b) => b.holidayDate.localeCompare(a.holidayDate)).map(h => (
+                  <tr key={h.holidayId} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-mono">{h.holidayDate}</td>
+                    <td className="px-5 py-3 font-semibold">{h.holidayNameAr}</td>
+                    <td className="px-5 py-3">
+                      <button
+                        onClick={() => onDeleteHoliday(h.holidayId!)}
+                        disabled={deletingHoliday === h.holidayId}
+                        className="text-rose-500 hover:text-white hover:bg-rose-500 p-2 rounded-lg transition-colors"
+                      >
+                        {deletingHoliday === h.holidayId ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════
 // ─── Main Page with Tabs ───
 // ════════════════════════════════════════════
-type TabId = 'daily' | 'individual';
+type TabId = 'daily' | 'individual' | 'holidays';
 
 const AttendancePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [settings, setSettings] = useState<HrSettingDto[]>([]);
+  const [holidays, setHolidays] = useState<HolidayDto[]>([]);
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      const [empRes, setRes, holRes] = await Promise.all([
+        employeeService.getAll(),
+        hrService.getSettings(),
+        hrService.getHolidays()
+      ]);
+      if (empRes.content) setEmployees(empRes.content);
+      if (setRes.success) setSettings(setRes.data || []);
+      if (holRes.success) setHolidays(holRes.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await employeeService.getAll();
-        setEmployees(data.content);
-      } catch { /* ignore */ }
-    })();
-  }, []);
+    loadInitialData();
+  }, [loadInitialData]);
+
+  const loadSettings = async () => {
+    try {
+      const res = await hrService.getSettings();
+      if (res.success) setSettings(res.data);
+    } catch { }
+  };
+
+  const loadHolidays = async () => {
+    try {
+      const res = await hrService.getHolidays();
+      if (res.success) setHolidays(res.data);
+    } catch { }
+  };
 
   const tabs: {
     id: TabId; label: string; icon: React.ElementType; description: string;
@@ -1425,6 +1801,10 @@ const AttendancePage: React.FC = () => {
       {
         id: 'individual', label: 'سجل الحضور', icon: ClipboardList,
         description: 'تتبع حضور موظف محدد عبر فترة زمنية',
+      },
+      {
+        id: 'holidays', label: 'إدارة العطلات', icon: SunMedium,
+        description: 'إعدادات الإجازة الأسبوعية والمناسبات الرسمية',
       },
     ];
 
@@ -1459,7 +1839,7 @@ const AttendancePage: React.FC = () => {
       {/* Tab Switcher */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-2">
         <div className="flex gap-2">
-          {tabs.map(tab => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
@@ -1490,8 +1870,9 @@ const AttendancePage: React.FC = () => {
 
       {/* Tab Content */}
       <div className="transition-all duration-300">
-        {activeTab === 'daily' && <DailyCheckTab employees={employees} />}
-        {activeTab === 'individual' && <IndividualRecordTab employees={employees} />}
+        {activeTab === 'daily' && <DailyCheckTab employees={employees} settings={settings} holidays={holidays} />}
+        {activeTab === 'individual' && <IndividualRecordTab employees={employees} settings={settings} holidays={holidays} />}
+        {activeTab === 'holidays' && <HolidaysTab settings={settings} holidays={holidays} reloadSettings={loadSettings} reloadHolidays={loadHolidays} />}
       </div>
     </div>
   );

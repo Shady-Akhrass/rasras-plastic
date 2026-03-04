@@ -24,6 +24,7 @@ import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import toast from 'react-hot-toast';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
 
 // Stat Card Component
@@ -237,6 +238,7 @@ const SupplierQuotationsPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getAllQuotations();
             setQuotations(data);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (error) {
             console.error('Failed to fetch quotations:', error);
         } finally {

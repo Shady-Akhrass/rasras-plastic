@@ -10,14 +10,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.rasras.erp.shared.security.UserPrincipal;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerRequestService {
 
     private final CustomerRequestRepository requestRepository;
-    // private final CustomerRepository customerRepository; // If needed for
-    // validation/name mapping
+    private final com.rasras.erp.approval.ApprovalService approvalService;
 
     @Transactional
     public CustomerRequestDto createRequest(CustomerRequestDto dto) {
@@ -28,7 +30,15 @@ public class CustomerRequestService {
         request.setPriceListId(dto.getPriceListId());
         request.setStatus("Pending");
         request.setNotes(dto.getNotes());
-        request.setCreatedBy(dto.getCreatedBy());
+
+        Integer currentUserId = dto.getCreatedBy();
+        if (currentUserId == null) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+                currentUserId = principal.getId();
+            }
+        }
+        request.setCreatedBy(currentUserId);
 
         if (dto.getItems() != null) {
             List<CustomerRequestItem> items = dto.getItems().stream().map(itemDto -> {
@@ -57,6 +67,25 @@ public class CustomerRequestService {
         }
 
         CustomerRequest saved = requestRepository.save(request);
+
+        // Initiate Approval Workflow
+        try {
+            if (currentUserId == null) {
+                System.err.println("Cannot initiate approval: Current user ID is null");
+            } else {
+                approvalService.initiateApproval(
+                        "CR_APPROVAL",
+                        "CustomerRequest",
+                        saved.getRequestId(),
+                        saved.getRequestNumber(),
+                        currentUserId,
+                        java.math.BigDecimal.ZERO);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the whole transaction if approval seeding fails
+            System.err.println("Failed to initiate approval for CR: " + e.getMessage());
+        }
+
         return mapToDto(saved);
     }
 

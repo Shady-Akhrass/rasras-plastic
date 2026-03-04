@@ -33,6 +33,7 @@ import purchaseService, {
     type QuotationComparison,
     type QuotationComparisonDetail
 } from '../../services/purchaseService';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import toast from 'react-hot-toast';
 
 const QuotationComparisonFormPage: React.FC = () => {
@@ -331,6 +332,7 @@ const QuotationComparisonFormPage: React.FC = () => {
                 savedComp = await purchaseService.createComparison(dataToSave);
             }
             await purchaseService.submitComparison(savedComp.id!);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success('تم حفظ المقارنة وإرسالها للاعتماد بنجاح');
             navigate('/dashboard/procurement/comparison');
             return savedComp;
@@ -370,6 +372,7 @@ const QuotationComparisonFormPage: React.FC = () => {
             setProcessing(true);
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
             await approvalService.takeAction(parseInt(approvalId), 1, action);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
             navigate('/dashboard/procurement/approvals');
         } catch (error) {

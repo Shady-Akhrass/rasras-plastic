@@ -20,6 +20,7 @@ import { salesQuotationService, type SalesQuotationDto } from '../../services/sa
 import Pagination from '../../components/common/Pagination';
 import { formatNumber, formatDate } from '../../utils/format';
 import { toast } from 'react-hot-toast';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -122,6 +123,7 @@ const QuotationListPage: React.FC = () => {
             setLoading(true);
             const data = await salesQuotationService.getAll();
             setList(Array.isArray(data) ? data : []);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (e) {
             toast.error('فشل تحميل عروض الأسعار');
             setList([]);

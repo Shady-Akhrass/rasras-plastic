@@ -29,6 +29,8 @@ import com.rasras.erp.sales.StockIssueNote;
 import com.rasras.erp.sales.StockIssueNoteItem;
 import com.rasras.erp.sales.SalesOrderItem;
 import com.rasras.erp.sales.PaymentReceiptRepository;
+import com.rasras.erp.sales.CustomerRequestRepository;
+import com.rasras.erp.sales.CustomerRequest;
 import com.rasras.erp.sales.CustomerRequestDeliveryScheduleRepository;
 import com.rasras.erp.sales.CustomerRequestDeliverySchedule;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +79,7 @@ public class ApprovalService {
     private final PaymentReceiptRepository paymentReceiptRepo;
     private final com.rasras.erp.crm.CustomerRepository customerRepo;
     private final CustomerRequestDeliveryScheduleRepository scheduleRepo;
+    private final CustomerRequestRepository customerRequestRepo;
 
     @Autowired
     @Lazy
@@ -400,7 +403,8 @@ public class ApprovalService {
             }
         }
 
-        // سند الصرف: بعد اعتماد المدير العام (الخطوة 2) نكمل الاعتماد وننفّذ الصرف تلقائياً دون خطوة "صرف الدفعة"
+        // سند الصرف: بعد اعتماد المدير العام (الخطوة 2) نكمل الاعتماد وننفّذ الصرف
+        // تلقائياً دون خطوة "صرف الدفعة"
         String docType = request.getDocumentType();
         if (("PaymentVoucher".equalsIgnoreCase(docType) || "PV".equalsIgnoreCase(docType))
                 && currentStep != null && currentStep.getStepNumber() != null && currentStep.getStepNumber() == 2) {
@@ -518,7 +522,8 @@ public class ApprovalService {
                     try {
                         supplierInvoiceService.createInvoiceFromGRN(grn.getId());
                     } catch (Exception e) {
-                        // فاتورة المورد قد تفشل لكن المخزون تم تحديثه
+                        System.err.println("Error creating automatic invoice from GRN: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
                 grnRepo.save(grn);
@@ -799,6 +804,14 @@ public class ApprovalService {
                     pr.setStatus("Rejected");
                 }
                 paymentReceiptRepo.save(pr);
+            });
+        } else if ("CustomerRequest".equalsIgnoreCase(type)) {
+            customerRequestRepo.findById(id).ifPresent(cr -> {
+                cr.setStatus(status);
+                if ("Approved".equals(status)) {
+                    cr.setApprovedAt(LocalDateTime.now());
+                }
+                customerRequestRepo.save(cr);
             });
         } else if ("StockIssueNote".equalsIgnoreCase(type)) {
             stockIssueNoteRepo.findById(id).ifPresent(note -> {

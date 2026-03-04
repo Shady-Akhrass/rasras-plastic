@@ -20,6 +20,7 @@ import { priceListService, type PriceListItemDto } from '../../services/priceLis
 import type { CustomerRequest, CustomerRequestItem } from '../../types/sales';
 import toast from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
 interface Unit {
     id: number;
@@ -289,6 +290,7 @@ const CustomerRequestFormPage = () => {
                 await customerRequestService.createRequest(submissionData);
                 toast.success('تم إنشاء الطلب بنجاح');
             }
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             navigate('/dashboard/sales/customer-requests', {
                 state: { success: true, message: 'تم حفظ الطلب بنجاح' },
             });

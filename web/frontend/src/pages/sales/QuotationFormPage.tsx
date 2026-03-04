@@ -33,6 +33,7 @@ import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
 // ──────────────────────────────────────────────
 // 🔧 SAFE DATA EXTRACTION HELPERS
@@ -723,6 +724,7 @@ const QuotationFormPage: React.FC = () => {
                 }
             }
 
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             navigate('/dashboard/sales/quotations');
         } catch (err: any) {
             const msg =

@@ -8,10 +8,14 @@ import {
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 
 
+import { exchangeRateService } from '../../services/exchangeRateService';
+
 interface ExchangeRateData {
     rate: number;
     lastUpdate: string;
     previousRate: number;
+    effectiveRate: number;
+    bufferPercent: number;
 }
 
 const ExchangeRateWidget = () => {
@@ -22,41 +26,42 @@ const ExchangeRateWidget = () => {
     const { defaultCurrency, getCurrencyLabel } = useSystemSettings();
     const [convertAmount, setConvertAmount] = useState<string>('1');
 
-    // Get previous rate from localStorage
-    const getPreviousRate = (): number => {
-        const stored = localStorage.getItem('previousExchangeRate');
-        return stored ? parseFloat(stored) : 0;
-    };
-
-    // Save current rate to localStorage
-    const saveCurrentRate = (rate: number) => {
-        localStorage.setItem('previousExchangeRate', rate.toString());
-    };
-
     const fetchExchangeRate = useCallback(async () => {
         try {
             setIsRefreshing(true);
             setError(null);
 
-            // Using free Exchange Rate API (no API key required)
+            // Fetch from external API as primary source
             const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch exchange rate');
-            }
+            if (!response.ok) throw new Error('Failed to fetch external rate');
 
             const data = await response.json();
             const currentRate = data.rates[defaultCurrency] || data.rates.EGP;
-            const previousRate = getPreviousRate() || currentRate;
+
+            // Record to backend history
+            await exchangeRateService.recordRate(currentRate);
+
+            // Get buffer and effective rate from backend
+            let bufferPercent = 0;
+            let effectiveRate = currentRate;
+            let prevRate = currentRate;
+
+            try {
+                bufferPercent = await exchangeRateService.getBufferPercentage();
+                effectiveRate = await exchangeRateService.getEffectiveRate();
+                const history = await exchangeRateService.getHistory();
+                prevRate = history.length > 1 ? history[1].rate : currentRate;
+            } catch (beErr) {
+                console.warn('Backend exchange rate calculations not available, using defaults');
+            }
 
             setExchangeRate({
                 rate: currentRate,
                 lastUpdate: data.date,
-                previousRate: previousRate
+                previousRate: prevRate,
+                effectiveRate: effectiveRate,
+                bufferPercent: bufferPercent
             });
-
-            // Save current rate for next comparison
-            saveCurrentRate(currentRate);
 
         } catch (err: any) {
             console.error('Error fetching exchange rate:', err);
@@ -189,7 +194,7 @@ const ExchangeRateWidget = () => {
                 <div className="mb-4">
                     <div className="flex items-baseline gap-2">
                         <span className="text-5xl font-bold text-white">
-                            {exchangeRate.rate.toFixed(2)}
+                            {exchangeRate.rate}
                         </span>
                         <span className="text-white/60 text-lg font-medium">{getCurrencyLabel(defaultCurrency)}</span>
                     </div>
@@ -205,7 +210,7 @@ const ExchangeRateWidget = () => {
                         }`}>
                         <TrendIcon className="w-4 h-4" />
                         <span className="text-sm font-bold">
-                            {isPositive ? '+' : ''}{change.toFixed(4)}
+                            {isPositive ? '+' : ''}{change}
                         </span>
                         {changePercent !== 0 && (
                             <span className="text-xs font-medium opacity-80">
@@ -222,11 +227,31 @@ const ExchangeRateWidget = () => {
                     </div>
                 </div>
 
+                {/* Buffer and Effective Rate Section */}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/5">
+                        <p className="text-white/60 text-[10px] uppercase font-bold tracking-wider mb-1">هامش الأمان (Buffer)</p>
+                        <div className="flex items-center gap-1">
+                            <span className="text-white font-bold text-lg">{exchangeRate.bufferPercent.toFixed(2)}%</span>
+                            <div className="p-1 bg-emerald-400/20 rounded-md">
+                                <TrendingUp className="w-3 h-3 text-emerald-300" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/5">
+                        <p className="text-white/60 text-[10px] uppercase font-bold tracking-wider mb-1">سعر الصرف الفعّال</p>
+                        <div className="flex items-center gap-1">
+                            <span className="text-white font-bold text-lg">{exchangeRate.effectiveRate}</span>
+                            <span className="text-white/40 text-[10px]">{defaultCurrency}</span>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Price Converter Section */}
-                <div className="mt-6 p-4 bg-black/10 backdrop-blur-sm rounded-xl border border-white/5">
+                <div className="mt-4 p-4 bg-black/10 backdrop-blur-sm rounded-xl border border-white/5">
                     <div className="flex items-center gap-2 mb-3">
                         <Calculator className="w-4 h-4 text-white/70" />
-                        <h4 className="text-white/80 text-xs font-bold uppercase tracking-wider">محول العملات السريع</h4>
+                        <h4 className="text-white/80 text-xs font-bold uppercase tracking-wider">محول التسعير السريع</h4>
                     </div>
                     <div className="space-y-3">
                         <div className="relative">
@@ -242,9 +267,9 @@ const ExchangeRateWidget = () => {
                             />
                         </div>
                         <div className="flex items-center justify-between px-1">
-                            <span className="text-white/50 text-[10px]">القيمة المقابلة:</span>
+                            <span className="text-white/50 text-[10px]">التكلفة المقدرة (بالأمان):</span>
                             <span className="text-white font-mono font-bold">
-                                {(Number(convertAmount) * exchangeRate.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {getCurrencyLabel(defaultCurrency)}
+                                {(Number(convertAmount) * exchangeRate.effectiveRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {getCurrencyLabel(defaultCurrency)}
                             </span>
                         </div>
                     </div>

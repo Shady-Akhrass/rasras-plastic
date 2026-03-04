@@ -24,17 +24,22 @@ public class StockBalanceService {
 
     @Transactional(readOnly = true)
     public List<StockBalanceDto> getAllBalances() {
-        return balanceRepo.findAll().stream()
+        return balanceRepo.findAllActive().stream()
                 .map(this::mapToDto)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    /** أرصدة صنف/مخزن: لأصناف ذات رصيد فعلي في المخزن (للقوائم المنسدلة في التحويل) */
+    /**
+     * أرصدة صنف/مخزن: لأصناف ذات رصيد فعلي في المخزن (للقوائم المنسدلة في التحويل)
+     */
     @Transactional(readOnly = true)
     public List<StockBalanceDto> getByWarehouseId(Integer warehouseId) {
-        if (warehouseId == null) return Collections.emptyList();
+        if (warehouseId == null)
+            return Collections.emptyList();
         return balanceRepo.findByWarehouseId(warehouseId).stream()
-                .filter(b -> b.getQuantityOnHand() != null && b.getQuantityOnHand().compareTo(java.math.BigDecimal.ZERO) > 0)
+                .filter(b -> b.getQuantityOnHand() != null
+                        && b.getQuantityOnHand().compareTo(java.math.BigDecimal.ZERO) > 0)
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -97,7 +102,7 @@ public class StockBalanceService {
 
         List<StockBalance> balances = warehouseId != null
                 ? balanceRepo.findByWarehouseId(warehouseId)
-                : balanceRepo.findAll();
+                : balanceRepo.findAllActive();
 
         Map<String, BigDecimal> additionsMap = new HashMap<>();
         Map<String, BigDecimal> issuesMap = new HashMap<>();
@@ -113,7 +118,8 @@ public class StockBalanceService {
 
         List<PeriodicInventoryReportDto> result = new ArrayList<>();
         for (StockBalance b : balances) {
-            if (warehouseId != null && !b.getWarehouse().getId().equals(warehouseId)) continue;
+            if (warehouseId != null && !b.getWarehouse().getId().equals(warehouseId))
+                continue;
             int itemId = b.getItem().getId();
             int whId = b.getWarehouse().getId();
             String key = itemId + "|" + whId;
@@ -148,13 +154,14 @@ public class StockBalanceService {
     }
 
     /**
-     * تقرير الأصناف تحت الحد الأدنى: أصناف لها حد أدنى مُعرّف والرصيد المجمع أقل منه
+     * تقرير الأصناف تحت الحد الأدنى: أصناف لها حد أدنى مُعرّف والرصيد المجمع أقل
+     * منه
      */
     @Transactional(readOnly = true)
     public List<ItemBelowMinDto> getItemsBelowMin(Integer warehouseId) {
         List<StockBalance> balances = warehouseId != null
                 ? balanceRepo.findByWarehouseId(warehouseId)
-                : balanceRepo.findAll();
+                : balanceRepo.findAllActive();
 
         Map<Integer, BigDecimal> totalByItem = new HashMap<>();
         for (StockBalance b : balances) {
@@ -173,7 +180,8 @@ public class StockBalanceService {
         List<ItemBelowMinDto> result = new ArrayList<>();
         for (Item item : itemsWithMin) {
             BigDecimal total = totalByItem.getOrDefault(item.getId(), BigDecimal.ZERO);
-            if (total.compareTo(item.getMinStockLevel()) >= 0) continue;
+            if (total.compareTo(item.getMinStockLevel()) >= 0)
+                continue;
 
             BigDecimal min = item.getMinStockLevel();
             BigDecimal diff = min.subtract(total);
@@ -198,6 +206,18 @@ public class StockBalanceService {
     }
 
     private StockBalanceDto mapToDto(StockBalance balance) {
+        if (balance == null || balance.getItem() == null || balance.getWarehouse() == null) {
+            return null;
+        }
+
+        try {
+            // Accessing a field on the proxy to trigger potential EntityNotFoundException
+            // early
+            balance.getItem().getItemCode();
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return null;
+        }
+
         return StockBalanceDto.builder()
                 .id(balance.getId())
                 .itemId(balance.getItem().getId())

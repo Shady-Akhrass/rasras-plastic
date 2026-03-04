@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import purchaseService, { type PurchaseRequisition, type PRLifecycle } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { formatDate } from '../../utils/format';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import PRLifecycleTracker from '../../components/procurement/PRLifecycleTracker';
@@ -180,7 +181,7 @@ const PRTableRow: React.FC<{
             {/* Added Missing Column for "Current Stage" matching header */}
             <td className="px-6 py-4">
                 <span className="text-xs text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-md">
-                   {pr.status === 'Approved' ? 'مكتمل' : 'قيد المراجعة'}
+                    {pr.status === 'Approved' ? 'مكتمل' : 'قيد المراجعة'}
                 </span>
             </td>
             <td className="px-6 py-4">
@@ -194,7 +195,7 @@ const PRTableRow: React.FC<{
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         <span>{isExpanded ? 'إخفاء' : 'تتبع'}</span>
                     </button>
-                    
+
                     {/* Actions Container */}
                     <div className="flex items-center gap-1">
                         {pr.status === 'Draft' && (
@@ -207,7 +208,7 @@ const PRTableRow: React.FC<{
                                 <Send className="w-4 h-4" />
                             </button>
                         )}
-                        
+
                         {(pr.status === 'Draft' || pr.status === 'Pending' || pr.status === 'Rejected') && (
                             <button
                                 onClick={() => onView(pr.id!)}
@@ -357,6 +358,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getAllPRs();
             setPrs(data);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (error) {
             console.error('Failed to fetch PRs:', error);
             toast.error('فشل تحميل قائمة الطلبات');
@@ -419,7 +421,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || pr.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-        
+
         // الأحدث في الأعلى
         return [...filtered].sort((a, b) => {
             const dateA = a.prDate ? new Date(a.prDate).getTime() : 0;

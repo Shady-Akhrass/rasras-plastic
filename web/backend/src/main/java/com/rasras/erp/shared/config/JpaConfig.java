@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import java.util.Optional;
 
 @Configuration
+@EnableJpaAuditing
 public class JpaConfig {
 
     @Bean

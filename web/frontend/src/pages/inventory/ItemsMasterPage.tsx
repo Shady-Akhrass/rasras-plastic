@@ -252,18 +252,22 @@ const ItemRow: React.FC<{
             {/* Prices */}
             <td className="px-4 py-4">
                 <div className="space-y-1">
-                    {/* Purchase Price */}
+                    {/* USD Purchase Price */}
+                    {item.purchasePriceUsd ? (
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="p-1 bg-emerald-100 rounded text-emerald-700">
+                                <DollarSign className="w-3 h-3" />
+                            </div>
+                            <span className="text-sm font-bold text-emerald-700">
+                                ${formatNumber(item.purchasePriceUsd)}
+                            </span>
+                        </div>
+                    ) : null}
+                    {/* EGP Purchase Price */}
                     <div className="flex items-center gap-2">
                         <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-sm text-slate-600">
+                        <span className="text-xs text-slate-600">
                             {item.lastPurchasePrice != null ? formatNumber(item.lastPurchasePrice) : '---'}
-                        </span>
-                    </div>
-                    {/* Standard Cost */}
-                    <div className="flex items-center gap-2">
-                        <DollarSign className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-xs text-slate-400">
-                            تكلفة: {item.standardCost != null ? formatNumber(item.standardCost) : '---'}
                         </span>
                     </div>
                 </div>
@@ -278,19 +282,24 @@ const ItemRow: React.FC<{
                             {item.lastSalePrice != null ? formatNumber(item.lastSalePrice) : '---'}
                         </span>
                     </div>
-                    {profitMargin && (
-                        <div className="flex items-center gap-1">
-                            <Percent className="w-3 h-3 text-slate-400" />
-                            <span className={`text-xs font-semibold ${parseFloat(profitMargin) > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                {profitMargin}% هامش
-                            </span>
-                        </div>
-                    )}
-                    {item.defaultVatRate !== undefined && item.defaultVatRate !== null && (
-                        <span className="text-[10px] text-slate-400">
-                            ضريبة: {item.defaultVatRate}%
-                        </span>
-                    )}
+                    <div className="flex flex-col gap-0.5">
+                        {profitMargin && (
+                            <div className="flex items-center gap-1">
+                                <Percent className="w-3 h-3 text-slate-400" />
+                                <span className={`text-[10px] font-semibold ${parseFloat(profitMargin) >= (item.targetProfitMarginPercentage || 0) ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {profitMargin}% فعلي
+                                </span>
+                            </div>
+                        )}
+                        {item.targetProfitMarginPercentage && (
+                            <div className="flex items-center gap-1 opacity-60">
+                                <TrendingUp className="w-3 h-3 text-brand-primary" />
+                                <span className="text-[10px] font-bold text-brand-primary">
+                                    {item.targetProfitMarginPercentage}% مستهدف
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </td>
 

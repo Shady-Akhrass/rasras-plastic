@@ -27,6 +27,7 @@ import customerService from '../../services/customerService';
 import { itemService } from '../../services/itemService';
 import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { formatNumber } from '../../utils/format';
 
 const safeNumber = (value: any, fallback: number = 0): number => {
@@ -244,6 +245,7 @@ const SaleOrderFormPage: React.FC = () => {
                 await saleOrderService.update(parseInt(id!), payload);
                 toast.success('تم التحديث');
             }
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             navigate('/dashboard/sales/orders');
         } catch (err: any) {
             const msg = err?.response?.status === 404 ? 'واجهة أوامر البيع غير مفعّلة في الخادم بعد' : (err?.response?.data?.message || 'فشل الحفظ');

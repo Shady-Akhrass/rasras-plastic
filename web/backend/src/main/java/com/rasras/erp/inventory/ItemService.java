@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,6 +27,8 @@ public class ItemService {
         private final StockMovementRepository stockMovementRepository;
         private final GRNItemRepository grnItemRepository;
         private final PurchaseReturnItemRepository purchaseReturnItemRepository;
+        private final com.rasras.erp.finance.ExchangeRateService exchangeRateService;
+        private final PriceListService priceListService;
 
         public List<ItemDto> getAllItems() {
                 List<Item> items = itemRepository.findAll();
@@ -105,6 +108,9 @@ public class ItemService {
                                 .lastSalePrice(dto.getLastSalePrice())
                                 .defaultVatRate(dto.getDefaultVatRate())
                                 .imagePath(dto.getImagePath())
+                                .purchasePriceUsd(dto.getPurchasePriceUsd())
+                                .purchaseExchangeRate(dto.getPurchaseExchangeRate())
+                                .targetProfitMarginPercentage(dto.getTargetProfitMarginPercentage())
                                 .isActive(true)
                                 .isSellable(dto.getIsSellable() != null ? dto.getIsSellable() : true)
                                 .isPurchasable(dto.getIsPurchasable() != null ? dto.getIsPurchasable() : true)
@@ -148,6 +154,9 @@ public class ItemService {
                 item.setLastSalePrice(dto.getLastSalePrice());
                 item.setDefaultVatRate(dto.getDefaultVatRate());
                 item.setImagePath(dto.getImagePath());
+                item.setPurchasePriceUsd(dto.getPurchasePriceUsd());
+                item.setPurchaseExchangeRate(dto.getPurchaseExchangeRate());
+                item.setTargetProfitMarginPercentage(dto.getTargetProfitMarginPercentage());
                 item.setIsActive(dto.getIsActive());
                 item.setIsSellable(dto.getIsSellable());
                 item.setIsPurchasable(dto.getIsPurchasable());
@@ -184,23 +193,12 @@ public class ItemService {
         }
 
         private void validatePriceFields(ItemDto dto) {
-                BigDecimal standardCost = dto.getStandardCost();
-                BigDecimal lastPurchasePrice = dto.getLastPurchasePrice();
-                BigDecimal lastSalePrice = dto.getLastSalePrice();
-                BigDecimal replacementPrice = dto.getReplacementPrice();
-
-                if (standardCost == null || lastPurchasePrice == null
-                                || lastSalePrice == null || replacementPrice == null) {
+                // EGP pricing fields are now auto-calculated based on USD prices and logic,
+                // so we don't strictly require them to be > 0 on manual entry.
+                // We only ensure purchasePriceUsd is valid if provided.
+                if (dto.getPurchasePriceUsd() != null && dto.getPurchasePriceUsd().compareTo(BigDecimal.ZERO) < 0) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "الأسعار والتكاليف (التكلفة المعيارية، آخر سعر شراء، آخر سعر بيع، السعر الاستبدالي) مطلوبة");
-                }
-
-                if (standardCost.compareTo(BigDecimal.ZERO) <= 0
-                                || lastPurchasePrice.compareTo(BigDecimal.ZERO) <= 0
-                                || lastSalePrice.compareTo(BigDecimal.ZERO) <= 0
-                                || replacementPrice.compareTo(BigDecimal.ZERO) <= 0) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "الأسعار والتكاليف يجب أن تكون أكبر من صفر");
+                                        "سعر الشراء بالدولار لا يمكن أن يكون سالباً");
                 }
         }
 
@@ -283,10 +281,172 @@ public class ItemService {
                                 .lastSalePrice(entity.getLastSalePrice())
                                 .defaultVatRate(entity.getDefaultVatRate())
                                 .imagePath(entity.getImagePath())
+                                .purchasePriceUsd(entity.getPurchasePriceUsd())
+                                .purchaseExchangeRate(entity.getPurchaseExchangeRate())
+                                .targetProfitMarginPercentage(entity.getTargetProfitMarginPercentage())
                                 .isActive(entity.getIsActive())
                                 .isSellable(entity.getIsSellable())
                                 .isPurchasable(entity.getIsPurchasable())
                                 .createdAt(entity.getCreatedAt())
                                 .build();
+        }
+
+        /**
+         * Calculates the suggested pricing based on current exchange rate and buffer.
+         */
+        public BigDecimal calculateSuggestedReplacementPrice(Item item) {
+                if (item.getPurchasePriceUsd() == null)
+                        return item.getReplacementPrice();
+
+                // Use a default of 7 selling days and 1.5 safety factor for now
+                // In a real app these could be settings or dynamic
+                BigDecimal effectiveRate = exchangeRateService.getEffectiveExchangeRate(7, 1.5);
+                return item.getPurchasePriceUsd().multiply(effectiveRate).setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+
+        public BigDecimal calculateSuggestedSellingPrice(Item item) {
+                BigDecimal cost = calculateSuggestedReplacementPrice(item);
+                BigDecimal margin = item.getTargetProfitMarginPercentage();
+
+                if (margin == null || margin.compareTo(BigDecimal.ZERO) == 0) {
+                        return item.getLastSalePrice();
+                }
+
+                // Price = Cost * (1 + Margin/100)
+                return cost.multiply(
+                                BigDecimal.ONE.add(margin.divide(BigDecimal.valueOf(100), 10,
+                                                java.math.RoundingMode.HALF_UP)))
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+
+        /**
+         * Updates item pricing automatically when a purchase is finalized (GRN
+         * store-in).
+         * - If current stock = 0 → standardCost uses the new purchase cost directly
+         * - If current stock > 0 → standardCost = weighted average (MAC)
+         * - lastPurchasePrice = USD × market rate
+         * - replacementPrice = USD × effective rate (includes buffer)
+         * - lastSalePrice = replacementPrice × (1 + margin/100)
+         * - Syncs all price list entries for this item
+         */
+        @Transactional
+        public void updatePricingFromPurchase(Integer itemId, BigDecimal purchasePriceUsd, BigDecimal receivedQty,
+                        BigDecimal purchaseRate) {
+                Item item = itemRepository.findById(itemId)
+                                .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
+
+                BigDecimal currentMarketRate = exchangeRateService.getCurrentRate();
+                BigDecimal effectiveRate = exchangeRateService.getEffectiveExchangeRate(30, 1.5);
+
+                // 1. Calculate weighted average USD cost
+                List<StockBalance> balances = stockBalanceRepository.findByItemId(itemId);
+                BigDecimal currentTotalQty = balances.stream()
+                                .map(b -> b.getQuantityOnHand() != null ? b.getQuantityOnHand() : BigDecimal.ZERO)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // Since stock increased before this call, subtract to get previous state
+                BigDecimal previousStockQty = currentTotalQty.subtract(receivedQty).max(BigDecimal.ZERO);
+                BigDecimal oldUsdCost = item.getPurchasePriceUsd() != null ? item.getPurchasePriceUsd()
+                                : BigDecimal.ZERO;
+
+                BigDecimal weightedUsdCost;
+                if (previousStockQty.compareTo(BigDecimal.ZERO) <= 0) {
+                        weightedUsdCost = purchasePriceUsd;
+                } else {
+                        BigDecimal totalOldValueUsd = previousStockQty.multiply(oldUsdCost);
+                        BigDecimal totalNewValueUsd = receivedQty.multiply(purchasePriceUsd);
+                        BigDecimal totalQty = previousStockQty.add(receivedQty);
+                        weightedUsdCost = totalOldValueUsd.add(totalNewValueUsd)
+                                        .divide(totalQty, 6, RoundingMode.HALF_UP);
+                }
+
+                // Update Item fields
+                item.setPurchasePriceUsd(purchasePriceUsd);
+                item.setPurchaseExchangeRate(purchaseRate != null ? purchaseRate : currentMarketRate);
+
+                // Standard Cost (EGP) = Weighted Avg USD × Market Rate
+                item.setStandardCost(weightedUsdCost.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+
+                // Last Purchase Price (EGP)
+                item.setLastPurchasePrice(
+                                purchasePriceUsd.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+
+                // Replacement Price (EGP) = Weighted Avg USD × Effective Rate
+                item.setReplacementPrice(weightedUsdCost.multiply(effectiveRate).setScale(2, RoundingMode.HALF_UP));
+
+                // Update selling prices based on the new replacement price
+                updateSellingPrices(item);
+
+                itemRepository.save(item);
+                priceListService.syncPriceListsForItem(itemId, item.getLastSalePrice());
+        }
+
+        @Transactional
+        public void updatePricingFromInvoice(Integer itemId, BigDecimal newUnitPriceUsd, BigDecimal receivedQty,
+                        BigDecimal purchaseRate) {
+                Item item = itemRepository.findById(itemId)
+                                .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
+
+                BigDecimal currentMarketRate = exchangeRateService.getCurrentRate();
+                BigDecimal effectiveRate = exchangeRateService.getEffectiveExchangeRate(30, 1.5);
+
+                // 1. Calculate Weighted Average USD Cost
+                List<StockBalance> balances = stockBalanceRepository.findByItemId(itemId);
+                BigDecimal currentTotalQty = balances.stream()
+                                .map(b -> b.getQuantityOnHand() != null ? b.getQuantityOnHand() : BigDecimal.ZERO)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                BigDecimal previousStockQty = currentTotalQty.subtract(receivedQty).max(BigDecimal.ZERO);
+                BigDecimal oldUsdCost = item.getPurchasePriceUsd() != null ? item.getPurchasePriceUsd()
+                                : BigDecimal.ZERO;
+
+                BigDecimal weightedUsdCost;
+                if (previousStockQty.compareTo(BigDecimal.ZERO) <= 0) {
+                        weightedUsdCost = newUnitPriceUsd;
+                } else {
+                        BigDecimal totalOldValueUsd = previousStockQty.multiply(oldUsdCost);
+                        BigDecimal totalNewValueUsd = receivedQty.multiply(newUnitPriceUsd);
+                        BigDecimal totalQty = previousStockQty.add(receivedQty);
+                        weightedUsdCost = totalOldValueUsd.add(totalNewValueUsd)
+                                        .divide(totalQty, 6, RoundingMode.HALF_UP);
+                }
+
+                // Update Item fields
+                item.setPurchasePriceUsd(newUnitPriceUsd);
+                item.setPurchaseExchangeRate(purchaseRate != null ? purchaseRate : currentMarketRate);
+
+                // Standard Cost (EGP) = Weighted Avg USD × Market Rate
+                item.setStandardCost(weightedUsdCost.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+
+                // Last Purchase Price (EGP)
+                item.setLastPurchasePrice(
+                                newUnitPriceUsd.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+
+                // Replacement Price (EGP) = Weighted Avg USD × Effective Rate
+                item.setReplacementPrice(weightedUsdCost.multiply(effectiveRate).setScale(2, RoundingMode.HALF_UP));
+
+                // Update selling prices
+                updateSellingPrices(item);
+
+                itemRepository.save(item);
+                priceListService.syncPriceListsForItem(itemId, item.getLastSalePrice());
+        }
+
+        private void updateSellingPrices(Item item) {
+                BigDecimal replacementPrice = item.getReplacementPrice();
+                if (replacementPrice == null)
+                        return;
+
+                BigDecimal targetMargin = item.getTargetProfitMarginPercentage() != null
+                                ? item.getTargetProfitMarginPercentage()
+                                : BigDecimal.ZERO;
+
+                BigDecimal sellingPrice = replacementPrice;
+                if (targetMargin.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal marginMultiplier = BigDecimal.ONE.add(
+                                        targetMargin.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
+                        sellingPrice = replacementPrice.multiply(marginMultiplier).setScale(2, RoundingMode.HALF_UP);
+                }
+                item.setLastSalePrice(sellingPrice);
         }
 }

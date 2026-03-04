@@ -11,12 +11,16 @@ import java.util.Optional;
 @Repository
 public interface StockBalanceRepository extends JpaRepository<StockBalance, Integer> {
 
-    @Query("SELECT b FROM StockBalance b WHERE b.item.id = :itemId AND b.warehouse.id = :warehouseId")
-    Optional<StockBalance> findByItemIdAndWarehouseId(@Param("itemId") Integer itemId, @Param("warehouseId") Integer warehouseId);
+    @Query("SELECT b FROM StockBalance b JOIN FETCH b.item JOIN FETCH b.warehouse")
+    List<StockBalance> findAllActive();
 
-    @Query("SELECT b FROM StockBalance b WHERE b.item.id = :itemId")
+    @Query("SELECT b FROM StockBalance b JOIN FETCH b.item JOIN FETCH b.warehouse WHERE b.item.id = :itemId AND b.warehouse.id = :warehouseId")
+    Optional<StockBalance> findByItemIdAndWarehouseId(@Param("itemId") Integer itemId,
+            @Param("warehouseId") Integer warehouseId);
+
+    @Query("SELECT b FROM StockBalance b JOIN FETCH b.item JOIN FETCH b.warehouse WHERE b.item.id = :itemId")
     List<StockBalance> findByItemId(@Param("itemId") Integer itemId);
 
-    @Query("SELECT b FROM StockBalance b WHERE b.warehouse.id = :warehouseId")
+    @Query("SELECT b FROM StockBalance b JOIN FETCH b.item JOIN FETCH b.warehouse WHERE b.warehouse.id = :warehouseId")
     List<StockBalance> findByWarehouseId(@Param("warehouseId") Integer warehouseId);
 }

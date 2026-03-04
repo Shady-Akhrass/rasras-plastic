@@ -123,6 +123,7 @@ const PayrollPage: React.FC = () => {
                 <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">الموظف</th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">الأساسي</th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">الاستحقاقات</th>
+                <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">عدد الساعات</th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">الاستقطاعات</th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">صافي المرتب</th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">الحالة</th>
@@ -166,11 +167,14 @@ const PayrollPage: React.FC = () => {
                     <td className="px-6 py-3 text-sm text-emerald-700">
                       {p.totalEarnings?.toFixed(2) ?? '-'}
                     </td>
+                    <td className="px-6 py-3 text-sm font-mono text-blue-700">
+                      {p.totalHours?.toFixed(1) ?? '0.0'} ساعة
+                    </td>
                     <td className="px-6 py-3 text-sm text-rose-700">
                       {p.totalDeductions?.toFixed(2) ?? '-'}
                     </td>
                     <td className="px-6 py-3 text-sm font-bold text-slate-900">
-                      {p.netSalary?.toFixed(2) ?? '-'}
+                      {p.netSalary?.toFixed(0) ?? '-'}
                     </td>
                     <td className="px-6 py-3 text-sm">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">

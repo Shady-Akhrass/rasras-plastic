@@ -19,6 +19,7 @@ import {
 import purchaseService, { type RFQ } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
 
@@ -208,6 +209,7 @@ const RFQsPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getAllRFQs();
             setRfqs(data);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             await fetchApprovedPRWithoutRFQCount();
         } catch (error) {
             console.error('Failed to fetch RFQs:', error);

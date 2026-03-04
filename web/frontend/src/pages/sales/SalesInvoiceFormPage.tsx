@@ -24,6 +24,7 @@ import customerService from '../../services/customerService';
 import { itemService } from '../../services/itemService';
 import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { formatNumber } from '../../utils/format';
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
@@ -269,6 +270,7 @@ const SalesInvoiceFormPage: React.FC = () => {
                 await salesInvoiceService.update(parseInt(id!), payload);
                 toast.success('تم التحديث');
             }
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             navigate('/dashboard/sales/invoices');
         } catch (err: any) {
             const msg = err?.response?.status === 404 ? 'واجهة فواتير المبيعات غير مفعّلة في الخادم بعد' : (err?.response?.data?.message || 'فشل الحفظ');

@@ -6,6 +6,7 @@ import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import {
     Search,
     Plus,
@@ -275,6 +276,7 @@ const DeliveryOrderListPage: React.FC = () => {
             setPendingLoading(true);
             const data = await stockIssueNoteService.getPendingDeliveryNotes();
             setPendingNotes(Array.isArray(data) ? data : []);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (e) {
             toast.error('فشل تحميل أذونات الصرف المعلقة');
             setPendingNotes([]);

@@ -2,8 +2,11 @@ package com.rasras.erp.hr;
 
 import com.rasras.erp.employee.Employee;
 import com.rasras.erp.employee.EmployeeRepository;
+import com.rasras.erp.hr.dto.AssignLeaveDto;
 import com.rasras.erp.hr.dto.EmployeeShiftDto;
+import com.rasras.erp.hr.dto.HolidayBulkDto;
 import com.rasras.erp.hr.dto.HolidayDto;
+import com.rasras.erp.hr.dto.HrSettingDto;
 import com.rasras.erp.hr.dto.LeaveTypeDto;
 import com.rasras.erp.hr.dto.WorkShiftDto;
 import com.rasras.erp.shared.exception.ResourceNotFoundException;
@@ -11,9 +14,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,6 +37,33 @@ public class HrService {
     private final PayrollRepository payrollRepository;
     private final PayrollDetailRepository payrollDetailRepository;
     private final SalaryComponentRepository salaryComponentRepository;
+    private final HrSettingRepository hrSettingRepository;
+
+    // ---- HR Settings ----
+    @Transactional(readOnly = true)
+    public List<HrSettingDto> getAllSettings() {
+        return hrSettingRepository.findAll().stream().map(e -> {
+            return HrSettingDto.builder()
+                    .settingKey(e.getSettingKey())
+                    .settingValue(e.getSettingValue())
+                    .description(e.getDescription())
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public HrSettingDto upsertSetting(HrSettingDto dto) {
+        HrSetting entity = hrSettingRepository.findById(dto.getSettingKey()).orElse(new HrSetting());
+        entity.setSettingKey(dto.getSettingKey());
+        entity.setSettingValue(dto.getSettingValue());
+        entity.setDescription(dto.getDescription());
+        HrSetting saved = hrSettingRepository.save(entity);
+        return HrSettingDto.builder()
+                .settingKey(saved.getSettingKey())
+                .settingValue(saved.getSettingValue())
+                .description(saved.getDescription())
+                .build();
+    }
 
     // ---- Leave Types ----
     @Transactional(readOnly = true)
@@ -127,6 +161,28 @@ public class HrService {
                 .createdAt(LocalDateTime.now())
                 .build();
         return mapHolidayToDto(holidayRepository.save(entity));
+    }
+
+    @Transactional
+    public List<HolidayDto> createBulkHolidays(HolidayBulkDto dto) {
+        LocalDate from = LocalDate.parse(dto.getFromDate());
+        LocalDate to = LocalDate.parse(dto.getToDate());
+        List<HolidayDto> result = new ArrayList<>();
+
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+            final LocalDate date = d;
+            if (holidayRepository.findByHolidayDate(date).isEmpty()) {
+                Holiday entity = Holiday.builder()
+                        .holidayDate(date)
+                        .holidayNameAr(dto.getHolidayNameAr())
+                        .holidayNameEn(dto.getHolidayNameEn())
+                        .isActive(dto.getIsActive() != null ? dto.getIsActive() : true)
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                result.add(mapHolidayToDto(holidayRepository.save(entity)));
+            }
+        }
+        return result;
     }
 
     @Transactional
@@ -313,6 +369,31 @@ public class HrService {
         return mapAttendanceToDto(attendanceRepository.save(entity));
     }
 
+    @Transactional
+    public void assignLeave(AssignLeaveDto dto) {
+        Employee employee = employeeRepository.findById(dto.getEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Employee", "id", dto.getEmployeeId()));
+
+        LocalDate from = LocalDate.parse(dto.getFromDate());
+        LocalDate to = LocalDate.parse(dto.getToDate());
+
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+            final LocalDate date = d;
+            Attendance att = attendanceRepository.findByEmployeeEmployeeIdAndAttendanceDateBetween(
+                    dto.getEmployeeId(), date, date).stream().findFirst().orElse(new Attendance());
+
+            att.setEmployee(employee);
+            att.setAttendanceDate(date);
+            att.setStatus("EXCUSED");
+            att.setLeaveType(dto.getLeaveTypeCode());
+            att.setNotes(dto.getNotes() != null ? dto.getNotes() : "Leave Permitted");
+            if (att.getOvertimeHours() == null) {
+                att.setOvertimeHours(java.math.BigDecimal.ZERO);
+            }
+            attendanceRepository.save(att);
+        }
+    }
+
     private com.rasras.erp.hr.dto.AttendanceDto mapAttendanceToDto(Attendance e) {
         Employee emp = e.getEmployee();
         return com.rasras.erp.hr.dto.AttendanceDto.builder()
@@ -359,6 +440,7 @@ public class HrService {
                 .totalEarnings(p.getTotalEarnings() != null ? p.getTotalEarnings().doubleValue() : null)
                 .totalDeductions(p.getTotalDeductions() != null ? p.getTotalDeductions().doubleValue() : null)
                 .netSalary(p.getNetSalary() != null ? p.getNetSalary().doubleValue() : null)
+                .totalHours(p.getTotalHours() != null ? p.getTotalHours().doubleValue() : null)
                 .status(p.getStatus())
                 .paymentDate(p.getPaymentDate() != null ? p.getPaymentDate().toString() : null)
                 .items(items)
@@ -373,7 +455,24 @@ public class HrService {
             throw new RuntimeException("Payroll already generated for this month!");
         }
 
-        // 2. Get active employees
+        // 2. Get period info
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate start = yearMonth.atDay(1);
+        LocalDate end = yearMonth.atEndOfMonth();
+
+        // Count Fridays (as requested: only Friday is holiday)
+        int totalDays = yearMonth.lengthOfMonth();
+        int fridays = 0;
+        for (int d = 1; d <= totalDays; d++) {
+            if (yearMonth.atDay(d).getDayOfWeek() == DayOfWeek.FRIDAY) {
+                fridays++;
+            }
+        }
+        int workableDays = totalDays - fridays;
+        if (workableDays <= 0)
+            workableDays = 26; // Fallback
+
+        // 3. Get active employees
         java.util.List<Employee> employees = employeeRepository.findByIsActiveTrue();
         java.util.List<Payroll> savedPayrolls = new java.util.ArrayList<>();
 
@@ -381,18 +480,45 @@ public class HrService {
             java.math.BigDecimal basic = emp.getBasicSalary() != null ? emp.getBasicSalary()
                     : java.math.BigDecimal.ZERO;
 
-            // Mock Calculation for now (TODO: Real calculation based on attendance)
-            java.math.BigDecimal allowances = basic.multiply(new java.math.BigDecimal("0.10")); // 10% allowance
-            java.math.BigDecimal deductions = basic.multiply(new java.math.BigDecimal("0.05")); // 5% deduction
-            java.math.BigDecimal net = basic.add(allowances).subtract(deductions);
+            // Hourly rate calculation: Basic / (WorkableDays * 8 hours)
+            java.math.BigDecimal totalWorkableHours = java.math.BigDecimal.valueOf(workableDays * 8);
+            java.math.BigDecimal hourlyRate = basic.compareTo(java.math.BigDecimal.ZERO) > 0
+                    ? basic.divide(totalWorkableHours, 4, java.math.RoundingMode.HALF_UP)
+                    : java.math.BigDecimal.ZERO;
+
+            // 4. Sum up worked hours from attendance
+            List<Attendance> attendances = attendanceRepository.findByEmployeeEmployeeIdAndAttendanceDateBetween(
+                    emp.getEmployeeId(), start, end);
+
+            double totalWorkedHours = 0;
+            for (Attendance att : attendances) {
+                if ("PRESENT".equals(att.getStatus()) || "LATE".equals(att.getStatus())) {
+                    if (att.getCheckInTime() != null && att.getCheckOutTime() != null) {
+                        Duration duration = Duration.between(att.getCheckInTime(), att.getCheckOutTime());
+                        totalWorkedHours += duration.toMinutes() / 60.0;
+                    }
+                }
+                if (att.getOvertimeHours() != null) {
+                    totalWorkedHours += att.getOvertimeHours().doubleValue();
+                }
+            }
+
+            java.math.BigDecimal earned = hourlyRate.multiply(java.math.BigDecimal.valueOf(totalWorkedHours))
+                    .setScale(0, java.math.RoundingMode.HALF_UP);
+
+            // Mock deduction (5% for now if required, otherwise zero as user said "hourly
+            // calculate")
+            java.math.BigDecimal deductions = java.math.BigDecimal.ZERO;
+            java.math.BigDecimal net = earned.subtract(deductions);
 
             Payroll p = new Payroll();
             p.setEmployee(emp);
             p.setPayrollMonth(month);
             p.setPayrollYear(year);
             p.setBasicSalary(basic);
-            p.setTotalEarnings(allowances);
+            p.setTotalEarnings(earned);
             p.setTotalDeductions(deductions);
+            p.setTotalHours(java.math.BigDecimal.valueOf(totalWorkedHours)); // Need to verify if this field exists
             p.setNetSalary(net);
             p.setStatus("DRAFT");
             p.setCreatedAt(LocalDateTime.now());
@@ -401,9 +527,10 @@ public class HrService {
             savedPayrolls.add(p);
 
             // Add details
-            createPayrollDetail(p, "Basic Salary", "EARNING", basic);
-            createPayrollDetail(p, "Housing Allowance", "EARNING", allowances);
-            createPayrollDetail(p, "Social Security", "DEDUCTION", deductions);
+            createPayrollDetail(p, "Worked Hours Salary", "EARNING", earned);
+            if (totalWorkedHours > 0) {
+                // Optional: could add explicit overtime or rate info in details if needed
+            }
         }
 
         return savedPayrolls.stream().map(this::mapPayrollToDto).collect(java.util.stream.Collectors.toList());

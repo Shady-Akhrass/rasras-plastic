@@ -10,6 +10,7 @@ import com.rasras.erp.inventory.UnitRepository;
 import com.rasras.erp.procurement.PurchaseOrder;
 import com.rasras.erp.procurement.PurchaseOrderItem;
 import com.rasras.erp.procurement.PurchaseOrderRepository;
+import com.rasras.erp.finance.ExchangeRateService;
 import com.rasras.erp.supplier.dto.InvoiceMatchDetailsDto;
 import com.rasras.erp.supplier.dto.SupplierInvoiceDto;
 import com.rasras.erp.supplier.dto.SupplierInvoiceItemDto;
@@ -41,7 +42,9 @@ public class SupplierInvoiceService {
         private final PurchaseOrderRepository poRepo;
         private final SupplierInvoicePdfService pdfService;
         private final ApprovalLimitRepository approvalLimitRepository;
+        private final com.rasras.erp.inventory.ItemService itemService;
         private final UserRepository userRepository;
+        private final ExchangeRateService exchangeRateService;
 
         @Transactional(readOnly = true)
         public List<SupplierInvoiceDto> getAllInvoices() {
@@ -227,6 +230,42 @@ public class SupplierInvoiceService {
                         supplier.setTotalInvoiced(totalInvoiced.add(invoice.getTotalAmount()));
                         supplier.setCurrentBalance(currentBalance.add(invoice.getTotalAmount()));
                         supplierRepo.save(supplier);
+
+                        // Update item prices based on the final invoice price
+                        String invCurrency = invoice.getCurrency() != null ? invoice.getCurrency() : "EGP";
+                        BigDecimal invRate = invoice.getExchangeRate() != null
+                                        && invoice.getExchangeRate().compareTo(BigDecimal.ZERO) > 0
+                                                        ? invoice.getExchangeRate()
+                                                        : BigDecimal.ONE;
+
+                        if (invoice.getItems() != null) {
+                                // Calculate Landed Cost factor: Ratio of Total Amount to SubTotal
+                                BigDecimal landedFactor = BigDecimal.ONE;
+                                if (invoice.getSubTotal() != null
+                                                && invoice.getSubTotal().compareTo(BigDecimal.ZERO) > 0) {
+                                        landedFactor = invoice.getTotalAmount().divide(invoice.getSubTotal(), 6,
+                                                        RoundingMode.HALF_UP);
+                                }
+
+                                for (SupplierInvoiceItem invItem : invoice.getItems()) {
+                                        // Apply landed factor to get the actual cost per unit including shipping/taxes
+                                        BigDecimal landedUnitPrice = invItem.getUnitPrice().multiply(landedFactor);
+
+                                        BigDecimal unitPriceUsd = landedUnitPrice;
+                                        if (!"USD".equalsIgnoreCase(invCurrency)) {
+                                                unitPriceUsd = landedUnitPrice.divide(invRate, 4,
+                                                                RoundingMode.HALF_UP);
+                                        }
+                                        if (invItem.getItem() != null) {
+                                                itemService.updatePricingFromInvoice(
+                                                                invItem.getItem().getId(),
+                                                                unitPriceUsd,
+                                                                invItem.getQuantity() != null ? invItem.getQuantity()
+                                                                                : BigDecimal.ONE,
+                                                                invRate);
+                                        }
+                                }
+                        }
                 }
 
                 return mapToDto(invoiceRepo.save(invoice));
@@ -282,6 +321,12 @@ public class SupplierInvoiceService {
                 Map<Integer, PurchaseOrderItem> poItemsMap = po.getItems().stream()
                                 .collect(Collectors.toMap(PurchaseOrderItem::getId, item -> item));
 
+                BigDecimal effectiveRate = po.getExchangeRate();
+                if ((effectiveRate == null || effectiveRate.compareTo(BigDecimal.ONE) == 0)
+                                && !"USD".equalsIgnoreCase(po.getCurrency())) {
+                        effectiveRate = exchangeRateService.getCurrentRate();
+                }
+
                 SupplierInvoice invoice = SupplierInvoice.builder()
                                 .invoiceNumber(generateInvoiceNumber())
                                 .supplierInvoiceNo(grn.getSupplierInvoiceNo() != null ? grn.getSupplierInvoiceNo()
@@ -292,7 +337,7 @@ public class SupplierInvoiceService {
                                 .grnId(grn.getId())
                                 .supplier(grn.getSupplier())
                                 .currency(po.getCurrency() != null ? po.getCurrency() : "EGP")
-                                .exchangeRate(po.getExchangeRate() != null ? po.getExchangeRate() : BigDecimal.ONE)
+                                .exchangeRate(effectiveRate != null ? effectiveRate : BigDecimal.ONE)
                                 .status("Unpaid")
                                 .approvalStatus("Approved") // Inherited approval
                                 .notes("Generated automatically from " + grn.getGrnNumber())
@@ -312,9 +357,27 @@ public class SupplierInvoiceService {
                         }
 
                         // Get corresponding PO item to get pricing, discount, and tax info
-                        PurchaseOrderItem poItem = poItemsMap.get(gi.getPoItemId());
+                        PurchaseOrderItem poItem = null;
+                        if (gi.getPoItemId() != null) {
+                                poItem = poItemsMap.get(gi.getPoItemId());
+                        }
+
+                        // Fallback: match by itemId if poItemId is missing or not found
+                        if (poItem == null && po.getItems() != null) {
+                                poItem = po.getItems().stream()
+                                                .filter(pi -> pi.getItem().getId().equals(gi.getItem().getId()))
+                                                .findFirst()
+                                                .orElse(null);
+                        }
+
                         if (poItem == null) {
-                                throw new RuntimeException("PO Item not found for GRN Item: " + gi.getId());
+                                // If still not found, just use the GRN item's existing unit cost
+                                // and assume 0% discount/tax to avoid crashing the invoice generation
+                                poItem = PurchaseOrderItem.builder()
+                                                .unitPrice(gi.getUnitCost())
+                                                .discountPercentage(BigDecimal.ZERO)
+                                                .taxPercentage(BigDecimal.ZERO)
+                                                .build();
                         }
 
                         // Use PO unit price, discount, and tax percentages
@@ -392,6 +455,41 @@ public class SupplierInvoiceService {
                 supplier.setTotalInvoiced(totalInvoiced.add(invoice.getTotalAmount()));
                 supplier.setCurrentBalance(currentBalance.add(invoice.getTotalAmount()));
                 supplierRepo.save(supplier);
+
+                // Update item prices based on these new purchase prices
+                if (invoice.getItems() != null) {
+                        BigDecimal invRate = invoice.getExchangeRate() != null
+                                        && invoice.getExchangeRate().compareTo(BigDecimal.ZERO) > 0
+                                                        ? invoice.getExchangeRate()
+                                                        : BigDecimal.ONE;
+                        String invCurrency = invoice.getCurrency() != null ? invoice.getCurrency() : "EGP";
+
+                        // Calculate Landed Cost factor: Ratio of Total Amount to SubTotal
+                        // This distributes delivery costs, taxes, and other costs across all items.
+                        BigDecimal landedFactor = BigDecimal.ONE;
+                        if (invoice.getSubTotal() != null && invoice.getSubTotal().compareTo(BigDecimal.ZERO) > 0) {
+                                landedFactor = invoice.getTotalAmount().divide(invoice.getSubTotal(), 6,
+                                                RoundingMode.HALF_UP);
+                        }
+
+                        for (SupplierInvoiceItem invItem : invoice.getItems()) {
+                                // Apply landed factor to get the actual cost per unit including shipping/taxes
+                                BigDecimal landedUnitPrice = invItem.getUnitPrice().multiply(landedFactor);
+
+                                BigDecimal unitPriceUsd = landedUnitPrice;
+                                if (!"USD".equalsIgnoreCase(invCurrency)) {
+                                        unitPriceUsd = landedUnitPrice.divide(invRate, 4, RoundingMode.HALF_UP);
+                                }
+                                if (invItem.getItem() != null) {
+                                        itemService.updatePricingFromInvoice(
+                                                        invItem.getItem().getId(),
+                                                        unitPriceUsd,
+                                                        invItem.getQuantity() != null ? invItem.getQuantity()
+                                                                        : BigDecimal.ONE,
+                                                        invRate);
+                                }
+                        }
+                }
         }
 
         @Transactional(readOnly = true)
@@ -544,7 +642,8 @@ public class SupplierInvoiceService {
                 List<InvoiceMatchDetailsDto.MatchDetailItemDto> rows = new ArrayList<>();
                 if (invoice.getItems() != null) {
                         Map<Integer, PurchaseOrderItem> poItemsById = (po != null && po.getItems() != null)
-                                        ? po.getItems().stream().collect(Collectors.toMap(PurchaseOrderItem::getId, pi -> pi))
+                                        ? po.getItems().stream()
+                                                        .collect(Collectors.toMap(PurchaseOrderItem::getId, pi -> pi))
                                         : Map.of();
                         Map<Integer, GRNItem> grnItemsById = (grn != null && grn.getItems() != null)
                                         ? grn.getItems().stream().collect(Collectors.toMap(GRNItem::getId, gi -> gi))
@@ -568,7 +667,8 @@ public class SupplierInvoiceService {
                                                         poQty = pi.getOrderedQty();
                                                         poPrice = pi.getUnitPrice();
                                                         poTotal = pi.getOrderedQty().multiply(pi.getUnitPrice() != null
-                                                                        ? pi.getUnitPrice() : BigDecimal.ZERO);
+                                                                        ? pi.getUnitPrice()
+                                                                        : BigDecimal.ZERO);
                                                 }
                                         }
                                 }

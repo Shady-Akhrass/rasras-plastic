@@ -1,10 +1,14 @@
 package com.rasras.erp.hr.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AttendanceDto {
 
     private Integer attendanceId;
@@ -21,4 +25,3 @@ public class AttendanceDto {
     private Double overtimeHours;
     private String notes;
 }
-

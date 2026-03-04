@@ -201,8 +201,15 @@ const DashboardLayout: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    const { pendingApprovals, pendingInspections, waitingImports, pendingCustomerRequests, waitingDeliveries, hasDeliveriesToday } =
-        useNotificationPolling(location.pathname);
+    const {
+        pendingApprovals,
+        pendingInspections,
+        waitingImports,
+        pendingCustomerRequests,
+        waitingDeliveries,
+        hasDeliveriesToday,
+        actionableNotifications
+    } = useNotificationPolling(location.pathname);
 
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
@@ -716,10 +723,15 @@ const DashboardLayout: React.FC = () => {
         });
     };
 
-    const notifications: any[] = [
-        /* Mock notifications removed for production optimization */
-    ];
-    const unreadCount = pendingApprovals;
+    const notifications: any[] = actionableNotifications.map(n => ({
+        title: n.title,
+        message: n.message,
+        time: formatTime(n.timestamp),
+        read: false,
+        type: n.type === 'error' ? 'warning' : n.type, // Map 'error' to 'warning' for NotificationItem compatibility
+        route: n.route
+    }));
+    const unreadCount = actionableNotifications.length;
 
     return (
         <div className="min-h-screen bg-slate-50/50 flex" dir="rtl">

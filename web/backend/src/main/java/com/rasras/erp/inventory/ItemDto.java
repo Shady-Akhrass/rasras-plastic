@@ -42,6 +42,9 @@ public class ItemDto {
     private BigDecimal lastSalePrice;
     private BigDecimal defaultVatRate;
     private String imagePath;
+    private BigDecimal purchasePriceUsd;
+    private BigDecimal purchaseExchangeRate;
+    private BigDecimal targetProfitMarginPercentage;
     private Boolean isActive;
     private Boolean isSellable;
     private Boolean isPurchasable;

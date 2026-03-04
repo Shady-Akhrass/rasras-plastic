@@ -8,6 +8,7 @@ import com.rasras.erp.shared.exception.ResourceNotFoundException;
 import com.rasras.erp.supplier.Supplier;
 import com.rasras.erp.supplier.SupplierRepository;
 import com.rasras.erp.supplier.SupplierInvoiceRepository;
+import com.rasras.erp.finance.ExchangeRateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,8 @@ public class GRNService {
     private final InventoryService inventoryService;
     private final com.rasras.erp.approval.ApprovalService approvalService;
     private final SupplierInvoiceRepository supplierInvoiceRepo;
+    private final ItemService itemService;
+    private final ExchangeRateService exchangeRateService;
 
     @Transactional(readOnly = true)
     public List<GoodsReceiptNoteDto> getAllGRNs() {
@@ -45,7 +48,8 @@ public class GRNService {
     }
 
     /**
-     * توريدات مكتملة ولم تُفوتر بعد — للاستخدام من صفحة فواتير الموردين (قسم المالية).
+     * توريدات مكتملة ولم تُفوتر بعد — للاستخدام من صفحة فواتير الموردين (قسم
+     * المالية).
      * محمي بصلاحية فواتير الموردين (SECTION_FINANCE أو غيره حسب SUPPLIER_INVOICES).
      */
     @Transactional(readOnly = true)
@@ -267,9 +271,26 @@ public class GRNService {
 
         // Recalculate each GRN item using acceptedQty
         for (GRNItem grnItem : grn.getItems()) {
-            PurchaseOrderItem poItem = poItemsMap.get(grnItem.getPoItemId());
+            PurchaseOrderItem poItem = null;
+            if (grnItem.getPoItemId() != null) {
+                poItem = poItemsMap.get(grnItem.getPoItemId());
+            }
+            // Fallback: match by itemId if poItemId is missing or not found
             if (poItem == null) {
-                throw new RuntimeException("PO Item not found for GRN Item: " + grnItem.getId());
+                poItem = po.getItems().stream()
+                        .filter(pi -> pi.getItem().getId().equals(grnItem.getItem().getId()))
+                        .findFirst()
+                        .orElse(null);
+            }
+
+            if (poItem == null) {
+                // If still not found, just use the GRN item's existing unit cost
+                // and assume 0% discount/tax to avoid crashing the whole QC process
+                poItem = PurchaseOrderItem.builder()
+                        .unitPrice(grnItem.getUnitCost())
+                        .discountPercentage(BigDecimal.ZERO)
+                        .taxPercentage(BigDecimal.ZERO)
+                        .build();
             }
 
             // Use acceptedQty if set, otherwise fallback to receivedQty
@@ -347,6 +368,14 @@ public class GRNService {
     }
 
     private void updateInventory(GoodsReceiptNote grn) {
+        PurchaseOrder po = grn.getPurchaseOrder();
+        boolean isUsd = po != null && "USD".equalsIgnoreCase(po.getCurrency());
+        BigDecimal poRate = (po != null && po.getExchangeRate() != null
+                && po.getExchangeRate().compareTo(BigDecimal.ONE) != 0
+                && po.getExchangeRate().compareTo(BigDecimal.ZERO) > 0)
+                        ? po.getExchangeRate()
+                        : (isUsd ? BigDecimal.ONE : exchangeRateService.getCurrentRate());
+
         for (GRNItem item : grn.getItems()) {
             BigDecimal qtyToRecord = item.getAcceptedQty() != null ? item.getAcceptedQty() : item.getReceivedQty();
             if (qtyToRecord.compareTo(BigDecimal.ZERO) > 0) {
@@ -361,6 +390,17 @@ public class GRNService {
                         grn.getGrnNumber(),
                         item.getUnitCost(),
                         grn.getCreatedBy());
+
+                // Automated Pricing Update
+                BigDecimal unitCostUsd;
+                if (isUsd) {
+                    unitCostUsd = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+                } else {
+                    BigDecimal egpCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+                    unitCostUsd = egpCost.divide(poRate, 4, java.math.RoundingMode.HALF_UP);
+                }
+
+                itemService.updatePricingFromPurchase(item.getItem().getId(), unitCostUsd, qtyToRecord, poRate);
             }
         }
     }

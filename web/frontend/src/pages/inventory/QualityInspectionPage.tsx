@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
     Search,
     Package,
@@ -12,6 +13,7 @@ import {
 import { grnService, type GoodsReceiptNoteDto } from '../../services/grnService';
 import { qualityService } from '../../services/qualityService';
 import { formatDate } from '../../utils/format';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../../components/common/ConfirmModal';
 
@@ -139,6 +141,7 @@ const QualityInspectionPage: React.FC = () => {
     const [selectedGrn, setSelectedGrn] = useState<GoodsReceiptNoteDto | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const location = useLocation();
     const [saving, setSaving] = useState(false);
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
@@ -151,8 +154,19 @@ const QualityInspectionPage: React.FC = () => {
             setLoading(true);
             const allGrns = await grnService.getAllGRNs();
             const list = Array.isArray(allGrns) ? allGrns : [];
-            // Only show GRNs that need inspection - exclude those already sent for approval
-            setGrns(list.filter(g => g.status === 'Pending Inspection'));
+            const filtered = list.filter(g => g.status === 'Pending Inspection');
+            setGrns(filtered);
+
+            // Handle auto-select if grnId is in URL
+            const queryParams = new URLSearchParams(location.search);
+            const grnId = queryParams.get('grnId');
+            if (grnId) {
+                const grnToSelect = filtered.find(g => g.id === parseInt(grnId));
+                if (grnToSelect) {
+                    handleRecordInspection(grnToSelect);
+                }
+            }
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (error) {
             console.error('Error fetching GRNs:', error);
             toast.error('فشل تحميل الشحنات');
@@ -203,6 +217,7 @@ const QualityInspectionPage: React.FC = () => {
             }
 
             setSelectedGrn(null);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             fetchPendingGRNs();
         } catch (error) {
             console.error('Error saving inspection:', error);

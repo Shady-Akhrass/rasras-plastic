@@ -34,9 +34,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { approvalService, type ApprovalRequestDto } from '../../services/approvalService';
-import { customerRequestService } from '../../services/customerRequestService';
-import type { CustomerRequest } from '../../types/sales';
-import { REFRESH_DATA_EVENT } from '../../hooks/useNotificationPolling';
+import { REFRESH_DATA_EVENT, TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { formatNumber, formatDate } from '../../utils/format';
 import { grnService } from '../../services/grnService';
 import warehouseService from '../../services/warehouseService';
@@ -58,6 +56,7 @@ const WORKFLOW_NAME_AR: Record<string, string> = {
     'Sales Quotation Approval': 'اعتماد عرض سعر مبيعات',
     'Stock Issue Note Approval': 'اعتماد إذن صرف',
     'Delivery Order Approval': 'اعتماد أمر توصيل',
+    'Customer Request Approval': 'اعتماد طلب عميل',
 };
 const STEP_NAME_AR: Record<string, string> = {
     'Procurement Manager Approval': 'اعتماد مدير المشتريات',
@@ -676,41 +675,15 @@ const ApprovalsInbox: React.FC = () => {
             const currentUser = currentUserJson ? JSON.parse(currentUserJson) : null;
             const uid = currentUser?.userId ?? currentUser?.id ?? currentUserId;
             const permissions: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
-            // طلبات العملاء يسمح بها الـ API فقط لـ SECTION_SALES (لا SECTION_OPERATIONS) → تجنب 403
-            const canFetchCustomerRequests = permissions.includes('SECTION_SALES');
 
             const promises: Promise<any>[] = [
                 approvalService.getPendingRequests(uid),
             ];
-            if (canFetchCustomerRequests) {
-                promises.push(customerRequestService.getAllRequests());
-            }
 
             const results = await Promise.all(promises);
             const approvalsData = results[0];
-            const crsData = results.length > 1 ? results[1] : { data: [] };
 
-            const approvals: ApprovalRequestDto[] = approvalsData.data || [];
-
-            // Map pending CRs to ApprovalRequestDto format (only if we fetched them)
-            const crs: ApprovalRequestDto[] = (crsData?.data || [])
-                .filter((cr: CustomerRequest) => cr.status === 'Pending')
-                .map((cr: CustomerRequest) => ({
-                    id: cr.requestId || 0,
-                    documentType: 'CustomerRequest',
-                    documentId: cr.requestId || 0,
-                    documentNumber: cr.requestNumber || `CR-${cr.requestId}`,
-                    requesterId: cr.customerId,
-                    requestedByName: 'Customer', // Or fetch customer name if available
-                    requestedDate: cr.requestDate ? new Date(cr.requestDate).toISOString() : new Date().toISOString(),
-                    status: 'Pending',
-                    currentStepName: 'Sales Manager Approval', // Hardcoded for now
-                    workflowName: 'Customer Request Approval',
-                    priority: 'Normal',
-                    totalAmount: 0 // CRs don't have amount yet
-                }));
-
-            const fetched = [...approvals, ...crs];
+            const fetched: ApprovalRequestDto[] = approvalsData.data || [];
 
             if (!mountedRef.current) return;
             setLastRefresh(Date.now());
@@ -797,16 +770,7 @@ const ApprovalsInbox: React.FC = () => {
         startTransition(async () => {
             addOptimistic({ type: 'remove', id: requestId });
             try {
-                const request = requests.find(r => r.id === requestId);
-                if (request?.documentType === 'CustomerRequest' || request?.documentType === 'CR') {
-                    if (action === 'Approved') {
-                        await customerRequestService.approveRequest(requestId);
-                    } else {
-                        await customerRequestService.rejectRequest(requestId, 'Rejected via Inbox');
-                    }
-                } else {
-                    await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId);
-                }
+                await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId);
 
                 const req = requests.find(r => r.id === requestId);
                 setRequests(prev => prev.filter(r => r.id !== requestId));
@@ -839,6 +803,10 @@ const ApprovalsInbox: React.FC = () => {
                         { duration: 3000 }
                     );
                 }
+
+                // Trigger global notification poll to update bell/counts immediately
+                window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
+
             } catch (err: any) {
                 const apiMessage = err?.response?.data?.message;
                 const displayMessage = apiMessage && typeof apiMessage === 'string'

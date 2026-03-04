@@ -22,6 +22,7 @@ import warehouseService from '../../services/warehouseService';
 import { stockBalanceService, type StockBalanceDto } from '../../services/stockBalanceService';
 import { toast } from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
 const StockIssueNoteFormPage: React.FC = () => {
     const navigate = useNavigate();
@@ -64,6 +65,13 @@ const StockIssueNoteFormPage: React.FC = () => {
             setStockBalances([]);
         }
     }, [form.warehouseId]);
+
+    useEffect(() => {
+        const orderId = queryParams.get('orderId');
+        if (isNew && orderId) {
+            setForm(f => ({ ...f, salesOrderId: parseInt(orderId) }));
+        }
+    }, [isNew]);
 
     // Load initial data (Orders + Warehouses + Existing Issue Notes)
     useEffect(() => {
@@ -218,6 +226,7 @@ const StockIssueNoteFormPage: React.FC = () => {
             const updated = await stockIssueNoteService.update(form.id!, form);
             if (updated) {
                 toast.success('تم تحديث إذن الصرف');
+                window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
                 navigate('/dashboard/sales/issue-notes');
             } else {
                 toast.error('فشل التحديث');

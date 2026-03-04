@@ -27,6 +27,9 @@ export interface ItemDto {
     lastSalePrice?: number;
     defaultVatRate?: number;
     imagePath?: string;
+    purchasePriceUsd?: number;
+    purchaseExchangeRate?: number;
+    targetProfitMarginPercentage?: number;
     isActive: boolean;
     isSellable: boolean;
     isPurchasable: boolean;

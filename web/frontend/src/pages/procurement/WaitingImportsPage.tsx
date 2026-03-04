@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 
 import {
     Truck,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
 import { formatNumber, formatDate } from '../../utils/format';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import toast from 'react-hot-toast';
 import Pagination from '../../components/common/Pagination';
 
@@ -266,6 +268,7 @@ const WaitingImportsPage: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
     const [processingId, setProcessingId] = useState<number | null>(null);
+    const location = useLocation();
 
     useEffect(() => {
         fetchWaitingPOs();
@@ -297,7 +300,7 @@ const WaitingImportsPage: React.FC = () => {
 
             // Mark PO as arrived and create GRN automatically
             await purchaseOrderService.markAsArrived(po.id, userId);
-
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success('تم تسجيل وصول الشحنة وإنشاء إذن الاستلام بنجاح');
 
             // Remove from local list
@@ -315,10 +318,26 @@ const WaitingImportsPage: React.FC = () => {
     };
 
     const filteredPOs = useMemo(() => {
-        const filtered = pos.filter(po =>
-            po.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            po.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        const queryParams = new URLSearchParams(location.search);
+        const poId = queryParams.get('poId');
+
+        let filtered = pos;
+
+        if (poId) {
+            filtered = pos.filter(p => p.id === parseInt(poId));
+            if (filtered.length === 0 && !searchTerm) {
+                // If not found in current list (maybe already arrived?), show search results as usual
+                filtered = pos;
+            }
+        }
+
+        if (searchTerm) {
+            filtered = filtered.filter(po =>
+                po.poNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                po.supplierNameAr?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
         // Sort by expected delivery date (earliest first)
         return [...filtered].sort((a, b) => {
             const dateA = a.expectedDeliveryDate ? new Date(a.expectedDeliveryDate).getTime() : 0;
@@ -326,7 +345,7 @@ const WaitingImportsPage: React.FC = () => {
             if (dateA !== dateB) return dateA - dateB;
             return (a.id ?? 0) - (b.id ?? 0);
         });
-    }, [pos, searchTerm]);
+    }, [pos, searchTerm, location.search]);
 
     const paginatedPOs = useMemo(() => {
         const start = (currentPage - 1) * pageSize;

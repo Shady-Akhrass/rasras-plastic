@@ -1,8 +1,11 @@
 package com.rasras.erp.hr;
 
+import com.rasras.erp.hr.dto.AssignLeaveDto;
 import com.rasras.erp.hr.dto.AttendanceDto;
 import com.rasras.erp.hr.dto.EmployeeShiftDto;
+import com.rasras.erp.hr.dto.HolidayBulkDto;
 import com.rasras.erp.hr.dto.HolidayDto;
+import com.rasras.erp.hr.dto.HrSettingDto;
 import com.rasras.erp.hr.dto.LeaveTypeDto;
 import com.rasras.erp.hr.dto.PayrollDto;
 import com.rasras.erp.hr.dto.WorkShiftDto;
@@ -26,6 +29,19 @@ import java.util.List;
 public class HrController {
 
     private final HrService hrService;
+
+    // ---- HR Settings ----
+    @GetMapping("/settings")
+    @Operation(summary = "Get all HR settings")
+    public ResponseEntity<ApiResponse<List<HrSettingDto>>> getSettings() {
+        return ResponseEntity.ok(ApiResponse.success(hrService.getAllSettings()));
+    }
+
+    @PutMapping("/settings")
+    @Operation(summary = "Create or update HR setting")
+    public ResponseEntity<ApiResponse<HrSettingDto>> upsertSetting(@RequestBody HrSettingDto dto) {
+        return ResponseEntity.ok(ApiResponse.success(hrService.upsertSetting(dto)));
+    }
 
     // ---- Leave Types ----
     @GetMapping("/leave-types")
@@ -99,6 +115,13 @@ public class HrController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Holiday created", saved));
     }
 
+    @PostMapping("/holidays/bulk")
+    @Operation(summary = "Create multiple holidays")
+    public ResponseEntity<ApiResponse<List<HolidayDto>>> createBulkHolidays(@RequestBody HolidayBulkDto dto) {
+        List<HolidayDto> saved = hrService.createBulkHolidays(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Holidays created", saved));
+    }
+
     @PutMapping("/holidays/{id}")
     @Operation(summary = "Update holiday")
     public ResponseEntity<ApiResponse<HolidayDto>> updateHoliday(@PathVariable Integer id,
@@ -163,6 +186,13 @@ public class HrController {
     public ResponseEntity<ApiResponse<AttendanceDto>> createAttendance(@RequestBody AttendanceDto dto) {
         AttendanceDto saved = hrService.upsertAttendance(dto);
         return ResponseEntity.ok(ApiResponse.success("Attendance saved", saved));
+    }
+
+    @PostMapping("/attendance/assign-leave")
+    @Operation(summary = "Assign leave to employee")
+    public ResponseEntity<ApiResponse<Void>> assignLeave(@RequestBody AssignLeaveDto dto) {
+        hrService.assignLeave(dto);
+        return ResponseEntity.ok(ApiResponse.success("Leave assigned successfully"));
     }
 
     @PutMapping("/attendance/{id}")

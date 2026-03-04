@@ -22,6 +22,7 @@ import Pagination from '../../components/common/Pagination';
 import { formatDate } from '../../utils/format';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import toast from 'react-hot-toast';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -267,6 +268,7 @@ const CustomerRequestListPage: React.FC = () => {
             } else {
                 setRequests([]);
             }
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (error) {
             console.error('Failed to fetch requests:', error);
             toast.error('فشل تحميل قائمة الطلبات');

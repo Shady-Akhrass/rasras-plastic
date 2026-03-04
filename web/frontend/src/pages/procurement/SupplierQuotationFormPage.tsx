@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { approvalService } from '../../services/approvalService';
 import purchaseService, { type SupplierQuotation, type SupplierQuotationItem, type Supplier, type RFQ } from '../../services/purchaseService';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { formatNumber } from '../../utils/format';
 import { itemService, type ItemDto } from '../../services/itemService';
@@ -238,7 +239,7 @@ const SupplierQuotationFormPage: React.FC = () => {
     const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
-    
+
     // Additional suppliers for copying quotation
     const [additionalSupplierIds, setAdditionalSupplierIds] = useState<number[]>([]);
 
@@ -441,7 +442,7 @@ const SupplierQuotationFormPage: React.FC = () => {
         if (rfqId === 0) return;
         try {
             const rfq = await purchaseService.getRFQById(rfqId);
-            
+
             // Check for existing quotation for this RFQ from the SAME supplier
             // This allows multiple quotations from different suppliers for the same RFQ
             if (!isEdit) {
@@ -449,9 +450,9 @@ const SupplierQuotationFormPage: React.FC = () => {
                 const existing = allQuotations.find(q => q.rfqId === rfqId && q.supplierId === rfq.supplierId);
 
                 if (existing) {
-                    toast.error(`عذراً، يوجد بالفعل عرض سعر من المورد ${rfq.supplierNameAr} لطلب السعر هذا`, { 
-                        duration: 4000, 
-                        icon: '⚠️' 
+                    toast.error(`عذراً، يوجد بالفعل عرض سعر من المورد ${rfq.supplierNameAr} لطلب السعر هذا`, {
+                        duration: 4000,
+                        icon: '⚠️'
                     });
                     setFormData(prev => ({ ...prev, rfqId: undefined }));
                     return;
@@ -577,15 +578,15 @@ const SupplierQuotationFormPage: React.FC = () => {
                 // 3. Create quotations for additional suppliers if any
                 if (additionalSupplierIds.length > 0) {
                     const toastId = toast.loading(`جاري نسخ العرض (0/${additionalSupplierIds.length})...`);
-                    
+
                     for (let i = 0; i < additionalSupplierIds.length; i++) {
                         const supplierId = additionalSupplierIds[i];
-                        
+
                         try {
                             // Check if quotation already exists for this supplier
                             const allQuotations = await purchaseService.getAllQuotations();
                             const existing = allQuotations.find(q => q.rfqId === formData.rfqId && q.supplierId === supplierId);
-                            
+
                             if (existing) {
                                 failCount++;
                                 toast.error(`يوجد عرض سعر من ${suppliers.find(s => s.id === supplierId)?.supplierNameAr} مسبقاً`, {
@@ -603,9 +604,9 @@ const SupplierQuotationFormPage: React.FC = () => {
 
                             await purchaseService.createQuotation(additionalQuotation);
                             successCount++;
-                            
+
                             toast.loading(`جاري نسخ العرض (${successCount - 1}/${additionalSupplierIds.length})...`, { id: toastId });
-                            
+
                             // Small delay between requests
                             if (i < additionalSupplierIds.length - 1) {
                                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -615,7 +616,7 @@ const SupplierQuotationFormPage: React.FC = () => {
                             console.error(`Failed to create quotation for supplier ${supplierId}:`, error);
                         }
                     }
-                    
+
                     toast.dismiss(toastId);
                 }
             }
@@ -656,7 +657,8 @@ const SupplierQuotationFormPage: React.FC = () => {
             } else {
                 toast.success('تم حفظ عرض السعر وتحديث أسعار المورد');
             }
-            
+
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             navigate('/dashboard/procurement/quotation');
         } catch (error) {
             console.error('Failed to save quotation:', error);
@@ -672,6 +674,7 @@ const SupplierQuotationFormPage: React.FC = () => {
             setProcessing(true);
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
             await approvalService.takeAction(parseInt(approvalId), 1, action);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
             navigate('/dashboard/procurement/approvals');
         } catch (error) {
@@ -744,8 +747,8 @@ const SupplierQuotationFormPage: React.FC = () => {
                                 <Save className="w-5 h-5" />
                             )}
                             <span>
-                                {saving 
-                                    ? 'جاري الحفظ...' 
+                                {saving
+                                    ? 'جاري الحفظ...'
                                     : !isEdit && additionalSupplierIds.length > 0
                                         ? `حفظ ${formatNumber(additionalSupplierIds.length + 1)} عروض سعر`
                                         : 'حفظ عرض السعر'

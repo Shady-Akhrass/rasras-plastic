@@ -30,6 +30,7 @@ import { unitService, type UnitDto } from '../../services/unitService';
 import { formatNumber } from '../../utils/format';
 import toast from 'react-hot-toast';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
 
 // ─── Centralized Calculation Helper ───
@@ -182,9 +183,31 @@ const PurchaseOrderFormPage: React.FC = () => {
         loadSuppliers();
         loadItems();
         loadUnits();
-        if (isEdit) loadPO();
-        else if (quotationId) loadQuotationData(parseInt(quotationId));
-    }, [id, quotationId]);
+        if (isEdit) {
+            loadPO();
+        } else if (comparisonId) {
+            loadComparisonData(parseInt(comparisonId));
+        } else if (quotationId) {
+            loadQuotationData(parseInt(quotationId));
+        }
+    }, [id, quotationId, comparisonId]);
+
+    const loadComparisonData = async (compId: number) => {
+        try {
+            setLoading(true);
+            const comparison = await purchaseService.getComparisonById(compId);
+            if (comparison && comparison.selectedQuotationId) {
+                await loadQuotationData(comparison.selectedQuotationId);
+            } else {
+                toast.error('لم يتم تحديد عرض سعر فائز في هذه المقارنة');
+            }
+        } catch (e) {
+            console.error('Failed to load comparison data:', e);
+            toast.error('فشل تحميل بيانات المقارنة');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const loadPO = async () => {
         try {
@@ -290,6 +313,7 @@ const PurchaseOrderFormPage: React.FC = () => {
         try {
             setSaving(true);
             const savedPO = await purchaseOrderService.createPO(optimisticPO);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success('تم حفظ أمر الشراء وإرساله للاعتماد بنجاح');
 
             const createInvoice = queryParams.get('createInvoice') === 'true';
@@ -320,6 +344,7 @@ const PurchaseOrderFormPage: React.FC = () => {
             setProcessing(true);
             const toastId = toast.loading('جاري تنفيذ الإجراء...');
             await approvalService.takeAction(parseInt(approvalId), 1, action);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
             toast.success(action === 'Approved' ? 'تم الاعتماد بنجاح' : 'تم رفض الطلب', { id: toastId });
             navigate('/dashboard/procurement/approvals');
         } catch {

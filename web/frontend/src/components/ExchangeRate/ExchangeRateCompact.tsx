@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import { exchangeRateService } from '../../services/exchangeRateService';
 
 const ExchangeRateCompact = () => {
     const [rate, setRate] = useState<number | null>(null);
@@ -12,26 +13,32 @@ const ExchangeRateCompact = () => {
     useEffect(() => {
         const fetchRate = async () => {
             try {
-                // Get previous rate from localStorage
-                const storedRate = localStorage.getItem('compactExchangeRate');
-                if (storedRate) {
-                    setPreviousRate(parseFloat(storedRate));
-                }
-
+                // Primary source: External API (as requested)
                 const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                if (!response.ok) throw new Error('Failed to fetch');
+                if (!response.ok) throw new Error('Failed to fetch from external API');
 
                 const data = await response.json();
                 const currentRate = data.rates[defaultCurrency] || data.rates.EGP;
-
                 setRate(currentRate);
 
-                // Save for next comparison
-                localStorage.setItem('compactExchangeRate', currentRate.toString());
+                // Save to backend and get history for comparison
+                await exchangeRateService.recordRate(currentRate);
+
+                const history = await exchangeRateService.getHistory();
+                if (history && history.length > 1) {
+                    setPreviousRate(history[1].rate); // history[0] is the one we just recorded
+                }
+
                 setError(false);
             } catch (err) {
                 console.error('Error fetching exchange rate:', err);
-                setError(true);
+                // Fallback to backend latest if external fails
+                try {
+                    const latest = await exchangeRateService.getLatestRate();
+                    if (latest) setRate(latest);
+                } catch (beErr) {
+                    setError(true);
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -64,14 +71,14 @@ const ExchangeRateCompact = () => {
                 hover:bg-white/20 transition-colors cursor-default" title="سعر صرف الدولار مقابل العملة المحلية">
             <DollarSign className="w-4 h-4" />
             <div className="flex items-baseline gap-1">
-                <span className="font-bold">{rate.toFixed(2)}</span>
+                <span className="font-bold">{rate}</span>
                 <span className="text-xs opacity-70">{getCurrencyLabel(defaultCurrency)}</span>
             </div>
 
             {change !== 0 && (
                 <div className={`flex items-center text-xs ${isPositive ? 'text-emerald-300' : 'text-rose-300'}`}>
                     {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                    <span className="mr-0.5">{Math.abs(change).toFixed(2)}</span>
+                    <span className="mr-0.5">{Math.abs(change)}</span>
                 </div>
             )}
         </div>

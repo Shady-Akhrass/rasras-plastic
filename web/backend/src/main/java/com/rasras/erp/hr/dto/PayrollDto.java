@@ -20,6 +20,6 @@ public class PayrollDto {
     private Double netSalary;
     private String status;
     private String paymentDate;
+    private Double totalHours;
     private List<PayrollItemDto> items;
 }
-

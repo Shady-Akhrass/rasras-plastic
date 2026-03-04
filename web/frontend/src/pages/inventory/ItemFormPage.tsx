@@ -12,6 +12,7 @@ import { unitService, type UnitDto } from '../../services/unitService';
 import { qualityService, type QualityParameterDto, type ItemQualitySpecDto } from '../../services/qualityService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import type { SupplierDto } from '../../services/supplierService';
+import { exchangeRateService } from '../../services/exchangeRateService';
 import { toast } from 'react-hot-toast';
 
 // Animated Input Component
@@ -446,10 +447,68 @@ const ItemFormPage: React.FC = () => {
         replacementPrice: 0,
         lastSalePrice: 0,
         defaultVatRate: 14,
+        purchasePriceUsd: 0,
+        purchaseExchangeRate: 0,
+        targetProfitMarginPercentage: 0,
         isActive: true,
         isSellable: true,
         isPurchasable: true
     });
+
+    const [effectiveRate, setEffectiveRate] = useState<number>(0);
+    const [marketRate, setMarketRate] = useState<number>(0);
+    const [buffer, setBuffer] = useState<number>(0);
+
+    useEffect(() => {
+        const fetchRates = async () => {
+            try {
+                const [effData, bufferData, latest] = await Promise.all([
+                    exchangeRateService.getEffectiveRate(30, 1.5),
+                    exchangeRateService.getBufferPercentage(30, 1.5),
+                    exchangeRateService.getLatestRate()
+                ]);
+                setEffectiveRate(effData);
+                setBuffer(bufferData);
+                setMarketRate(latest);
+            } catch (error) {
+                console.error('Failed to fetch exchange rates for pricing preview', error);
+            }
+        };
+        if (activeTab === 'pricing') {
+            fetchRates();
+        }
+    }, [activeTab]);
+
+    // Auto-calculate EGP prices when USD price, margin, or exchange rates change
+    useEffect(() => {
+        const usd = formData.purchasePriceUsd || 0;
+        const margin = formData.targetProfitMarginPercentage || 0;
+
+        if (usd > 0 && marketRate > 0) {
+            // Auto-fill exchange rate on the form ONLY if it's a new item or not yet set
+            if (!formData.purchaseExchangeRate || formData.purchaseExchangeRate === 0) {
+                updateForm('purchaseExchangeRate', marketRate);
+            }
+
+            // آخر سعر شراء = USD × market rate
+            const lastPurchase = usd * marketRate;
+
+            // السعر الاستبدالي = USD × effective rate (with buffer)
+            const effRate = effectiveRate > 0 ? effectiveRate : marketRate;
+            const replacement = usd * effRate;
+
+            // آخر سعر بيع = replacement × (1 + margin/100)
+            const sale = replacement * (1 + margin / 100);
+
+            // Update form data with calculated previews
+            setFormData(prev => ({
+                ...prev,
+                lastPurchasePrice: parseFloat(lastPurchase.toFixed(2)),
+                replacementPrice: parseFloat(replacement.toFixed(2)),
+                lastSalePrice: parseFloat(sale.toFixed(2))
+            }));
+        }
+    }, [formData.purchasePriceUsd, formData.targetProfitMarginPercentage, effectiveRate, marketRate]);
 
     const [originalData, setOriginalData] = useState<ItemDto | null>(null);
 
@@ -542,14 +601,10 @@ const ItemFormPage: React.FC = () => {
         const purchase = Number(formData.lastPurchasePrice) || 0;
         const sale = Number(formData.lastSalePrice) || 0;
         const replacement = Number(formData.replacementPrice) || 0;
-        if (cost < 0 || purchase < 0 || sale < 0 || replacement < 0) {
+        const usdPrice = Number(formData.purchasePriceUsd) || 0;
+
+        if (usdPrice < 0 || cost < 0 || purchase < 0 || sale < 0 || replacement < 0) {
             return { valid: false, error: 'الأسعار والتكاليف لا يمكن أن تكون سالبة' };
-        }
-        if (cost <= 0 || purchase <= 0 || sale <= 0 || replacement <= 0) {
-            return {
-                valid: false,
-                error: 'الأسعار والتكاليف (التكلفة المعيارية، آخر سعر شراء، آخر سعر بيع، السعر الاستبدالي) مطلوبة ويجب أن تكون أكبر من صفر'
-            };
         }
 
         const vat = Number(formData.defaultVatRate) ?? 14;
@@ -887,97 +942,186 @@ const ItemFormPage: React.FC = () => {
                 {/* Pricing Tab */}
                 {activeTab === 'pricing' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                        <FormSection
-                            title="الأسعار والتكاليف"
-                            icon={DollarSign}
-                            description="أسعار الشراء والبيع والتكلفة"
-                            badge="ج.م"
-                        >
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormInput
-                                    label="التكلفة المعيارية"
-                                    value={formData.standardCost || 0}
-                                    onChange={(v) => updateForm('standardCost', parseFloat(v) || 0)}
-                                    icon={DollarSign}
-                                    type="number"
-                                    placeholder="0.00"
-                                    required
-                                />
-                                <FormInput
-                                    label="آخر سعر شراء"
-                                    value={formData.lastPurchasePrice || 0}
-                                    onChange={(v) => updateForm('lastPurchasePrice', parseFloat(v) || 0)}
-                                    icon={ShoppingCart}
-                                    type="number"
-                                    placeholder="0.00"
-                                    required
-                                />
-                                <FormInput
-                                    label="آخر سعر بيع"
-                                    value={formData.lastSalePrice || 0}
-                                    onChange={(v) => updateForm('lastSalePrice', parseFloat(v) || 0)}
-                                    icon={ShoppingBag}
-                                    type="number"
-                                    placeholder="0.00"
-                                    required
-                                />
-                                <FormInput
-                                    label="السعر الاستبدالي"
-                                    value={formData.replacementPrice || 0}
-                                    onChange={(v) => updateForm('replacementPrice', parseFloat(v) || 0)}
-                                    icon={TrendingUp}
-                                    type="number"
-                                    placeholder="0.00"
-                                    required
-                                />
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Left Column: Pricing Strategy */}
+                            <FormSection
+                                title="إستراتيجية التسعير (البيع)"
+                                icon={TrendingUp}
+                                description="تحديد هامش الربح والضرائب"
+                                badge="حماية الأرباح"
+                            >
+                                <div className="space-y-6">
+                                    <FormInput
+                                        label="هامش الربح المستهدف (%)"
+                                        value={formData.targetProfitMarginPercentage || ''}
+                                        onChange={(v) => updateForm('targetProfitMarginPercentage', parseFloat(v) || 0)}
+                                        icon={Percent}
+                                        type="number"
+                                        placeholder="20"
+                                        colorClass="border-brand-primary/20 bg-brand-primary/5"
+                                        hint="النسبة المئوية للربح فوق التكلفة"
+                                    />
+                                    <FormInput
+                                        label="نسبة الضريبة (VAT %)"
+                                        value={formData.defaultVatRate || ''}
+                                        onChange={(v) => updateForm('defaultVatRate', parseFloat(v) || 0)}
+                                        icon={Percent}
+                                        type="number"
+                                        placeholder="14"
+                                    />
+                                </div>
+                            </FormSection>
 
-                            <PriceCalculator
-                                cost={formData.standardCost || formData.lastPurchasePrice || 0}
-                                salePrice={formData.lastSalePrice || 0}
-                                vatRate={formData.defaultVatRate || 0}
-                            />
+                            {/* Right Column: Purchase Item */}
+                            <FormSection
+                                title="شراء الصنف (التكلفة)"
+                                icon={ShoppingCart}
+                                description="بيانات التكلفة بالدولار وسعر الصرف"
+                            >
+                                <div className="space-y-6">
+                                    <FormInput
+                                        label="سعر الشراء ($ USD)"
+                                        value={formData.purchasePriceUsd || ''}
+                                        onChange={(v) => updateForm('purchasePriceUsd', parseFloat(v) || 0)}
+                                        icon={DollarSign}
+                                        type="number"
+                                        placeholder="0.00"
+                                        colorClass="border-emerald-200 bg-emerald-50/30"
+                                        hint="سعر الشراء من المورد بالدولار"
+                                    />
+                                    <FormInput
+                                        label="سعر صرف الشراء (التاريخي)"
+                                        value={formData.purchaseExchangeRate || ''}
+                                        onChange={(v) => updateForm('purchaseExchangeRate', parseFloat(v) || 0)}
+                                        icon={RefreshCw}
+                                        type="number"
+                                        placeholder="0.00"
+                                        hint="سعر صرف الدولار وقت الشراء الفعلي"
+                                    />
+                                </div>
+                            </FormSection>
+                        </div>
 
-                            {/* تنبيه التقييم المزدوج: فرق كبير بين التكلفة التاريخية وسعر الإحلال */}
-                            {(() => {
-                                const hist = Number(formData.standardCost) || Number(formData.lastPurchasePrice) || 0;
-                                const repl = Number(formData.replacementPrice) || 0;
-                                const diffPct = hist > 0 ? Math.abs(repl - hist) / hist : 0;
-                                if (diffPct >= 0.15 && (hist > 0 || repl > 0)) {
-                                    return (
-                                        <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-200 rounded-xl flex items-start gap-3">
-                                            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                            {/* Suggested Pricing Based on Market Rates */}
+                            {(formData.purchasePriceUsd || 0) > 0 && effectiveRate > 0 && (
+                                <div className="mt-8 p-6 bg-emerald-50/50 rounded-2xl border-2 border-emerald-100/50 animate-in zoom-in-95 duration-500">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-emerald-100 rounded-lg">
+                                                <Calculator className="w-5 h-5 text-emerald-600" />
+                                            </div>
                                             <div>
-                                                <p className="font-semibold text-amber-800">تنبيه: فرق كبير في التقييم المزدوج</p>
-                                                <p className="text-sm text-amber-700 mt-1">
-                                                    التكلفة التاريخية (محاسبة): {hist.toLocaleString('ar-EG')} — سعر الإحلال (قرارات): {repl.toLocaleString('ar-EG')}.
-                                                    الفرق ≈ {(diffPct * 100).toFixed(0)}%. راجع القيم عند الحاجة.
-                                                </p>
+                                                <h4 className="font-bold text-emerald-900">معاينة تسعير السوق (آلي)</h4>
+                                                <p className="text-xs text-emerald-600">بناءً على سعر الصرف الفعال وهامش الأمان</p>
                                             </div>
                                         </div>
-                                    );
-                                }
-                                return null;
-                            })()}
-                        </FormSection>
+                                        <div className="text-left">
+                                            <div className="text-xs font-bold text-emerald-700">سعر الصرف الفعال</div>
+                                            <div className="text-lg font-black text-emerald-600">
+                                                {effectiveRate.toFixed(3)}
+                                                <span className="text-[10px] mr-1 opacity-60">EGP/$</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                        <FormSection
-                            title="الضرائب"
-                            icon={Percent}
-                            description="إعدادات الضريبة الافتراضية"
-                        >
-                            <div className="max-w-xs">
-                                <FormInput
-                                    label="نسبة ضريبة القيمة المضافة"
-                                    value={formData.defaultVatRate || 14}
-                                    onChange={(v) => updateForm('defaultVatRate', parseFloat(v) || 0)}
-                                    icon={Percent}
-                                    type="number"
-                                    placeholder="14"
-                                    hint="النسبة الافتراضية للضريبة على هذا الصنف"
-                                />
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="p-4 bg-white rounded-xl border border-emerald-100 shadow-sm">
+                                            <div className="text-xs text-slate-500 mb-1">سعر الشراء الفعلي (EGP)</div>
+                                            <div className="text-lg font-bold text-slate-700">
+                                                {((formData.purchasePriceUsd || 0) * marketRate).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                                <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-1">حسب السعر اللحظي: {marketRate}</div>
+                                        </div>
+
+                                        <div className="p-4 bg-white rounded-xl border border-emerald-100 shadow-sm">
+                                            <div className="text-xs text-emerald-600 mb-1 font-bold">السعر الاستبدالي (EGP)</div>
+                                            <div className="text-lg font-bold text-emerald-700">
+                                                {((formData.purchasePriceUsd || 0) * effectiveRate).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                                <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
+                                            </div>
+                                            <div className="text-[10px] text-emerald-500 mt-1">يتضمن {buffer.toFixed(1)}% هامش أمان</div>
+                                        </div>
+
+                                        <div className="p-4 bg-brand-primary/5 rounded-xl border border-brand-primary/20 shadow-sm">
+                                            <div className="text-xs text-brand-primary mb-1 font-bold">سعر البيع المقترح (EGP)</div>
+                                            <div className="text-lg font-bold text-brand-primary">
+                                                {((formData.purchasePriceUsd || 0) * effectiveRate * (1 + (formData.targetProfitMarginPercentage || 0) / 100)).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                                <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
+                                            </div>
+                                            <div className="text-[10px] text-brand-primary/70 mt-1">شامل هامش ربح {formData.targetProfitMarginPercentage}%</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 flex items-start gap-2 text-[11px] text-slate-500 bg-white/50 p-2 rounded-lg border border-slate-100">
+                                        <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <p>سيتم تحديث هذه القيم تلقائياً في السجلات عند إتمام دورة المشتريات (إذن الإضافة) لضمان دقة التكلفة المتوسطة المرجحة.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                        {/* Calculated Prices Summary Row */}
+                        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -mr-16 -mt-16 opacity-50" />
+                            
+                            <div className="flex items-center gap-2 mb-6 relative">
+                                <div className="p-2 bg-amber-100 rounded-lg">
+                                    <Calculator className="w-5 h-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-800">الأسعار المحسوبة تلقائياً (EGP)</h4>
+                                    <p className="text-[10px] text-slate-500">يتم تحديث هذه الحقول آلياً بناءً على بيانات السوق والشراء</p>
+                                </div>
+                                <span className="mr-auto text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold flex items-center gap-1">
+                                    <RefreshCw className="w-2 h-2" />
+                                    تحديث لحظي
+                                </span>
                             </div>
-                        </FormSection>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 block mb-1">التكلفة المعيارية (EGP)</label>
+                                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold flex items-center justify-between">
+                                        <span>{(formData.standardCost || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-[10px] text-slate-400 font-normal">MAC</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">المتوسط المرجح المخزني</p>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 block mb-1">آخر سعر شراء (EGP)</label>
+                                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold flex items-center justify-between">
+                                        <span>{(formData.lastPurchasePrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
+                                        <ShoppingCart className="w-3.5 h-3.5 text-slate-300" />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">بناءً على سعر السوق: {marketRate.toFixed(2)}</p>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-brand-primary block mb-1">السعر الاستبدالي (EGP)</label>
+                                    <div className="p-3 bg-brand-primary/5 border border-brand-primary/10 rounded-xl text-brand-primary font-bold flex items-center justify-between">
+                                        <span>{(formData.replacementPrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-md font-bold">+{buffer.toFixed(1)}%</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">يتضمن هامش أمان العملة</p>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 block mb-1">آخر سعر بيع (EGP)</label>
+                                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold flex items-center justify-between">
+                                        <span>{(formData.lastSalePrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
+                                        <ShoppingBag className="w-3.5 h-3.5 text-slate-300" />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">شامل هامش ربح {formData.targetProfitMarginPercentage || 0}%</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <PriceCalculator
+                            cost={formData.replacementPrice || 0}
+                            salePrice={formData.lastSalePrice || 0}
+                            vatRate={formData.defaultVatRate || 14}
+                        />
                     </div>
                 )}
 

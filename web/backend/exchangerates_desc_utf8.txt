@@ -1,0 +1,17 @@
+﻿Field	Type	Null	Key	Default	Extra
+ExchangeRateID	int	NO	PRI	NULL	auto_increment
+FromCurrency	varchar(3)	NO	MUL	NULL	
+ToCurrency	varchar(3)	NO		NULL	
+RateDate	date	NO		NULL	
+BuyRate	decimal(18,6)	NO		NULL	
+SellRate	decimal(18,6)	NO		NULL	
+AverageRate	decimal(18,6)	NO		NULL	
+Source	varchar(50)	YES		NULL	
+CreatedAt	datetime	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+CreatedBy	int	YES		NULL	
+currency_code	varchar(3)	YES		NULL	
+rate	decimal(18,6)	NO		NULL	
+recorded_at	datetime(6)	NO		NULL	
+exchange_rate	decimal(18,6)	NO		NULL	
+CurrencyCode	varchar(3)	YES		NULL	
+RecordedAt	datetime(6)	NO		NULL	

@@ -91,6 +91,15 @@ public class Item {
     @Column(name = "ImagePath")
     private String imagePath;
 
+    @Column(name = "PurchasePriceUSD", precision = 18, scale = 4)
+    private BigDecimal purchasePriceUsd;
+
+    @Column(name = "PurchaseExchangeRate", precision = 18, scale = 6)
+    private BigDecimal purchaseExchangeRate;
+
+    @Column(name = "TargetProfitMarginPercentage", precision = 5, scale = 2)
+    private BigDecimal targetProfitMarginPercentage;
+
     @Column(name = "IsActive")
     private Boolean isActive;
 

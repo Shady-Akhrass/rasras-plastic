@@ -18,6 +18,7 @@ import {
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import toast from 'react-hot-toast';
 
 // Stat Card Component
@@ -264,6 +265,7 @@ const QuotationComparisonPage: React.FC = () => {
             setLoading(true);
             const data = await purchaseService.getAllComparisons();
             setComparisons(data);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (error) {
             console.error('Failed to fetch comparisons:', error);
         } finally {

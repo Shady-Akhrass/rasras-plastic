@@ -29,6 +29,7 @@ import { salesQuotationService } from '../../services/salesQuotationService';
 import { customerRequestService } from '../../services/customerRequestService';
 import { approvalService } from '../../services/approvalService';
 import { toast } from 'react-hot-toast';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { vehicleService, type VehicleDto } from '../../services/vehicleService';
 import { formatDate } from '../../utils/format';
 import type { CustomerRequest } from '../../types/sales';
@@ -425,6 +426,7 @@ const DeliveryOrderFormPage: React.FC = () => {
             const updated = await deliveryOrderService.update(form.id, form);
             if (updated) {
                 toast.success('تم تحديث أمر التوصيل');
+                window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
                 navigate('/dashboard/sales/delivery-orders');
             } else {
                 toast.error('فشل التحديث');

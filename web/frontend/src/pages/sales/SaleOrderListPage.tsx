@@ -20,6 +20,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { saleOrderService, type SaleOrderDto } from '../../services/saleOrderService';
+import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { formatNumber, formatDate } from '../../utils/format';
@@ -150,6 +151,7 @@ const SaleOrderListPage: React.FC = () => {
             setLoading(true);
             const data = await saleOrderService.getAll();
             setList(Array.isArray(data) ? data : []);
+            window.dispatchEvent(new CustomEvent(TRIGGER_POLL_EVENT));
         } catch (e) {
             toast.error('فشل تحميل أوامر البيع');
             setList([]);

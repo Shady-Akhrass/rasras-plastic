@@ -4,11 +4,13 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * ثوابت مشتركة بين PathPermissionFilter و PathPermissionAuditService (مثل قائمة المسارات المستثناة).
+ * ثوابت مشتركة بين PathPermissionFilter و PathPermissionAuditService (مثل قائمة
+ * المسارات المستثناة).
  */
 public final class PathPermissionConstants {
 
-    private PathPermissionConstants() {}
+    private PathPermissionConstants() {
+    }
 
     /** مسارات لا نطبق عليها قواعد path_permission (whitelist). */
     public static final String[] WHITELIST_PREFIXES = {
@@ -19,7 +21,8 @@ public final class PathPermissionConstants {
             "/api/api-docs",
             "/api/actuator",
             "/api/uploads/",
-            "/api/public/"
+            "/api/public/",
+            "/api/finance/exchange-rates"
     };
 
     public static List<String> getWhitelistPrefixes() {
@@ -27,9 +30,11 @@ public final class PathPermissionConstants {
     }
 
     public static boolean isWhitelisted(String path) {
-        if (path == null) return true;
+        if (path == null)
+            return true;
         for (String prefix : WHITELIST_PREFIXES) {
-            if (path.equals(prefix) || path.startsWith(prefix)) return true;
+            if (path.equals(prefix) || path.startsWith(prefix))
+                return true;
         }
         return false;
     }

@@ -10,6 +10,8 @@ public interface PriceListItemRepository extends JpaRepository<PriceListItem, In
 
     void deleteByPriceListId(Integer priceListId);
 
+    List<PriceListItem> findByItemId(Integer itemId);
+
     @org.springframework.data.jpa.repository.Query("SELECT MAX(p.id) FROM PriceListItem p")
     Integer findMaxId();
 }
