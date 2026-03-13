@@ -22,6 +22,7 @@ public class ApprovalRequestDto {
     private BigDecimal totalAmount;
     private String status;
     private String currentStepName;
+    private String currentApproverName;
     private LocalDateTime requestedDate;
     private LocalDateTime completedDate;
     private String priority; // Derived or default

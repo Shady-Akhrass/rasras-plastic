@@ -54,21 +54,21 @@ public final class SecurityConstants {
     public static final String INVENTORY_CATEGORIES_ACCESS =
             "(" + WAREHOUSE_SECTION + ") or hasAuthority('MENU_OPERATIONS_CATEGORIES')";
 
-    /** الأصناف: من لديه قسم مخازن/عمليات أو SUPPLIER_INVOICE_VIEW أو صلاحية عنصر القائمة فقط */
+    /** الأصناف: من لديه قسم مخازن/عمليات/مبيعات أو SUPPLIER_INVOICE_VIEW أو صلاحية عنصر القائمة فقط */
     public static final String INVENTORY_ITEMS_ACCESS =
-            "(" + WAREHOUSE_SECTION + ") or hasAuthority('SUPPLIER_INVOICE_VIEW') or hasAuthority('MENU_OPERATIONS_ITEMS')";
+            "(" + WAREHOUSE_SECTION + ") or hasAuthority('SECTION_SALES') or hasAuthority('SUPPLIER_INVOICE_VIEW') or hasAuthority('MENU_OPERATIONS_ITEMS')";
 
-    /** قوائم الأسعار: من لديه قسم العمليات أو صلاحية عنصر القائمة فقط */
+    /** قوائم الأسعار: من لديه قسم العمليات/مبيعات أو صلاحية عنصر القائمة فقط */
     public static final String PRICE_LISTS_ACCESS =
-            "hasAuthority('SECTION_OPERATIONS') or hasAuthority('MENU_OPERATIONS_PRICE_LISTS')";
+            "hasAuthority('SECTION_OPERATIONS') or hasAuthority('SECTION_SALES') or hasAuthority('MENU_OPERATIONS_PRICE_LISTS')";
 
     /** معاملات الجودة: من لديه قسم العمليات أو صلاحية عنصر القائمة فقط */
     public static final String QUALITY_PARAMETERS_ACCESS =
             "hasAuthority('SECTION_OPERATIONS') or hasAuthority('MENU_OPERATIONS_QUALITY_PARAMETERS')";
 
-    /** أرصدة المخزون: من لديه قسم مخازن/عمليات أو صلاحية الأصناف (صفحة الأصناف تحتاج الأرصدة مع القائمة) */
+    /** أرصدة المخزون: من لديه قسم مخازن/عمليات/مبيعات أو صلاحية الأصناف (صفحة الأصناف تحتاج الأرصدة مع القائمة) */
     public static final String STOCKS_ACCESS =
-            "(" + WAREHOUSE_SECTION + ") or hasAuthority('MENU_OPERATIONS_ITEMS')";
+            "(" + WAREHOUSE_SECTION + ") or hasAuthority('SECTION_SALES') or hasAuthority('MENU_OPERATIONS_ITEMS')";
 
     /** العملاء (CRM) */
     public static final String CRM_SECTION =

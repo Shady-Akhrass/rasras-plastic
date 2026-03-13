@@ -396,25 +396,6 @@ export function useNotificationPolling(pathname: string) {
 
         // ─── Sales Flow Relational Logic ───
 
-        // 1. Pending Customer Request -> Create Quotation
-        crs.filter((cr: any) => {
-            const hasQuote = sQuotes.some((q: any) => q.requestId === cr.requestId);
-            const hasOrder = sOrders.some((o: any) => o.salesQuotationId && sQuotes.filter((q: any) => q.requestId === cr.requestId).some((q: any) => q.id === o.salesQuotationId));
-            return cr.status === 'Pending' && !hasQuote && !hasOrder;
-        })
-            .forEach((cr: any) => {
-                newActionable.push({
-                    id: `cr-new-${cr.id}`,
-                    title: 'طلب عميل',
-                    message: `${cr.requestNumber} - العميل: ${cr.customerNameAr || 'عميل'}`,
-                    route: `/dashboard/sales/customer-requests`,
-                    type: 'info',
-                    timestamp: new Date(cr.requestDate || cr.createdAt || Date.now()),
-                    module: 'sales',
-                    actionLabel: 'مراجعة'
-                });
-            });
-
         // 2. Approved Request -> Quotation (If not already handled by "Pending")
         crs.filter((cr: any) => {
             const isApproved = cr.status === 'Approved' || cr.status === 'Accepted';
@@ -423,16 +404,17 @@ export function useNotificationPolling(pathname: string) {
         })
             .forEach((cr: any) => {
                 newActionable.push({
-                    id: `cr-quote-${cr.id}`,
+                    id: `cr-quote-${cr.requestId}`,
                     title: 'طلب عميل مقبول',
                     message: `طلب العميل ${cr.requestNumber} مقبول وبانتظار إنشاء عرض سعر`,
-                    route: `/dashboard/sales/quotations/new?requestId=${cr.id}`,
+                    route: `/dashboard/sales/quotations/new?requestId=${cr.requestId}`,
                     type: 'warning',
                     timestamp: new Date(cr.updatedAt || Date.now()),
                     module: 'sales',
                     actionLabel: 'إنشاء عرض سعر'
                 });
             });
+
 
         // 3. Approved Quotation -> Sales Order
         sQuotes.filter((q: any) => {
@@ -472,7 +454,7 @@ export function useNotificationPolling(pathname: string) {
                 });
             });
 
-        // 5. Approved SIN -> Delivery Order (using Pending Delivery Notes for schedule mapping)
+        // 5. Approved SIN -> Delivery Order
         deliveries.forEach((d: any) => {
             newActionable.push({
                 id: `sin-do-${d.issueNoteId}-${d.scheduleId || '0'}`,
@@ -486,7 +468,6 @@ export function useNotificationPolling(pathname: string) {
             });
         });
 
-
         // 7. GRN Inspected -> Store In
         inspections.filter((grn: any) => grn.status === 'Inspected')
             .forEach((grn: any) => {
@@ -498,9 +479,51 @@ export function useNotificationPolling(pathname: string) {
                     type: 'success',
                     timestamp: new Date(grn.updatedAt || grn.grnDate || Date.now()),
                     module: 'inventory',
-                    actionLabel: 'إتمام الإضافة'
+                    actionLabel: 'إتماتم الإضافة'
                 });
             });
+
+        // ─── Filter actionableNotifications and counts by role ───
+        const role = user.roleCode?.toUpperCase();
+        let filteredActionable = newActionable;
+
+        if (role === 'ADMIN' || role === 'GM') {
+            // Admin/GM only sees management + system level notifications OR approvals
+            const managementModules = ['system', 'management'];
+            const managementDocs = ['Supplier', 'PaymentVoucher', 'PV', 'QuotationComparison', 'QC'];
+            
+            filteredActionable = newActionable.filter(n => {
+                if (n.id.toString().startsWith('appr-')) return true; // Approvals always visible
+                const isManagementModule = managementModules.includes(n.module as string);
+                const isManagementDoc = managementDocs.some(doc => n.title?.includes(doc) || n.message?.includes(doc));
+                const isInventoryPass = n.id.toString().startsWith('grn-store-'); // "Ready to store in"
+                return isManagementModule || isManagementDoc || isInventoryPass;
+            });
+
+            // For Admin/GM, keep inspections visible since they monitor everything
+        } else if (role === 'QC' || role === 'QUALITY') {
+            filteredActionable = newActionable.filter(n => n.module === 'inventory' || n.id.toString().startsWith('appr-'));
+            currentPendingApprovals = 0;
+            currentWaitingImports = 0;
+            currentPendingCustomerRequests = 0;
+            currentWaitingDeliveries = 0;
+        } else if (role === 'PM' || role === 'PROCUREMENT' || role === 'BUYER') {
+            filteredActionable = newActionable.filter(n => n.module === 'procurement' || n.id.toString().startsWith('appr-'));
+            currentPendingInspections = 0;
+            currentPendingCustomerRequests = 0;
+            currentWaitingDeliveries = 0;
+        } else if (role === 'WHM' || role === 'WAREHOUSE') {
+            filteredActionable = newActionable.filter(n => n.module === 'inventory' || n.id.toString().startsWith('appr-'));
+            currentPendingApprovals = 0;
+            currentPendingCustomerRequests = 0;
+            currentWaitingImports = 0;
+        } else if (role === 'FM' || role === 'FINANCE') {
+            filteredActionable = newActionable.filter(n => (n.module as string) === 'accounting' || (n.module as string) === 'finance' || n.id.toString().startsWith('appr-'));
+            currentPendingInspections = 0;
+            currentPendingCustomerRequests = 0;
+            currentWaitingImports = 0;
+            currentWaitingDeliveries = 0;
+        }
 
         setCounts({
             pendingApprovals: currentPendingApprovals,
@@ -509,7 +532,7 @@ export function useNotificationPolling(pathname: string) {
             pendingCustomerRequests: currentPendingCustomerRequests,
             waitingDeliveries: currentWaitingDeliveries,
             hasDeliveriesToday: currentHasDeliveriesToday,
-            actionableNotifications: newActionable.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+            actionableNotifications: filteredActionable.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
         });
 
         isInitialLoad.current = false;

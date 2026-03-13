@@ -16,52 +16,72 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StockMovementService {
 
-    private final StockMovementRepository stockMovementRepository;
+        private final StockMovementRepository stockMovementRepository;
 
-    /**
-     * Simple helper used where full filtering/pagination is not needed.
-     */
-    @Transactional(readOnly = true)
-    public List<StockMovementItemDto> getMovementsByItem(Integer itemId) {
-        List<StockMovement> movements = stockMovementRepository.findByItemIdOrderByMovementDateDesc(itemId);
-        return movements.stream()
-                .map(this::toItemDto)
-                .collect(Collectors.toList());
-    }
+        /**
+         * Simple helper used where full filtering/pagination is not needed.
+         */
+        @Transactional(readOnly = true)
+        public List<StockMovementItemDto> getMovementsByItem(Integer itemId) {
+                List<StockMovement> movements = stockMovementRepository.findByItemIdOrderByMovementDateDesc(itemId);
+                return movements.stream()
+                                .map(this::toItemDto)
+                                .collect(Collectors.toList());
+        }
 
-    /**
-     * فلترة حسب الصنف والمستودع ونطاق التاريخ مع ترقيم صفحات.
-     */
-    @Transactional(readOnly = true)
-    public Page<StockMovementItemDto> getMovementsByItem(
-            Integer itemId,
-            Integer warehouseId,
-            LocalDate fromDate,
-            LocalDate toDate,
-            Pageable pageable) {
+        /**
+         * فلترة حسب الصنف والمستودع ونطاق التاريخ مع ترقيم صفحات.
+         */
+        @Transactional(readOnly = true)
+        public Page<StockMovementItemDto> getMovementsByItem(
+                        Integer itemId,
+                        Integer warehouseId,
+                        LocalDate fromDate,
+                        LocalDate toDate,
+                        Pageable pageable) {
 
-        LocalDateTime from = fromDate != null ? fromDate.atStartOfDay() : null;
-        LocalDateTime to = toDate != null ? toDate.plusDays(1).atStartOfDay() : null;
+                LocalDateTime from = fromDate != null ? fromDate.atStartOfDay() : null;
+                LocalDateTime to = toDate != null ? toDate.plusDays(1).atStartOfDay() : null;
 
-        Page<StockMovement> page = stockMovementRepository.findByItemAndFilters(
-                itemId, warehouseId, from, to, pageable);
+                Page<StockMovement> page;
+                if (itemId != null) {
+                        page = stockMovementRepository.findByItemAndFilters(
+                                        itemId, warehouseId, from, to, pageable);
+                } else {
+                        // Global movements if itemId is null
+                        page = stockMovementRepository.findAll(pageable);
+                }
 
-        return page.map(this::toItemDto);
-    }
+                return page.map(this::toItemDto);
+        }
 
-    private StockMovementItemDto toItemDto(StockMovement m) {
-        String ref = m.getReferenceNumber() != null && !m.getReferenceNumber().isBlank()
-                ? m.getReferenceNumber()
-                : (m.getReferenceType() != null
-                ? m.getReferenceType() + (m.getReferenceId() != null ? " #" + m.getReferenceId() : "")
-                : null);
+        @Transactional(readOnly = true)
+        public Page<StockMovementItemDto> getAllMovements(Pageable pageable) {
+                return stockMovementRepository.findAll(pageable).map(this::toItemDto);
+        }
 
-        return StockMovementItemDto.builder()
-                .date(m.getMovementDate())
-                .type(m.getMovementType())
-                .qty(m.getQuantity())
-                .balance(m.getBalanceAfter())
-                .ref(ref)
-                .build();
-    }
+        private StockMovementItemDto toItemDto(StockMovement m) {
+                String ref = m.getReferenceNumber() != null && !m.getReferenceNumber().isBlank()
+                                ? m.getReferenceNumber()
+                                : (m.getReferenceType() != null
+                                                ? m.getReferenceType() + (m.getReferenceId() != null
+                                                                ? " #" + m.getReferenceId()
+                                                                : "")
+                                                : null);
+
+                return StockMovementItemDto.builder()
+                                .date(m.getMovementDate())
+                                .type(m.getMovementType())
+                                .movementType(m.getDirection())
+                                .qty(m.getQuantity())
+                                .balance(m.getBalanceAfter())
+                                .ref(ref)
+                                .itemNameAr(m.getItem() != null ? m.getItem().getItemNameAr() : null)
+                                .itemNameEn(m.getItem() != null ? m.getItem().getItemNameEn() : null)
+                                .warehouseNameAr(
+                                                m.getWarehouse() != null ? m.getWarehouse().getWarehouseNameAr() : null)
+                                .warehouseNameEn(
+                                                m.getWarehouse() != null ? m.getWarehouse().getWarehouseNameEn() : null)
+                                .build();
+        }
 }

@@ -33,6 +33,7 @@ import com.rasras.erp.sales.CustomerRequestRepository;
 import com.rasras.erp.sales.CustomerRequest;
 import com.rasras.erp.sales.CustomerRequestDeliveryScheduleRepository;
 import com.rasras.erp.sales.CustomerRequestDeliverySchedule;
+import com.rasras.erp.employee.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,10 +81,17 @@ public class ApprovalService {
     private final com.rasras.erp.crm.CustomerRepository customerRepo;
     private final CustomerRequestDeliveryScheduleRepository scheduleRepo;
     private final CustomerRequestRepository customerRequestRepo;
+    private final EmployeeRepository employeeRepo;
 
     @Autowired
     @Lazy
     private com.rasras.erp.sales.SalesInvoiceService salesInvoiceService;
+
+    @Autowired
+    @Lazy
+    private com.rasras.erp.inventory.ItemService itemService;
+
+    private final com.rasras.erp.finance.ExchangeRateService exchangeRateService;
 
     @Transactional
     public ApprovalRequest initiateApproval(String workflowCode, String docType, Integer docId,
@@ -170,31 +178,26 @@ public class ApprovalService {
         List<ApprovalRequest> requests = requestRepo
                 .findByStatusInWithCurrentStepAndApproverRole(List.of("Pending", "InProgress"));
 
-        // Filter requests: اعتماداً على كود الدور (roleCode) لتفادي اختلاف الـ ID بين
-        // الخطوة والمستخدم
-        List<ApprovalRequest> filteredRequests;
-        if ("ADMIN".equalsIgnoreCase(user.getRole().getRoleCode())) {
-            filteredRequests = requests;
-        } else {
-            String userRoleCode = user.getRole().getRoleCode();
-            filteredRequests = requests.stream()
-                    .filter(req -> {
-                        ApprovalWorkflowStep step = req.getCurrentStep();
-                        if (step == null)
+        // Filter requests: اعتماداً على كود الدور (roleCode) لتفادي اختلاف الـ ID بين الخطوة والمستخدم
+        String userRoleCode = user.getRole().getRoleCode();
+
+        List<ApprovalRequest> filteredRequests = requests.stream()
+                .filter(req -> {
+                    ApprovalWorkflowStep step = req.getCurrentStep();
+                    if (step == null)
+                        return false;
+                    if ("ROLE".equals(step.getApproverType())) {
+                        if (step.getApproverRole() == null)
                             return false;
-                        if ("ROLE".equals(step.getApproverType())) {
-                            if (step.getApproverRole() == null)
-                                return false;
-                            // مقارنة بكود الدور حتى لو اختلف RoleID (مثلاً مدير المالي FM)
-                            return userRoleCode != null
-                                    && userRoleCode.equalsIgnoreCase(step.getApproverRole().getRoleCode());
-                        } else {
-                            return step.getApproverUser() != null
-                                    && user.getUserId().equals(step.getApproverUser().getUserId());
-                        }
-                    })
-                    .collect(Collectors.toList());
-        }
+                        // مقارنة بكود الدور حتى لو اختلف RoleID (مثلاً مدير المالي FM)
+                        return userRoleCode != null
+                                && userRoleCode.equalsIgnoreCase(step.getApproverRole().getRoleCode());
+                    } else {
+                        return step.getApproverUser() != null
+                                && user.getUserId().equals(step.getApproverUser().getUserId());
+                    }
+                })
+                .collect(Collectors.toList());
 
         // Map to DTOs
         return filteredRequests.stream().map(this::mapToDto).collect(Collectors.toList());
@@ -220,7 +223,7 @@ public class ApprovalService {
                 .workflowName(req.getWorkflow().getWorkflowName())
                 .stepName(action.getStep().getStepName())
                 .actionType(action.getActionType())
-                .actionByUser(action.getActionByUser().getUsername())
+                .actionByUser(getEmployeeArabicName(action.getActionByUser()))
                 .actionDate(action.getActionDate())
                 .comments(action.getComments())
                 .totalAmount(req.getTotalAmount())
@@ -243,25 +246,47 @@ public class ApprovalService {
             amountToUse = BigDecimal.ZERO;
         }
         final BigDecimal finalAmount = amountToUse;
+        String currentApproverName = "";
+        ApprovalWorkflowStep currentStep = req.getCurrentStep();
+        if (currentStep != null) {
+            if (currentStep.getApproverUser() != null) {
+                currentApproverName = "تم عن طريق " + getEmployeeArabicName(currentStep.getApproverUser());
+            } else if (currentStep.getApproverRole() != null) {
+                // Return "تم عن طريق [Arabic Role Name]" as specifically requested by the user
+                currentApproverName = "تم عن طريق " + currentStep.getApproverRole().getRoleNameAr();
+            }
+        }
+
         return ApprovalRequestDto.builder()
                 .id(req.getId())
                 .workflowName(req.getWorkflow().getWorkflowName())
                 .documentType(req.getDocumentType())
                 .documentId(req.getDocumentId())
                 .documentNumber(req.getDocumentNumber())
-                .requestedByName(req.getRequestedByUser().getUsername())
+                .requestedByName(getEmployeeArabicName(req.getRequestedByUser()))
                 .totalAmount(finalAmount)
                 .status(req.getStatus())
-                .currentStepName(req.getCurrentStep() != null ? req.getCurrentStep().getStepName() : "")
+                .currentStepName(currentStep != null ? currentStep.getStepName() : "")
+                .currentApproverName(currentApproverName)
                 .requestedDate(req.getRequestedDate())
                 .completedDate(req.getCompletedDate())
                 .priority("Normal")
                 .build();
     }
 
+    private String getEmployeeArabicName(User user) {
+        String name = user.getUsername();
+        if (user.getEmployeeId() != null) {
+            name = employeeRepo.findById(user.getEmployeeId())
+                    .map(emp -> emp.getFirstNameAr() + (emp.getLastNameAr() != null && !emp.getLastNameAr().trim().isEmpty() ? " " + emp.getLastNameAr() : ""))
+                    .orElse(name);
+        }
+        return name;
+    }
+
     @Transactional
     public void processAction(Integer requestId, Integer actionByUserId, String actionType, String comments,
-            Integer warehouseId) {
+            Integer warehouseId, BigDecimal exchangeRate) {
         ApprovalRequest request = requestRepo.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
 
@@ -296,7 +321,7 @@ public class ApprovalService {
         // 2. Update request state
         if ("Approved".equalsIgnoreCase(actionType)) {
             handleIntermediateDocumentStatus(request, actionByUserId);
-            moveToNextStep(request, actionByUserId);
+            moveToNextStep(request, actionByUserId, exchangeRate);
         } else if ("Rejected".equalsIgnoreCase(actionType)) {
             // ✅ Strategy B: إغلاق الطلب نهائياً (لا إعادة استخدام)
             request.setStatus("Rejected"); // يمكن استخدام "Cancelled" إذا كان متوفراً في enum
@@ -304,7 +329,7 @@ public class ApprovalService {
             request.setCurrentStep(null); // ✅ تصفير CurrentStep (يُكتب NULL في CurrentStepID)
 
             // تحديث الوثيقة المرتبطة (سيعيدها إلى Draft)
-            updateLinkedDocumentStatus(request, "Rejected", actionByUserId);
+            updateLinkedDocumentStatus(request, "Rejected", actionByUserId, exchangeRate);
 
             // ✅ ملاحظة: CurrentStep يصبح null وهذا طبيعي لأن الطلب مُغلق
             // Audit Trail محفوظ في approvalactions - CurrentStep مجرد مؤشر تشغيلي
@@ -321,13 +346,13 @@ public class ApprovalService {
                     // Similar logic to processAction but for sync
                     if ("Approved".equalsIgnoreCase(actionType)) {
                         handleIntermediateDocumentStatus(request, userId);
-                        moveToNextStep(request, userId);
+                        moveToNextStep(request, userId, null);
                     } else if ("Rejected".equalsIgnoreCase(actionType)) {
                         // ✅ Strategy B: إغلاق الطلب نهائياً
                         request.setStatus("Rejected");
                         request.setCompletedDate(LocalDateTime.now());
                         request.setCurrentStep(null); // ✅ تصفير CurrentStep
-                        updateLinkedDocumentStatus(request, "Rejected", userId);
+                        updateLinkedDocumentStatus(request, "Rejected", userId, null);
                     }
                     requestRepo.save(request);
                 });
@@ -337,13 +362,13 @@ public class ApprovalService {
                 .ifPresent(request -> {
                     if ("Approved".equalsIgnoreCase(actionType)) {
                         handleIntermediateDocumentStatus(request, userId);
-                        moveToNextStep(request, userId);
+                        moveToNextStep(request, userId, null);
                     } else if ("Rejected".equalsIgnoreCase(actionType)) {
                         // ✅ Strategy B: إغلاق الطلب نهائياً
                         request.setStatus("Rejected");
                         request.setCompletedDate(LocalDateTime.now());
                         request.setCurrentStep(null); // ✅ تصفير CurrentStep
-                        updateLinkedDocumentStatus(request, "Rejected", userId);
+                        updateLinkedDocumentStatus(request, "Rejected", userId, null);
                     }
                     requestRepo.save(request);
                 });
@@ -385,7 +410,7 @@ public class ApprovalService {
         }
     }
 
-    private void moveToNextStep(ApprovalRequest request, Integer userId) {
+    private void moveToNextStep(ApprovalRequest request, Integer userId, BigDecimal exchangeRate) {
         if (request.getWorkflow() == null) {
             return;
         }
@@ -410,7 +435,7 @@ public class ApprovalService {
                 && currentStep != null && currentStep.getStepNumber() != null && currentStep.getStepNumber() == 2) {
             request.setStatus("Approved");
             request.setCompletedDate(LocalDateTime.now());
-            updateLinkedDocumentStatus(request, "Approved", userId);
+            updateLinkedDocumentStatus(request, "Approved", userId, exchangeRate);
             return;
         }
 
@@ -452,10 +477,11 @@ public class ApprovalService {
         // لا مزيد من الخطوات المطلوبة، الطلب معتمد بالكامل
         request.setStatus("Approved");
         request.setCompletedDate(LocalDateTime.now());
-        updateLinkedDocumentStatus(request, "Approved", userId);
+        updateLinkedDocumentStatus(request, "Approved", userId, exchangeRate);
     }
 
-    private void updateLinkedDocumentStatus(ApprovalRequest request, String status, Integer userId) {
+    private void updateLinkedDocumentStatus(ApprovalRequest request, String status, Integer userId,
+            BigDecimal userExchangeRate) {
         String type = request.getDocumentType();
         Integer id = request.getDocumentId();
 
@@ -495,6 +521,14 @@ public class ApprovalService {
                 if ("Approved".equals(status)) {
                     grn.setStatus("Approved");
 
+                    // Use the passed exchange rate, or fallback to system active rate
+                    BigDecimal finalRate;
+                    if (userExchangeRate != null && userExchangeRate.compareTo(BigDecimal.ZERO) > 0) {
+                        finalRate = userExchangeRate;
+                    } else {
+                        finalRate = exchangeRateService.getCurrentRate();
+                    }
+
                     // تحديث أرصدة المخزون تلقائياً عند الاعتماد (أولاً لضمان ظهور الأصناف)
                     if (grn.getItems() != null && grn.getWarehouseId() != null) {
                         for (GRNItem item : grn.getItems()) {
@@ -512,6 +546,22 @@ public class ApprovalService {
                                         grn.getGrnNumber(),
                                         item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO,
                                         userId);
+
+                                // Automated Pricing Update based on frontend rate via approval
+                                BigDecimal unitCostUsd;
+                                boolean isUsd = "USD".equalsIgnoreCase(
+                                        grn.getPurchaseOrder() != null ? grn.getPurchaseOrder().getCurrency() : "EGP");
+                                if (isUsd) {
+                                    unitCostUsd = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+                                } else {
+                                    BigDecimal egpCost = item.getUnitCost() != null ? item.getUnitCost()
+                                            : BigDecimal.ZERO;
+                                    unitCostUsd = egpCost.divide(finalRate, 4, java.math.RoundingMode.HALF_UP);
+                                }
+
+                                // Record purchase price using actual conversion rate
+                                itemService.updatePricingFromPurchase(item.getItem().getId(), unitCostUsd, qtyToRecord,
+                                        finalRate);
                             }
                         }
                         grn.setStatus("Completed");
@@ -520,7 +570,7 @@ public class ApprovalService {
                     }
 
                     try {
-                        supplierInvoiceService.createInvoiceFromGRN(grn.getId());
+                        supplierInvoiceService.createInvoiceFromGRN(grn.getId(), finalRate);
                     } catch (Exception e) {
                         System.err.println("Error creating automatic invoice from GRN: " + e.getMessage());
                         e.printStackTrace();

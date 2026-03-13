@@ -149,9 +149,11 @@ const CustomerRequestFormPage = () => {
     };
 
     useEffect(() => {
-        loadMasterData();
         if (isEditMode) {
-            loadRequest(Number(id));
+            // Load master data first, then load the request using it
+            loadMasterDataThenRequest(Number(id));
+        } else {
+            loadMasterData();
         }
     }, [id]);
 
@@ -187,7 +189,47 @@ const CustomerRequestFormPage = () => {
         }
     };
 
-    const loadRequest = async (reqId: number) => {
+    /**
+     * Used in edit/view mode: loads master data first so we have the items catalog
+     * available for enriching the request lines with unitId and unitPrice.
+     */
+    const loadMasterDataThenRequest = async (reqId: number) => {
+        try {
+            setLoading(true);
+            const [customersData, itemsRes, unitsRes, priceListsRes] = await Promise.all([
+                customerService.getAllCustomers(),
+                itemService.getAllItems(),
+                unitService.getAllUnits(),
+                priceListService.getAllPriceLists(),
+            ]);
+
+            setCustomers(Array.isArray(customersData) ? customersData : []);
+
+            const itemsData = 'data' in itemsRes ? (itemsRes as any).data : itemsRes;
+            const resolvedItems: ItemDto[] = Array.isArray(itemsData) ? itemsData : [];
+            setItems(resolvedItems);
+
+            const unitsData = 'data' in unitsRes ? (unitsRes as any).data : unitsRes;
+            setUnits(Array.isArray(unitsData) ? unitsData : []);
+
+            const plData = 'data' in priceListsRes ? (priceListsRes as any).data : priceListsRes;
+            const sellingLists = Array.isArray(plData) ? plData.filter((pl: any) => pl.listType === 'SELLING') : [];
+            const allSellablePrices: PriceListItemDto[] = [];
+            sellingLists.forEach((list: any) => {
+                if (list.items) allSellablePrices.push(...list.items);
+            });
+            setSellablePrices(allSellablePrices);
+
+            // Now load the request — master data is ready
+            await loadRequest(reqId, resolvedItems, allSellablePrices);
+        } catch (error) {
+            console.error('Failed to load master data', error);
+            toast.error('فشل تحميل البيانات الأساسية');
+            setLoading(false);
+        }
+    };
+
+    const loadRequest = async (reqId: number, masterItems?: ItemDto[], masterPrices?: PriceListItemDto[]) => {
         try {
             setLoading(true);
             const response = await customerRequestService.getRequestById(reqId);
@@ -202,32 +244,56 @@ const CustomerRequestFormPage = () => {
                     requestNumber: data.requestNumber,
                 });
 
+                // Use provided master data when available (edit/view mode),
+                // fall back to component state (should already be loaded).
+                const resolvedItems = masterItems ?? items;
+                const resolvedPrices = masterPrices ?? sellablePrices;
+
+                const lookupUnitId = (productId: number): number | undefined =>
+                    resolvedItems.find(i => i.id === productId)?.unitId;
+
+                const lookupUnitPrice = (productId: number): number => {
+                    const pli = resolvedPrices.find(p => p.itemId === productId);
+                    return pli ? priceListService.getPriceForItem(productId, [pli]) : 0;
+                };
+
+                const lookupProductName = (productId: number, fallback: string): string =>
+                    resolvedItems.find(i => i.id === productId)?.itemNameAr || fallback || '';
+
                 if (data.schedules && data.schedules.length > 0) {
                     const reconstructed: MergedLine[] = data.schedules.map((s: any) => {
-                        const matchingItem = data.items?.find((it: any) => it.productId === s.productId);
+                        const productId = s.productId || 0;
+                        const matchingItem = data.items?.find((it: any) => it.productId === productId);
+                        const unitPrice = lookupUnitPrice(productId);
+                        const qty = Number(s.quantity) || 0;
                         return {
-                            productId: s.productId || 0,
-                            productName: matchingItem?.productName || '',
-                            unitId: matchingItem?.unitId,
-                            quantity: s.quantity || 0,
-                            unitPrice: (matchingItem as any)?.unitPrice || 0,
-                            totalPrice: (s.quantity || 0) * ((matchingItem as any)?.unitPrice || 0),
+                            productId,
+                            productName: lookupProductName(productId, matchingItem?.productName || ''),
+                            unitId: lookupUnitId(productId),
+                            quantity: qty,
+                            unitPrice,
+                            totalPrice: qty * unitPrice,
                             deliveryDate: s.deliveryDate || new Date().toISOString().split('T')[0],
                             notes: s.notes || '',
                         };
                     });
                     setLines(reconstructed);
                 } else if (data.items && data.items.length > 0) {
-                    const reconstructed: MergedLine[] = data.items.map((it: any) => ({
-                        productId: it.productId || 0,
-                        productName: it.productName || '',
-                        unitId: it.unitId,
-                        quantity: it.quantity || 0,
-                        unitPrice: (it as any).unitPrice || 0,
-                        totalPrice: (it.quantity || 0) * ((it as any).unitPrice || 0),
-                        deliveryDate: new Date().toISOString().split('T')[0],
-                        notes: it.notes || '',
-                    }));
+                    const reconstructed: MergedLine[] = data.items.map((it: any) => {
+                        const productId = it.productId || 0;
+                        const unitPrice = lookupUnitPrice(productId);
+                        const qty = Number(it.quantity) || 0;
+                        return {
+                            productId,
+                            productName: lookupProductName(productId, it.productName || ''),
+                            unitId: lookupUnitId(productId),
+                            quantity: qty,
+                            unitPrice,
+                            totalPrice: qty * unitPrice,
+                            deliveryDate: new Date().toISOString().split('T')[0],
+                            notes: it.notes || '',
+                        };
+                    });
                     setLines(reconstructed);
                 }
             }
@@ -239,6 +305,8 @@ const CustomerRequestFormPage = () => {
             setLoading(false);
         }
     };
+
+
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;

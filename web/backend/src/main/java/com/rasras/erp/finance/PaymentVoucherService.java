@@ -550,12 +550,12 @@ public class PaymentVoucherService {
                                 .voucherNumber(voucher.getVoucherNumber())
                                 .voucherDate(voucher.getVoucherDate())
                                 .supplierId(voucher.getSupplier() != null ? voucher.getSupplier().getId() : null)
-                                .supplierNameAr(voucher.getSupplier() != null
+                                .supplierNameAr(voucher.getSupplier() != null && isSupplierExisting(voucher.getSupplier())
                                                 ? voucher.getSupplier().getSupplierNameAr()
-                                                : null)
-                                .supplierNameEn(voucher.getSupplier() != null
+                                                : "N/A")
+                                .supplierNameEn(voucher.getSupplier() != null && isSupplierExisting(voucher.getSupplier())
                                                 ? voucher.getSupplier().getSupplierNameEn()
-                                                : null)
+                                                : "N/A")
                                 .paymentMethod(voucher.getPaymentMethod())
                                 .bankName(voucher.getBankName())
                                 .accountNumber(voucher.getAccountNumber())
@@ -634,5 +634,15 @@ public class PaymentVoucherService {
                 }
 
                 return dto;
+        }
+
+        private boolean isSupplierExisting(Supplier supplier) {
+                if (supplier == null)
+                        return false;
+                try {
+                        return supplierRepo.existsById(supplier.getId());
+                } catch (Exception e) {
+                        return false;
+                }
         }
 }

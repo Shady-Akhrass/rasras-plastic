@@ -7,9 +7,6 @@ import {
 } from 'lucide-react';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 
-
-import { exchangeRateService } from '../../services/exchangeRateService';
-
 interface ExchangeRateData {
     rate: number;
     lastUpdate: string;
@@ -23,7 +20,7 @@ const ExchangeRateWidget = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const { defaultCurrency, getCurrencyLabel } = useSystemSettings();
+    const { defaultCurrency, baseCurrency, getCurrencyLabel } = useSystemSettings();
     const [convertAmount, setConvertAmount] = useState<string>('1');
 
     const fetchExchangeRate = useCallback(async () => {
@@ -31,29 +28,52 @@ const ExchangeRateWidget = () => {
             setIsRefreshing(true);
             setError(null);
 
-            // Fetch from external API as primary source
-            const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+            // Fetch from external API as primary source using baseCurrency
+            const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${baseCurrency}`);
             if (!response.ok) throw new Error('Failed to fetch external rate');
 
             const data = await response.json();
             const currentRate = data.rates[defaultCurrency] || data.rates.EGP;
 
-            // Record to backend history
-            await exchangeRateService.recordRate(currentRate);
+            // 100% Frontend History & Buffer Calculation
+            const historyKey = `exchange_rate_history_${baseCurrency}_${defaultCurrency}`;
+            let history: { rate: number, date: string }[] = JSON.parse(localStorage.getItem(historyKey) || '[]');
 
-            // Get buffer and effective rate from backend
-            let bufferPercent = 0;
-            let effectiveRate = currentRate;
-            let prevRate = currentRate;
+            const today = new Date().toISOString().split('T')[0];
+            const lastEntry = history.length > 0 ? history[0] : null;
 
-            try {
-                bufferPercent = await exchangeRateService.getBufferPercentage();
-                effectiveRate = await exchangeRateService.getEffectiveRate();
-                const history = await exchangeRateService.getHistory();
-                prevRate = history.length > 1 ? history[1].rate : currentRate;
-            } catch (beErr) {
-                console.warn('Backend exchange rate calculations not available, using defaults');
+            // Record rate locally
+            if (!lastEntry || lastEntry.date !== today) {
+                history.unshift({ rate: currentRate, date: today });
+                history = history.slice(0, 30); // Keep last 30 days
+                localStorage.setItem(historyKey, JSON.stringify(history));
+            } else if (lastEntry.rate !== currentRate) {
+                history[0].rate = currentRate;
+                localStorage.setItem(historyKey, JSON.stringify(history));
             }
+
+            // Sync with backend so other parts of the system (ItemService) use this rate
+            // await apiClient.post('/finance/exchange-rates', currentRate); // REMOVED as per user request
+
+            // Calculate previous rate
+            let prevRate = currentRate;
+            if (history.length > 1) {
+                prevRate = history[1].rate;
+            }
+
+            // Calculate buffer locally (Avg Daily Change * 30 days * 1.5 safety factor)
+            let bufferPercent = 0;
+            if (history.length > 1) {
+                let totalChange = 0;
+                for (let i = 0; i < history.length - 1; i++) {
+                    const diff = Math.abs((history[i].rate - history[i + 1].rate) / history[i + 1].rate) * 100;
+                    totalChange += diff;
+                }
+                const avgDailyChange = totalChange / (history.length - 1);
+                bufferPercent = avgDailyChange * 30 * 1.5;
+            }
+
+            const effectiveRate = Number((currentRate * (1 + (bufferPercent / 100))).toFixed(4));
 
             setExchangeRate({
                 rate: currentRate,
@@ -70,7 +90,7 @@ const ExchangeRateWidget = () => {
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    }, [defaultCurrency]);
+    }, [defaultCurrency, baseCurrency]);
 
     useEffect(() => {
         fetchExchangeRate();
@@ -168,7 +188,7 @@ const ExchangeRateWidget = () => {
                             <p className="text-white text-lg font-bold flex items-center gap-2">
                                 <span className="flex items-center gap-1">
                                     <DollarSign className="w-4 h-4" />
-                                    USD
+                                    {baseCurrency}
                                 </span>
                                 <span className="text-white/50">/</span>
                                 <span className="flex items-center gap-1">
@@ -198,7 +218,7 @@ const ExchangeRateWidget = () => {
                         </span>
                         <span className="text-white/60 text-lg font-medium">{getCurrencyLabel(defaultCurrency)}</span>
                     </div>
-                    <p className="text-white/70 text-sm mt-1">لكل دولار أمريكي واحد</p>
+                    <p className="text-white/70 text-sm mt-1">لكل {getCurrencyLabel(baseCurrency)} واحد</p>
                 </div>
 
                 {/* Change Indicator */}
@@ -262,7 +282,7 @@ const ExchangeRateWidget = () => {
                                 type="number"
                                 value={convertAmount}
                                 onChange={(e) => setConvertAmount(e.target.value)}
-                                placeholder="المبلغ بالدولار..."
+                                placeholder={`المبلغ بـ ${getCurrencyLabel(baseCurrency)}...`}
                                 className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pr-8 pl-3 text-white text-sm focus:bg-white/10 outline-none transition-all placeholder:text-white/20"
                             />
                         </div>

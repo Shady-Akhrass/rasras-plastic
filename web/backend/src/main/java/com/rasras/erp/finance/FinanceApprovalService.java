@@ -19,22 +19,23 @@ public class FinanceApprovalService {
     public void initiatePaymentApproval(Integer invoiceId, Integer requestedByUserId, BigDecimal amount) {
         // Initiate approval workflow for payment
         approvalService.initiateApproval(
-            "PAYMENT_APPROVAL",
-            "PaymentVoucher",
-            invoiceId,
-            "PV-" + invoiceId,
-            requestedByUserId,
-            amount
-        );
+                "PAYMENT_APPROVAL",
+                "PaymentVoucher",
+                invoiceId,
+                "PV-" + invoiceId,
+                requestedByUserId,
+                amount);
     }
 
     @Transactional
-    public void processFinanceManagerApproval(Integer requestId, Integer actionByUserId, String action, String comments) {
-        approvalService.processAction(requestId, actionByUserId, action, comments, null);
+    public void processFinanceManagerApproval(Integer requestId, Integer actionByUserId, String action,
+            String comments) {
+        approvalService.processAction(requestId, actionByUserId, action, comments, null, null);
     }
 
     @Transactional
-    public void processGeneralManagerApproval(Integer requestId, Integer actionByUserId, String action, String comments) {
-        approvalService.processAction(requestId, actionByUserId, action, comments, null);
+    public void processGeneralManagerApproval(Integer requestId, Integer actionByUserId, String action,
+            String comments) {
+        approvalService.processAction(requestId, actionByUserId, action, comments, null, null);
     }
 }

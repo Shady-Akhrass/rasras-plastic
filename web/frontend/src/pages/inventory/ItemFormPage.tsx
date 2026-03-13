@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     ChevronRight, Save, Package, Info, Scale, Barcode, DollarSign,
     Settings, Image as ImageIcon, RefreshCw, AlertCircle, CheckCircle2,
     X, Tag, Box, Percent, ShoppingCart, ShoppingBag, FileText,
-    Layers, TrendingUp, Calculator, Microscope, Trash2, Plus, Truck
+    Layers, TrendingUp, Calculator, Microscope, Trash2, Plus, Truck, Zap
 } from 'lucide-react';
 import { itemService, type ItemDto } from '../../services/itemService';
 import { itemCategoryService, type ItemCategoryDto } from '../../services/itemCategoryService';
@@ -12,7 +12,8 @@ import { unitService, type UnitDto } from '../../services/unitService';
 import { qualityService, type QualityParameterDto, type ItemQualitySpecDto } from '../../services/qualityService';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import type { SupplierDto } from '../../services/supplierService';
-import { exchangeRateService } from '../../services/exchangeRateService';
+import { exchangeRateService, type ItemPricingInfo } from '../../services/exchangeRateService';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import { toast } from 'react-hot-toast';
 
 // Animated Input Component
@@ -28,9 +29,45 @@ const FormInput: React.FC<{
     disabled?: boolean;
     hint?: string;
     colorClass?: string;
-}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', dir, disabled, hint, colorClass }) => {
+    noContainer?: boolean;
+}> = ({ label, value, onChange, icon: Icon, placeholder, required, type = 'text', dir, disabled, hint, colorClass, noContainer }) => {
     const [isFocused, setIsFocused] = useState(false);
     const hasValue = value !== undefined && value !== null && value !== '' && value !== 0;
+
+    const inputElement = (
+        <div className="relative">
+            {Icon && (
+                <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200
+                    ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
+            )}
+            <input
+                type={type}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder={placeholder}
+                required={required}
+                disabled={disabled}
+                dir={dir}
+                step={type === 'number' ? '0.01' : undefined}
+                className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none
+                    disabled:bg-slate-100 disabled:cursor-not-allowed
+                    ${Icon ? 'pr-12' : ''}
+                    ${colorClass || ''}
+                    ${isFocused
+                        ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
+                        : hasValue
+                            ? 'border-brand-primary/30 bg-brand-primary/5'
+                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+            />
+            {hasValue && !isFocused && type !== 'number' && (
+                <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-primary" />
+            )}
+        </div>
+    );
+
+    if (noContainer) return inputElement;
 
     return (
         <div className="space-y-2">
@@ -39,36 +76,7 @@ const FormInput: React.FC<{
                 {label}
                 {required && <span className="text-rose-500 mr-1">*</span>}
             </label>
-            <div className="relative">
-                {Icon && (
-                    <Icon className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-all duration-200
-                        ${isFocused ? 'text-brand-primary scale-110' : 'text-slate-400'}`} />
-                )}
-                <input
-                    type={type}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    placeholder={placeholder}
-                    required={required}
-                    disabled={disabled}
-                    dir={dir}
-                    step={type === 'number' ? '0.01' : undefined}
-                    className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 outline-none
-                        disabled:bg-slate-100 disabled:cursor-not-allowed
-                        ${Icon ? 'pr-12' : ''}
-                        ${colorClass || ''}
-                        ${isFocused
-                            ? 'border-brand-primary bg-white shadow-lg shadow-brand-primary/10'
-                            : hasValue
-                                ? 'border-brand-primary/30 bg-brand-primary/5'
-                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
-                />
-                {hasValue && !isFocused && type !== 'number' && (
-                    <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-primary" />
-                )}
-            </div>
+            {inputElement}
             {hint && (
                 <p className="text-xs text-slate-500 flex items-center gap-1">
                     <Info className="w-3 h-3" />
@@ -358,10 +366,9 @@ const PriceCalculator: React.FC<{
     cost: number;
     salePrice: number;
     vatRate: number;
-}> = ({ cost, salePrice, vatRate }) => {
+}> = ({ cost, salePrice }) => {
     const profit = salePrice - cost;
     const margin = cost > 0 ? ((profit / cost) * 100).toFixed(1) : '0';
-    const priceWithVat = salePrice * (1 + vatRate / 100);
 
     return (
         <div className="mt-4 p-4 bg-gradient-to-br from-brand-primary/5 to-white rounded-xl border border-brand-primary/20">
@@ -369,7 +376,7 @@ const PriceCalculator: React.FC<{
                 <Calculator className="w-4 h-4 text-brand-primary" />
                 حاسبة الأسعار التلقائية
             </p>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-white rounded-lg border border-slate-100">
                     <p className="text-xs text-slate-500 mb-1">هامش الربح</p>
                     <p className={`text-lg font-bold ${parseFloat(margin) > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -382,12 +389,6 @@ const PriceCalculator: React.FC<{
                         {profit.toFixed(2)}
                     </p>
                 </div>
-                <div className="text-center p-3 bg-white rounded-lg border border-slate-100">
-                    <p className="text-xs text-slate-500 mb-1">السعر بالضريبة</p>
-                    <p className="text-lg font-bold text-brand-primary">
-                        {priceWithVat.toFixed(2)}
-                    </p>
-                </div>
             </div>
         </div>
     );
@@ -396,7 +397,8 @@ const PriceCalculator: React.FC<{
 const ItemFormPage: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
-    const isEdit = Boolean(id && id !== 'new');
+    const isEdit = !!id && id !== 'new';
+    const { defaultCurrency, baseCurrency } = useSystemSettings();
 
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
@@ -404,6 +406,8 @@ const ItemFormPage: React.FC = () => {
     const [units, setUnits] = useState<UnitDto[]>([]);
     const [activeTab, setActiveTab] = useState<'basic' | 'pricing' | 'stock' | 'quality' | 'suppliers' | 'settings'>('basic');
     const [hasChanges, setHasChanges] = useState(false);
+    const [syncSalePrice, setSyncSalePrice] = useState(false);
+    const userEditedPricing = useRef(false);
 
     // Suppliers (الموردون المعتمدون) - مندوب المبيعات لا يرى هذا التبويب (يُخفى حسب الصلاحية لاحقاً)
     const [supplierItems, setSupplierItems] = useState<SupplierItemDto[]>([]);
@@ -455,21 +459,34 @@ const ItemFormPage: React.FC = () => {
         isPurchasable: true
     });
 
-    const [effectiveRate, setEffectiveRate] = useState<number>(0);
     const [marketRate, setMarketRate] = useState<number>(0);
-    const [buffer, setBuffer] = useState<number>(0);
+    const [itemPricingInfo, setItemPricingInfo] = useState<ItemPricingInfo | null>(null);
 
     useEffect(() => {
         const fetchRates = async () => {
             try {
-                const [effData, bufferData, latest] = await Promise.all([
+                // Use consolidated exchangeRateService instead of direct fetch
+                const liveRate = await exchangeRateService.fetchLiveRate(baseCurrency, defaultCurrency);
+
+                const [, , latest] = await Promise.all([
                     exchangeRateService.getEffectiveRate(30, 1.5),
                     exchangeRateService.getBufferPercentage(30, 1.5),
                     exchangeRateService.getLatestRate()
                 ]);
-                setEffectiveRate(effData);
-                setBuffer(bufferData);
-                setMarketRate(latest);
+
+                // Prioritize liveRate if fetch succeeded, otherwise use backend latest
+                const finalMarketRate = liveRate > 0 ? liveRate : latest;
+                setMarketRate(finalMarketRate);
+
+                // Fetch per-item pricing info if editing an existing item
+                if (isEdit && id) {
+                    try {
+                        const pricingInfo = await exchangeRateService.getItemPricingInfo(parseInt(id));
+                        setItemPricingInfo(pricingInfo);
+                    } catch (e) {
+                        console.error('Failed to fetch item pricing info', e);
+                    }
+                }
             } catch (error) {
                 console.error('Failed to fetch exchange rates for pricing preview', error);
             }
@@ -477,38 +494,31 @@ const ItemFormPage: React.FC = () => {
         if (activeTab === 'pricing') {
             fetchRates();
         }
-    }, [activeTab]);
+    }, [activeTab, isEdit, id, baseCurrency, defaultCurrency]);
 
-    // Auto-calculate EGP prices when USD price, margin, or exchange rates change
+    // Recalculate prices when USD cost or rate changes to provide initial EGP values
     useEffect(() => {
+        if (isEdit && !userEditedPricing.current) return;
+
         const usd = formData.purchasePriceUsd || 0;
-        const margin = formData.targetProfitMarginPercentage || 0;
+        const rateToUse = (formData.purchaseExchangeRate && formData.purchaseExchangeRate > 0)
+            ? formData.purchaseExchangeRate
+            : marketRate;
 
-        if (usd > 0 && marketRate > 0) {
-            // Auto-fill exchange rate on the form ONLY if it's a new item or not yet set
-            if (!formData.purchaseExchangeRate || formData.purchaseExchangeRate === 0) {
-                updateForm('purchaseExchangeRate', marketRate);
-            }
+        if (usd > 0 && rateToUse > 0) {
+            const purchaseCost = usd * rateToUse;
 
-            // آخر سعر شراء = USD × market rate
-            const lastPurchase = usd * marketRate;
-
-            // السعر الاستبدالي = USD × effective rate (with buffer)
-            const effRate = effectiveRate > 0 ? effectiveRate : marketRate;
-            const replacement = usd * effRate;
-
-            // آخر سعر بيع = replacement × (1 + margin/100)
-            const sale = replacement * (1 + margin / 100);
-
-            // Update form data with calculated previews
+            // Only auto-fill if the user hasn't started manually overriding these
             setFormData(prev => ({
                 ...prev,
-                lastPurchasePrice: parseFloat(lastPurchase.toFixed(2)),
-                replacementPrice: parseFloat(replacement.toFixed(2)),
-                lastSalePrice: parseFloat(sale.toFixed(2))
+                lastPurchasePrice: parseFloat(purchaseCost.toFixed(2)),
+                // We only auto-sync replacement price if it was 0 or just initialized
+                replacementPrice: prev.replacementPrice === 0 ? parseFloat(purchaseCost.toFixed(2)) : prev.replacementPrice,
+                // Sale price will follow via updateForm or a separate check
+                purchaseExchangeRate: prev.purchaseExchangeRate === 0 ? rateToUse : prev.purchaseExchangeRate
             }));
         }
-    }, [formData.purchasePriceUsd, formData.targetProfitMarginPercentage, effectiveRate, marketRate]);
+    }, [formData.purchasePriceUsd, formData.purchaseExchangeRate, marketRate]);
 
     const [originalData, setOriginalData] = useState<ItemDto | null>(null);
 
@@ -647,7 +657,49 @@ const ItemFormPage: React.FC = () => {
     };
 
     const updateForm = (field: keyof ItemDto, value: any) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        if (field === 'purchasePriceUsd' || field === 'targetProfitMarginPercentage' || field === 'purchaseExchangeRate' || field === 'replacementPrice') {
+            userEditedPricing.current = true;
+        }
+
+        setFormData(prev => {
+            const next = { ...prev, [field]: value };
+
+            // Recalculate Sale Price if replacement or margin changes AND sync is ON
+            if (field === 'replacementPrice' || field === 'targetProfitMarginPercentage') {
+                if (syncSalePrice) {
+                    const replacement = field === 'replacementPrice' ? Number(value) : (prev.replacementPrice || 0);
+                    const margin = field === 'targetProfitMarginPercentage' ? Number(value) : (prev.targetProfitMarginPercentage || 0);
+                    next.lastSalePrice = parseFloat((replacement * (1 + margin / 100)).toFixed(2));
+                }
+            }
+
+            // If purchasePriceUsd changed, we also suggest updating replacement for new items
+            if (field === 'purchasePriceUsd') {
+                const rate = prev.purchaseExchangeRate || marketRate;
+                if (rate > 0) {
+                    const cost = Number(value) * rate;
+                    next.lastPurchasePrice = parseFloat(cost.toFixed(2));
+                    // Update replacement if it's currently 0 or matches previous cost (auto-sync)
+                    if (!prev.replacementPrice || prev.replacementPrice === parseFloat(((prev.purchasePriceUsd || 0) * rate).toFixed(2))) {
+                        next.replacementPrice = parseFloat(cost.toFixed(2));
+                        // Only sync sale price if toggle is on
+                        if (syncSalePrice) {
+                            next.lastSalePrice = parseFloat((next.replacementPrice * (1 + (prev.targetProfitMarginPercentage || 0) / 100)).toFixed(2));
+                        }
+                    }
+                }
+            }
+
+            return next;
+        });
+    };
+
+    const handleManualPriceSync = () => {
+        const replacement = formData.replacementPrice || 0;
+        const margin = formData.targetProfitMarginPercentage || 0;
+        const sale = parseFloat((replacement * (1 + margin / 100)).toFixed(2));
+        updateForm('lastSalePrice', sale);
+        toast.success('تم تحديث سعر البيع بناءً على التكلفة الاستبدالية');
     };
 
     const tabs = [
@@ -686,7 +738,7 @@ const ItemFormPage: React.FC = () => {
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6 pb-24">
+        <div className="w-full space-y-6 pb-24">
             {/* Header */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-primary via-brand-primary/95 to-brand-primary/90 
                 rounded-3xl p-6 text-white">
@@ -1002,68 +1054,54 @@ const ItemFormPage: React.FC = () => {
                             </FormSection>
                         </div>
 
-                            {/* Suggested Pricing Based on Market Rates */}
-                            {(formData.purchasePriceUsd || 0) > 0 && effectiveRate > 0 && (
-                                <div className="mt-8 p-6 bg-emerald-50/50 rounded-2xl border-2 border-emerald-100/50 animate-in zoom-in-95 duration-500">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-2 bg-emerald-100 rounded-lg">
-                                                <Calculator className="w-5 h-5 text-emerald-600" />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-emerald-900">معاينة تسعير السوق (آلي)</h4>
-                                                <p className="text-xs text-emerald-600">بناءً على سعر الصرف الفعال وهامش الأمان</p>
-                                            </div>
+                        {/* Simplified Pricing Preview */}
+                        {(formData.purchasePriceUsd || 0) > 0 && (formData.purchaseExchangeRate || marketRate) > 0 && (
+                            <div className="mt-8 p-6 bg-brand-primary/5 rounded-2xl border-2 border-brand-primary/10 animate-in zoom-in-95 duration-500">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-2 bg-brand-primary/10 rounded-lg">
+                                            <Calculator className="w-5 h-5 text-brand-primary" />
                                         </div>
-                                        <div className="text-left">
-                                            <div className="text-xs font-bold text-emerald-700">سعر الصرف الفعال</div>
-                                            <div className="text-lg font-black text-emerald-600">
-                                                {effectiveRate.toFixed(3)}
-                                                <span className="text-[10px] mr-1 opacity-60">EGP/$</span>
-                                            </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-800">معاينة التكلفة والبيع</h4>
+                                            <p className="text-xs text-slate-500">حساب فوري بناءً على سعر الشراء والعملة</p>
                                         </div>
                                     </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="p-4 bg-white rounded-xl border border-emerald-100 shadow-sm">
-                                            <div className="text-xs text-slate-500 mb-1">سعر الشراء الفعلي (EGP)</div>
-                                            <div className="text-lg font-bold text-slate-700">
-                                                {((formData.purchasePriceUsd || 0) * marketRate).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                                                <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
-                                            </div>
-                                            <div className="text-[10px] text-slate-400 mt-1">حسب السعر اللحظي: {marketRate}</div>
+                                    <div className="text-left">
+                                        <div className="text-xs font-bold text-slate-400">سعر الصرف المستخدم</div>
+                                        <div className="text-lg font-black text-brand-primary">
+                                            {(formData.purchaseExchangeRate || marketRate).toFixed(3)}
+                                            <span className="text-[10px] mr-1 opacity-60">EGP/$</span>
                                         </div>
-
-                                        <div className="p-4 bg-white rounded-xl border border-emerald-100 shadow-sm">
-                                            <div className="text-xs text-emerald-600 mb-1 font-bold">السعر الاستبدالي (EGP)</div>
-                                            <div className="text-lg font-bold text-emerald-700">
-                                                {((formData.purchasePriceUsd || 0) * effectiveRate).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                                                <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
-                                            </div>
-                                            <div className="text-[10px] text-emerald-500 mt-1">يتضمن {buffer.toFixed(1)}% هامش أمان</div>
-                                        </div>
-
-                                        <div className="p-4 bg-brand-primary/5 rounded-xl border border-brand-primary/20 shadow-sm">
-                                            <div className="text-xs text-brand-primary mb-1 font-bold">سعر البيع المقترح (EGP)</div>
-                                            <div className="text-lg font-bold text-brand-primary">
-                                                {((formData.purchasePriceUsd || 0) * effectiveRate * (1 + (formData.targetProfitMarginPercentage || 0) / 100)).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                                                <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
-                                            </div>
-                                            <div className="text-[10px] text-brand-primary/70 mt-1">شامل هامش ربح {formData.targetProfitMarginPercentage}%</div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 flex items-start gap-2 text-[11px] text-slate-500 bg-white/50 p-2 rounded-lg border border-slate-100">
-                                        <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                        <p>سيتم تحديث هذه القيم تلقائياً في السجلات عند إتمام دورة المشتريات (إذن الإضافة) لضمان دقة التكلفة المتوسطة المرجحة.</p>
                                     </div>
                                 </div>
-                            )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                        <div className="text-xs text-slate-500 mb-1">تكلفة الشراء بالعملة المحلية (EGP)</div>
+                                        <div className="text-xl font-bold text-slate-800">
+                                            {((formData.purchasePriceUsd || 0) * (formData.purchaseExchangeRate || marketRate)).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                            <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-1">هذه هي التكلفة التي سيتم بناء الربح عليها لضمان ثبات الهامش.</p>
+                                    </div>
+
+                                    <div className="p-4 bg-white rounded-xl border border-brand-primary/20 shadow-sm">
+                                        <div className="text-xs text-brand-primary mb-1 font-bold">سعر البيع المقترح (EGP)</div>
+                                        <div className="text-xl font-bold text-brand-primary">
+                                            {((formData.purchasePriceUsd || 0) * (formData.purchaseExchangeRate || marketRate) * (1 + (formData.targetProfitMarginPercentage || 0) / 100)).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                                            <span className="text-xs mr-1 font-normal opacity-60">ج.م</span>
+                                        </div>
+                                        <div className="text-[10px] text-brand-primary/70 mt-1">بإضافة هامش ربح {formData.targetProfitMarginPercentage}% على التكلفة الفعلية.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Calculated Prices Summary Row */}
                         <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -mr-16 -mt-16 opacity-50" />
-                            
+
                             <div className="flex items-center gap-2 mb-6 relative">
                                 <div className="p-2 bg-amber-100 rounded-lg">
                                     <Calculator className="w-5 h-5 text-amber-600" />
@@ -1080,36 +1118,72 @@ const ItemFormPage: React.FC = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500 block mb-1">التكلفة المعيارية (EGP)</label>
+                                    <label className="text-xs font-bold text-slate-500 block mb-1">التكلفة المتوسطة (EGP)</label>
                                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold flex items-center justify-between">
                                         <span>{(formData.standardCost || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
                                         <span className="text-[10px] text-slate-400 font-normal">MAC</span>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">المتوسط المرجح المخزني</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">المتوسط المرجح الفعلي في المخزن</p>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500 block mb-1">آخر سعر شراء (EGP)</label>
+                                    <label className="text-xs font-bold text-slate-500 block mb-1">تكلفة آخر شراء (EGP)</label>
                                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold flex items-center justify-between">
                                         <span>{(formData.lastPurchasePrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
                                         <ShoppingCart className="w-3.5 h-3.5 text-slate-300" />
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">بناءً على سعر السوق: {marketRate.toFixed(2)}</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">بناءً على السعر التاريخي المسجل</p>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-brand-primary block mb-1">السعر الاستبدالي (EGP)</label>
-                                    <div className="p-3 bg-brand-primary/5 border border-brand-primary/10 rounded-xl text-brand-primary font-bold flex items-center justify-between">
-                                        <span>{(formData.replacementPrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
-                                        <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-md font-bold">+{buffer.toFixed(1)}%</span>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <FormInput
+                                            label="السعر الاستبدالي (EGP)"
+                                            value={formData.replacementPrice || ''}
+                                            onChange={(v) => updateForm('replacementPrice', parseFloat(v) || 0)}
+                                            icon={CheckCircle2}
+                                            type="number"
+                                            placeholder="0.00"
+                                            hint="سعر استبدال الأصل بقيمته السوقية الحالية"
+                                            colorClass="border-brand-primary/20 bg-brand-primary/5"
+                                        />
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">يتضمن هامش أمان العملة</p>
+                                    <div className="flex items-center gap-2 mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSyncSalePrice(!syncSalePrice)}
+                                            className={`p-1 rounded-md transition-colors ${syncSalePrice ? 'bg-brand-primary text-white' : 'bg-slate-200 text-slate-500'}`}
+                                            title={syncSalePrice ? 'إيقاف المزامنة التلقائية' : 'تفعيل المزامنة التلقائية مع سعر البيع'}
+                                        >
+                                            <RefreshCw className={`w-4 h-4 ${syncSalePrice ? 'animate-spin-slow' : ''}`} />
+                                        </button>
+                                        <span className="text-[10px] text-slate-600 font-medium">
+                                            {syncSalePrice ? 'مزامنة سعر البيع مفعلة' : 'مزامنة سعر البيع معطلة'}
+                                        </span>
+                                        {!syncSalePrice && (
+                                            <button
+                                                type="button"
+                                                onClick={handleManualPriceSync}
+                                                className="mr-auto text-[10px] px-2 py-1 bg-amber-100 text-amber-700 rounded-md hover:bg-amber-200 transition-colors font-bold flex items-center gap-1"
+                                            >
+                                                <Zap className="w-3 h-3" />
+                                                تحديث السعر الآن
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500 block mb-1">آخر سعر بيع (EGP)</label>
+                                    <label className="text-xs font-bold text-slate-500 block mb-1">سعر البيع الحالي (EGP)</label>
                                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold flex items-center justify-between">
-                                        <span>{(formData.lastSalePrice || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}</span>
+                                        <FormInput
+                                            label=""
+                                            value={formData.lastSalePrice || ''}
+                                            onChange={(v) => updateForm('lastSalePrice', parseFloat(v) || 0)}
+                                            type="number"
+                                            placeholder="0.00"
+                                            noContainer
+                                        />
                                         <ShoppingBag className="w-3.5 h-3.5 text-slate-300" />
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-1">شامل هامش ربح {formData.targetProfitMarginPercentage || 0}%</p>
@@ -1122,6 +1196,97 @@ const ItemFormPage: React.FC = () => {
                             salePrice={formData.lastSalePrice || 0}
                             vatRate={formData.defaultVatRate || 14}
                         />
+
+                        {/* Per-Item Exchange Rate History */}
+                        {isEdit && itemPricingInfo && itemPricingInfo.history && itemPricingInfo.history.length > 0 && (
+                            <FormSection
+                                title="سجل أسعار الصرف للصنف"
+                                icon={TrendingUp}
+                                description="تاريخ أسعار الصرف عند كل عملية شراء"
+                                badge={`${itemPricingInfo.history.length} سجل`}
+                            >
+                                <div className="space-y-4">
+                                    {/* Buffer Comparison */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                                            <div className="text-xs text-emerald-600 font-bold mb-1">هامش أمان الصنف (Buffer)</div>
+                                            <div className="text-2xl font-black text-emerald-700">
+                                                {itemPricingInfo.itemBufferPercentage.toFixed(2)}%
+                                            </div>
+                                            <div className="text-[10px] text-emerald-500 mt-1">محسوب من تاريخ مشتريات هذا الصنف</div>
+                                        </div>
+                                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                            <div className="text-xs text-slate-500 font-bold mb-1">هامش أمان السوق (العام)</div>
+                                            <div className="text-2xl font-black text-slate-600">
+                                                {itemPricingInfo.globalBufferPercentage.toFixed(2)}%
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-1">محسوب من سجل أسعار الصرف العام</div>
+                                        </div>
+                                    </div>
+
+                                    {/* History Timeline */}
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm" dir="rtl">
+                                            <thead>
+                                                <tr className="border-b border-slate-200">
+                                                    <th className="py-2 px-3 text-right font-bold text-slate-600">التاريخ</th>
+                                                    <th className="py-2 px-3 text-right font-bold text-slate-600">سعر الصرف</th>
+                                                    <th className="py-2 px-3 text-right font-bold text-slate-600">سعر الشراء ($)</th>
+                                                    <th className="py-2 px-3 text-right font-bold text-slate-600">المصدر</th>
+                                                    <th className="py-2 px-3 text-right font-bold text-slate-600">التغير</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {itemPricingInfo.history.map((entry, idx) => {
+                                                    const prev = itemPricingInfo.history[idx + 1];
+                                                    const change = prev
+                                                        ? ((entry.exchangeRate - prev.exchangeRate) / prev.exchangeRate * 100)
+                                                        : 0;
+                                                    return (
+                                                        <tr key={entry.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                                            <td className="py-2 px-3 text-slate-600">
+                                                                {new Date(entry.recordedAt).toLocaleDateString('ar-EG', {
+                                                                    year: 'numeric', month: 'short', day: 'numeric'
+                                                                })}
+                                                            </td>
+                                                            <td className="py-2 px-3 font-bold text-slate-800">
+                                                                {entry.exchangeRate.toFixed(4)}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-emerald-600 font-medium">
+                                                                ${entry.purchasePriceUsd?.toFixed(4) || '-'}
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${entry.sourceType === 'INVOICE'
+                                                                    ? 'bg-blue-100 text-blue-700'
+                                                                    : 'bg-amber-100 text-amber-700'
+                                                                    }`}>
+                                                                    {entry.sourceType === 'INVOICE' ? 'فاتورة' : 'إذن إضافة'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                {prev ? (
+                                                                    <span className={`font-bold text-xs ${change > 0 ? 'text-rose-600' : change < 0 ? 'text-emerald-600' : 'text-slate-400'
+                                                                        }`}>
+                                                                        {change > 0 ? '▲' : change < 0 ? '▼' : '—'} {Math.abs(change).toFixed(2)}%
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-300 text-xs">—</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-amber-50/50 p-3 rounded-lg border border-amber-100">
+                                        <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                        <p>هامش أمان الصنف يُحسب تلقائياً من نسبة التغير اليومي في سعر الصرف بين كل عملية شراء والتالية لهذا الصنف تحديداً. إذا لم تتوفر بيانات كافية، يتم استخدام هامش السوق العام.</p>
+                                    </div>
+                                </div>
+                            </FormSection>
+                        )}
                     </div>
                 )}
 
@@ -1568,7 +1733,7 @@ const ItemFormPage: React.FC = () => {
 
             {/* Unsaved Changes Warning */}
             {hasChanges && (
-                <div className="fixed bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-96 
+                <div className="fixed bottom-6 left-6 right-6 md:left-6 md:right-auto md:w-96 
                     bg-brand-primary text-white p-4 rounded-xl shadow-xl shadow-brand-primary/30 
                     flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-300 z-40
                     md:bottom-6">

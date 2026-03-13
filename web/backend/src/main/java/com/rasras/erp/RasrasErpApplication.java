@@ -9,4 +9,5 @@ public class RasrasErpApplication {
     public static void main(String[] args) {
         SpringApplication.run(RasrasErpApplication.class, args);
     }
+
 }

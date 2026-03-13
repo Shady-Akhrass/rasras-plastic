@@ -19,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByUsernameWithPermissions(String username);
 
     boolean existsByRole_RoleId(Integer roleId);
+
+    java.util.List<User> findByRole_RoleId(Integer roleId);
 }

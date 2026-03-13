@@ -29,6 +29,7 @@ public class ItemService {
         private final PurchaseReturnItemRepository purchaseReturnItemRepository;
         private final com.rasras.erp.finance.ExchangeRateService exchangeRateService;
         private final PriceListService priceListService;
+        private final ItemExchangeRateHistoryRepository itemRateHistoryRepo;
 
         public List<ItemDto> getAllItems() {
                 List<Item> items = itemRepository.findAll();
@@ -162,7 +163,10 @@ public class ItemService {
                 item.setIsPurchasable(dto.getIsPurchasable());
 
                 try {
-                        return mapToDto(itemRepository.save(item));
+                        ItemDto savedDto = mapToDto(itemRepository.save(item));
+                        priceListService.syncPriceListsForItem(id, item.getLastSalePrice(),
+                                        item.getLastPurchasePrice());
+                        return savedDto;
                 } catch (DataIntegrityViolationException e) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "البيانات المرتبطة غير صحيحة - تحقق من الحقول المرتبطة (مندوب المبيعات، قائمة الأسعار، التصنيف، أو وحدة القياس)");
@@ -335,10 +339,23 @@ public class ItemService {
                 Item item = itemRepository.findById(itemId)
                                 .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
 
-                BigDecimal currentMarketRate = exchangeRateService.getCurrentRate();
-                BigDecimal effectiveRate = exchangeRateService.getEffectiveExchangeRate(30, 1.5);
+                BigDecimal rateToRecord;
+                if (purchaseRate != null && purchaseRate.compareTo(BigDecimal.ZERO) > 0) {
+                        rateToRecord = purchaseRate;
+                } else {
+                        rateToRecord = exchangeRateService.getCurrentRate();
+                }
 
-                // 1. Calculate weighted average USD cost
+                // Record exchange rate history for this item
+                itemRateHistoryRepo.save(ItemExchangeRateHistory.builder()
+                                .itemId(itemId)
+                                .exchangeRate(rateToRecord)
+                                .purchasePriceUsd(purchasePriceUsd)
+                                .sourceType("GRN")
+                                .recordedAt(java.time.LocalDateTime.now())
+                                .build());
+
+                // 1. Calculate weighted average EGP cost (Moving Average Cost)
                 List<StockBalance> balances = stockBalanceRepository.findByItemId(itemId);
                 BigDecimal currentTotalQty = balances.stream()
                                 .map(b -> b.getQuantityOnHand() != null ? b.getQuantityOnHand() : BigDecimal.ZERO)
@@ -346,39 +363,46 @@ public class ItemService {
 
                 // Since stock increased before this call, subtract to get previous state
                 BigDecimal previousStockQty = currentTotalQty.subtract(receivedQty).max(BigDecimal.ZERO);
-                BigDecimal oldUsdCost = item.getPurchasePriceUsd() != null ? item.getPurchasePriceUsd()
+
+                // Old EGP Cost = standardCost (which is our MAC in EGP)
+                BigDecimal oldEgpCost = item.getStandardCost() != null ? item.getStandardCost()
                                 : BigDecimal.ZERO;
 
-                BigDecimal weightedUsdCost;
+                // New transaction EGP cost
+                BigDecimal newEgpCost = purchasePriceUsd.multiply(rateToRecord);
+
+                BigDecimal weightedEgpCost;
                 if (previousStockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                        weightedUsdCost = purchasePriceUsd;
+                        weightedEgpCost = newEgpCost;
                 } else {
-                        BigDecimal totalOldValueUsd = previousStockQty.multiply(oldUsdCost);
-                        BigDecimal totalNewValueUsd = receivedQty.multiply(purchasePriceUsd);
+                        BigDecimal totalOldValueEgp = previousStockQty.multiply(oldEgpCost);
+                        BigDecimal totalNewValueEgp = receivedQty.multiply(newEgpCost);
                         BigDecimal totalQty = previousStockQty.add(receivedQty);
-                        weightedUsdCost = totalOldValueUsd.add(totalNewValueUsd)
-                                        .divide(totalQty, 6, RoundingMode.HALF_UP);
+                        weightedEgpCost = totalOldValueEgp.add(totalNewValueEgp)
+                                        .divide(totalQty, 2, RoundingMode.HALF_UP);
                 }
 
                 // Update Item fields
                 item.setPurchasePriceUsd(purchasePriceUsd);
-                item.setPurchaseExchangeRate(purchaseRate != null ? purchaseRate : currentMarketRate);
+                item.setPurchaseExchangeRate(rateToRecord);
 
-                // Standard Cost (EGP) = Weighted Avg USD × Market Rate
-                item.setStandardCost(weightedUsdCost.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+                // Standard Cost (EGP) = Moving Average Cost
+                item.setStandardCost(weightedEgpCost);
 
                 // Last Purchase Price (EGP)
                 item.setLastPurchasePrice(
-                                purchasePriceUsd.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+                                purchasePriceUsd.multiply(rateToRecord).setScale(2, RoundingMode.HALF_UP));
 
-                // Replacement Price (EGP) = Weighted Avg USD × Effective Rate
-                item.setReplacementPrice(weightedUsdCost.multiply(effectiveRate).setScale(2, RoundingMode.HALF_UP));
+                // Replacement Price (EGP) = Moving Average Cost (Locked to purchase rate)
+                // This ensures profit margin is relative to the actual acquired cost, not daily
+                // volatility
+                item.setReplacementPrice(weightedEgpCost);
 
                 // Update selling prices based on the new replacement price
                 updateSellingPrices(item);
 
                 itemRepository.save(item);
-                priceListService.syncPriceListsForItem(itemId, item.getLastSalePrice());
+                priceListService.syncPriceListsForItem(itemId, item.getLastSalePrice(), item.getLastPurchasePrice());
         }
 
         @Transactional
@@ -387,49 +411,67 @@ public class ItemService {
                 Item item = itemRepository.findById(itemId)
                                 .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
 
-                BigDecimal currentMarketRate = exchangeRateService.getCurrentRate();
-                BigDecimal effectiveRate = exchangeRateService.getEffectiveExchangeRate(30, 1.5);
+                BigDecimal rateToRecord;
+                if (purchaseRate != null && purchaseRate.compareTo(BigDecimal.ZERO) > 0) {
+                        rateToRecord = purchaseRate;
+                } else {
+                        rateToRecord = exchangeRateService.getCurrentRate();
+                }
 
-                // 1. Calculate Weighted Average USD Cost
+                // Record exchange rate history for this item
+                itemRateHistoryRepo.save(ItemExchangeRateHistory.builder()
+                                .itemId(itemId)
+                                .exchangeRate(rateToRecord)
+                                .purchasePriceUsd(newUnitPriceUsd)
+                                .sourceType("INVOICE")
+                                .recordedAt(java.time.LocalDateTime.now())
+                                .build());
+
+                // 1. Calculate Weighted Average EGP Cost (Moving Average Cost)
                 List<StockBalance> balances = stockBalanceRepository.findByItemId(itemId);
                 BigDecimal currentTotalQty = balances.stream()
                                 .map(b -> b.getQuantityOnHand() != null ? b.getQuantityOnHand() : BigDecimal.ZERO)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 BigDecimal previousStockQty = currentTotalQty.subtract(receivedQty).max(BigDecimal.ZERO);
-                BigDecimal oldUsdCost = item.getPurchasePriceUsd() != null ? item.getPurchasePriceUsd()
+
+                // Old EGP Cost = standardCost (MAC in EGP)
+                BigDecimal oldEgpCost = item.getStandardCost() != null ? item.getStandardCost()
                                 : BigDecimal.ZERO;
 
-                BigDecimal weightedUsdCost;
+                // New transaction EGP cost
+                BigDecimal newEgpCost = newUnitPriceUsd.multiply(rateToRecord);
+
+                BigDecimal weightedEgpCost;
                 if (previousStockQty.compareTo(BigDecimal.ZERO) <= 0) {
-                        weightedUsdCost = newUnitPriceUsd;
+                        weightedEgpCost = newEgpCost;
                 } else {
-                        BigDecimal totalOldValueUsd = previousStockQty.multiply(oldUsdCost);
-                        BigDecimal totalNewValueUsd = receivedQty.multiply(newUnitPriceUsd);
+                        BigDecimal totalOldValueEgp = previousStockQty.multiply(oldEgpCost);
+                        BigDecimal totalNewValueEgp = receivedQty.multiply(newEgpCost);
                         BigDecimal totalQty = previousStockQty.add(receivedQty);
-                        weightedUsdCost = totalOldValueUsd.add(totalNewValueUsd)
-                                        .divide(totalQty, 6, RoundingMode.HALF_UP);
+                        weightedEgpCost = totalOldValueEgp.add(totalNewValueEgp)
+                                        .divide(totalQty, 2, RoundingMode.HALF_UP);
                 }
 
                 // Update Item fields
                 item.setPurchasePriceUsd(newUnitPriceUsd);
-                item.setPurchaseExchangeRate(purchaseRate != null ? purchaseRate : currentMarketRate);
+                item.setPurchaseExchangeRate(rateToRecord);
 
-                // Standard Cost (EGP) = Weighted Avg USD × Market Rate
-                item.setStandardCost(weightedUsdCost.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+                // Standard Cost (EGP) = Moving Average Cost
+                item.setStandardCost(weightedEgpCost);
 
                 // Last Purchase Price (EGP)
                 item.setLastPurchasePrice(
-                                newUnitPriceUsd.multiply(currentMarketRate).setScale(2, RoundingMode.HALF_UP));
+                                newUnitPriceUsd.multiply(rateToRecord).setScale(2, RoundingMode.HALF_UP));
 
-                // Replacement Price (EGP) = Weighted Avg USD × Effective Rate
-                item.setReplacementPrice(weightedUsdCost.multiply(effectiveRate).setScale(2, RoundingMode.HALF_UP));
+                // Replacement Price (EGP) = Moving Average Cost (Locked to purchase rate)
+                item.setReplacementPrice(weightedEgpCost);
 
                 // Update selling prices
                 updateSellingPrices(item);
 
                 itemRepository.save(item);
-                priceListService.syncPriceListsForItem(itemId, item.getLastSalePrice());
+                priceListService.syncPriceListsForItem(itemId, item.getLastSalePrice(), item.getLastPurchasePrice());
         }
 
         private void updateSellingPrices(Item item) {
@@ -448,5 +490,27 @@ public class ItemService {
                         sellingPrice = replacementPrice.multiply(marginMultiplier).setScale(2, RoundingMode.HALF_UP);
                 }
                 item.setLastSalePrice(sellingPrice);
+        }
+
+        /**
+         * Returns the exchange rate history for a specific item, for display on the
+         * pricing tab.
+         */
+        public java.util.Map<String, Object> getItemPricingInfo(Integer itemId) {
+                java.util.List<ItemExchangeRateHistory> history = itemRateHistoryRepo
+                                .findTop10ByItemIdOrderByRecordedAtDesc(itemId);
+
+                BigDecimal itemBuffer = exchangeRateService.calculateBufferForItem(itemId, 30, 1.5);
+                BigDecimal globalBuffer = exchangeRateService.calculateBufferPercentage(30, 1.5);
+                BigDecimal currentRate = exchangeRateService.getCurrentRate();
+                BigDecimal effectiveRate = exchangeRateService.getEffectiveExchangeRateForItem(itemId, 30, 1.5);
+
+                java.util.Map<String, Object> result = new java.util.HashMap<>();
+                result.put("history", history);
+                result.put("itemBufferPercentage", itemBuffer);
+                result.put("globalBufferPercentage", globalBuffer);
+                result.put("currentMarketRate", currentRate);
+                result.put("effectiveRate", effectiveRate);
+                return result;
         }
 }

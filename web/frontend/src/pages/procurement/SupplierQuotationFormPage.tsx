@@ -515,11 +515,6 @@ const SupplierQuotationFormPage: React.FC = () => {
             return;
         }
 
-        if (!formData.quotationNumber?.trim()) {
-            toast.error('يرجى إدخال رقم عرض السعر');
-            return;
-        }
-
         if (!formData.validUntilDate) {
             toast.error('يرجى تحديد تاريخ انتهاء الصلاحية');
             return;
@@ -910,18 +905,17 @@ const SupplierQuotationFormPage: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
                                     <FileText className="w-4 h-4 text-brand-primary" />
-                                    رقم عرض السعر (عند المورد) <span className="text-rose-500">*</span>
+                                    رقم عرض السعر (عند المورد)
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.quotationNumber || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, quotationNumber: e.target.value }))}
-                                    required
                                     disabled={isView || isLocked}
                                     className={`w-full px-4 py-3 border-2 border-transparent rounded-xl 
                                         focus:border-brand-primary outline-none transition-all font-semibold
                                         ${isView || isLocked ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50 focus:bg-white'}`}
-                                    placeholder={isView || isLocked ? '' : "INV-XXX"}
+                                    placeholder={isView || isLocked ? '' : "INV-XXX (يُترك فارغاً للترقيم التلقائي)"}
                                 />
                             </div>
 

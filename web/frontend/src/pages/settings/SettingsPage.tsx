@@ -146,10 +146,10 @@ const QuickStat: React.FC<{
 
 const SettingsPage: React.FC = () => {
     const navigate = useNavigate();
-    const { defaultCurrency, getCurrencyLabel, rates } = useSystemSettings();
+    const { defaultCurrency, baseCurrency, getCurrencyLabel, convertAmount } = useSystemSettings();
 
-    // Get live rate for the stat card
-    const usdToDefaultRate = rates[defaultCurrency] || 0;
+    // Get live rate for the stat card using the currency converter
+    const baseToDefaultRate = convertAmount(1, baseCurrency) || 0;
 
     const settingsModules: SettingsModule[] = [
         {
@@ -281,9 +281,9 @@ const SettingsPage: React.FC = () => {
                 />
                 <QuickStat
                     icon={DollarSign}
-                    value={usdToDefaultRate ? usdToDefaultRate.toFixed(2) : '...'}
-                    label={`سعر الصرف (USD / ${getCurrencyLabel(defaultCurrency)})`}
-                    trend={usdToDefaultRate > 0 ? "" : undefined}
+                    value={baseToDefaultRate ? baseToDefaultRate.toFixed(2) : '...'}
+                    label={`سعر الصرف (${baseCurrency} / ${getCurrencyLabel(defaultCurrency)})`}
+                    trend={baseToDefaultRate > 0 ? "" : undefined}
                 />
             </div>
 

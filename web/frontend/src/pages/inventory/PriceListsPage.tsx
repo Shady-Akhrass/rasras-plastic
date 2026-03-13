@@ -611,9 +611,13 @@ const PriceListsPage: React.FC = () => {
         if (field === 'itemId') {
             const selectedItem = items.find(i => i.id === value);
             if (selectedItem) {
+                const defaultPrice = formData.listType === 'SELLING'
+                    ? (selectedItem.lastSalePrice || selectedItem.replacementPrice || 0)
+                    : (selectedItem.lastPurchasePrice || selectedItem.replacementPrice || 0);
+
                 newItems[index] = {
                     ...newItems[index],
-                    unitPrice: selectedItem.replacementPrice || selectedItem.lastSalePrice || 0,
+                    unitPrice: defaultPrice,
                     itemCode: selectedItem.itemCode,
                     itemNameAr: selectedItem.itemNameAr,
                     minQty: 1 // Default min quantity

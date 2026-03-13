@@ -303,7 +303,7 @@ public class SupplierInvoiceService {
         }
 
         @Transactional
-        public void createInvoiceFromGRN(Integer grnId) {
+        public void createInvoiceFromGRN(Integer grnId, BigDecimal userExchangeRate) {
                 GoodsReceiptNote grn = grnRepo.findById(grnId)
                                 .orElseThrow(() -> new RuntimeException("GRN not found"));
 
@@ -321,10 +321,15 @@ public class SupplierInvoiceService {
                 Map<Integer, PurchaseOrderItem> poItemsMap = po.getItems().stream()
                                 .collect(Collectors.toMap(PurchaseOrderItem::getId, item -> item));
 
-                BigDecimal effectiveRate = po.getExchangeRate();
-                if ((effectiveRate == null || effectiveRate.compareTo(BigDecimal.ONE) == 0)
-                                && !"USD".equalsIgnoreCase(po.getCurrency())) {
-                        effectiveRate = exchangeRateService.getCurrentRate();
+                BigDecimal effectiveRate;
+                if (userExchangeRate != null && userExchangeRate.compareTo(BigDecimal.ZERO) > 0) {
+                        effectiveRate = userExchangeRate;
+                } else {
+                        effectiveRate = po.getExchangeRate();
+                        if ((effectiveRate == null || effectiveRate.compareTo(BigDecimal.ONE) == 0)
+                                        && !"USD".equalsIgnoreCase(po.getCurrency())) {
+                                effectiveRate = exchangeRateService.getCurrentRate();
+                        }
                 }
 
                 SupplierInvoice invoice = SupplierInvoice.builder()

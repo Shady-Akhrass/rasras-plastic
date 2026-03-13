@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @RestController
 @RequestMapping("/approvals")
@@ -21,7 +22,10 @@ public class ApprovalController {
 
     private final ApprovalService approvalService;
 
-    /** قائمة الاعتمادات المعلقة — حسب دور المستخدم المسجّل: الأدمن يرى الكل، غيره يرى طلبات خطوة دوره فقط */
+    /**
+     * قائمة الاعتمادات المعلقة — حسب دور المستخدم المسجّل: الأدمن يرى الكل، غيره
+     * يرى طلبات خطوة دوره فقط
+     */
     @PreAuthorize(SecurityConstants.AUTHENTICATED)
     @GetMapping("/pending")
     public ResponseEntity<ApiResponse<List<ApprovalRequestDto>>> getPendingRequests(
@@ -48,7 +52,9 @@ public class ApprovalController {
         return ResponseEntity.ok(ApiResponse.success(approvalService.getRecentApprovalActions(limit)));
     }
 
-    /** تنفيذ اعتماد/رفض — فقط من له صلاحية الاعتماد؛ يُسجّل المستخدم المسجّل دخوله */
+    /**
+     * تنفيذ اعتماد/رفض — فقط من له صلاحية الاعتماد؛ يُسجّل المستخدم المسجّل دخوله
+     */
     @PreAuthorize(SecurityConstants.APPROVAL_ACTION)
     @PostMapping("/{id}/action")
     public ResponseEntity<ApiResponse<Void>> takeAction(
@@ -56,7 +62,8 @@ public class ApprovalController {
             @RequestParam(required = false) Integer userId,
             @RequestParam String action,
             @RequestParam(required = false) String comments,
-            @RequestParam(required = false) Integer warehouseId) {
+            @RequestParam(required = false) Integer warehouseId,
+            @RequestParam(required = false) java.math.BigDecimal exchangeRate) {
         Integer effectiveUserId = null;
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
@@ -68,7 +75,8 @@ public class ApprovalController {
         if (effectiveUserId == null) {
             return ResponseEntity.badRequest().build();
         }
-        approvalService.processAction(id, effectiveUserId, action, comments, warehouseId);
+        approvalService.processAction(id, effectiveUserId, action, comments, warehouseId, exchangeRate);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
 }

@@ -34,7 +34,7 @@ public class StockMovementController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<Page<StockMovementItemDto>>> getMovementsByItem(
-            @RequestParam Integer itemId,
+            @RequestParam(required = false) Integer itemId,
             @RequestParam(required = false) Integer warehouseId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,

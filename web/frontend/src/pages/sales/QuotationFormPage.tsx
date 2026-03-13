@@ -154,6 +154,10 @@ const QuotationFormPage: React.FC = () => {
     const [allQuotations, setAllQuotations] = useState<SalesQuotationDto[]>([]);
     const [selectedRequestId, setSelectedRequestId] = useState<number | ''>('');
     const approvalId = queryParams.get('approvalId');
+    // Parse requestId from URL (set by notification link e.g. ?requestId=5)
+    const requestIdFromUrl = safeNumber(queryParams.get('requestId'));
+    // Ref to avoid triggering auto-selection more than once
+    const autoSelectDoneRef = React.useRef(false);
 
     const [form, setForm] = useState<SalesQuotationDto>({
         quotationDate: new Date().toISOString().split('T')[0],
@@ -348,6 +352,7 @@ const QuotationFormPage: React.FC = () => {
         loadInitialData();
     }, [loadInitialData]);
 
+
     // ──────────────────────────────────────────
     // Request Selection Handler
     // ──────────────────────────────────────────
@@ -436,6 +441,30 @@ const QuotationFormPage: React.FC = () => {
             toast.success('تم استيراد البيانات من طلب العميل');
         }
     }, [approvedRequests, form.priceListId, priceListItems, allPriceListsWithItems, items, findItemInPriceLists, getPriceFromList]);
+
+    // ──────────────────────────────────────────
+    // Auto-select request from URL param on mount
+    // Fires once after approvedRequests and price lists are ready
+    // ──────────────────────────────────────────
+    useEffect(() => {
+        if (
+            !isNew ||
+            !requestIdFromUrl ||
+            autoSelectDoneRef.current ||
+            approvedRequests.length === 0 ||
+            allPriceListsWithItems.length === 0
+        ) return;
+
+        const found = approvedRequests.find(r => safeNumber(r.requestId) === requestIdFromUrl);
+        if (!found) {
+            toast.error('طلب العميل غير موجود أو غير معتمد');
+            return;
+        }
+
+        autoSelectDoneRef.current = true;
+        handleRequestSelection(requestIdFromUrl);
+    }, [isNew, requestIdFromUrl, approvedRequests, allPriceListsWithItems, handleRequestSelection]);
+
 
     // ──────────────────────────────────────────
     // Load existing quotation

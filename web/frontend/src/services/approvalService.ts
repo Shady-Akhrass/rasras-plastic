@@ -9,6 +9,7 @@ export interface ApprovalRequestDto {
     requestedByName: string;
     requestedDate: string;
     currentStepName: string;
+    currentApproverName?: string;
     totalAmount: number;
     priority: string;
     status: string;
@@ -50,10 +51,11 @@ export const approvalService = {
         }
     },
 
-    takeAction: async (requestId: number, userId: number, action: 'Approved' | 'Rejected', comments?: string, warehouseId?: number) => {
+    takeAction: async (requestId: number, userId: number, action: 'Approved' | 'Rejected', comments?: string, warehouseId?: number, exchangeRate?: number) => {
         const params: Record<string, string | number> = { userId, action };
         if (comments) params.comments = comments;
         if (warehouseId) params.warehouseId = warehouseId;
+        if (exchangeRate !== undefined) params.exchangeRate = exchangeRate;
         const response = await apiClient.post('/approvals/' + requestId + '/action', null, { params });
         return response.data;
     },

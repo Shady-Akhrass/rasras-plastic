@@ -52,4 +52,10 @@ public class ItemController {
         itemService.deleteItem(id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    @GetMapping("/{id}/pricing-info")
+    @Operation(summary = "Get item pricing info", description = "Returns exchange rate history and buffer calculations for an item")
+    public ResponseEntity<java.util.Map<String, Object>> getItemPricingInfo(@PathVariable Integer id) {
+        return ResponseEntity.ok(itemService.getItemPricingInfo(id));
+    }
 }

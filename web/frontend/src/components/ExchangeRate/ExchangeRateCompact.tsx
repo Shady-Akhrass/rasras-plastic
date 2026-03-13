@@ -1,42 +1,58 @@
 import { useEffect, useState } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
-import { exchangeRateService } from '../../services/exchangeRateService';
 
 const ExchangeRateCompact = () => {
     const [rate, setRate] = useState<number | null>(null);
     const [previousRate, setPreviousRate] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(false);
-    const { defaultCurrency, getCurrencyLabel } = useSystemSettings();
+    const { defaultCurrency, baseCurrency, getCurrencyLabel } = useSystemSettings();
 
     useEffect(() => {
         const fetchRate = async () => {
             try {
-                // Primary source: External API (as requested)
-                const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                // Primary source: External API (using baseCurrency)
+                const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${baseCurrency}`);
                 if (!response.ok) throw new Error('Failed to fetch from external API');
 
                 const data = await response.json();
                 const currentRate = data.rates[defaultCurrency] || data.rates.EGP;
                 setRate(currentRate);
 
-                // Save to backend and get history for comparison
-                await exchangeRateService.recordRate(currentRate);
+                // Save to localStorage instead of backend
+                const historyKey = `exchange_rate_history_${baseCurrency}_${defaultCurrency}`;
+                let history: { rate: number, date: string }[] = JSON.parse(localStorage.getItem(historyKey) || '[]');
 
-                const history = await exchangeRateService.getHistory();
-                if (history && history.length > 1) {
-                    setPreviousRate(history[1].rate); // history[0] is the one we just recorded
+                const today = new Date().toISOString().split('T')[0];
+                const lastEntry = history.length > 0 ? history[0] : null;
+
+                if (!lastEntry || lastEntry.date !== today) {
+                    history.unshift({ rate: currentRate, date: today });
+                    history = history.slice(0, 30);
+                    localStorage.setItem(historyKey, JSON.stringify(history));
+                } else if (lastEntry.rate !== currentRate) {
+                    history[0].rate = currentRate;
+                    localStorage.setItem(historyKey, JSON.stringify(history));
+                }
+
+                // Sync with backend (REMOVED as per user request)
+                // await apiClient.post('/finance/exchange-rates', currentRate);
+
+                if (history.length > 1) {
+                    setPreviousRate(history[1].rate);
                 }
 
                 setError(false);
             } catch (err) {
                 console.error('Error fetching exchange rate:', err);
-                // Fallback to backend latest if external fails
-                try {
-                    const latest = await exchangeRateService.getLatestRate();
-                    if (latest) setRate(latest);
-                } catch (beErr) {
+                // Fallback to local storage if external fails
+                const historyKey = `exchange_rate_history_${baseCurrency}_${defaultCurrency}`;
+                const history: { rate: number, date: string }[] = JSON.parse(localStorage.getItem(historyKey) || '[]');
+                if (history.length > 0) {
+                    setRate(history[0].rate);
+                    if (history.length > 1) setPreviousRate(history[1].rate);
+                } else {
                     setError(true);
                 }
             } finally {
@@ -47,7 +63,7 @@ const ExchangeRateCompact = () => {
         fetchRate();
         const interval = setInterval(fetchRate, 5 * 60 * 1000);
         return () => clearInterval(interval);
-    }, [defaultCurrency]);
+    }, [defaultCurrency, baseCurrency]);
 
 
     if (isLoading) {

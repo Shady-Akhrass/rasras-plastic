@@ -37,6 +37,12 @@ public class SupplierQuotationService {
 
         @Transactional
         public SupplierQuotationDto createQuotation(SupplierQuotationDto dto) {
+                if (dto.getQuotationNumber() == null || dto.getQuotationNumber().trim().isEmpty()) {
+                        SupplierQuotation lastQuote = quotationRepository.findTopByOrderByIdDesc();
+                        int nextId = (lastQuote != null && lastQuote.getId() != null) ? lastQuote.getId() + 1 : 1;
+                        dto.setQuotationNumber("INV-" + nextId);
+                }
+
                 SupplierQuotation quotation = new SupplierQuotation();
                 quotation.setQuotationNumber(dto.getQuotationNumber());
                 quotation.setQuotationDate(dto.getQuotationDate());
@@ -84,6 +90,16 @@ public class SupplierQuotationService {
         public SupplierQuotationDto updateQuotation(Integer id, SupplierQuotationDto dto) {
                 SupplierQuotation quotation = quotationRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Quotation not found"));
+
+                if (dto.getQuotationNumber() == null || dto.getQuotationNumber().trim().isEmpty()) {
+                        if (quotation.getQuotationNumber() == null || quotation.getQuotationNumber().trim().isEmpty()) {
+                                SupplierQuotation lastQuote = quotationRepository.findTopByOrderByIdDesc();
+                                int nextId = (lastQuote != null && lastQuote.getId() != null) ? lastQuote.getId() + 1 : 1;
+                                dto.setQuotationNumber("INV-" + nextId);
+                        } else {
+                                dto.setQuotationNumber(quotation.getQuotationNumber());
+                        }
+                }
 
                 quotation.setQuotationNumber(dto.getQuotationNumber());
                 quotation.setQuotationDate(dto.getQuotationDate());

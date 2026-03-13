@@ -18,7 +18,7 @@ export interface PageResult<T> {
 
 export const stockMovementService = {
     getPaged: async (params: {
-        itemId: number;
+        itemId?: number;
         warehouseId?: number;
         fromDate?: string;
         toDate?: string;
@@ -41,7 +41,7 @@ export const stockMovementService = {
     },
 
     downloadExcel: async (params: {
-        itemId: number;
+        itemId?: number;
         warehouseId?: number;
         fromDate?: string;
         toDate?: string;

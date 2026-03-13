@@ -4,6 +4,7 @@ import { currencyService } from '../services/currencyService';
 
 /** Public settings keys (any authenticated user). Backend may use DefaultCurrency or DEFAULT_CURRENCY. */
 const DEFAULT_CURRENCY_KEYS = ['DefaultCurrency', 'DEFAULT_CURRENCY'];
+const BASE_CURRENCY_KEYS = ['BaseCurrency', 'BASE_CURRENCY'];
 
 export const useSystemSettings = () => {
     const [settings, setSettings] = useState<SystemSettingDto[]>([]);
@@ -41,6 +42,9 @@ export const useSystemSettings = () => {
     const defaultCurrency =
         DEFAULT_CURRENCY_KEYS.map((k) => getSetting(k)).find(Boolean) || 'EGP';
 
+    const baseCurrency =
+        BASE_CURRENCY_KEYS.map((k) => getSetting(k)).find(Boolean) || 'USD';
+
     const getCurrencyLabel = (currency: string) => {
         const target = currency || defaultCurrency;
         switch (target) {
@@ -62,6 +66,7 @@ export const useSystemSettings = () => {
         loading,
         getSetting,
         defaultCurrency,
+        baseCurrency,
         getCurrencyLabel,
         convertAmount,
         rates

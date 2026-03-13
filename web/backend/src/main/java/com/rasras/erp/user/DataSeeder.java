@@ -279,6 +279,7 @@ public class DataSeeder implements CommandLineRunner {
                 { "MENU_SALES_VEHICLES", "المركبات", "Vehicles" },
                 { "MENU_SALES_INVOICES", "فواتير المبيعات", "Sales Invoices" },
                 { "MENU_SALES_RECEIPTS", "إيصالات الدفع", "Receipts" },
+                { "MENU_SALES_OUTSTANDING", "أرصدة العملاء", "Customer Outstanding" },
                 // العملاء (CRM)
                 { "MENU_CRM_CUSTOMERS", "العملاء", "Customers" },
                 // المالية
@@ -304,8 +305,8 @@ public class DataSeeder implements CommandLineRunner {
                 // تحت المخزون)
                 { "MENU_OPERATIONS_CATEGORIES", "تصنيفات الأصناف", "Categories" },
                 { "MENU_OPERATIONS_ITEMS", "الأصناف", "Items" },
-                { "MENU_OPERATIONS_QUALITY_INSPECTION", "فحص الجودة", "Quality Inspection" },
-                { "MENU_OPERATIONS_QUALITY_PARAMETERS", "معاملات الجودة", "Quality Parameters" },
+                { "MENU_WAREHOUSE_QUALITY_INSPECTION", "فحص الجودة", "Quality Inspection" },
+                { "MENU_WAREHOUSE_QUALITY_PARAMETERS", "معاملات الجودة", "Quality Parameters" },
                 { "MENU_OPERATIONS_CATEGORIES", "تصنيفات الأصناف (عمليات)", "Categories (legacy)" },
                 { "MENU_OPERATIONS_ITEMS", "الأصناف (عمليات)", "Items (legacy)" },
                 { "MENU_OPERATIONS_PRICE_LISTS", "قوائم الأسعار", "Price Lists" },
@@ -381,6 +382,13 @@ public class DataSeeder implements CommandLineRunner {
                     assignPermissionToRole(role, perm.getPermissionCode());
                 }
             }
+        }
+        // WHM also needs quality inspection/parameters from MENU_OPERATIONS_ (warehouse-centric)
+        Role whmRole = roleRepository.findByRoleCode("WHM").orElse(null);
+        if (whmRole != null) {
+            assignPermissionToRole(whmRole, "MENU_WAREHOUSE_QUALITY_INSPECTION");
+            assignPermissionToRole(whmRole, "MENU_WAREHOUSE_QUALITY_PARAMETERS");
+            assignPermissionToRole(whmRole, "MENU_PROCUREMENT_GRN");
         }
     }
 
@@ -655,16 +663,16 @@ public class DataSeeder implements CommandLineRunner {
                 stepRepo.save(step1);
             }
 
-            // Step 2: Procurement Manager Approval
-            Role pmRole = roleRepository.findByRoleCode("PM").orElse(null);
-            if (pmRole != null) {
+            // Step 2: Warehouse Manager Approval
+            Role whmRole = roleRepository.findByRoleCode("WHM").orElse(null);
+            if (whmRole != null) {
                 com.rasras.erp.approval.ApprovalWorkflowStep step2 = com.rasras.erp.approval.ApprovalWorkflowStep
                         .builder()
                         .workflow(grnWorkflow)
                         .stepNumber(2)
-                        .stepName("Procurement Manager Approval")
+                        .stepName("Warehouse Manager Approval")
                         .approverType("ROLE")
-                        .approverRole(pmRole)
+                        .approverRole(whmRole)
                         .build();
                 stepRepo.save(step2);
             }

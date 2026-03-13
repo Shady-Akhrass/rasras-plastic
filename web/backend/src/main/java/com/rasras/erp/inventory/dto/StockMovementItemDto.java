@@ -18,8 +18,13 @@ import java.time.LocalDateTime;
 public class StockMovementItemDto {
 
     private LocalDateTime date;
-    private String type;      // movementType (GRN, RETURN, ADJUSTMENT, etc.)
-    private BigDecimal qty;   // quantity
+    private String type; // movementType (GRN, RETURN, ADJUSTMENT, etc.)
+    private String movementType; // IN, OUT
+    private BigDecimal qty; // quantity
     private BigDecimal balance; // balanceAfter
-    private String ref;       // reference number or referenceType + referenceId
+    private String ref; // reference number or referenceType + referenceId
+    private String itemNameAr;
+    private String itemNameEn;
+    private String warehouseNameAr;
+    private String warehouseNameEn;
 }

@@ -374,8 +374,8 @@ const DashboardLayout: React.FC = () => {
             },
             {
                 to: '/dashboard/procurement/grn', icon: ArrowDownToLine,
-                label: 'إذن استلام / إذن إضافة (GRN)', section: 'procurement', menuPermission: 'MENU_PROCUREMENT_GRN', order: 6,
-                requiredPermission: 'SECTION_PROCUREMENT'
+                label: 'إذن استلام / إذن إضافة (GRN)', section: 'warehouse', menuPermission: 'MENU_PROCUREMENT_GRN', order: 6,
+                warehouseGroup: 'cycle', requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/procurement/invoices', icon: FileText,
@@ -553,17 +553,17 @@ const DashboardLayout: React.FC = () => {
                 requiredPermission: 'SECTION_WAREHOUSE'
             },
 
-            // Operations
             {
                 to: '/dashboard/inventory/quality-inspection', icon: Microscope,
-                label: 'فحص الجودة', section: 'operations', menuPermission: 'MENU_OPERATIONS_QUALITY_INSPECTION',
-                badge: pendingInspections || undefined, order: 1,
-                requiredPermission: 'SECTION_OPERATIONS'
+                label: 'فحص الجودة', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_QUALITY_INSPECTION',
+                badge: pendingInspections || undefined, order: 12.1,
+                warehouseGroup: 'cycle', requiredPermission: 'SECTION_WAREHOUSE',
+                hideWhenHasPermission: 'SECTION_PROCUREMENT'
             },
             {
                 to: '/dashboard/inventory/quality-parameters', icon: Microscope,
-                label: 'معاملات الجودة', section: 'operations', menuPermission: 'MENU_OPERATIONS_QUALITY_PARAMETERS', order: 2,
-                requiredPermission: 'SECTION_OPERATIONS'
+                label: 'معاملات الجودة', section: 'warehouse', menuPermission: 'MENU_WAREHOUSE_QUALITY_PARAMETERS', order: 12.2,
+                warehouseGroup: 'cycle', requiredPermission: 'SECTION_WAREHOUSE'
             },
             {
                 to: '/dashboard/inventory/categories', icon: Package,
@@ -600,7 +600,8 @@ const DashboardLayout: React.FC = () => {
             {
                 to: '/dashboard/settings/users', icon: User,
                 label: 'إدارة المستخدمين', section: 'system', menuPermission: 'MENU_SYSTEM_USERS',
-                requiredPermission: 'SECTION_SYSTEM'
+                requiredPermission: 'SECTION_SYSTEM',
+                showWhenAlsoHasPermission: 'ADMIN_OR_GM'
             },
             {
                 to: '/dashboard/settings/roles', icon: Shield,
@@ -655,6 +656,8 @@ const DashboardLayout: React.FC = () => {
         }
         return true;
     });
+    // Final sort to handle moved items correctly
+    filteredNavItems.sort((a, b) => (a.order || 99) - (b.order || 99));
 
     const hasManySections = new Set(filteredNavItems.map(i => i.section)).size > 3;
 

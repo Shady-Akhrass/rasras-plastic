@@ -67,12 +67,6 @@ const STEP_NAME_AR: Record<string, string> = {
     'Warehouse Manager Approval': 'اعتماد مدير المستودع',
     'Payment Disbursement': 'صرف الدفعة',
 };
-const USERNAME_AR: Record<string, string> = {
-    'shady': 'شادي',
-    'asdfg': 'أحمد',
-    'Mohammed': 'محمد',
-    'yazan': 'يزن',
-};
 const tr = (en: string | undefined, map: Record<string, string>) =>
     en && map[en] ? map[en] : en || '';
 
@@ -461,7 +455,7 @@ const RequestCard: React.FC<{
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500">
                                 <div className="flex items-center gap-1.5">
                                     <User className="w-3.5 h-3.5 text-slate-400" />
-                                    <span className="font-medium">{tr(request.requestedByName, USERNAME_AR) || 'غير محدد'}</span>
+                                    <span className="font-medium">{request.requestedByName || 'غير محدد'}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -469,7 +463,10 @@ const RequestCard: React.FC<{
                                 </div>
                                 <div className="flex items-center gap-1.5 text-brand-primary font-bold">
                                     <Clock className="w-3.5 h-3.5" />
-                                    <span className="text-xs">{tr(request.currentStepName, STEP_NAME_AR)}</span>
+                                    <span className="text-xs">
+                                        {tr(request.currentStepName, STEP_NAME_AR)}
+                                        {request.currentApproverName && <span className="text-slate-500 font-normal mr-1">({request.currentApproverName})</span>}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -622,12 +619,37 @@ const ApprovalsInbox: React.FC = () => {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [lastRefresh, setLastRefresh] = useState(0);
 
+    const userString = localStorage.getItem('user');
+    const user = userString ? JSON.parse(userString) : null;
+
     // ─── Refs ───
     const previousIdsRef = useRef<Set<number>>(new Set());
     const isInitialLoadRef = useRef(true);
     const mountedRef = useRef(true);
+    // ─── Filterable Options based on user role ───
+    const filteredOptions = useMemo(() => {
+        const role = user?.roleCode?.toUpperCase();
+        if (role === 'ADMIN' || role === 'GM') {
+            return FILTER_OPTIONS.filter(opt =>
+                ['All', 'Supplier', 'PaymentVoucher', 'QuotationComparison', 'StockIssueNote', 'PurchaseOrder', 'PurchaseReturn', 'CustomerRequest', 'SalesQuotation', 'DeliveryOrder', 'PR', 'SupplierInvoice'].includes(opt.value) || true // Allow all for Admin/GM except GRN
+            ).filter(opt => opt.value !== 'GoodsReceiptNote');
+        }
+        if (role === 'QC' || role === 'QUALITY') {
+            return FILTER_OPTIONS.filter(opt => ['All', 'GoodsReceiptNote', 'PurchaseReturn'].includes(opt.value));
+        }
+        if (role === 'WHM' || role === 'WAREHOUSE') {
+            return FILTER_OPTIONS.filter(opt => ['All', 'GoodsReceiptNote', 'StockIssueNote', 'DeliveryOrder'].includes(opt.value));
+        }
+        if (role === 'SECTION_PROCUREMENT' || role === 'PM' || role === 'PROCUREMENT' || role === 'BUYER') {
+            return FILTER_OPTIONS.filter(opt => !['CustomerRequest', 'SalesQuotation', 'StockIssueNote', 'DeliveryOrder', 'PaymentVoucher'].includes(opt.value));
+        }
+        if (role === 'FM' || role === 'FINANCE') {
+            return FILTER_OPTIONS.filter(opt => ['All', 'PaymentVoucher', 'QuotationComparison', 'PurchaseOrder', 'SalesInvoice', 'PaymentReceipt', 'SupplierInvoice', 'Supplier'].includes(opt.value));
+        }
+        return FILTER_OPTIONS;
+    }, [user?.roleCode]);
 
-    // ─── Optimistic ───
+    // ─── Stats mapping ───
     const [optimisticRequests, addOptimistic] = useOptimistic(
         requests,
         (state: ApprovalRequestDto[], action: OptimisticAction) => {
@@ -644,11 +666,6 @@ const ApprovalsInbox: React.FC = () => {
         selectedWarehouseId: number; loading: boolean;
     }>({ show: false, request: null, warehouses: [], selectedWarehouseId: 0, loading: false });
 
-    // ─── Get Current User ───
-    // طلبات الاعتماد تُفلتر حسب المستخدم الحالي؛ استخدام userId خاطئ يعرض طلبات مستخدم آخر.
-    // مصدر الحقيقة: تسجيل الدخول و /auth/me يخزنان userId في localStorage (محدّث عبر refreshUserPermissions).
-    const userString = localStorage.getItem('user');
-    const user = userString ? JSON.parse(userString) : null;
     const currentUserId = user?.userId ?? user?.id ?? 1;
 
     // ─── Sound toggle persist ───
@@ -674,7 +691,6 @@ const ApprovalsInbox: React.FC = () => {
             const currentUserJson = localStorage.getItem('user');
             const currentUser = currentUserJson ? JSON.parse(currentUserJson) : null;
             const uid = currentUser?.userId ?? currentUser?.id ?? currentUserId;
-            const permissions: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
 
             const promises: Promise<any>[] = [
                 approvalService.getPendingRequests(uid),
@@ -755,9 +771,19 @@ const ApprovalsInbox: React.FC = () => {
                 fetchRequests(true);
             }
         };
+        // Also listen for TRIGGER_POLL_EVENT dispatched after any form save
+        // so the inbox refreshes directly without waiting for the polling chain
+        const handleTrigger = () => {
+            if (mountedRef.current) fetchRequests(true);
+        };
         window.addEventListener(REFRESH_DATA_EVENT, handleRefresh);
-        return () => window.removeEventListener(REFRESH_DATA_EVENT, handleRefresh);
+        window.addEventListener(TRIGGER_POLL_EVENT, handleTrigger);
+        return () => {
+            window.removeEventListener(REFRESH_DATA_EVENT, handleRefresh);
+            window.removeEventListener(TRIGGER_POLL_EVENT, handleTrigger);
+        };
     }, [fetchRequests]);
+
 
     // ─── Actions ───
     const handleAction = useCallback(async (requestId: number, action: 'Approved' | 'Rejected', warehouseId?: number) => {
@@ -770,7 +796,41 @@ const ApprovalsInbox: React.FC = () => {
         startTransition(async () => {
             addOptimistic({ type: 'remove', id: requestId });
             try {
-                await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId);
+                // Fetch the current exchange rate using the service
+                let currentRate: number | null = null;
+                try {
+                    const settingsStr = localStorage.getItem('system_settings');
+                    const settings = settingsStr ? JSON.parse(settingsStr) : {};
+                    const baseCurrency = settings.baseCurrency || 'USD';
+                    const defaultCurrency = settings.defaultCurrency || 'EGP';
+
+                    const historyKey = `exchange_rate_history_${baseCurrency}_${defaultCurrency}`;
+                    const historyStr = localStorage.getItem(historyKey);
+                    const history = historyStr ? JSON.parse(historyStr) : [];
+
+                    if (history && history.length > 0) {
+                        currentRate = history[0].rate;
+                    } else {
+                        // Use consolidated exchangeRateService to fetch live rate
+                        const { exchangeRateService } = await import('../../services/exchangeRateService');
+                        currentRate = await exchangeRateService.fetchLiveRate(baseCurrency, defaultCurrency);
+                    }
+                } catch (e) {
+                    console.error('Failed to get exchange rate', e);
+                }
+
+                if (!currentRate || currentRate <= 0) {
+                    toast.error('لم يتم العثور على سعر صرف صالح. الرجاء تحديث الصفحة أو فتح لوحة التحكم أولاً.');
+                    setProcessingId(null);
+                    setRemovingIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(requestId);
+                        return next;
+                    });
+                    return;
+                }
+
+                await approvalService.takeAction(requestId, currentUserId, action, undefined, warehouseId, currentRate);
 
                 const req = requests.find(r => r.id === requestId);
                 setRequests(prev => prev.filter(r => r.id !== requestId));
@@ -1039,7 +1099,7 @@ const ApprovalsInbox: React.FC = () => {
 
                 {/* Filter chips */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    {FILTER_OPTIONS.map(opt => {
+                    {filteredOptions.map(opt => {
                         const Icon = opt.icon;
                         const isActive = typeFilter === opt.value;
                         const count = opt.value === 'All'
