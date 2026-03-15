@@ -73,6 +73,69 @@ public class CompanyInfo {
     @Column(name = "FiscalYearStartMonth")
     private Integer fiscalYearStartMonth;
 
+    @Column(name = "AboutText", columnDefinition = "TEXT")
+    private String aboutText;
+
+    @Column(name = "VisionText", columnDefinition = "TEXT")
+    private String visionText;
+
+    @Column(name = "MissionText", columnDefinition = "TEXT")
+    private String missionText;
+
+    @Column(name = "GoalsText", columnDefinition = "TEXT")
+    private String goalsText;
+
+    @Column(name = "FooterTextEn", columnDefinition = "TEXT")
+    private String footerTextEn;
+
+    @Column(name = "AboutTextEn", columnDefinition = "TEXT")
+    private String aboutTextEn;
+
+    @Column(name = "VisionTextEn", columnDefinition = "TEXT")
+    private String visionTextEn;
+
+    @Column(name = "MissionTextEn", columnDefinition = "TEXT")
+    private String missionTextEn;
+
+    @Column(name = "GoalsTextEn", columnDefinition = "TEXT")
+    private String goalsTextEn;
+
+    @Column(name = "ServicesContentAr", columnDefinition = "TEXT")
+    private String servicesContentAr;
+
+    @Column(name = "ServicesContentEn", columnDefinition = "TEXT")
+    private String servicesContentEn;
+
+    @Column(name = "ProductsContentAr", columnDefinition = "TEXT")
+    private String productsContentAr;
+
+    @Column(name = "ProductsContentEn", columnDefinition = "TEXT")
+    private String productsContentEn;
+
+    @Column(name = "PartnersContent", columnDefinition = "TEXT")
+    private String partnersContent;
+
+    @Column(name = "IndustriesContentAr", columnDefinition = "TEXT")
+    private String industriesContentAr;
+
+    @Column(name = "IndustriesContentEn", columnDefinition = "TEXT")
+    private String industriesContentEn;
+
+    @Column(name = "BrochurePath")
+    private String brochurePath;
+
+    @Column(name = "StatsHappyClients")
+    private Integer statsHappyClients;
+
+    @Column(name = "StatsYearsExperience")
+    private Integer statsYearsExperience;
+
+    @Column(name = "StatsProjectsCompleted")
+    private Integer statsProjectsCompleted;
+
+    @Column(name = "StatsCustomerSatisfaction")
+    private Integer statsCustomerSatisfaction;
+
     @LastModifiedDate
     @Column(name = "UpdatedAt")
     private LocalDateTime updatedAt;

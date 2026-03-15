@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -40,6 +41,12 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
 
     @Query("SELECT m FROM StockMovement m WHERE m.movementDate >= :from AND m.movementDate < :to ORDER BY m.warehouse.id, m.item.id, m.movementDate")
     List<StockMovement> findByDateRange(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
+
+    @Query("SELECT COALESCE(SUM(m.quantity), 0) FROM StockMovement m WHERE m.item.id = :itemId AND m.direction = 'OUT' AND m.movementDate >= :from AND m.movementDate < :to")
+    BigDecimal sumOutQuantityByItemAndDateRange(
+            @Param("itemId") Integer itemId,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to);
 }
