@@ -42,6 +42,31 @@ public class CompanyInfoService {
         companyInfo.setLogoPath(companyInfoDto.getLogoPath());
         companyInfo.setHeaderPath(companyInfoDto.getHeaderPath());
 
+        companyInfo.setAboutText(companyInfoDto.getAboutText());
+        companyInfo.setVisionText(companyInfoDto.getVisionText());
+        companyInfo.setMissionText(companyInfoDto.getMissionText());
+        companyInfo.setGoalsText(companyInfoDto.getGoalsText());
+
+        companyInfo.setFooterTextEn(companyInfoDto.getFooterTextEn());
+        companyInfo.setAboutTextEn(companyInfoDto.getAboutTextEn());
+        companyInfo.setVisionTextEn(companyInfoDto.getVisionTextEn());
+        companyInfo.setMissionTextEn(companyInfoDto.getMissionTextEn());
+        companyInfo.setGoalsTextEn(companyInfoDto.getGoalsTextEn());
+
+        companyInfo.setServicesContentAr(companyInfoDto.getServicesContentAr());
+        companyInfo.setServicesContentEn(companyInfoDto.getServicesContentEn());
+        companyInfo.setProductsContentAr(companyInfoDto.getProductsContentAr());
+        companyInfo.setProductsContentEn(companyInfoDto.getProductsContentEn());
+        companyInfo.setPartnersContent(companyInfoDto.getPartnersContent());
+        companyInfo.setIndustriesContentAr(companyInfoDto.getIndustriesContentAr());
+        companyInfo.setIndustriesContentEn(companyInfoDto.getIndustriesContentEn());
+        companyInfo.setBrochurePath(companyInfoDto.getBrochurePath());
+
+        companyInfo.setStatsHappyClients(companyInfoDto.getStatsHappyClients());
+        companyInfo.setStatsYearsExperience(companyInfoDto.getStatsYearsExperience());
+        companyInfo.setStatsProjectsCompleted(companyInfoDto.getStatsProjectsCompleted());
+        companyInfo.setStatsCustomerSatisfaction(companyInfoDto.getStatsCustomerSatisfaction());
+
         CompanyInfo saved = companyInfoRepository.save(companyInfo);
         return mapToDto(saved);
     }
@@ -80,6 +105,27 @@ public class CompanyInfoService {
                 .footerText(entity.getFooterText())
                 .currency(entity.getCurrency())
                 .fiscalYearStartMonth(entity.getFiscalYearStartMonth())
+                .aboutText(entity.getAboutText())
+                .visionText(entity.getVisionText())
+                .missionText(entity.getMissionText())
+                .goalsText(entity.getGoalsText())
+                .footerTextEn(entity.getFooterTextEn())
+                .aboutTextEn(entity.getAboutTextEn())
+                .visionTextEn(entity.getVisionTextEn())
+                .missionTextEn(entity.getMissionTextEn())
+                .goalsTextEn(entity.getGoalsTextEn())
+                .servicesContentAr(entity.getServicesContentAr())
+                .servicesContentEn(entity.getServicesContentEn())
+                .productsContentAr(entity.getProductsContentAr())
+                .productsContentEn(entity.getProductsContentEn())
+                .partnersContent(entity.getPartnersContent())
+                .industriesContentAr(entity.getIndustriesContentAr())
+                .industriesContentEn(entity.getIndustriesContentEn())
+                .brochurePath(entity.getBrochurePath())
+                .statsHappyClients(entity.getStatsHappyClients())
+                .statsYearsExperience(entity.getStatsYearsExperience())
+                .statsProjectsCompleted(entity.getStatsProjectsCompleted())
+                .statsCustomerSatisfaction(entity.getStatsCustomerSatisfaction())
                 .build();
     }
 }

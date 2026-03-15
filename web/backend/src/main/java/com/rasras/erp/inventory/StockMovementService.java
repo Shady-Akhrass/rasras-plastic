@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +32,28 @@ public class StockMovementService {
     }
 
     /**
+     * متوسط الاستهلاك الشهري لصنف معيّن بناءً على حركات الصرف (OUT) خلال آخر عدد من الأشهر (Rolling Window).
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal getAverageMonthlyConsumption(Integer itemId, int months) {
+        if (itemId == null || months <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        LocalDateTime to = LocalDateTime.now();
+        LocalDateTime from = to.minusMonths(months);
+
+        // Repository query uses COALESCE, so it will never return null
+        BigDecimal totalOut = stockMovementRepository.sumOutQuantityByItemAndDateRange(itemId, from, to);
+
+        if (months == 1) {
+            return totalOut.setScale(3, RoundingMode.HALF_UP);
+        }
+
+        return totalOut.divide(BigDecimal.valueOf(months), 3, RoundingMode.HALF_UP);
+    }
+
+    /**
      * فلترة حسب الصنف والمستودع ونطاق التاريخ مع ترقيم صفحات.
      */
     @Transactional(readOnly = true)
@@ -41,6 +65,7 @@ public class StockMovementService {
             Pageable pageable) {
 
         LocalDateTime from = fromDate != null ? fromDate.atStartOfDay() : null;
+        // make "to" inclusive by moving to start of next day and using < to
         LocalDateTime to = toDate != null ? toDate.plusDays(1).atStartOfDay() : null;
 
         Page<StockMovement> page = stockMovementRepository.findByItemAndFilters(
@@ -50,18 +75,22 @@ public class StockMovementService {
     }
 
     private StockMovementItemDto toItemDto(StockMovement m) {
-        String ref = m.getReferenceNumber() != null && !m.getReferenceNumber().isBlank()
-                ? m.getReferenceNumber()
-                : (m.getReferenceType() != null
-                ? m.getReferenceType() + (m.getReferenceId() != null ? " #" + m.getReferenceId() : "")
-                : null);
-
         return StockMovementItemDto.builder()
                 .date(m.getMovementDate())
                 .type(m.getMovementType())
                 .qty(m.getQuantity())
                 .balance(m.getBalanceAfter())
-                .ref(ref)
+                .ref(buildRef(m))
                 .build();
+    }
+
+    private String buildRef(StockMovement m) {
+        if (m.getReferenceNumber() != null && !m.getReferenceNumber().isBlank()) {
+            return m.getReferenceNumber();
+        }
+        if (m.getReferenceType() == null) {
+            return null;
+        }
+        return m.getReferenceType() + (m.getReferenceId() != null ? " #" + m.getReferenceId() : "");
     }
 }

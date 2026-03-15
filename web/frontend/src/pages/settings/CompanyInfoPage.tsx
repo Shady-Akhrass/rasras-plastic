@@ -4,7 +4,8 @@ import {
     Printer, FileImage, CreditCard, Calendar, Edit2, X, Check,
     AlertCircle, Sparkles, Settings, Eye,
     ChevronRight, Camera, Trash2, RefreshCw, Info, CheckCircle2,
-    Building, Hash, Landmark, ImageIcon
+    Building, Hash, Landmark, ImageIcon, Target, Users, Award, Star, Plus,
+    BookOpen, Download, FileDown
 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { formatDate } from '../../utils/format';
@@ -28,9 +29,204 @@ interface CompanyInfo {
     footerText: string;
     currency: string;
     fiscalYearStartMonth: number;
+    aboutText: string;
+    visionText: string;
+    missionText: string;
+    goalsText: string;
+    footerTextEn?: string;
+    aboutTextEn?: string;
+    visionTextEn?: string;
+    missionTextEn?: string;
+    goalsTextEn?: string;
+    servicesContentAr?: string;
+    servicesContentEn?: string;
+    productsContentAr?: string;
+    productsContentEn?: string;
+    partnersContent?: string;
+    industriesContentAr?: string;
+    industriesContentEn?: string;
+    brochurePath?: string;
+    statsHappyClients?: number;
+    statsYearsExperience?: number;
+    statsProjectsCompleted?: number;
+    statsCustomerSatisfaction?: number;
 }
 
-type TabType = 'basic' | 'contact' | 'system' | 'branding';
+type TabType = 'basic' | 'contact' | 'system' | 'branding' | 'public';
+
+type ServiceItem = { title: string; desc: string };
+type PartnerItem = { name: string; logo: string; url: string };
+type IndustryItem = { title: string; desc: string };
+
+// في صفحة الإعدادات نحتاج نحافظ على عدد الصفوف حتى لو كانت فارغة
+function parseServicesContent(raw: string | undefined): ServiceItem[] {
+    if (raw == null) return [];
+    const lines = raw.split('\n');
+    return lines.map(line => {
+        const [title, desc] = line.split('|').map(part => (part ?? '').trim());
+        return { title, desc };
+    });
+}
+
+function serializeServices(items: ServiceItem[]): string {
+    return items
+        .map(i => `${(i.title || '').trim()}|${(i.desc || '').trim()}`)
+        .join('\n');
+}
+
+function parsePartnersContent(raw: string | undefined): PartnerItem[] {
+    if (raw == null) return [];
+    const lines = raw.split('\n');
+    return lines.map(line => {
+        const parts = line.split('|');
+        const name = (parts[0] ?? '').trim();
+        const logo = (parts[1] ?? '').trim();
+        const url = (parts[2] ?? '').trim();
+        return { name, logo, url };
+    });
+}
+
+function serializePartners(items: PartnerItem[]): string {
+    return items
+        .map(i => `${(i.name || '').trim()}|${(i.logo || '').trim()}|${(i.url || '').trim()}`)
+        .join('\n');
+}
+
+function parseIndustriesContent(raw: string | undefined): IndustryItem[] {
+    if (raw == null) return [];
+    const lines = raw.split('\n');
+    return lines.map(line => {
+        const [title, desc] = line.split('|').map(part => (part ?? '').trim());
+        return { title, desc };
+    });
+}
+
+function serializeIndustries(items: IndustryItem[]): string {
+    return items
+        .map(i => `${(i.title || '').trim()}|${(i.desc || '').trim()}`)
+        .join('\n');
+}
+
+// PDF Upload Component
+const PdfUpload: React.FC<{
+    label: string;
+    value: string;
+    onChange: (url: string) => void;
+}> = ({ label, value, onChange }) => {
+    const [uploading, setUploading] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const getFileUrl = (url: string) => {
+        if (!url) return '';
+        if (url.startsWith('http') || url.startsWith('blob:')) return url;
+        const baseUrl = import.meta.env.VITE_API_URL || 'https://api.rasrasplastic.com';
+        return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
+
+    const uploadPdf = async (file: File) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+            setUploading(true);
+            const loadingToast = toast.loading('جاري رفع الملف...');
+            const response = await apiClient.post('/upload', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            toast.dismiss(loadingToast);
+            if (response.data.success) {
+                const fileUrl = response.data.data;
+                if (fileUrl && !fileUrl.startsWith('blob:')) {
+                    onChange(fileUrl);
+                    toast.success('تم رفع الكتيّب بنجاح');
+                } else {
+                    toast.error('خطأ في رابط الملف من الخادم');
+                }
+            }
+        } catch {
+            toast.error('فشل رفع الملف');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type === 'application/pdf') {
+            uploadPdf(file);
+        } else if (file) {
+            toast.error('يرجى اختيار ملف PDF فقط');
+        }
+    };
+
+    const fileName = value ? value.split('/').pop()?.split('_').slice(1).join('_') || 'brochure.pdf' : '';
+
+    return (
+        <div className="space-y-3">
+            <label className="block text-sm font-medium text-slate-600">{label}</label>
+            <div className={`relative flex items-center gap-4 p-5 rounded-2xl border-2 border-dashed transition-all duration-300
+                ${value ? 'border-brand-primary/30 bg-brand-primary/5' : 'border-slate-200 hover:border-brand-primary/40 bg-slate-50'}`}>
+                {/* PDF icon */}
+                <div className={`shrink-0 w-14 h-14 rounded-xl flex items-center justify-center
+                    ${value ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'}`}>
+                    <FileDown className="w-7 h-7" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    {value ? (
+                        <>
+                            <p className="text-sm font-semibold text-slate-800 truncate">{fileName}</p>
+                            <a
+                                href={getFileUrl(value)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-brand-primary hover:underline flex items-center gap-1 mt-0.5"
+                            >
+                                <Download className="w-3 h-3" />
+                                معاينة / تنزيل
+                            </a>
+                        </>
+                    ) : (
+                        <p className="text-sm text-slate-500">
+                            {uploading ? 'جاري الرفع...' : 'اختر ملف PDF أو اسحبه هنا'}
+                        </p>
+                    )}
+                </div>
+                <div className="flex items-center gap-2">
+                    {value && (
+                        <button
+                            type="button"
+                            onClick={() => onChange('')}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            title="حذف"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={uploading}
+                        className="px-4 py-2 rounded-xl bg-brand-primary text-white text-sm font-medium
+                            hover:bg-brand-primary/90 disabled:opacity-50 transition-all flex items-center gap-2"
+                    >
+                        {uploading ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <BookOpen className="w-4 h-4" />
+                        )}
+                        {value ? 'تغيير' : 'رفع PDF'}
+                    </button>
+                </div>
+                <input
+                    ref={inputRef}
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                />
+            </div>
+        </div>
+    );
+};
 
 // Animated Input Component
 const AnimatedInput: React.FC<{
@@ -115,7 +311,7 @@ const AnimatedTextarea: React.FC<{
                 </div>
                 <textarea
                     name={name}
-                    value={value}
+                    value={value || ''}
                     onChange={onChange}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
@@ -185,7 +381,8 @@ const FileUpload: React.FC<{
     value: string;
     onChange: (url: string) => void;
     type: 'logo' | 'header';
-}> = ({ label, value, onChange, type }) => {
+    compact?: boolean;
+}> = ({ label, value, onChange, type, compact }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [isHovering, setIsHovering] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -262,7 +459,11 @@ const FileUpload: React.FC<{
     };
 
     const isLogo = type === 'logo';
-    const containerClass = isLogo ? 'aspect-square' : 'aspect-[3/1]';
+    const containerClass = isLogo
+        ? compact
+            ? 'h-28 w-28'
+            : 'aspect-square'
+        : 'aspect-[3/1]';
 
     // Helper to resolve image URL
     const getImageUrl = (url: string) => {
@@ -479,7 +680,23 @@ const CompanyInfoPage: React.FC = () => {
         headerPath: '',
         footerText: '',
         currency: 'EGP',
-        fiscalYearStartMonth: 1
+        fiscalYearStartMonth: 1,
+        aboutText: '',
+        visionText: '',
+        missionText: '',
+        goalsText: '',
+        statsHappyClients: undefined,
+        statsYearsExperience: undefined,
+        statsProjectsCompleted: undefined,
+        statsCustomerSatisfaction: undefined,
+        servicesContentAr: '',
+        servicesContentEn: '',
+        productsContentAr: '',
+        productsContentEn: '',
+        partnersContent: '',
+        industriesContentAr: '',
+        industriesContentEn: '',
+        brochurePath: ''
     });
 
     // Calculate completion percentage
@@ -493,6 +710,7 @@ const CompanyInfoPage: React.FC = () => {
     };
 
     useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'instant' });
         fetchCompanyInfo();
     }, []);
 
@@ -531,8 +749,8 @@ const CompanyInfoPage: React.FC = () => {
                 });
                 setFormData(response.data.data);
                 setOriginalData(response.data.data);
-                setIsEditing(false);
                 setHasChanges(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         } catch (error) {
             console.error('Error updating company info:', error);
@@ -572,6 +790,111 @@ const CompanyInfoPage: React.FC = () => {
         value: i + 1,
         label: formatDate(new Date(2024, i), { month: 'long' })
     }));
+
+    // الخدمات: تحويل من/إلى النص المخزن (مع تزامن العربي والإنجليزي)
+    const servicesAr = parseServicesContent(formData.servicesContentAr);
+    const servicesEn = parseServicesContent(formData.servicesContentEn);
+    const servicesCount = Math.max(servicesAr.length, servicesEn.length) || 1;
+    const servicesIndexes = Array.from({ length: servicesCount }, (_, i) => i);
+
+    const updateServicesAr = (index: number, field: 'title' | 'desc', value: string) => {
+        const baseLength = Math.max(servicesAr.length, index + 1);
+        const next: ServiceItem[] = Array.from({ length: baseLength }, (_, i) => servicesAr[i] || { title: '', desc: '' });
+        next[index] = { ...next[index], [field]: value };
+        setFormData(prev => ({ ...prev, servicesContentAr: serializeServices(next) }));
+    };
+
+    const updateServicesEn = (index: number, field: 'title' | 'desc', value: string) => {
+        const baseLength = Math.max(servicesEn.length, index + 1);
+        const next: ServiceItem[] = Array.from({ length: baseLength }, (_, i) => servicesEn[i] || { title: '', desc: '' });
+        next[index] = { ...next[index], [field]: value };
+        setFormData(prev => ({ ...prev, servicesContentEn: serializeServices(next) }));
+    };
+
+    const addServiceRow = () => {
+        const nextAr = [...servicesAr, { title: '', desc: '' }];
+        const nextEn = [...servicesEn, { title: '', desc: '' }];
+        setFormData(prev => ({
+            ...prev,
+            servicesContentAr: serializeServices(nextAr),
+            servicesContentEn: serializeServices(nextEn)
+        }));
+    };
+
+    const removeServiceRow = (index: number) => {
+        const nextAr = servicesAr.filter((_, i) => i !== index);
+        const nextEn = servicesEn.filter((_, i) => i !== index);
+        setFormData(prev => ({
+            ...prev,
+            servicesContentAr: serializeServices(nextAr),
+            servicesContentEn: serializeServices(nextEn)
+        }));
+    };
+
+    // الشركاء: إدارة الأسطر مع رفع صورة للّوجو
+    const partners = parsePartnersContent(formData.partnersContent);
+    const partnersCount = partners.length || 1;
+    const partnersIndexes = Array.from({ length: partnersCount }, (_, i) => i);
+
+    const updatePartner = (index: number, field: keyof PartnerItem, value: string) => {
+        const baseLength = Math.max(partners.length, index + 1);
+        const next: PartnerItem[] = Array.from(
+            { length: baseLength },
+            (_, i) => partners[i] || { name: '', logo: '', url: '' }
+        );
+        next[index] = { ...next[index], [field]: value };
+        setFormData(prev => ({ ...prev, partnersContent: serializePartners(next) }));
+    };
+
+    const addPartnerRow = () => {
+        const next = [...partners, { name: '', logo: '', url: '' }];
+        setFormData(prev => ({ ...prev, partnersContent: serializePartners(next) }));
+    };
+
+    const removePartnerRow = (index: number) => {
+        const next = partners.filter((_, i) => i !== index);
+        setFormData(prev => ({ ...prev, partnersContent: serializePartners(next) }));
+    };
+
+    // القطاعات: تحويل من/إلى النص المخزن (مع تزامن العربي والإنجليزي)
+    const industriesAr = parseIndustriesContent(formData.industriesContentAr);
+    const industriesEn = parseIndustriesContent(formData.industriesContentEn);
+    const industriesCount = Math.max(industriesAr.length, industriesEn.length) || 1;
+    const industriesIndexes = Array.from({ length: industriesCount }, (_, i) => i);
+
+    const updateIndustryAr = (index: number, field: 'title' | 'desc', value: string) => {
+        const baseLength = Math.max(industriesAr.length, index + 1);
+        const next: IndustryItem[] = Array.from({ length: baseLength }, (_, i) => industriesAr[i] || { title: '', desc: '' });
+        next[index] = { ...next[index], [field]: value };
+        setFormData(prev => ({ ...prev, industriesContentAr: serializeIndustries(next) }));
+    };
+
+    const updateIndustryEn = (index: number, field: 'title' | 'desc', value: string) => {
+        const baseLength = Math.max(industriesEn.length, index + 1);
+        const next: IndustryItem[] = Array.from({ length: baseLength }, (_, i) => industriesEn[i] || { title: '', desc: '' });
+        next[index] = { ...next[index], [field]: value };
+        setFormData(prev => ({ ...prev, industriesContentEn: serializeIndustries(next) }));
+    };
+
+    const addIndustryRow = () => {
+        const nextAr = [...industriesAr, { title: '', desc: '' }];
+        const nextEn = [...industriesEn, { title: '', desc: '' }];
+        setFormData(prev => ({
+            ...prev,
+            industriesContentAr: serializeIndustries(nextAr),
+            industriesContentEn: serializeIndustries(nextEn)
+        }));
+    };
+
+    const removeIndustryRow = (index: number) => {
+        const nextAr = industriesAr.filter((_, i) => i !== index);
+        const nextEn = industriesEn.filter((_, i) => i !== index);
+        setFormData(prev => ({
+            ...prev,
+            industriesContentAr: serializeIndustries(nextAr),
+            industriesContentEn: serializeIndustries(nextEn)
+        }));
+    };
 
     // Loading Skeleton
     if (initialLoading) {
@@ -801,11 +1124,16 @@ const CompanyInfoPage: React.FC = () => {
                                     <Edit2 className="w-5 h-5" />
                                     <span>تعديل البيانات</span>
                                 </button>
-                                <button className="w-full px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl
-                                    text-right flex items-center gap-3 transition-colors duration-200">
+                                <a
+                                    href="/company-profile"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl
+                                        text-right flex items-center gap-3 transition-colors duration-200"
+                                >
                                     <Eye className="w-5 h-5" />
                                     <span>معاينة الصفحة العامة</span>
-                                </button>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -813,8 +1141,8 @@ const CompanyInfoPage: React.FC = () => {
             ) : (
                 /* ============ EDIT MODE ============ */
                 <div className="space-y-6">
-                    {/* Tabs Navigation */}
-                    <div className="flex flex-wrap gap-3 p-2 bg-slate-50 rounded-2xl">
+                    {/* Tabs Navigation - مرتبة لتسهيل إدخال البيانات */}
+                    <div className="flex flex-wrap gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
                         <TabButton
                             active={activeTab === 'basic'}
                             onClick={() => setActiveTab('basic')}
@@ -826,6 +1154,12 @@ const CompanyInfoPage: React.FC = () => {
                             onClick={() => setActiveTab('contact')}
                             icon={<Phone className="w-5 h-5" />}
                             label="التواصل"
+                        />
+                        <TabButton
+                            active={activeTab === 'public'}
+                            onClick={() => setActiveTab('public')}
+                            icon={<Eye className="w-5 h-5" />}
+                            label="محتوى الموقع العام  "
                         />
                         <TabButton
                             active={activeTab === 'branding'}
@@ -843,17 +1177,17 @@ const CompanyInfoPage: React.FC = () => {
 
                     {/* Form Content */}
                     <form onSubmit={handleSubmit}>
-                        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+                        <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-10 shadow-sm">
                             {/* Basic Info Tab */}
                             {activeTab === 'basic' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-                                    <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                                    <div className="flex items-center gap-3 pb-5 border-b-2 border-slate-100">
                                         <div className="p-3 bg-brand-primary/10 rounded-xl">
                                             <Building2 className="w-6 h-6 text-brand-primary" />
                                         </div>
                                         <div>
                                             <h3 className="text-xl font-bold text-slate-800">المعلومات الأساسية</h3>
-                                            <p className="text-sm text-slate-500">بيانات الشركة الرسمية</p>
+                                            <p className="text-sm text-slate-500">بيانات الشركة الرسمية (الاسم، الرقم الضريبي، السجل التجاري)</p>
                                         </div>
                                     </div>
 
@@ -899,13 +1233,13 @@ const CompanyInfoPage: React.FC = () => {
                             {/* Contact Tab */}
                             {activeTab === 'contact' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-                                    <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                                    <div className="flex items-center gap-3 pb-5 border-b-2 border-slate-100">
                                         <div className="p-3 bg-brand-primary/10 rounded-xl">
                                             <Phone className="w-6 h-6 text-brand-primary" />
                                         </div>
                                         <div>
                                             <h3 className="text-xl font-bold text-slate-800">معلومات التواصل</h3>
-                                            <p className="text-sm text-slate-500">العنوان وبيانات الاتصال</p>
+                                            <p className="text-sm text-slate-500">العنوان، الهاتف، الفاكس، البريد والموقع الإلكتروني</p>
                                         </div>
                                     </div>
 
@@ -981,13 +1315,13 @@ const CompanyInfoPage: React.FC = () => {
                             {/* Branding Tab */}
                             {activeTab === 'branding' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-                                    <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                                    <div className="flex items-center gap-3 pb-5 border-b-2 border-slate-100">
                                         <div className="p-3 bg-brand-primary/10 rounded-xl">
                                             <ImageIcon className="w-6 h-6 text-brand-primary" />
                                         </div>
                                         <div>
                                             <h3 className="text-xl font-bold text-slate-800">الهوية البصرية</h3>
-                                            <p className="text-sm text-slate-500">الشعار وصور الهوية</p>
+                                            <p className="text-sm text-slate-500">شعار الشركة، صورة الهيدر، ونص الفوتر (عربي وإنجليزي)</p>
                                         </div>
                                     </div>
 
@@ -1006,6 +1340,24 @@ const CompanyInfoPage: React.FC = () => {
                                         />
                                     </div>
 
+                                    {/* Brochure Upload */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-4">
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <div className="p-2 bg-red-50 rounded-lg">
+                                                <BookOpen className="w-5 h-5 text-red-500" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-slate-800">الكتيّب التعريفي (Brochure)</h4>
+                                                <p className="text-xs text-slate-500 mt-0.5">ملف PDF يظهر للزوار في الصفحة العامة مع زر تنزيل</p>
+                                            </div>
+                                        </div>
+                                        <PdfUpload
+                                            label=""
+                                            value={formData.brochurePath || ''}
+                                            onChange={(url) => setFormData(prev => ({ ...prev, brochurePath: url }))}
+                                        />
+                                    </div>
+
                                     <div className="mt-6">
                                         <AnimatedTextarea
                                             label="نص الفوتر"
@@ -1016,6 +1368,17 @@ const CompanyInfoPage: React.FC = () => {
                                             placeholder="النص الذي سيظهر في ذيل الصفحات"
                                             rows={2}
                                         />
+                                        <div className="mt-4">
+                                            <AnimatedTextarea
+                                                label="Footer text (English)"
+                                                name="footerTextEn"
+                                                value={formData.footerTextEn || ''}
+                                                onChange={handleChange}
+                                                icon={<FileText className="w-5 h-5" />}
+                                                placeholder="Text that will appear in the footer (English)"
+                                                rows={2}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1023,13 +1386,13 @@ const CompanyInfoPage: React.FC = () => {
                             {/* System Tab */}
                             {activeTab === 'system' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-                                    <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                                    <div className="flex items-center gap-3 pb-5 border-b-2 border-slate-100">
                                         <div className="p-3 bg-brand-primary/10 rounded-xl">
                                             <Settings className="w-6 h-6 text-brand-primary" />
                                         </div>
                                         <div>
                                             <h3 className="text-xl font-bold text-slate-800">إعدادات النظام</h3>
-                                            <p className="text-sm text-slate-500">العملة والسنة المالية</p>
+                                            <p className="text-sm text-slate-500">العملة الافتراضية وبداية السنة المالية</p>
                                         </div>
                                     </div>
 
@@ -1063,6 +1426,510 @@ const CompanyInfoPage: React.FC = () => {
                                             </p>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Public Page Content Tab - أقسام مرتبة وموسّعة */}
+                            {activeTab === 'public' && (
+                                <div className="space-y-10 animate-in fade-in slide-in-from-left-4 duration-300">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-3 bg-brand-primary/10 rounded-xl">
+                                                <Eye className="w-6 h-6 text-brand-primary" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-bold text-slate-800">محتوى الصفحة العامة</h3>
+                                                <p className="text-sm text-slate-500">النصوص والإحصائيات التي تظهر في صفحة تعريف الشركة</p>
+                                            </div>
+                                        </div>
+                                        <a
+                                            href="/company-profile"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors text-sm"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                            معاينة الصفحة العامة
+                                        </a>
+                                    </div>
+
+                                    {/* قسم: نص التعريف (Hero) */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
+                                        <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                            <FileText className="w-5 h-5 text-brand-primary" />
+                                            نص التعريف (يظهر تحت اسم الشركة في الهيدر)
+                                        </h4>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <AnimatedTextarea
+                                                label="عربي"
+                                                name="aboutText"
+                                                value={formData.aboutText}
+                                                onChange={handleChange}
+                                                icon={<FileText className="w-5 h-5" />}
+                                                placeholder="اكتب جملة تعريفية قصيرة عن الشركة..."
+                                                rows={3}
+                                            />
+                                            <AnimatedTextarea
+                                                label="English"
+                                                name="aboutTextEn"
+                                                value={formData.aboutTextEn || ''}
+                                                onChange={handleChange}
+                                                icon={<FileText className="w-5 h-5" />}
+                                                placeholder="Write a short intro about the company in English..."
+                                                rows={3}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* قسم: الرؤية والرسالة والأهداف */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
+                                        <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                            <Sparkles className="w-5 h-5 text-brand-primary" />
+                                            الرؤية والرسالة والأهداف
+                                        </h4>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <AnimatedTextarea
+                                                label="الرؤية (عربي)"
+                                                name="visionText"
+                                                value={formData.visionText}
+                                                onChange={handleChange}
+                                                icon={<Sparkles className="w-5 h-5" />}
+                                                placeholder="كيف ترى الشركة مستقبلها؟"
+                                                rows={3}
+                                            />
+                                            <AnimatedTextarea
+                                                label="Vision (English)"
+                                                name="visionTextEn"
+                                                value={formData.visionTextEn || ''}
+                                                onChange={handleChange}
+                                                icon={<Sparkles className="w-5 h-5" />}
+                                                placeholder="How do you see the future of the company?"
+                                                rows={3}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <AnimatedTextarea
+                                                label="الرسالة (عربي)"
+                                                name="missionText"
+                                                value={formData.missionText}
+                                                onChange={handleChange}
+                                                icon={<Target className="w-5 h-5" />}
+                                                placeholder="ما هي رسالة الشركة؟"
+                                                rows={3}
+                                            />
+                                            <AnimatedTextarea
+                                                label="Mission (English)"
+                                                name="missionTextEn"
+                                                value={formData.missionTextEn || ''}
+                                                onChange={handleChange}
+                                                icon={<Target className="w-5 h-5" />}
+                                                placeholder="What is the mission of the company?"
+                                                rows={3}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <AnimatedTextarea
+                                                label="الأهداف (عربي)"
+                                                name="goalsText"
+                                                value={formData.goalsText}
+                                                onChange={handleChange}
+                                                icon={<CheckCircle2 className="w-5 h-5" />}
+                                                placeholder="ما هي أهم أهداف الشركة؟"
+                                                rows={3}
+                                            />
+                                            <AnimatedTextarea
+                                                label="Goals (English)"
+                                                name="goalsTextEn"
+                                                value={formData.goalsTextEn || ''}
+                                                onChange={handleChange}
+                                                icon={<CheckCircle2 className="w-5 h-5" />}
+                                                placeholder="What are the main goals of the company?"
+                                                rows={3}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* قسم: الإحصائيات */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
+                                        <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                            <Award className="w-5 h-5 text-brand-primary" />
+                                            الإحصائيات (أرقام تظهر في الصفحة العامة)
+                                        </h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                            <AnimatedInput
+                                                label="عدد العملاء السعداء"
+                                                name="statsHappyClients"
+                                                value={formData.statsHappyClients?.toString() || ''}
+                                                onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    setFormData(prev => ({ ...prev, statsHappyClients: v ? Number(v) : undefined }));
+                                                }}
+                                                icon={<Users className="w-5 h-5" />}
+                                                placeholder="مثال: 500"
+                                                type="number"
+                                            />
+                                            <AnimatedInput
+                                                label="سنوات الخبرة"
+                                                name="statsYearsExperience"
+                                                value={formData.statsYearsExperience?.toString() || ''}
+                                                onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    setFormData(prev => ({ ...prev, statsYearsExperience: v ? Number(v) : undefined }));
+                                                }}
+                                                icon={<Award className="w-5 h-5" />}
+                                                placeholder="مثال: 15"
+                                                type="number"
+                                            />
+                                            <AnimatedInput
+                                                label="عدد المشاريع المنجزة"
+                                                name="statsProjectsCompleted"
+                                                value={formData.statsProjectsCompleted?.toString() || ''}
+                                                onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    setFormData(prev => ({ ...prev, statsProjectsCompleted: v ? Number(v) : undefined }));
+                                                }}
+                                                icon={<CheckCircle2 className="w-5 h-5" />}
+                                                placeholder="مثال: 1000"
+                                                type="number"
+                                            />
+                                            <AnimatedInput
+                                                label="نسبة رضا العملاء %"
+                                                name="statsCustomerSatisfaction"
+                                                value={formData.statsCustomerSatisfaction?.toString() || ''}
+                                                onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    setFormData(prev => ({ ...prev, statsCustomerSatisfaction: v ? Number(v) : undefined }));
+                                                }}
+                                                icon={<Star className="w-5 h-5" />}
+                                                placeholder="مثال: 98"
+                                                type="number"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* قسم: الخدمات - إدخال كل خدمة على حدة */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-8">
+                                        <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                            <FileText className="w-5 h-5 text-brand-primary" />
+                                            الخدمات
+                                        </h4>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            {/* خدمات عربي */}
+                                            <div className="space-y-4">
+                                                <p className="text-sm font-medium text-slate-700">خدماتنا (عربي)</p>
+                                                {servicesIndexes.map((index) => {
+                                                    const item = servicesAr[index] || { title: '', desc: '' };
+                                                    const canRemove = servicesCount > 1 || item.title || item.desc;
+                                                    return (
+                                                    <div key={index} className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs font-medium text-slate-500">خدمة {index + 1}</span>
+                                                            {canRemove ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeServiceRow(index)}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="حذف الخدمة"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={item.title}
+                                                            onChange={(e) => updateServicesAr(index, 'title', e.target.value)}
+                                                            placeholder="عنوان الخدمة"
+                                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all"
+                                                        />
+                                                        <textarea
+                                                            value={item.desc}
+                                                            onChange={(e) => updateServicesAr(index, 'desc', e.target.value)}
+                                                            placeholder="وصف الخدمة"
+                                                            rows={2}
+                                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none resize-none transition-all"
+                                                        />
+                                                    </div>
+                                                    );
+                                                })}
+                                                <button
+                                                    type="button"
+                                                    onClick={addServiceRow}
+                                                    className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-primary hover:bg-brand-primary/5 text-slate-500 hover:text-brand-primary font-medium transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Plus className="w-5 h-5" />
+                                                    إضافة خدمة
+                                                </button>
+                                            </div>
+
+                                            {/* خدمات إنجليزي */}
+                                            <div className="space-y-4">
+                                                <p className="text-sm font-medium text-slate-700">Our Services (English)</p>
+                                                {servicesIndexes.map((index) => {
+                                                    const item = servicesEn[index] || { title: '', desc: '' };
+                                                    const canRemove = servicesCount > 1 || item.title || item.desc;
+                                                    return (
+                                                    <div key={index} className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs font-medium text-slate-500">Service {index + 1}</span>
+                                                            {canRemove ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeServiceRow(index)}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Remove service"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={item.title}
+                                                            onChange={(e) => updateServicesEn(index, 'title', e.target.value)}
+                                                            placeholder="Service title"
+                                                            dir="ltr"
+                                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all text-left"
+                                                        />
+                                                        <textarea
+                                                            value={item.desc}
+                                                            onChange={(e) => updateServicesEn(index, 'desc', e.target.value)}
+                                                            placeholder="Service description"
+                                                            rows={2}
+                                                            dir="ltr"
+                                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none resize-none transition-all text-left"
+                                                        />
+                                                    </div>
+                                                    );
+                                                })}
+                                                <button
+                                                    type="button"
+                                                    onClick={addServiceRow}
+                                                    className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-primary hover:bg-brand-primary/5 text-slate-500 hover:text-brand-primary font-medium transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Plus className="w-5 h-5" />
+                                                    Add service
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* قسم: المنتجات */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
+                                        <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                            <FileText className="w-5 h-5 text-brand-primary" />
+                                            المنتجات
+                                        </h4>
+                                        <p className="text-sm text-slate-500">كل سطر: العنوان|الدرجات/النوع|الوصف</p>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <AnimatedTextarea
+                                                label="منتجاتنا (عربي)"
+                                                name="productsContentAr"
+                                                value={formData.productsContentAr || ''}
+                                                onChange={handleChange}
+                                                icon={<FileText className="w-5 h-5" />}
+                                                placeholder="Polyethylene (PE)|LDPE, LLDPE, HDPE|خامات متعددة الاستخدامات..."
+                                                rows={5}
+                                            />
+                                            <AnimatedTextarea
+                                                label="Our Products (English)"
+                                                name="productsContentEn"
+                                                value={formData.productsContentEn || ''}
+                                                onChange={handleChange}
+                                                icon={<FileText className="w-5 h-5" />}
+                                                placeholder="Polyethylene (PE)|LDPE, LLDPE, HDPE|Versatile materials..."
+                                                rows={5}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* قسم: الشركاء - إدخال منظم مع رفع صورة للّوجو */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
+                                        <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                            <Users className="w-5 h-5 text-brand-primary" />
+                                            شركاؤنا
+                                        </h4>
+                                        <p className="text-sm text-slate-500">
+                                            لكل شريك: الاسم، لوجو (رفع صورة)، ورابط الموقع (اختياري)
+                                        </p>
+
+                                        <div className="space-y-4">
+                                            {partnersIndexes.map((index) => {
+                                                const item = partners[index] || { name: '', logo: '', url: '' };
+                                                const canRemove = partnersCount > 1 || item.name || item.logo || item.url;
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4"
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs font-medium text-slate-500">
+                                                                شريك {index + 1}
+                                                            </span>
+                                                            {canRemove && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removePartnerRow(index)}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="حذف الشريك"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <label className="text-sm font-medium text-slate-700">
+                                                                    اسم الشريك
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={item.name}
+                                                                    onChange={(e) => updatePartner(index, 'name', e.target.value)}
+                                                                    placeholder="مثال: SABIC"
+                                                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <label className="text-sm font-medium text-slate-700">
+                                                                    رابط موقع الشريك (اختياري)
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={item.url}
+                                                                    onChange={(e) => updatePartner(index, 'url', e.target.value)}
+                                                                    placeholder="https://partner.com"
+                                                                    dir="ltr"
+                                                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all text-left"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                            <label className="text-sm font-medium text-slate-700">
+                                                                لوجو الشريك
+                                                            </label>
+                                        <div className="flex items-center gap-4">
+                                            <FileUpload
+                                                label="لوجو الشريك"
+                                                value={item.logo}
+                                                onChange={(url) => updatePartner(index, 'logo', url)}
+                                                type="logo"
+                                                compact
+                                            />
+                                            {item.logo && (
+                                                <span className="text-xs text-slate-500 break-all">
+                                                    {item.logo}
+                                                </span>
+                                            )}
+                                        </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            <button
+                                                type="button"
+                                                onClick={addPartnerRow}
+                                                className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-primary hover:bg-brand-primary/5 text-slate-500 hover:text-brand-primary font-medium transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Plus className="w-5 h-5" />
+                                                إضافة شريك
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* ===== قسم القطاعات ===== */}
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 space-y-6">
+                                        <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                            <Target className="w-5 h-5 text-brand-primary" />
+                                            القطاعات التي نخدمها
+                                        </h4>
+                                        <p className="text-xs text-slate-500">يُعرض في الصفحة العامة كبطاقات بالعربي والإنجليزي</p>
+                                        <div className="space-y-4">
+                                            {industriesIndexes.map((index) => {
+                                                const itemAr = industriesAr[index] || { title: '', desc: '' };
+                                                const itemEn = industriesEn[index] || { title: '', desc: '' };
+                                                const canRemove = industriesCount > 1 || itemAr.title || itemEn.title;
+                                                return (
+                                                    <div key={index} className="relative p-4 bg-white rounded-xl border border-slate-200 space-y-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-primary bg-brand-primary/10 px-2.5 py-1 rounded-full">
+                                                                <Target className="w-3 h-3" />
+                                                                قطاع {index + 1}
+                                                            </span>
+                                                            {canRemove && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeIndustryRow(index)}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                                                                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                                    العربي
+                                                                </p>
+                                                                <input
+                                                                    type="text"
+                                                                    value={itemAr.title}
+                                                                    onChange={e => updateIndustryAr(index, 'title', e.target.value)}
+                                                                    placeholder="عنوان القطاع (مثال: التصنيع البلاستيكي)"
+                                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 outline-none transition-all"
+                                                                    dir="rtl"
+                                                                />
+                                                                <textarea
+                                                                    value={itemAr.desc}
+                                                                    onChange={e => updateIndustryAr(index, 'desc', e.target.value)}
+                                                                    placeholder="وصف القطاع (مثال: مصانع التعبئة والتغليف البلاستيكية)"
+                                                                    rows={2}
+                                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 outline-none resize-none transition-all"
+                                                                    dir="rtl"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                                                                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                                                    English
+                                                                </p>
+                                                                <input
+                                                                    type="text"
+                                                                    value={itemEn.title}
+                                                                    onChange={e => updateIndustryEn(index, 'title', e.target.value)}
+                                                                    placeholder="Industry title (e.g. Plastic Manufacturing)"
+                                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 outline-none transition-all"
+                                                                    dir="ltr"
+                                                                />
+                                                                <textarea
+                                                                    value={itemEn.desc}
+                                                                    onChange={e => updateIndustryEn(index, 'desc', e.target.value)}
+                                                                    placeholder="Short description (e.g. Packaging factories & manufacturers)"
+                                                                    rows={2}
+                                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 outline-none resize-none transition-all"
+                                                                    dir="ltr"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            <button
+                                                type="button"
+                                                onClick={addIndustryRow}
+                                                className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-brand-primary hover:bg-brand-primary/5 text-slate-500 hover:text-brand-primary font-medium transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Plus className="w-5 h-5" />
+                                                إضافة قطاع
+                                            </button>
+                                        </div>
+                                    </div>
+
                                 </div>
                             )}
                         </div>

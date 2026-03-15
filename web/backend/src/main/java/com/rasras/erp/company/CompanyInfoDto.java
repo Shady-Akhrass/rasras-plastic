@@ -27,4 +27,25 @@ public class CompanyInfoDto {
     private String footerText;
     private String currency;
     private Integer fiscalYearStartMonth;
+    private String aboutText;
+    private String visionText;
+    private String missionText;
+    private String goalsText;
+    private String footerTextEn;
+    private String aboutTextEn;
+    private String visionTextEn;
+    private String missionTextEn;
+    private String goalsTextEn;
+    private String servicesContentAr;
+    private String servicesContentEn;
+    private String productsContentAr;
+    private String productsContentEn;
+    private String partnersContent;
+    private String industriesContentAr;
+    private String industriesContentEn;
+    private String brochurePath;
+    private Integer statsHappyClients;
+    private Integer statsYearsExperience;
+    private Integer statsProjectsCompleted;
+    private Integer statsCustomerSatisfaction;
 }
