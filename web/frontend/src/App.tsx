@@ -316,8 +316,8 @@ function App() {
         </Route>
 
         {/* Redirects */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/company-profile" replace />} />
+        <Route path="*" element={<Navigate to="/company-profile" replace />} />
       </Routes>
     </Router>
   );
