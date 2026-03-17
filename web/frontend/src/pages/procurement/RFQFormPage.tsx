@@ -6,7 +6,7 @@ import {
     Hash, Layers, ClipboardList, CheckCircle2, Check, Search, Users, Eye,
     AlertCircle, Zap, Link2, ChevronDown, BadgeDollarSign
 } from 'lucide-react';
-import purchaseService, { type RFQ, type RFQItem, type Supplier, type PurchaseRequisition, type PurchaseRequisitionItem } from '../../services/purchaseService';
+import purchaseService, { type RFQ, type RFQItem, type Supplier } from '../../services/purchaseService';
 import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { supplierService, type SupplierItemDto } from '../../services/supplierService';
 import { itemService, type ItemDto } from '../../services/itemService';

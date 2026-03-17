@@ -17,6 +17,7 @@ public class UserDto {
     private String username;
     private Integer employeeId;
     private Integer roleId;
+    private String roleCode;
     private String roleName;
     private String roleNameAr;
     private String displayNameAr;

@@ -150,9 +150,9 @@ public class ApprovalService {
             if (step.getApproverRole() == null) {
                 continue;
             }
-            Integer roleId = step.getApproverRole().getRoleId();
+            String roleCode = step.getApproverRole().getRoleCode();
             boolean matches = limits.stream().anyMatch(limit -> {
-                if (limit.getRole() == null || !roleId.equals(limit.getRole().getRoleId())) {
+                if (limit.getRole() == null || roleCode == null || !roleCode.equalsIgnoreCase(limit.getRole().getRoleCode())) {
                     return false;
                 }
                 BigDecimal min = limit.getMinAmount() != null ? limit.getMinAmount() : BigDecimal.ZERO;
@@ -450,9 +450,9 @@ public class ApprovalService {
             for (int i = currentIdx + 1; i < steps.size(); i++) {
                 ApprovalWorkflowStep candidate = steps.get(i);
                 if (amount != null && limits != null && !limits.isEmpty() && candidate.getApproverRole() != null) {
-                    Integer roleId = candidate.getApproverRole().getRoleId();
+                    String roleCode = candidate.getApproverRole().getRoleCode();
                     boolean matches = limits.stream().anyMatch(limit -> {
-                        if (limit.getRole() == null || !roleId.equals(limit.getRole().getRoleId())) {
+                        if (limit.getRole() == null || roleCode == null || !roleCode.equalsIgnoreCase(limit.getRole().getRoleCode())) {
                             return false;
                         }
                         BigDecimal min = limit.getMinAmount() != null ? limit.getMinAmount() : BigDecimal.ZERO;

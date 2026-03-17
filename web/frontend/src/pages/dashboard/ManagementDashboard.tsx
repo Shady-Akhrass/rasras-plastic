@@ -1,13 +1,13 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, type Variants } from 'framer-motion';
 import {
-    Users, Package, TrendingUp, ArrowUpRight, ArrowDownRight, User,
+    Package, TrendingUp, ArrowUpRight, ArrowDownRight, User,
     FileText, DollarSign, Calendar, Clock,
-    CheckCircle2, XCircle, ArrowRight, BarChart3,
+    CheckCircle2, XCircle, BarChart3,
     Activity, Zap, RefreshCw, Download, Bell,
     ChevronLeft, PieChart,
-    MoreHorizontal, ExternalLink, UserPlus, ShoppingCart,
+    UserPlus, ShoppingCart,
     AlertTriangle, Wallet, Landmark
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
@@ -19,7 +19,7 @@ import { hrService } from '../../services/hrService';
 import customerService from '../../services/customerService';
 import { supplierService } from '../../services/supplierService';
 import { stockMovementService } from '../../services/stockMovementService';
-import { approvalService } from '../../services/approvalService';
+
 import { salesInvoiceService } from '../../services/salesInvoiceService';
 import { supplierInvoiceService } from '../../services/supplierInvoiceService';
 import { purchaseOrderService } from '../../services/purchaseOrderService';
@@ -33,12 +33,7 @@ import toast from 'react-hot-toast';
 import ExchangeRateCompact from '../../components/ExchangeRate/ExchangeRateCompact';
 import ExchangeRateWidget from '../../components/ExchangeRate/ExchangeRateWidget';
 
-interface DashboardStats {
-    totalEmployees?: number;
-    activeEmployees?: number;
-    totalDepartments?: number;
-    employeeGrowthRate?: number;
-}
+
 
 // Helper to normalize Java LocalDate array `[2024, 3, 7]` into ISO `2024-03-07` or `[2024,3,7,12,30]` -> `2024-03-07`
 export const parseBackendDateStr = (rawDate: any): string => {
@@ -437,12 +432,10 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
 
 // Latest Activity Highlight Card
 const LatestActivityCard = ({ 
-    title, 
     type, 
     data, 
     onClick 
 }: { 
-    title: string; 
     type: 'SO' | 'PO'; 
     data: any; 
     onClick?: () => void 
@@ -831,7 +824,6 @@ const ManagementDashboard: React.FC = () => {
     const [customerOutstanding, setCustomerOutstanding] = useState(0);
     const [supplierOutstanding, setSupplierOutstanding] = useState(0);
     const [recentMovements, setRecentMovements] = useState<any[]>([]);
-    const [pendingApprovals, setPendingApprovals] = useState(0);
 
     // Functional Area Stats
     const [procurementStats, setProcurementStats] = useState({ waitingImports: 0, pendingPRs: 0, suppliersCount: 0 });
@@ -863,7 +855,7 @@ const ManagementDashboard: React.FC = () => {
                     customerService.getOutstandingSummary(), // 3
                     supplierService.getOutstandingSummary(), // 4
                     stockMovementService.getPaged({ page: 0, size: 10 }), // 5
-                    user?.userId ? approvalService.getPendingCount(user.userId) : 0, // 6
+
                     salesInvoiceService.getAll(), // 7
                     supplierInvoiceService.getAllInvoices().then((res: any) => res?.data ?? []), // 8
                     // Finance
@@ -884,7 +876,7 @@ const ManagementDashboard: React.FC = () => {
 
                 const [
                     stockRes, warehouseRes, attendanceRes, customerRes, supplierRes,
-                    movementRes, approvalsCount, salesRes, supplierInvsRes,
+                    movementRes, salesRes, supplierInvsRes,
                     unpaidInvsRes, vouchersRes, waitingPOsRes, prsRes, allSuppliersRes,
                     salesRequestsRes, allSalesOrdersRes, allPurchaseOrdersRes, grnsRes, transfersRes
                 ] = results;
@@ -952,7 +944,6 @@ const ManagementDashboard: React.FC = () => {
                 setSupplierOutstanding((supplierRes.data || supplierRes || []).reduce((acc: any, s: any) => acc + (s.currentBalance || 0), 0));
 
                 setRecentMovements(movementRes.content || []);
-                setPendingApprovals(typeof approvalsCount === 'number' ? approvalsCount : 0);
 
                 // --- Analytics ---
                 const customerRevenue: Record<string, number> = {};
@@ -1084,7 +1075,7 @@ const ManagementDashboard: React.FC = () => {
         });
     };
 
-    const activities = []; // Placeholder for future activity log integration
+
 
     return (
         <motion.div
@@ -1688,13 +1679,11 @@ const ManagementDashboard: React.FC = () => {
                     className="lg:col-span-1 space-y-6 flex flex-col"
                 >
                     <LatestActivityCard 
-                        title="أخر أمر بيع"
                         type="SO"
                         data={latestSaleOrders[0]}
                         onClick={() => navigate('/dashboard/sales/orders')}
                     />
                     <LatestActivityCard 
-                        title="أخر أمر شراء"
                         type="PO"
                         data={latestPurchaseOrders[0]}
                         onClick={() => navigate('/dashboard/procurement/po')}

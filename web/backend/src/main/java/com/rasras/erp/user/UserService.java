@@ -121,6 +121,7 @@ public class UserService {
                 .username(user.getUsername())
                 .employeeId(user.getEmployeeId())
                 .roleId(user.getRole().getRoleId())
+                .roleCode(user.getRole().getRoleCode())
                 .roleName(user.getRole().getRoleNameEn())
                 .roleNameAr(user.getRole().getRoleNameAr())
                 .displayNameAr(displayNameAr)
