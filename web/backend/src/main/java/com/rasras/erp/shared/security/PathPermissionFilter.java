@@ -37,6 +37,12 @@ public class PathPermissionFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
+        // Allow CORS preflight requests to pass through without permission checks.
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (PathPermissionConstants.isWhitelisted(path)) {
             filterChain.doFilter(request, response);
             return;

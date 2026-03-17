@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ScrollToTop from './components/common/ScrollToTop';
 import LoginPage from './pages/auth/LoginPage';
@@ -27,7 +26,7 @@ import ItemsBelowMinReportPage from './pages/inventory/reports/ItemsBelowMinRepo
 import StagnantItemsReportPage from './pages/inventory/reports/StagnantItemsReportPage';
 import ItemMovementReportPage from './pages/inventory/reports/ItemMovementReportPage';
 import InventoryCountPage from './pages/inventory/InventoryCountPage';
-// GRN pages in inventory/warehouse now redirect to procurement/grn
+
 import GRNListPageRedirect from './pages/inventory/warehouse/GRNListPage';
 import GRNFormPageRedirect from './pages/inventory/warehouse/GRNFormPage';
 import MaterialIssueListPage from './pages/inventory/warehouse/MaterialIssueListPage';
