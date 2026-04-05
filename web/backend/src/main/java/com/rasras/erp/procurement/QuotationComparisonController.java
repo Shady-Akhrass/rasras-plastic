@@ -3,6 +3,8 @@ package com.rasras.erp.procurement;
 import com.rasras.erp.shared.dto.ApiResponse;
 import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import java.util.List;
 public class QuotationComparisonController {
 
     private final QuotationComparisonService comparisonService;
+    private final QuotationComparisonPdfService comparisonPdfService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<QuotationComparisonDto>>> getAllComparisons() {
@@ -25,6 +28,17 @@ public class QuotationComparisonController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<QuotationComparisonDto>> getComparisonById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(comparisonService.getComparisonById(id)));
+    }
+
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> downloadComparisonPdf(@PathVariable Integer id) {
+        QuotationComparisonDto comparison = comparisonService.getComparisonById(id);
+        byte[] pdf = comparisonPdfService.generatePdf(comparison);
+        String fileName = "QuotationComparison_" + (comparison.getComparisonNumber() != null ? comparison.getComparisonNumber() : id) + ".pdf";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @PostMapping

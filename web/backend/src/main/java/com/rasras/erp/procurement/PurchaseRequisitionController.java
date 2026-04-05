@@ -4,6 +4,8 @@ import com.rasras.erp.shared.dto.ApiResponse;
 import com.rasras.erp.shared.security.SecurityConstants;
 import com.rasras.erp.shared.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -20,19 +22,18 @@ import java.util.List;
 public class PurchaseRequisitionController {
 
     private final PurchaseRequisitionService prService;
+    private final PurchaseRequisitionPdfService prPdfService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<PurchaseRequisitionDto>>> getAllPurchaseRequisitions() {
         return ResponseEntity.ok(ApiResponse.success(prService.getAllPurchaseRequisitions()));
     }
 
-    /** Count of approved PRs that have no RFQ yet (for RFQ page alert). Must be before /{id}. */
     @GetMapping("/approved-without-rfq-count")
     public ResponseEntity<ApiResponse<Long>> getApprovedPRWithoutRFQCount() {
         return ResponseEntity.ok(ApiResponse.success(prService.getApprovedPRWithoutRFQCount()));
     }
 
-    /** Sales: only PRs created by the current user. Must be declared before /{id}. */
     @GetMapping("/sales")
     public ResponseEntity<ApiResponse<List<PurchaseRequisitionDto>>> getSalesPRs() {
         Integer userId = null;
@@ -48,6 +49,18 @@ public class PurchaseRequisitionController {
         return ResponseEntity.ok(ApiResponse.success(prService.getPurchaseRequisitionById(id)));
     }
 
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> downloadPurchaseRequisitionPdf(@PathVariable Integer id) {
+        PurchaseRequisitionDto pr = prService.getPurchaseRequisitionById(id);
+        byte[] pdf = prPdfService.generatePdf(pr);
+        String fileName = "PurchaseRequisition_" + (pr.getPrNumber() != null ? pr.getPrNumber() : id) + ".pdf";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<PurchaseRequisitionDto>> createPurchaseRequisition(
             @RequestBody PurchaseRequisitionDto dto) {
@@ -55,7 +68,8 @@ public class PurchaseRequisitionController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<PurchaseRequisitionDto>> updatePurchaseRequisition(@PathVariable Integer id,
+    public ResponseEntity<ApiResponse<PurchaseRequisitionDto>> updatePurchaseRequisition(
+            @PathVariable Integer id,
             @RequestBody PurchaseRequisitionDto dto) {
         return ResponseEntity.ok(ApiResponse.success(prService.updatePurchaseRequisition(id, dto)));
     }

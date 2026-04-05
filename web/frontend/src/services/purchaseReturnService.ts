@@ -53,6 +53,12 @@ export const purchaseReturnService = {
         const response = await apiClient.get<ApiResponse<PurchaseReturnDto>>(`/procurement/returns/${id}`);
         return response.data;
     },
+    downloadReturnPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/procurement/returns/${id}/pdf`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    },
 
     createReturn: async (dto: PurchaseReturnDto) => {
         const response = await apiClient.post<ApiResponse<PurchaseReturnDto>>('/procurement/returns', dto);

@@ -3,6 +3,8 @@ package com.rasras.erp.procurement;
 import com.rasras.erp.shared.dto.ApiResponse;
 import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import java.util.List;
 public class SupplierQuotationController {
 
     private final SupplierQuotationService quotationService;
+    private final SupplierQuotationPdfService quotationPdfService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<SupplierQuotationDto>>> getAllQuotations() {
@@ -25,6 +28,17 @@ public class SupplierQuotationController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<SupplierQuotationDto>> getQuotationById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(quotationService.getQuotationById(id)));
+    }
+
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> downloadQuotationPdf(@PathVariable Integer id) {
+        SupplierQuotationDto quotation = quotationService.getQuotationById(id);
+        byte[] pdf = quotationPdfService.generatePdf(quotation);
+        String fileName = "SupplierQuotation_" + (quotation.getQuotationNumber() != null ? quotation.getQuotationNumber() : id) + ".pdf";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @PostMapping

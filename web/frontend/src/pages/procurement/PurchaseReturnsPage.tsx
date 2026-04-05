@@ -13,13 +13,15 @@ import {
     Eye,
     Truck,
     X,
-    Filter
+    Filter,
+    Printer
 } from 'lucide-react';
 import { formatNumber, formatDate } from '../../utils/format';
 import { purchaseReturnService, type PurchaseReturnDto } from '../../services/purchaseReturnService';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import { openPdfDownload } from '../../utils/downloadPdf';
 
 
 // Stat Card Component
@@ -100,10 +102,11 @@ const ReturnTableRow: React.FC<{
     returnItem: PurchaseReturnDto;
     index: number;
     onView: (id: number) => void;
+    onPrint: (item: PurchaseReturnDto) => void;
     getCurrencyLabel: (currency: string) => string;
     defaultCurrency: string;
     convertAmount: (amount: number, from: string) => number;
-}> = ({ returnItem, index, onView, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+}> = ({ returnItem, index, onView, onPrint, getCurrencyLabel, defaultCurrency, convertAmount }) => (
 
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
@@ -157,6 +160,13 @@ const ReturnTableRow: React.FC<{
                     title="عرض التفاصيل"
                 >
                     <Eye className="w-4 h-4" />
+                </button>
+                <button
+                    onClick={() => onPrint(returnItem)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                    title="طباعة PDF"
+                >
+                    <Printer className="w-4 h-4" />
                 </button>
             </div>
         </td>
@@ -278,6 +288,15 @@ const PurchaseReturnsPage: React.FC = () => {
 
     const handleViewReturn = (id: number) => {
         navigate(`/dashboard/procurement/returns/${id}?mode=view`);
+    };
+
+    const handlePrintReturn = async (item: PurchaseReturnDto) => {
+        if (!item.id) return;
+        openPdfDownload({
+            endpoint: `/procurement/returns/${item.id}/pdf`,
+            loadingMessage: 'جاري تجهيز ملف مرتجع الشراء...',
+            successMessage: 'تم فتح ملف مرتجع الشراء'
+        });
     };
 
     return (
@@ -447,6 +466,7 @@ const PurchaseReturnsPage: React.FC = () => {
                                             returnItem={returnItem}
                                             index={index}
                                             onView={handleViewReturn}
+                                            onPrint={handlePrintReturn}
                                             getCurrencyLabel={getCurrencyLabel}
                                             defaultCurrency={defaultCurrency}
                                             convertAmount={convertAmount}

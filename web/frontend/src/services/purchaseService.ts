@@ -182,6 +182,12 @@ const purchaseService = {
         const response = await apiClient.get<{ data: PurchaseRequisition }>(`/procurement/pr/${id}`);
         return response.data.data;
     },
+    downloadPRPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/procurement/pr/${id}/pdf`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    },
     /** Count of approved PRs that have no RFQ yet (for RFQ page alert). */
     getApprovedPRWithoutRFQCount: async (): Promise<number> => {
         const response = await apiClient.get<{ data: number }>('/procurement/pr/approved-without-rfq-count');
@@ -212,6 +218,12 @@ const purchaseService = {
         const response = await apiClient.get<{ data: RFQ }>(`/procurement/rfq/${id}`);
         return response.data.data;
     },
+    downloadRFQPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/procurement/rfq/${id}/pdf`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    },
     createRFQ: async (rfq: RFQ) => {
         const response = await apiClient.post<{ data: RFQ }>('/procurement/rfq', rfq);
         return response.data.data;
@@ -233,6 +245,12 @@ const purchaseService = {
         const response = await apiClient.get<{ data: SupplierQuotation }>(`/procurement/quotation/${id}`);
         return response.data.data;
     },
+    downloadQuotationPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/procurement/quotation/${id}/pdf`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    },
     createQuotation: async (quotation: SupplierQuotation) => {
         const response = await apiClient.post<{ data: SupplierQuotation }>('/procurement/quotation', quotation);
         return response.data.data;
@@ -253,6 +271,12 @@ const purchaseService = {
     getComparisonById: async (id: number) => {
         const response = await apiClient.get<{ data: QuotationComparison }>(`/procurement/comparison/${id}`);
         return response.data.data;
+    },
+    downloadComparisonPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/procurement/comparison/${id}/pdf`, {
+            responseType: 'blob'
+        });
+        return response.data;
     },
     createComparison: async (comparison: QuotationComparison) => {
         const response = await apiClient.post<{ data: QuotationComparison }>('/procurement/comparison', comparison);

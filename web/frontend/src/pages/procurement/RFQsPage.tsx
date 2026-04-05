@@ -14,7 +14,8 @@ import {
     Truck,
     Package,
     Trash2,
-    Bell
+    Bell,
+    Printer
 } from 'lucide-react';
 import purchaseService, { type RFQ } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
@@ -22,6 +23,7 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { formatDate } from '../../utils/format';
 import toast from 'react-hot-toast';
+import { openPdfDownload } from '../../utils/downloadPdf';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -97,7 +99,8 @@ const RFQTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onDelete: (rfq: RFQ) => void;
-}> = ({ rfq, index, onView, onDelete }) => (
+    onPrint: (rfq: RFQ) => void;
+}> = ({ rfq, index, onView, onDelete, onPrint }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -166,6 +169,13 @@ const RFQTableRow: React.FC<{
                     title="حذف"
                 >
                     <Trash2 className="w-5 h-5" />
+                </button>
+                <button
+                    onClick={() => onPrint(rfq)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200"
+                    title="طباعة PDF"
+                >
+                    <Printer className="w-5 h-5" />
                 </button>
             </div>
         </td>
@@ -239,6 +249,15 @@ const RFQsPage: React.FC = () => {
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    const handlePrintRFQ = async (rfq: RFQ) => {
+        if (!rfq.id) return;
+        openPdfDownload({
+            endpoint: `/procurement/rfq/${rfq.id}/pdf`,
+            loadingMessage: 'جاري تجهيز ملف RFQ...',
+            successMessage: 'تم فتح ملف طلب عرض السعر'
+        });
     };
 
     const filteredRFQs = useMemo(() => {
@@ -394,6 +413,7 @@ const RFQsPage: React.FC = () => {
                                         index={index}
                                         onView={(id) => navigate(`/dashboard/procurement/rfq/${id}`)}
                                         onDelete={handleDeleteClick}
+                                        onPrint={handlePrintRFQ}
                                     />
                                 ))
                             )}

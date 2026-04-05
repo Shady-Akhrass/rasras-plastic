@@ -13,13 +13,15 @@ import {
     X,
     Edit3,
     Trash2,
-    Filter
+    Filter,
+    Printer
 } from 'lucide-react';
 import purchaseService, { type QuotationComparison } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import toast from 'react-hot-toast';
+import { openPdfDownload } from '../../utils/downloadPdf';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -104,9 +106,10 @@ const ComparisonTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onDelete: (comparison: QuotationComparison) => void;
+    onPrint: (comparison: QuotationComparison) => void;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
-}> = ({ comparison, index, onView, onDelete, isSelected, onToggleSelect }) => (
+}> = ({ comparison, index, onView, onDelete, onPrint, isSelected, onToggleSelect }) => (
     <tr
         className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
         style={{
@@ -176,6 +179,13 @@ const ComparisonTableRow: React.FC<{
                         <Trash2 className="w-4 h-4" />
                     </button>
                 )}
+                <button
+                    onClick={() => onPrint(comparison)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                    title="طباعة PDF"
+                >
+                    <Printer className="w-4 h-4" />
+                </button>
             </div>
         </td>
     </tr>
@@ -350,6 +360,15 @@ const QuotationComparisonPage: React.FC = () => {
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    const handlePrintComparison = async (comparison: QuotationComparison) => {
+        if (!comparison.id) return;
+        openPdfDownload({
+            endpoint: `/procurement/comparison/${comparison.id}/pdf`,
+            loadingMessage: 'جاري تجهيز ملف المقارنة...',
+            successMessage: 'تم فتح ملف المقارنة'
+        });
     };
 
     return (
@@ -540,6 +559,7 @@ const QuotationComparisonPage: React.FC = () => {
                                         index={index}
                                         onView={handleView}
                                         onDelete={handleDeleteClick}
+                                        onPrint={handlePrintComparison}
                                         isSelected={!!comparison.id && selectedIds.includes(comparison.id)}
                                         onToggleSelect={handleToggleSelect}
                                     />

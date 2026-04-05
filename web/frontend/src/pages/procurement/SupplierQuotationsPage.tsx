@@ -16,7 +16,8 @@ import {
     X,
     XCircle,
     AlertCircle,
-    Trash2
+    Trash2,
+    Printer
 } from 'lucide-react';
 import { formatNumber, formatDate } from '../../utils/format';
 import purchaseService, { type SupplierQuotation } from '../../services/purchaseService';
@@ -25,6 +26,7 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import toast from 'react-hot-toast';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
+import { openPdfDownload } from '../../utils/downloadPdf';
 
 
 // Stat Card Component
@@ -96,13 +98,14 @@ const QuotationTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onDelete: (quotation: SupplierQuotation) => void;
+    onPrint: (quotation: SupplierQuotation) => void;
     navigate: ReturnType<typeof useNavigate>;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
     getCurrencyLabel: (currency: string) => string;
     defaultCurrency: string;
     convertAmount: (amount: number, from: string) => number;
-}> = ({ quotation, index, onView, onDelete, navigate, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+}> = ({ quotation, index, onView, onDelete, onPrint, navigate, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
 
     <tr
         className="hover:bg-indigo-50/50 transition-all duration-200 group border-b border-slate-100 last:border-0 cursor-pointer"
@@ -209,6 +212,13 @@ const QuotationTableRow: React.FC<{
                 >
                     <Trash2 className="w-4 h-4" />
                 </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onPrint(quotation); }}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                    title="طباعة PDF"
+                >
+                    <Printer className="w-4 h-4" />
+                </button>
             </div>
         </td>
     </tr>
@@ -295,6 +305,15 @@ const SupplierQuotationsPage: React.FC = () => {
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    const handlePrintQuotation = async (quotation: SupplierQuotation) => {
+        if (!quotation.id) return;
+        openPdfDownload({
+            endpoint: `/procurement/quotation/${quotation.id}/pdf`,
+            loadingMessage: 'جاري تجهيز ملف عرض السعر...',
+            successMessage: 'تم فتح ملف عرض السعر'
+        });
     };
 
     const filteredQuotations = useMemo(() => {
@@ -527,6 +546,7 @@ const SupplierQuotationsPage: React.FC = () => {
                                         index={index}
                                         onView={(id) => navigate(`/dashboard/procurement/quotation/${id}`)}
                                         onDelete={handleDeleteClick}
+                                        onPrint={handlePrintQuotation}
                                         navigate={navigate}
                                         isSelected={!!q.id && selectedIds.includes(q.id)}
                                         onToggleSelect={handleToggleSelect}

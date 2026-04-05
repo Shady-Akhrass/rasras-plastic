@@ -14,7 +14,8 @@ import {
     TrendingUp,
     RefreshCw,
     DollarSign,
-    Trash2
+    Trash2,
+    Printer
 } from 'lucide-react';
 import { purchaseOrderService, type PurchaseOrderDto } from '../../services/purchaseOrderService';
 import Pagination from '../../components/common/Pagination';
@@ -23,6 +24,7 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import { toast } from 'react-hot-toast';
 import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import { openPdfDownload } from '../../utils/downloadPdf';
 
 
 // Stat Card Component
@@ -114,12 +116,13 @@ const POTableRow: React.FC<{
     index: number;
     onView: (id: number) => void;
     onDelete: (order: PurchaseOrderDto) => void;
+    onPrint: (order: PurchaseOrderDto) => void;
     isSelected: boolean;
     onToggleSelect: (id: number) => void;
     getCurrencyLabel: (currency: string) => string;
     defaultCurrency: string;
     convertAmount: (amount: number, from: string) => number;
-}> = ({ order, index, onView, onDelete, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
+}> = ({ order, index, onView, onDelete, onPrint, isSelected, onToggleSelect, getCurrencyLabel, defaultCurrency, convertAmount }) => (
 
 
     <tr
@@ -182,6 +185,13 @@ const POTableRow: React.FC<{
                     title="عرض التفاصيل"
                 >
                     <Eye className="w-4 h-4" />
+                </button>
+                <button
+                    onClick={() => onPrint(order)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                    title="طباعة PDF"
+                >
+                    <Printer className="w-4 h-4" />
                 </button>
                 <button
                     onClick={() => onDelete(order)}
@@ -382,6 +392,15 @@ const PurchaseOrdersPage: React.FC = () => {
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    const handlePrintOrder = async (order: PurchaseOrderDto) => {
+        if (!order.id) return;
+        openPdfDownload({
+            endpoint: `/procurement/po/${order.id}/pdf`,
+            loadingMessage: 'جاري تجهيز ملف أمر الشراء...',
+            successMessage: 'تم فتح ملف أمر الشراء'
+        });
     };
 
     return (
@@ -588,6 +607,7 @@ const PurchaseOrdersPage: React.FC = () => {
                                         index={index}
                                         onView={handleViewOrder}
                                         onDelete={handleDeleteClick}
+                                        onPrint={handlePrintOrder}
                                         isSelected={!!order.id && selectedIds.includes(order.id)}
                                         onToggleSelect={handleToggleSelect}
                                         getCurrencyLabel={getCurrencyLabel}

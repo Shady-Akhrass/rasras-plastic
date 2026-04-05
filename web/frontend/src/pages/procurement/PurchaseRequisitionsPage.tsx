@@ -19,7 +19,8 @@ import {
     Trash2,
     ChevronDown,
     ChevronUp,
-    Send
+    Send,
+    Printer
 } from 'lucide-react';
 import purchaseService, { type PurchaseRequisition, type PRLifecycle } from '../../services/purchaseService';
 import Pagination from '../../components/common/Pagination';
@@ -28,6 +29,7 @@ import { formatDate } from '../../utils/format';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import PRLifecycleTracker from '../../components/procurement/PRLifecycleTracker';
 import toast from 'react-hot-toast';
+import { openPdfDownload } from '../../utils/downloadPdf';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -130,11 +132,12 @@ const PRTableRow: React.FC<{
     onView: (id: number) => void;
     onSubmit: (id: number) => void;
     onDelete: (pr: PurchaseRequisition) => void;
+    onPrint: (pr: PurchaseRequisition) => void;
     isExpanded: boolean;
     onToggleExpand: () => void;
     lifecycle: PRLifecycle | null;
     loadingLifecycle: boolean;
-}> = ({ pr, index, onView, onSubmit, onDelete, isExpanded, onToggleExpand, lifecycle, loadingLifecycle }) => (
+}> = ({ pr, index, onView, onSubmit, onDelete, onPrint, isExpanded, onToggleExpand, lifecycle, loadingLifecycle }) => (
     <>
         <tr
             className="hover:bg-brand-primary/5 transition-all duration-200 group border-b border-slate-100 last:border-0"
@@ -230,6 +233,14 @@ const PRTableRow: React.FC<{
                                 <Trash2 className="w-4 h-4" />
                             </button>
                         )}
+                        <button
+                            onClick={() => onPrint(pr)}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 
+                                    rounded-lg transition-all duration-200"
+                            title="طباعة PDF"
+                        >
+                            <Printer className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
             </td>
@@ -476,6 +487,15 @@ const PurchaseRequisitionsPage: React.FC = () => {
         }
     };
 
+    const handlePrintPR = async (pr: PurchaseRequisition) => {
+        if (!pr.id) return;
+        openPdfDownload({
+            endpoint: `/procurement/pr/${pr.id}/pdf`,
+            loadingMessage: 'جاري تجهيز ملف طلب الشراء...',
+            successMessage: 'تم فتح ملف طلب الشراء'
+        });
+    };
+
     return (
         <div className="space-y-6">
             <style>{`
@@ -658,6 +678,7 @@ const PurchaseRequisitionsPage: React.FC = () => {
                                         onView={handleViewPR}
                                         onSubmit={handleSubmit}
                                         onDelete={handleDeleteClick}
+                                        onPrint={handlePrintPR}
                                         isExpanded={expandedRows.has(pr.id!)}
                                         onToggleExpand={() => handleToggleExpand(pr.id!)}
                                         lifecycle={lifecycleData.get(pr.id!) || null}

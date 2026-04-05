@@ -6,8 +6,7 @@ import {
     FileText, DollarSign, Calendar, Clock,
     CheckCircle2, XCircle, BarChart3,
     Activity, Zap, RefreshCw, Download, Bell,
-    ChevronLeft, PieChart,
-    UserPlus, ShoppingCart,
+    ChevronLeft, PieChart, UserPlus, ShoppingCart,
     AlertTriangle, Wallet, Landmark
 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
@@ -19,7 +18,6 @@ import { hrService } from '../../services/hrService';
 import customerService from '../../services/customerService';
 import { supplierService } from '../../services/supplierService';
 import { stockMovementService } from '../../services/stockMovementService';
-
 import { salesInvoiceService } from '../../services/salesInvoiceService';
 import { supplierInvoiceService } from '../../services/supplierInvoiceService';
 import { purchaseOrderService } from '../../services/purchaseOrderService';
@@ -32,8 +30,6 @@ import { saleOrderService } from '../../services/saleOrderService';
 import toast from 'react-hot-toast';
 import ExchangeRateCompact from '../../components/ExchangeRate/ExchangeRateCompact';
 import ExchangeRateWidget from '../../components/ExchangeRate/ExchangeRateWidget';
-
-
 
 // Helper to normalize Java LocalDate array `[2024, 3, 7]` into ISO `2024-03-07` or `[2024,3,7,12,30]` -> `2024-03-07`
 export const parseBackendDateStr = (rawDate: any): string => {
@@ -855,23 +851,22 @@ const ManagementDashboard: React.FC = () => {
                     customerService.getOutstandingSummary(), // 3
                     supplierService.getOutstandingSummary(), // 4
                     stockMovementService.getPaged({ page: 0, size: 10 }), // 5
-
-                    salesInvoiceService.getAll(), // 7
-                    supplierInvoiceService.getAllInvoices().then((res: any) => res?.data ?? []), // 8
+                    salesInvoiceService.getAll(), // 6
+                    supplierInvoiceService.getAllInvoices().then((res: any) => res?.data ?? []), // 7
                     // Finance
-                    paymentVoucherService.getUnpaidInvoices().catch(() => []), // 9
-                    paymentVoucherService.getAllVouchers().catch(() => []), // 10
+                    paymentVoucherService.getUnpaidInvoices().catch(() => []), // 8
+                    paymentVoucherService.getAllVouchers().catch(() => []), // 9
                     // Procurement
-                    purchaseOrderService.getWaitingForArrivalPOs().catch(() => []), // 11
-                    purchaseService.getAllPRs().catch(() => []), // 12
-                    purchaseService.getAllSuppliers().catch(() => []), // 13
+                    purchaseOrderService.getWaitingForArrivalPOs().catch(() => []), // 10
+                    purchaseService.getAllPRs().catch(() => []), // 11
+                    purchaseService.getAllSuppliers().catch(() => []), // 12
                     // Sales
-                    customerRequestService.getAllRequests().then((r: any) => r.data || []).catch(() => []), // 14
-                    saleOrderService.getAll().catch(() => []), // 15
-                    purchaseOrderService.getAllPOs().catch(() => []), // 16
+                    customerRequestService.getAllRequests().then((r: any) => r.data || []).catch(() => []), // 13
+                    saleOrderService.getAll().catch(() => []), // 14
+                    purchaseOrderService.getAllPOs().catch(() => []), // 15
                     // Warehouse
-                    grnService.getAllGRNs().catch(() => []), // 17
-                    transferNoteService.getAll().catch(() => []) // 18
+                    grnService.getAllGRNs().catch(() => []), // 16
+                    transferNoteService.getAll().catch(() => []) // 17
                 ]);
 
                 const [
@@ -1074,8 +1069,6 @@ const ManagementDashboard: React.FC = () => {
             day: 'numeric'
         });
     };
-
-
 
     return (
         <motion.div

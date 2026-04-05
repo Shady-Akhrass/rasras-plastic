@@ -2,6 +2,8 @@ package com.rasras.erp.procurement;
 
 import com.rasras.erp.shared.security.SecurityConstants;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,7 @@ import java.util.Map;
 public class PurchaseOrderController {
 
     private final PurchaseOrderService poService;
+    private final PurchaseOrderPdfService poPdfService;
 
     @PreAuthorize(SecurityConstants.PROCUREMENT_SECTION + " or " + SecurityConstants.SUPPLIER_INVOICE_VIEW + " or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('INVENTORY_VIEW')")
     @GetMapping
@@ -40,6 +43,18 @@ public class PurchaseOrderController {
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, PurchaseOrderDto>> getPOById(@PathVariable Integer id) {
         return ResponseEntity.ok(Map.of("data", poService.getPOById(id)));
+    }
+
+    @PreAuthorize(SecurityConstants.PROCUREMENT_SECTION + " or " + SecurityConstants.SUPPLIER_INVOICE_VIEW + " or hasAuthority('SECTION_WAREHOUSE') or hasAuthority('SECTION_OPERATIONS') or hasAuthority('INVENTORY_VIEW')")
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> downloadPOPdf(@PathVariable Integer id) {
+        PurchaseOrderDto po = poService.getPOById(id);
+        byte[] pdf = poPdfService.generatePdf(po);
+        String fileName = "PurchaseOrder_" + (po.getPoNumber() != null ? po.getPoNumber() : id) + ".pdf";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @PreAuthorize(SecurityConstants.PROCUREMENT_SECTION)

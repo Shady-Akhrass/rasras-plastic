@@ -60,6 +60,12 @@ export const purchaseOrderService = {
         const response = await apiClient.get<{ data: PurchaseOrderDto }>(`/procurement/po/${id}`);
         return response.data.data;
     },
+    downloadPOPdf: async (id: number) => {
+        const response = await apiClient.get<Blob>(`/procurement/po/${id}/pdf`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    },
     getWaitingForArrivalPOs: async () => {
         const response = await apiClient.get<{ data: PurchaseOrderDto[] }>('/procurement/po/waiting');
         return response.data.data;
