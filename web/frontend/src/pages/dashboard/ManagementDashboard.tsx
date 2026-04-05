@@ -202,7 +202,7 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
     const rawMax = data.length > 0 ? Math.max(...data.map(d => d.profit)) : 1000;
     const range = rawMax - rawMin || 1;
 
-    const bufferedMax = rawMax + (range * 0.2); 
+    const bufferedMax = rawMax + (range * 0.2);
     const bufferedMin = rawMin - (range * 0.2);
     const bufferedRange = bufferedMax - bufferedMin || 1;
 
@@ -222,7 +222,7 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
     const generateSmoothPath = (pts: { x: number, y: number }[]) => {
         if (pts.length < 2) return "";
         let path = `M ${pts[0].x} ${pts[0].y}`;
-        
+
         for (let i = 0; i < pts.length - 1; i++) {
             const p0 = pts[i];
             const p1 = pts[i + 1];
@@ -234,7 +234,7 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
     };
 
     const linePath = generateSmoothPath(points);
-    const areaPath = points.length > 0 
+    const areaPath = points.length > 0
         ? `${linePath} L ${getX(data.length - 1)} ${height - paddingY} L ${getX(0)} ${height - paddingY} Z`
         : "";
 
@@ -246,14 +246,14 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
 
     return (
         <div className="flex flex-col w-full h-full bg-slate-50/10 rounded-2xl p-2 select-none">
-            
+
             {/* Header with Summary Summary */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 px-2">
                 <div>
                     <h4 className="font-bold text-slate-800 text-xl font-arabic">تحليل الربح اليومي</h4>
                     <p className="text-sm text-slate-500 mt-1">مراقبة الأداء المالي للشهر الحالي (EGP)</p>
                 </div>
-                
+
                 <div className="flex gap-3">
                     <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 text-center shadow-sm">
                         <span className="block text-[10px] text-emerald-600 font-bold mb-0.5">أعلى ربح</span>
@@ -272,17 +272,17 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
 
             {/* CHART CONTAINER */}
             <div className="relative w-full h-[520px] pb-6">
-                
+
                 {/* SVG CHART */}
-                <svg 
-                    viewBox={`0 0 ${width} ${height}`} 
+                <svg
+                    viewBox={`0 0 ${width} ${height}`}
                     className="w-full h-full overflow-visible"
                     preserveAspectRatio="none"
                 >
                     <defs>
                         <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.3"/>
-                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.0"/>
+                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
                         </linearGradient>
                         <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                             <feGaussianBlur stdDeviation="3" result="coloredBlur" />
@@ -299,23 +299,23 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
                         const y = getY(val);
                         return (
                             <g key={i}>
-                                <line 
-                                    x1={paddingX} y1={y} 
-                                    x2={width - paddingX} y2={y} 
-                                    stroke="#e2e8f0" 
-                                    strokeWidth="0.5" 
-                                    strokeDasharray="4 4" 
+                                <line
+                                    x1={paddingX} y1={y}
+                                    x2={width - paddingX} y2={y}
+                                    stroke="#e2e8f0"
+                                    strokeWidth="0.5"
+                                    strokeDasharray="4 4"
                                     opacity="0.5"
                                 />
-                                <text 
-                                    x={paddingX - 10} y={y} 
-                                    textAnchor="end" 
-                                    alignmentBaseline="middle" 
-                                    fontSize="10" 
-                                    fill="#94a3b8" 
+                                <text
+                                    x={paddingX - 10} y={y}
+                                    textAnchor="end"
+                                    alignmentBaseline="middle"
+                                    fontSize="10"
+                                    fill="#94a3b8"
                                     className="font-mono"
                                 >
-                                    {val > 1000 || val < -1000 ? `${(val/1000).toFixed(1)}k` : Math.round(val)}
+                                    {val > 1000 || val < -1000 ? `${(val / 1000).toFixed(1)}k` : Math.round(val)}
                                 </text>
                             </g>
                         );
@@ -323,18 +323,18 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
 
                     {/* Zero Line */}
                     {rawMin < 0 && rawMax > 0 && (
-                        <line 
-                            x1={paddingX} y1={getY(0)} 
-                            x2={width - paddingX} y2={getY(0)} 
-                            stroke="#ef4444" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" 
+                        <line
+                            x1={paddingX} y1={getY(0)}
+                            x2={width - paddingX} y2={getY(0)}
+                            stroke="#ef4444" strokeWidth="1" strokeDasharray="4 4" opacity="0.4"
                         />
                     )}
 
                     {/* Average Line */}
-                    <line 
-                        x1={paddingX} y1={getY(avgProfit)} 
-                        x2={width - paddingX} y2={getY(avgProfit)} 
-                        stroke="#f59e0b" strokeWidth="1" strokeDasharray="6 4" opacity="0.4" 
+                    <line
+                        x1={paddingX} y1={getY(avgProfit)}
+                        x2={width - paddingX} y2={getY(avgProfit)}
+                        stroke="#f59e0b" strokeWidth="1" strokeDasharray="6 4" opacity="0.4"
                     />
 
                     {/* The Filled Area */}
@@ -369,7 +369,7 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
                         return (
                             <g key={i} className="group">
                                 <circle cx={cx} cy={cy} r="20" fill="transparent" className="cursor-pointer" />
-                                
+
                                 <motion.circle
                                     cx={cx}
                                     cy={cy}
@@ -384,23 +384,23 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
                                 />
 
                                 <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                                    <rect 
-                                        x={cx - 60} y={cy - 45} 
-                                        width="120" height="35" rx="8" 
-                                        fill="#1e293b" 
+                                    <rect
+                                        x={cx - 60} y={cy - 45}
+                                        width="120" height="35" rx="8"
+                                        fill="#1e293b"
                                         className="shadow-xl"
                                     />
-                                    <text 
-                                        x={cx} y={cy - 23} 
-                                        textAnchor="middle" 
-                                        fill="white" 
-                                        fontSize="12" 
+                                    <text
+                                        x={cx} y={cy - 23}
+                                        textAnchor="middle"
+                                        fill="white"
+                                        fontSize="12"
                                         fontWeight="bold"
                                         className="font-mono font-bold"
                                     >
                                         {formatNumber(d.profit)}
                                     </text>
-                                    <path d={`M${cx-5},${cy-10} L${cx+5},${cy-10} L${cx},${cy-5} Z`} fill="#1e293b" />
+                                    <path d={`M${cx - 5},${cy - 10} L${cx + 5},${cy - 10} L${cx},${cy - 5} Z`} fill="#1e293b" />
                                 </g>
                             </g>
                         );
@@ -410,9 +410,9 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
                 {/* X-AXIS LABELS */}
                 <div className="absolute bottom-0 left-0 w-full px-[40px] flex justify-between">
                     {data.map((d, i) => (
-                        (data.length < 15 || i % Math.ceil(data.length/10) === 0 || i === data.length-1) && (
-                            <span 
-                                key={i} 
+                        (data.length < 15 || i % Math.ceil(data.length / 10) === 0 || i === data.length - 1) && (
+                            <span
+                                key={i}
                                 className="text-[10px] text-slate-400 font-bold transform -translate-x-1/2 mt-2"
                                 style={{ position: 'absolute', left: `${(i / (data.length - 1 || 1)) * 100}%` }}
                             >
@@ -427,14 +427,14 @@ const MonthlyProfitChart = ({ data = [] }: { data: { date: string; profit: numbe
 };
 
 // Latest Activity Highlight Card
-const LatestActivityCard = ({ 
-    type, 
-    data, 
-    onClick 
-}: { 
-    type: 'SO' | 'PO'; 
-    data: any; 
-    onClick?: () => void 
+const LatestActivityCard = ({
+    type,
+    data,
+    onClick
+}: {
+    type: 'SO' | 'PO';
+    data: any;
+    onClick?: () => void
 }) => {
     if (!data) return null;
     return (
@@ -444,9 +444,8 @@ const LatestActivityCard = ({
             className="flex-1 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
         >
             <div className="flex items-center justify-between mb-3">
-                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
-                    type === 'SO' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'
-                }`}>
+                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${type === 'SO' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'
+                    }`}>
                     {type === 'SO' ? 'أخر أمر بيع' : 'أخر أمر شراء'}
                 </span>
                 <span className="text-[11px] text-slate-400">{new Date(data.soDate || data.poDate || 0).toLocaleDateString('ar-EG')}</span>
@@ -844,38 +843,38 @@ const ManagementDashboard: React.FC = () => {
                 else setIsRefreshing(true);
                 const todayCurrent = new Date().toISOString().split('T')[0];
 
-                const results: any[] = await Promise.all([
-                    stockBalanceService.getAllBalances(), // 0
-                    warehouseService.getActive(), // 1
-                    hrService.getAttendance(todayCurrent, todayCurrent), // 2
-                    customerService.getOutstandingSummary(), // 3
-                    supplierService.getOutstandingSummary(), // 4
-                    stockMovementService.getPaged({ page: 0, size: 10 }), // 5
-                    salesInvoiceService.getAll(), // 6
-                    supplierInvoiceService.getAllInvoices().then((res: any) => res?.data ?? []), // 7
-                    // Finance
-                    paymentVoucherService.getUnpaidInvoices().catch(() => []), // 8
-                    paymentVoucherService.getAllVouchers().catch(() => []), // 9
-                    // Procurement
-                    purchaseOrderService.getWaitingForArrivalPOs().catch(() => []), // 10
-                    purchaseService.getAllPRs().catch(() => []), // 11
-                    purchaseService.getAllSuppliers().catch(() => []), // 12
-                    // Sales
-                    customerRequestService.getAllRequests().then((r: any) => r.data || []).catch(() => []), // 13
-                    saleOrderService.getAll().catch(() => []), // 14
-                    purchaseOrderService.getAllPOs().catch(() => []), // 15
-                    // Warehouse
-                    grnService.getAllGRNs().catch(() => []), // 16
-                    transferNoteService.getAll().catch(() => []) // 17
-                ]);
+                // Batch 1: البيانات الأساسية
+                const [stockRes, warehouseRes, attendanceRes, customerRes, supplierRes, movementRes] =
+                    await Promise.all([
+                        stockBalanceService.getAllBalances(),
+                        warehouseService.getActive(),
+                        hrService.getAttendance(todayCurrent, todayCurrent),
+                        customerService.getOutstandingSummary(),
+                        supplierService.getOutstandingSummary(),
+                        stockMovementService.getPaged({ page: 0, size: 10 }),
+                    ]);
 
-                const [
-                    stockRes, warehouseRes, attendanceRes, customerRes, supplierRes,
-                    movementRes, salesRes, supplierInvsRes,
-                    unpaidInvsRes, vouchersRes, waitingPOsRes, prsRes, allSuppliersRes,
-                    salesRequestsRes, allSalesOrdersRes, allPurchaseOrdersRes, grnsRes, transfersRes
-                ] = results;
+                // Batch 2: المبيعات والمالية
+                const [salesRes, supplierInvsRes, unpaidInvsRes, vouchersRes] =
+                    await Promise.all([
+                        salesInvoiceService.getAll(),
+                        supplierInvoiceService.getAllInvoices().then((res: any) => res?.data ?? []),
+                        paymentVoucherService.getUnpaidInvoices().catch(() => []),
+                        paymentVoucherService.getAllVouchers().catch(() => []),
+                    ]);
 
+                // Batch 3: المشتريات والمخازن
+                const [waitingPOsRes, prsRes, allSuppliersRes, salesRequestsRes, allSalesOrdersRes, allPurchaseOrdersRes, grnsRes, transfersRes] =
+                    await Promise.all([
+                        purchaseOrderService.getWaitingForArrivalPOs().catch(() => []),
+                        purchaseService.getAllPRs().catch(() => []),
+                        purchaseService.getAllSuppliers().catch(() => []),
+                        customerRequestService.getAllRequests().then((r: any) => r.data || []).catch(() => []),
+                        saleOrderService.getAll().catch(() => []),
+                        purchaseOrderService.getAllPOs().catch(() => []),
+                        grnService.getAllGRNs().catch(() => []),
+                        transferNoteService.getAll().catch(() => []),
+                    ]);
                 // 1. Process Stock Data
                 const stocks = stockRes.data || [];
                 const totalValue = stocks.reduce((acc: any, s: any) => acc + ((s.quantityOnHand || 0) * (s.averageCost || 0)), 0);
@@ -963,11 +962,11 @@ const ManagementDashboard: React.FC = () => {
                         label, value, color: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'][i % 7]
                     })));
 
-                const sortedSOs = [...salesOrdersArr].sort((a,b) => new Date(b.soDate || 0).getTime() - new Date(a.soDate || 0).getTime());
+                const sortedSOs = [...salesOrdersArr].sort((a, b) => new Date(b.soDate || 0).getTime() - new Date(a.soDate || 0).getTime());
                 setLatestSaleOrders(sortedSOs.slice(0, 5));
 
                 const sortedPOs = [...(Array.isArray(allPurchaseOrdersRes) ? allPurchaseOrdersRes : [])]
-                    .sort((a,b) => new Date(b.poDate || 0).getTime() - new Date(a.poDate || 0).getTime());
+                    .sort((a, b) => new Date(b.poDate || 0).getTime() - new Date(a.poDate || 0).getTime());
                 setLatestPurchaseOrders(sortedPOs.slice(0, 5));
 
                 // --- Monthly Profit Analysis ---
@@ -997,8 +996,8 @@ const ManagementDashboard: React.FC = () => {
                 for (let i = 5; i >= 0; i--) {
                     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
                     const mStr = d.toISOString().substring(0, 7);
-                    const mSales = salesInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(mStr)).reduce((s,v) => s + (v.totalAmount || 0), 0);
-                    const mExp = supplierInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(mStr)).reduce((s,v) => s + (v.totalAmount || 0), 0);
+                    const mSales = salesInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(mStr)).reduce((s, v) => s + (v.totalAmount || 0), 0);
+                    const mExp = supplierInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(mStr)).reduce((s, v) => s + (v.totalAmount || 0), 0);
                     monthly.push({ label: d.toLocaleDateString('ar-EG', { month: 'short' }), sales: mSales, expenses: mExp, profit: mSales - mExp });
                 }
 
@@ -1006,8 +1005,8 @@ const ManagementDashboard: React.FC = () => {
                 for (let i = 6; i >= 0; i--) {
                     const d = new Date(now); d.setDate(d.getDate() - i);
                     const dStr = d.toISOString().split('T')[0];
-                    const dSales = salesInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(dStr)).reduce((s,v) => s + (v.totalAmount || 0), 0);
-                    const dExp = supplierInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(dStr)).reduce((s,v) => s + (v.totalAmount || 0), 0);
+                    const dSales = salesInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(dStr)).reduce((s, v) => s + (v.totalAmount || 0), 0);
+                    const dExp = supplierInvoicesArr.filter(v => parseBackendDateStr(v.invoiceDate).startsWith(dStr)).reduce((s, v) => s + (v.totalAmount || 0), 0);
                     daily.push({ label: d.toLocaleDateString('ar-EG', { weekday: 'short' }), sales: dSales, expenses: dExp, profit: dSales - dExp });
                 }
 
@@ -1018,11 +1017,11 @@ const ManagementDashboard: React.FC = () => {
                     const wSales = salesInvoicesArr.filter(inv => {
                         const ide = parseBackendDateStr(inv.invoiceDate);
                         return ide && new Date(ide) >= dStart && new Date(ide) <= dEnd;
-                    }).reduce((s,v) => s + (v.totalAmount || 0), 0);
+                    }).reduce((s, v) => s + (v.totalAmount || 0), 0);
                     const wExp = supplierInvoicesArr.filter(inv => {
                         const ide = parseBackendDateStr(inv.invoiceDate);
                         return ide && new Date(ide) >= dStart && new Date(ide) <= dEnd;
-                    }).reduce((s,v) => s + (v.totalAmount || 0), 0);
+                    }).reduce((s, v) => s + (v.totalAmount || 0), 0);
                     weekly.push({ label: `الأسبوع ${4 - i}`, sales: wSales, expenses: wExp, profit: wSales - wExp });
                 }
 
@@ -1125,7 +1124,7 @@ const ManagementDashboard: React.FC = () => {
                         <div className="flex items-center gap-4 relative z-10">
                             <p className="text-white/70 text-lg">إليك ملخص ما يحدث في نظامك اليوم</p>
                             <div className="flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10 backdrop-blur-sm">
-                                <motion.div 
+                                <motion.div
                                     animate={{ opacity: [0.4, 1, 0.4] }}
                                     transition={{ duration: 2, repeat: Infinity }}
                                     className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"
@@ -1193,7 +1192,7 @@ const ManagementDashboard: React.FC = () => {
                     ))}
                 </div>
             ) : (
-                <motion.div 
+                <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
@@ -1222,7 +1221,7 @@ const ManagementDashboard: React.FC = () => {
                                 <span className="text-slate-500">إجمالي أوامر البيع</span>
                                 <span className="font-bold text-slate-900"><AnimatedNumber value={salesStats.totalOrders} /></span>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => navigate('/dashboard/customer-request')}
                                 className="w-full py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
@@ -1254,7 +1253,7 @@ const ManagementDashboard: React.FC = () => {
                                 <span className="text-slate-500">إجمالي الموردين</span>
                                 <span className="font-bold text-slate-900"><AnimatedNumber value={procurementStats.suppliersCount} /></span>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => navigate('/dashboard/procurement')}
                                 className="w-full py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
@@ -1286,7 +1285,7 @@ const ManagementDashboard: React.FC = () => {
                                 <span className="text-slate-500">عدد المستودعات</span>
                                 <span className="font-bold text-slate-900"><AnimatedNumber value={warehouseStats.warehousesCount} /></span>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => navigate('/dashboard/inventory')}
                                 className="w-full py-2 text-xs font-semibold text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
@@ -1318,7 +1317,7 @@ const ManagementDashboard: React.FC = () => {
                                 <span className="text-slate-500">إجمالي السندات</span>
                                 <span className="font-bold text-slate-900"><AnimatedNumber value={financeStats.vouchersCount} /></span>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => navigate('/dashboard/finance')}
                                 className="w-full py-2 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
@@ -1446,7 +1445,7 @@ const ManagementDashboard: React.FC = () => {
                                     سجل الحركة التفصيلي <ChevronLeft className="w-3 h-3" />
                                 </button>
                             </div>
-                            
+
                             <div className="overflow-x-auto">
                                 <table className="w-full text-right">
                                     <thead>
@@ -1466,7 +1465,7 @@ const ManagementDashboard: React.FC = () => {
                                             </tr>
                                         ) : (
                                             recentMovements.map((m, i) => (
-                                                <motion.tr 
+                                                <motion.tr
                                                     key={i}
                                                     initial={{ opacity: 0, y: 10 }}
                                                     animate={{ opacity: 1, y: 0 }}
@@ -1484,7 +1483,7 @@ const ManagementDashboard: React.FC = () => {
                                                     </td>
                                                     <td className="py-4">
                                                         <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-block
-                                                            ${m.type === 'ISSUE' || m.type === 'TRANSFER_OUT' || m.type === 'RETURN' 
+                                                            ${m.type === 'ISSUE' || m.type === 'TRANSFER_OUT' || m.type === 'RETURN'
                                                                 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                                             {getMovementTypeLabel(m.type)}
                                                         </span>
@@ -1520,17 +1519,17 @@ const ManagementDashboard: React.FC = () => {
                     className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
                 >
                     <div className="md:col-span-1 lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[280px]">
-                        <AnalyticalDonut 
-                            data={topCustomers} 
-                            title="أهم العملاء" 
-                            subtitle="توزيع الإيرادات حسب كبار العملاء" 
+                        <AnalyticalDonut
+                            data={topCustomers}
+                            title="أهم العملاء"
+                            subtitle="توزيع الإيرادات حسب كبار العملاء"
                         />
                     </div>
                     <div className="md:col-span-1 lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[280px]">
-                        <AnalyticalDonut 
-                            data={warehouseValueDist} 
-                            title="توزيع المخزون" 
-                            subtitle="قيمة البضاعة حسب المستودعات" 
+                        <AnalyticalDonut
+                            data={warehouseValueDist}
+                            title="توزيع المخزون"
+                            subtitle="قيمة البضاعة حسب المستودعات"
                         />
                     </div>
                     <StatCard
@@ -1554,7 +1553,7 @@ const ManagementDashboard: React.FC = () => {
             )}
 
             {/* Main Content Grid */}
-            <motion.div 
+            <motion.div
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -1671,12 +1670,12 @@ const ManagementDashboard: React.FC = () => {
                     variants={itemVariants}
                     className="lg:col-span-1 space-y-6 flex flex-col"
                 >
-                    <LatestActivityCard 
+                    <LatestActivityCard
                         type="SO"
                         data={latestSaleOrders[0]}
                         onClick={() => navigate('/dashboard/sales/orders')}
                     />
-                    <LatestActivityCard 
+                    <LatestActivityCard
                         type="PO"
                         data={latestPurchaseOrders[0]}
                         onClick={() => navigate('/dashboard/procurement/po')}
@@ -1687,7 +1686,7 @@ const ManagementDashboard: React.FC = () => {
 
 
             {/* Bottom Section */}
-            <motion.div 
+            <motion.div
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
