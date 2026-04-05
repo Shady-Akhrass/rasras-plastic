@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, type Variants } from 'framer-motion';
 import {
@@ -805,6 +805,8 @@ const ManagementDashboard: React.FC = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [currentTime, setCurrentTime] = useState(new Date());
+    const isFetchingRef = useRef(false);
+    const lastFetchTimeRef = useRef(0);
 
     // Analytical States
     const [topCustomers, setTopCustomers] = useState<{ label: string; value: number; color: string }[]>([]);
@@ -839,6 +841,13 @@ const ManagementDashboard: React.FC = () => {
     useEffect(() => {
         const fetchAllData = async (silent = false) => {
             try {
+                if (isFetchingRef.current) return;
+                
+                const currentTimeMs = Date.now();
+                // Throttle: Don't refetch analytical data more than once every 30s
+                if (silent && currentTimeMs - lastFetchTimeRef.current < 30000) return;
+
+                isFetchingRef.current = true;
                 if (!silent) setIsLoading(true);
                 else setIsRefreshing(true);
                 const todayCurrent = new Date().toISOString().split('T')[0];
@@ -1034,13 +1043,15 @@ const ManagementDashboard: React.FC = () => {
             } finally {
                 setIsLoading(false);
                 setIsRefreshing(false);
+                isFetchingRef.current = false;
+                lastFetchTimeRef.current = Date.now();
             }
         };
 
         fetchAllData();
         const handleRefresh = () => fetchAllData(true);
         window.addEventListener('refresh-dashboard', handleRefresh);
-        const refreshInterval = setInterval(() => fetchAllData(true), 60000);
+        const refreshInterval = setInterval(() => fetchAllData(true), 180000); // 3 minutes
         return () => {
             clearInterval(refreshInterval);
             window.removeEventListener('refresh-dashboard', handleRefresh);

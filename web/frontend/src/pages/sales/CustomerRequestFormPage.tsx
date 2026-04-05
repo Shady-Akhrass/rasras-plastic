@@ -14,18 +14,12 @@ import {
 } from 'lucide-react';
 import { customerRequestService } from '../../services/customerRequestService';
 import customerService, { type Customer } from '../../services/customerService';
-import { itemService, type ItemDto } from '../../services/itemService';
-import { unitService } from '../../services/unitService';
 import { priceListService, type PriceListItemDto } from '../../services/priceListService';
 import type { CustomerRequest, CustomerRequestItem } from '../../types/sales';
 import toast from 'react-hot-toast';
 import { formatNumber } from '../../utils/format';
 import { TRIGGER_POLL_EVENT } from '../../hooks/useNotificationPolling';
 
-interface Unit {
-    id: number;
-    unitNameAr: string;
-}
 
 interface MergedLine {
     productId: number;
@@ -47,8 +41,6 @@ const CustomerRequestFormPage = () => {
     const [loading, setLoading] = useState(false);
 
     const [customers, setCustomers] = useState<Customer[]>([]);
-    const [items, setItems] = useState<ItemDto[]>([]);
-    const [units, setUnits] = useState<Unit[]>([]);
     const [sellablePrices, setSellablePrices] = useState<PriceListItemDto[]>([]);
 
     const [lines, setLines] = useState<MergedLine[]>([]);
@@ -119,17 +111,17 @@ const CustomerRequestFormPage = () => {
             const line = { ...updated[index], [field]: value };
 
             if (field === 'productId') {
-                const selectedItem = items.find(i => i.id === value);
-                if (selectedItem) {
-                    line.productName = selectedItem.itemNameAr;
-                    line.unitId = selectedItem.unitId;
-                }
-
                 const pli = sellablePrices.find(p => p.itemId === value);
                 if (pli) {
-                    line.unitPrice = priceListService.getPriceForItem(value as number, [pli]);
-                    setFormData(f => ({ ...f, priceListId: pli.priceListId }));
+                    line.productName = pli.itemNameAr || '';
+                    line.unitId = pli.unitId;
+                    line.unitPrice = pli.unitPrice || 0;
+                    if (!formData.priceListId) {
+                        setFormData(f => ({ ...f, priceListId: pli.priceListId }));
+                    }
                 } else {
+                    line.productName = '';
+                    line.unitId = undefined;
                     line.unitPrice = 0;
                 }
             }
@@ -159,23 +151,16 @@ const CustomerRequestFormPage = () => {
 
     const loadMasterData = async () => {
         try {
-            const [customersData, itemsRes, unitsRes, priceListsRes] = await Promise.all([
+            const [customersData, priceListsRes] = await Promise.all([
                 customerService.getAllCustomers(),
-                itemService.getAllItems(),
-                unitService.getAllUnits(),
                 priceListService.getAllPriceLists(),
             ]);
 
             setCustomers(Array.isArray(customersData) ? customersData : []);
 
-            const itemsData = 'data' in itemsRes ? (itemsRes as any).data : itemsRes;
-            setItems(Array.isArray(itemsData) ? itemsData : []);
-
-            const unitsData = 'data' in unitsRes ? (unitsRes as any).data : unitsRes;
-            setUnits(Array.isArray(unitsData) ? unitsData : []);
-
             const plData = 'data' in priceListsRes ? (priceListsRes as any).data : priceListsRes;
-            const sellingLists = Array.isArray(plData) ? plData.filter((pl: any) => pl.listType === 'SELLING') : [];
+            const sellingLists = Array.isArray(plData) ? plData.filter((pl: any) => pl.listType === 'SELLING' && pl.isActive) : [];
+
             const allSellablePrices: PriceListItemDto[] = [];
             sellingLists.forEach((list: any) => {
                 if (list.items) {
@@ -196,24 +181,16 @@ const CustomerRequestFormPage = () => {
     const loadMasterDataThenRequest = async (reqId: number) => {
         try {
             setLoading(true);
-            const [customersData, itemsRes, unitsRes, priceListsRes] = await Promise.all([
+            const [customersData, priceListsRes] = await Promise.all([
                 customerService.getAllCustomers(),
-                itemService.getAllItems(),
-                unitService.getAllUnits(),
                 priceListService.getAllPriceLists(),
             ]);
 
             setCustomers(Array.isArray(customersData) ? customersData : []);
 
-            const itemsData = 'data' in itemsRes ? (itemsRes as any).data : itemsRes;
-            const resolvedItems: ItemDto[] = Array.isArray(itemsData) ? itemsData : [];
-            setItems(resolvedItems);
-
-            const unitsData = 'data' in unitsRes ? (unitsRes as any).data : unitsRes;
-            setUnits(Array.isArray(unitsData) ? unitsData : []);
-
             const plData = 'data' in priceListsRes ? (priceListsRes as any).data : priceListsRes;
-            const sellingLists = Array.isArray(plData) ? plData.filter((pl: any) => pl.listType === 'SELLING') : [];
+            const sellingLists = Array.isArray(plData) ? plData.filter((pl: any) => pl.listType === 'SELLING' && pl.isActive) : [];
+
             const allSellablePrices: PriceListItemDto[] = [];
             sellingLists.forEach((list: any) => {
                 if (list.items) allSellablePrices.push(...list.items);
@@ -221,7 +198,7 @@ const CustomerRequestFormPage = () => {
             setSellablePrices(allSellablePrices);
 
             // Now load the request — master data is ready
-            await loadRequest(reqId, resolvedItems, allSellablePrices);
+            await loadRequest(reqId, allSellablePrices);
         } catch (error) {
             console.error('Failed to load master data', error);
             toast.error('فشل تحميل البيانات الأساسية');
@@ -229,7 +206,7 @@ const CustomerRequestFormPage = () => {
         }
     };
 
-    const loadRequest = async (reqId: number, masterItems?: ItemDto[], masterPrices?: PriceListItemDto[]) => {
+    const loadRequest = async (reqId: number, masterPrices?: PriceListItemDto[]) => {
         try {
             setLoading(true);
             const response = await customerRequestService.getRequestById(reqId);
@@ -246,19 +223,19 @@ const CustomerRequestFormPage = () => {
 
                 // Use provided master data when available (edit/view mode),
                 // fall back to component state (should already be loaded).
-                const resolvedItems = masterItems ?? items;
                 const resolvedPrices = masterPrices ?? sellablePrices;
 
-                const lookupUnitId = (productId: number): number | undefined =>
-                    resolvedItems.find(i => i.id === productId)?.unitId;
+                const lookupPriceListItem = (productId: number): PriceListItemDto | undefined =>
+                    resolvedPrices.find(p => p.itemId === productId);
 
-                const lookupUnitPrice = (productId: number): number => {
-                    const pli = resolvedPrices.find(p => p.itemId === productId);
-                    return pli ? priceListService.getPriceForItem(productId, [pli]) : 0;
-                };
+                const lookupUnitId = (productId: number): number | undefined =>
+                    lookupPriceListItem(productId)?.unitId;
+
+                const lookupUnitPrice = (productId: number): number =>
+                    lookupPriceListItem(productId)?.unitPrice || 0;
 
                 const lookupProductName = (productId: number, fallback: string): string =>
-                    resolvedItems.find(i => i.id === productId)?.itemNameAr || fallback || '';
+                    lookupPriceListItem(productId)?.itemNameAr || fallback || '';
 
                 if (data.schedules && data.schedules.length > 0) {
                     const reconstructed: MergedLine[] = data.schedules.map((s: any) => {
@@ -514,6 +491,7 @@ const CustomerRequestFormPage = () => {
                                     ))}
                                 </select>
                             </div>
+
                         </div>
                     </div>
 
@@ -577,10 +555,8 @@ const CustomerRequestFormPage = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {lines.map((line, index) => {
-                                        const unitName =
-                                            units.find(u => u.id === line.unitId)?.unitNameAr ||
-                                            items.find(i => i.id === line.productId)?.unitName ||
-                                            '-';
+                                        const pli = sellablePrices.find(p => p.itemId === line.productId);
+                                        const unitName = pli?.unitName || '-';
 
                                         return (
                                             <tr key={index} className="group hover:bg-slate-50/50 transition-colors">
@@ -600,11 +576,10 @@ const CustomerRequestFormPage = () => {
                                                             ${isViewMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                     >
                                                         <option value={0}>اختر الصنف...</option>
-                                                        {items
-                                                            .filter(i => i.isSellable)
-                                                            .map(i => (
-                                                                <option key={i.id} value={i.id}>
-                                                                    {i.itemNameAr} ({i.grade || i.itemCode})
+                                                        {sellablePrices
+                                                            .map(p => (
+                                                                <option key={`${p.priceListId}-${p.itemId}`} value={p.itemId}>
+                                                                    {p.itemNameAr} ({p.grade || p.itemCode}) - {formatNumber(p.unitPrice)}
                                                                 </option>
                                                             ))}
                                                     </select>
