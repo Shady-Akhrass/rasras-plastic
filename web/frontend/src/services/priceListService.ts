@@ -8,6 +8,9 @@ export interface PriceListItemDto {
     itemId: number;
     itemNameAr?: string;
     itemCode?: string;
+    grade?: string;
+    unitId?: number;
+    unitName?: string;
     unitPrice: number;
     minQty?: number;
     maxQty?: number;

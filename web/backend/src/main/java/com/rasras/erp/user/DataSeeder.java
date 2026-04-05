@@ -808,26 +808,47 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         // 8. Delivery Order Approval Workflow
-        if (!workflowRepo.findByWorkflowCode("DELIVERY_APPROVAL").isPresent()) {
-            com.rasras.erp.approval.ApprovalWorkflow doWorkflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
-                    .workflowCode("DELIVERY_APPROVAL")
-                    .workflowName("Delivery Order Approval")
-                    .documentType("DeliveryOrder")
-                    .isActive(true)
-                    .build();
-            workflowRepo.save(doWorkflow);
+        com.rasras.erp.approval.ApprovalWorkflow doWorkflow = workflowRepo.findByWorkflowCode("DELIVERY_APPROVAL")
+                .orElseGet(() -> {
+                    com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                            .workflowCode("DELIVERY_APPROVAL")
+                            .workflowName("Delivery Order Approval")
+                            .documentType("DeliveryOrder")
+                            .isActive(true)
+                            .build();
+                    return workflowRepo.save(workflow);
+                });
 
-            Role gmRole = roleRepository.findByRoleCode("GM").orElse(null);
-            if (gmRole != null) {
-                com.rasras.erp.approval.ApprovalWorkflowStep step1 = com.rasras.erp.approval.ApprovalWorkflowStep
-                        .builder()
-                        .workflow(doWorkflow)
-                        .stepNumber(1)
-                        .stepName("General Manager Approval")
-                        .approverType("ROLE")
-                        .approverRole(gmRole)
-                        .build();
+        Role smRoleForDo = roleRepository.findByRoleCode("SM").orElse(null);
+        Role whmRoleForDo = roleRepository.findByRoleCode("WHM").orElse(null);
+
+        if (smRoleForDo != null && whmRoleForDo != null) {
+            List<com.rasras.erp.approval.ApprovalWorkflowStep> steps = stepRepo.findByWorkflowWorkflowIdOrderByStepNumberAsc(doWorkflow.getWorkflowId());
+            
+            // Step 1: Sales Manager Approval
+            com.rasras.erp.approval.ApprovalWorkflowStep step1 = steps.stream().filter(s -> s.getStepNumber() == 1).findFirst().orElse(null);
+            if (step1 == null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(doWorkflow).stepNumber(1).stepName("Sales Manager Approval")
+                        .approverType("ROLE").approverRole(smRoleForDo).isActive(true).build());
+            } else if (step1.getApproverRole() == null || !step1.getApproverRole().getRoleCode().equals("SM")) {
+                step1.setApproverRole(smRoleForDo);
+                step1.setStepName("Sales Manager Approval");
                 stepRepo.save(step1);
+                log.info("Corrected Step 1 of Delivery Order Approval to SM role");
+            }
+
+            // Step 2: Warehouse Manager Approval
+            com.rasras.erp.approval.ApprovalWorkflowStep step2 = steps.stream().filter(s -> s.getStepNumber() == 2).findFirst().orElse(null);
+            if (step2 == null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(doWorkflow).stepNumber(2).stepName("Warehouse Manager Approval")
+                        .approverType("ROLE").approverRole(whmRoleForDo).isActive(true).build());
+            } else if (step2.getApproverRole() == null || !step2.getApproverRole().getRoleCode().equals("WHM")) {
+                step2.setApproverRole(whmRoleForDo);
+                step2.setStepName("Warehouse Manager Approval");
+                stepRepo.save(step2);
+                log.info("Corrected Step 2 of Delivery Order Approval to WHM role");
             }
         }
 
@@ -868,20 +889,47 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         // 11. Stock Issue Note Approval
-        if (!workflowRepo.findByWorkflowCode("ISSUE_NOTE_APPROVAL").isPresent()) {
-            com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
-                    .workflowCode("ISSUE_NOTE_APPROVAL")
-                    .workflowName("Stock Issue Note Approval")
-                    .documentType("StockIssueNote")
-                    .isActive(true)
-                    .build();
-            workflowRepo.save(workflow);
+        com.rasras.erp.approval.ApprovalWorkflow issueNoteWorkflow = workflowRepo.findByWorkflowCode("ISSUE_NOTE_APPROVAL")
+                .orElseGet(() -> {
+                    com.rasras.erp.approval.ApprovalWorkflow workflow = com.rasras.erp.approval.ApprovalWorkflow.builder()
+                            .workflowCode("ISSUE_NOTE_APPROVAL")
+                            .workflowName("Stock Issue Note Approval")
+                            .documentType("StockIssueNote")
+                            .isActive(true)
+                            .build();
+                    return workflowRepo.save(workflow);
+                });
 
-            Role whmRole = roleRepository.findByRoleCode("WHM").orElse(null);
-            if (whmRole != null) {
+        Role smRoleForIssue = roleRepository.findByRoleCode("SM").orElse(null);
+        Role whmRoleForIssue = roleRepository.findByRoleCode("WHM").orElse(null);
+
+        if (smRoleForIssue != null && whmRoleForIssue != null) {
+            List<com.rasras.erp.approval.ApprovalWorkflowStep> steps = stepRepo.findByWorkflowWorkflowIdOrderByStepNumberAsc(issueNoteWorkflow.getWorkflowId());
+            
+            // Step 1: Sales Manager Approval
+            com.rasras.erp.approval.ApprovalWorkflowStep step1 = steps.stream().filter(s -> s.getStepNumber() == 1).findFirst().orElse(null);
+            if (step1 == null) {
                 stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
-                        .workflow(workflow).stepNumber(1).stepName("Warehouse Manager Approval")
-                        .approverType("ROLE").approverRole(whmRole).build());
+                        .workflow(issueNoteWorkflow).stepNumber(1).stepName("Sales Manager Approval")
+                        .approverType("ROLE").approverRole(smRoleForIssue).isActive(true).build());
+            } else if (step1.getApproverRole() == null || !step1.getApproverRole().getRoleCode().equals("SM")) {
+                step1.setApproverRole(smRoleForIssue);
+                step1.setStepName("Sales Manager Approval");
+                stepRepo.save(step1);
+                log.info("Corrected Step 1 of Stock Issue Note Approval to SM role");
+            }
+
+            // Step 2: Warehouse Manager Approval
+            com.rasras.erp.approval.ApprovalWorkflowStep step2 = steps.stream().filter(s -> s.getStepNumber() == 2).findFirst().orElse(null);
+            if (step2 == null) {
+                stepRepo.save(com.rasras.erp.approval.ApprovalWorkflowStep.builder()
+                        .workflow(issueNoteWorkflow).stepNumber(2).stepName("Warehouse Manager Approval")
+                        .approverType("ROLE").approverRole(whmRoleForIssue).isActive(true).build());
+            } else if (step2.getApproverRole() == null || !step2.getApproverRole().getRoleCode().equals("WHM")) {
+                step2.setApproverRole(whmRoleForIssue);
+                step2.setStepName("Warehouse Manager Approval");
+                stepRepo.save(step2);
+                log.info("Corrected Step 2 of Stock Issue Note Approval to WHM role");
             }
         }
 

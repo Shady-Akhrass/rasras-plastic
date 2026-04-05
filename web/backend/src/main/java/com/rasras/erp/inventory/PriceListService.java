@@ -13,6 +13,7 @@ public class PriceListService {
     private final PriceListRepository repository;
     private final PriceListItemRepository itemRepository;
     private final ItemRepository inventoryItemRepository;
+    private final UnitRepository unitRepository;
 
     @Transactional(readOnly = true)
     public List<PriceListDto> getAll() {
@@ -114,12 +115,22 @@ public class PriceListService {
 
     private PriceListItemDto mapToItemDto(PriceListItem entity) {
         Item inventoryItem = inventoryItemRepository.findById(entity.getItemId()).orElse(null);
+        String unitName = null;
+        if (inventoryItem != null && inventoryItem.getUnitId() != null) {
+            unitName = unitRepository.findById(inventoryItem.getUnitId())
+                    .map(UnitOfMeasure::getUnitNameAr)
+                    .orElse(null);
+        }
+
         return PriceListItemDto.builder()
                 .id(entity.getId())
                 .priceListId(entity.getPriceListId())
                 .itemId(entity.getItemId())
                 .itemNameAr(inventoryItem != null ? inventoryItem.getItemNameAr() : null)
                 .itemCode(inventoryItem != null ? inventoryItem.getItemCode() : null)
+                .grade(inventoryItem != null ? inventoryItem.getGrade() : null)
+                .unitId(inventoryItem != null ? inventoryItem.getUnitId() : null)
+                .unitName(unitName)
                 .unitPrice(entity.getUnitPrice())
                 .minQty(entity.getMinQty())
                 .maxQty(entity.getMaxQty())

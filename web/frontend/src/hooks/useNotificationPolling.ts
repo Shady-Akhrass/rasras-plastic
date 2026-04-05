@@ -58,11 +58,11 @@ export const TRIGGER_POLL_EVENT = 'app:trigger_notification_poll';
 // ─── Interval Config ───
 const INTERVALS = {
     /** When user is on a relevant page (approvals, inspections, etc.) */
-    ACTIVE_PAGE: 8_000,       // 8 seconds for "sudden" feel
+    ACTIVE_PAGE: 30_000,       // Increased from 8s to 30s
     /** Normal background polling */
-    BACKGROUND: 60_000,      // 1 minute
+    BACKGROUND: 120_000,      // Increased from 1min to 2min
     /** When tab is hidden — very infrequent */
-    HIDDEN_TAB: 300_000,      // 5 minutes
+    HIDDEN_TAB: 600_000,      // Increased from 5min to 10min
 } as const;
 
 // Which paths count as "active" for faster polling
@@ -114,6 +114,8 @@ export function useNotificationPolling(pathname: string) {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isTabVisible = useRef(true);
     const pathnameRef = useRef(pathname);
+    const lastFetchTime = useRef(0);
+    const isFetching = useRef(false);
 
     // Keep pathname in sync without causing effect re-runs
     useEffect(() => {
@@ -139,6 +141,15 @@ export function useNotificationPolling(pathname: string) {
         const userString = localStorage.getItem('user');
         const user = userString ? JSON.parse(userString) : null;
         if (!user?.userId) return;
+
+        // Throttling: Don't fetch more than once every 10 seconds unless it's initial load
+        const now = Date.now();
+        if (isFetching.current || (now - lastFetchTime.current < 10000 && !isInitialLoad.current)) {
+            return;
+        }
+
+        isFetching.current = true;
+        lastFetchTime.current = now;
 
         const permissions: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
         const has = (p: string) => permissions.includes(p);
@@ -536,6 +547,7 @@ export function useNotificationPolling(pathname: string) {
         });
 
         isInitialLoad.current = false;
+        isFetching.current = false;
     }, [pathnameRef]);
 
     // ─── Adaptive scheduling loop ───
